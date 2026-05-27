@@ -1,0 +1,2 @@
+- [Grova app architecture](grova-arch.md) — 2-person private couples app; auth via backend couple-code; all data in API in-memory store; frontend polls every 3s.
+- [Framer-motion safe patterns](framer-safe.md) — avoid AnimatePresence; use motion.div with conditional rendering to prevent useContext crashes.
