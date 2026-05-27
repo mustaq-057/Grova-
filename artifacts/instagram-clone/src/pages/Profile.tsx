@@ -1,39 +1,102 @@
 import { useState } from "react";
-import { Grid3x3, Film, Tag, Settings } from "lucide-react";
+import { Grid3x3, Bookmark, Settings, Edit3, Check, X } from "lucide-react";
+import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
-import { MOCK_USERS, MOCK_PROFILE_POSTS } from "@/lib/mock-data";
+import { ME, WIFE, MY_PROFILE_POSTS, WIFE_PROFILE_POSTS, SAVED_POSTS } from "@/lib/mock-data";
 
-const ME = MOCK_USERS[0];
-
-type Tab = "posts" | "reels" | "tagged";
+type Tab = "posts" | "saved";
 
 export default function Profile() {
-  const [activeTab, setActiveTab] = useState<Tab>("posts");
-  const [following, setFollowing] = useState(false);
+  const [location] = useLocation();
+  const isWife = location === "/profile/wife";
+  const user = isWife ? WIFE : ME;
+  const posts = isWife ? WIFE_PROFILE_POSTS : MY_PROFILE_POSTS;
 
-  const tabs: { id: Tab; icon: typeof Grid3x3; label: string }[] = [
-    { id: "posts", icon: Grid3x3, label: "Posts" },
-    { id: "reels", icon: Film, label: "Reels" },
-    { id: "tagged", icon: Tag, label: "Tagged" },
+  const [activeTab, setActiveTab] = useState<Tab>("posts");
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(user.name);
+  const [bio, setBio] = useState(user.bio);
+  const [pendingName, setPendingName] = useState(user.name);
+  const [pendingBio, setPendingBio] = useState(user.bio);
+
+  const startEdit = () => {
+    setPendingName(name);
+    setPendingBio(bio);
+    setEditing(true);
+  };
+
+  const saveEdit = () => {
+    setName(pendingName);
+    setBio(pendingBio);
+    setEditing(false);
+  };
+
+  const cancelEdit = () => {
+    setEditing(false);
+  };
+
+  const displayedPosts = activeTab === "saved" ? SAVED_POSTS : posts;
+
+  const tabs = [
+    { id: "posts" as Tab, icon: Grid3x3, label: "Posts" },
+    { id: "saved" as Tab, icon: Bookmark, label: "Saved" },
   ];
 
-  const displayedPosts = activeTab === "tagged"
-    ? MOCK_PROFILE_POSTS.slice(0, 9)
-    : MOCK_PROFILE_POSTS;
-
   return (
-    <div className="pb-16 md:pb-4 max-w-[935px] mx-auto">
+    <div className="max-w-[600px] mx-auto pb-20 md:pb-6">
+      {/* Header bar */}
+      <div className="flex items-center justify-between px-4 py-4 border-b border-border">
+        <div className="flex gap-3">
+          <Link href="/profile">
+            <button
+              className={`text-sm font-medium px-3 py-1.5 rounded-lg transition-colors ${
+                !isWife ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground"
+              }`}
+              data-testid="button-my-profile"
+            >
+              My Profile
+            </button>
+          </Link>
+          <Link href="/profile/wife">
+            <button
+              className={`text-sm font-medium px-3 py-1.5 rounded-lg transition-colors ${
+                isWife ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground"
+              }`}
+              data-testid="button-wife-profile"
+            >
+              Luna's Profile
+            </button>
+          </Link>
+        </div>
+        <div className="flex items-center gap-2">
+          {!isWife && !editing && (
+            <button
+              onClick={startEdit}
+              className="text-muted-foreground hover:text-foreground transition-colors p-2"
+              data-testid="button-edit"
+            >
+              <Edit3 className="w-4.5 h-4.5" />
+            </button>
+          )}
+          <Link href="/settings">
+            <button className="text-muted-foreground hover:text-foreground transition-colors p-2" data-testid="button-settings">
+              <Settings className="w-5 h-5" strokeWidth={1.5} />
+            </button>
+          </Link>
+        </div>
+      </div>
+
       {/* Profile header */}
       <div className="px-4 pt-6 pb-4">
-        <div className="flex items-start gap-6 md:gap-16">
+        <div className="flex items-start gap-6 md:gap-10">
           {/* Avatar */}
           <div className="shrink-0">
-            <div className="story-ring">
+            <div className="story-ring hover:scale-105 transition-transform cursor-pointer">
               <div className="bg-background rounded-full p-[3px]">
                 <img
-                  src={ME.avatar}
-                  alt={ME.username}
-                  className="w-20 h-20 md:w-36 md:h-36 rounded-full object-cover"
+                  src={user.avatar}
+                  alt={user.username}
+                  className="w-24 h-24 md:w-32 md:h-32 rounded-full object-cover"
                   data-testid="img-avatar"
                 />
               </div>
@@ -42,82 +105,71 @@ export default function Profile() {
 
           {/* Info */}
           <div className="flex-1 min-w-0">
-            {/* Username row */}
-            <div className="flex flex-wrap items-center gap-3 mb-4">
-              <h1 className="text-xl font-light" data-testid="text-username">{ME.username}</h1>
-              <div className="flex gap-2">
-                {following ? (
+            {/* Stats */}
+            <div className="flex gap-6 mb-4">
+              <div className="text-center md:text-left">
+                <p className="font-bold text-base">{posts.length}</p>
+                <p className="text-xs text-muted-foreground">posts</p>
+              </div>
+              <div className="text-center md:text-left">
+                <p className="font-bold text-base">1</p>
+                <p className="text-xs text-muted-foreground">
+                  {isWife ? "husband" : "wife"}
+                </p>
+              </div>
+            </div>
+
+            {/* Edit fields or display */}
+            {!isWife && editing ? (
+              <div className="space-y-2">
+                <input
+                  value={pendingName}
+                  onChange={(e) => setPendingName(e.target.value)}
+                  className="w-full bg-secondary rounded-lg px-3 py-2 text-sm outline-none border border-border focus:border-primary transition-colors"
+                  placeholder="Name"
+                  data-testid="input-name"
+                />
+                <textarea
+                  value={pendingBio}
+                  onChange={(e) => setPendingBio(e.target.value)}
+                  rows={2}
+                  className="w-full bg-secondary rounded-lg px-3 py-2 text-sm outline-none resize-none border border-border focus:border-primary transition-colors"
+                  placeholder="Bio"
+                  data-testid="input-bio"
+                />
+                <div className="flex gap-2">
                   <button
-                    onClick={() => setFollowing(false)}
-                    className="px-4 py-1.5 rounded-lg bg-secondary text-sm font-semibold hover:bg-secondary/80 transition-colors"
-                    data-testid="button-following"
+                    onClick={saveEdit}
+                    className="flex items-center gap-1.5 px-4 py-1.5 bg-primary text-primary-foreground text-sm font-semibold rounded-lg"
+                    data-testid="button-save-profile"
                   >
-                    Following
+                    <Check className="w-3.5 h-3.5" /> Save
                   </button>
-                ) : (
                   <button
-                    onClick={() => setFollowing(true)}
-                    className="px-5 py-1.5 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
-                    data-testid="button-follow"
+                    onClick={cancelEdit}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-secondary text-sm font-semibold rounded-lg"
+                    data-testid="button-cancel-edit"
                   >
-                    Follow
+                    <X className="w-3.5 h-3.5" /> Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <p className="font-semibold text-base">{name}</p>
+                <p className="text-sm text-muted-foreground mt-0.5">{bio}</p>
+                <p className="text-xs text-muted-foreground/60 mt-1">@{user.username}</p>
+                {!isWife && (
+                  <button
+                    onClick={startEdit}
+                    className="mt-3 px-4 py-1.5 bg-secondary text-sm font-semibold rounded-lg hover:bg-secondary/80 transition-colors"
+                    data-testid="button-edit-profile"
+                  >
+                    Edit profile
                   </button>
                 )}
-                <button
-                  className="px-4 py-1.5 rounded-lg bg-secondary text-sm font-semibold hover:bg-secondary/80 transition-colors"
-                  data-testid="button-message"
-                >
-                  Message
-                </button>
-              </div>
-              <button className="text-muted-foreground hover:text-foreground" data-testid="button-settings">
-                <Settings className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Stats — desktop */}
-            <div className="hidden md:flex gap-8 mb-4">
-              <div className="text-sm">
-                <span className="font-semibold">{MOCK_PROFILE_POSTS.length}</span>{" "}
-                <span className="text-muted-foreground">posts</span>
-              </div>
-              <div className="text-sm" data-testid="text-followers">
-                <span className="font-semibold">{ME.followers.toLocaleString()}</span>{" "}
-                <span className="text-muted-foreground">followers</span>
-              </div>
-              <div className="text-sm">
-                <span className="font-semibold">{ME.following.toLocaleString()}</span>{" "}
-                <span className="text-muted-foreground">following</span>
-              </div>
-            </div>
-
-            {/* Bio — desktop */}
-            <div className="hidden md:block">
-              <p className="font-semibold text-sm">{ME.name}</p>
-              <p className="text-sm text-muted-foreground mt-0.5">{ME.bio}</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Bio — mobile */}
-        <div className="md:hidden mt-3">
-          <p className="font-semibold text-sm">{ME.name}</p>
-          <p className="text-sm text-muted-foreground mt-0.5">{ME.bio}</p>
-        </div>
-
-        {/* Stats — mobile */}
-        <div className="md:hidden flex justify-around border-t border-border mt-4 pt-4 text-center">
-          <div>
-            <p className="font-semibold text-sm">{MOCK_PROFILE_POSTS.length}</p>
-            <p className="text-xs text-muted-foreground">posts</p>
-          </div>
-          <div>
-            <p className="font-semibold text-sm" data-testid="text-followers-mobile">{ME.followers.toLocaleString()}</p>
-            <p className="text-xs text-muted-foreground">followers</p>
-          </div>
-          <div>
-            <p className="font-semibold text-sm">{ME.following.toLocaleString()}</p>
-            <p className="text-xs text-muted-foreground">following</p>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -131,59 +183,55 @@ export default function Profile() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-semibold uppercase tracking-widest transition-colors relative ${
+              className={`flex-1 flex items-center justify-center gap-2 py-3 text-xs font-semibold uppercase tracking-widest transition-colors relative ${
                 isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground"
               }`}
               data-testid={`button-tab-${tab.id}`}
             >
               {isActive && (
-                <motion.div
-                  layoutId="profile-tab-indicator"
-                  className="absolute top-0 left-0 right-0 h-px bg-foreground"
-                />
+                <motion.div layoutId="profile-tab-indicator" className="absolute top-0 left-0 right-0 h-px bg-foreground" />
               )}
               <Icon className="w-4 h-4" />
-              <span className="hidden sm:inline">{tab.label}</span>
+              <span>{tab.label}</span>
             </button>
           );
         })}
       </div>
 
-      {/* Photo grid */}
+      {/* Grid */}
       <motion.div
-        key={activeTab}
+        key={activeTab + (isWife ? "wife" : "me")}
         className="grid grid-cols-3 gap-0.5"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.2 }}
       >
-        {displayedPosts.map((post, i) => (
-          <div
-            key={post.id}
-            className="relative aspect-square overflow-hidden group cursor-pointer"
-            data-testid={`card-post-${post.id}`}
-          >
-            <img
-              src={post.image}
-              alt=""
-              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-              loading="lazy"
-            />
-            {post.isVideo && (
-              <div className="absolute top-2 right-2">
-                <Film className="w-4 h-4 text-white fill-white/70 drop-shadow" />
-              </div>
-            )}
-            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4">
-              <div className="flex items-center gap-1 text-white font-semibold text-sm">
-                <span>♥</span> {post.likes.toLocaleString()}
-              </div>
-              <div className="flex items-center gap-1 text-white font-semibold text-sm">
-                <span>◯</span> {post.comments}
+        {displayedPosts.length === 0 ? (
+          <div className="col-span-3 flex flex-col items-center py-16 gap-3">
+            <Grid3x3 className="w-12 h-12 text-muted-foreground/30" />
+            <p className="text-muted-foreground text-sm">No posts yet</p>
+          </div>
+        ) : (
+          displayedPosts.map((post) => (
+            <div
+              key={post.id}
+              className="relative aspect-square overflow-hidden group cursor-pointer"
+              data-testid={`grid-post-${post.id}`}
+            >
+              <img
+                src={post.image}
+                alt=""
+                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                loading="lazy"
+              />
+              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+                <div className="flex items-center gap-1 text-white text-sm font-semibold">
+                  ♥ {post.likes}
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          ))
+        )}
       </motion.div>
     </div>
   );

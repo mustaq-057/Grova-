@@ -1,23 +1,25 @@
 import { useState } from "react";
 import { Heart, MessageCircle, Bookmark, Send, MoreHorizontal } from "lucide-react";
 import { motion } from "framer-motion";
-import { MOCK_STORIES, MOCK_POSTS } from "@/lib/mock-data";
+import { MOCK_STORIES, MOCK_POSTS, ME, WIFE } from "@/lib/mock-data";
 
 function StoriesRow() {
   return (
-    <div className="flex gap-4 px-4 py-4 overflow-x-auto scrollbar-hide border-b border-border">
+    <div className="flex gap-5 px-4 py-4 border-b border-border">
       {MOCK_STORIES.map((story) => (
-        <div key={story.id} className="flex flex-col items-center gap-1.5 cursor-pointer shrink-0" data-testid={`story-${story.id}`}>
-          <div className={`story-ring ${story.viewed ? "opacity-40 grayscale" : ""} transition-all hover:scale-105`}>
+        <div key={story.id} className="flex flex-col items-center gap-1.5 cursor-pointer" data-testid={`story-${story.id}`}>
+          <div className="story-ring hover:scale-105 transition-transform">
             <div className="bg-background rounded-full p-[2px]">
               <img
                 src={story.user.avatar}
                 alt={story.user.username}
-                className="w-14 h-14 rounded-full object-cover"
+                className="w-16 h-16 rounded-full object-cover"
               />
             </div>
           </div>
-          <span className="text-[11px] text-muted-foreground truncate w-16 text-center">{story.user.username}</span>
+          <span className="text-[12px] text-muted-foreground font-medium">
+            {story.user.id === "me" ? "You" : story.user.name}
+          </span>
         </div>
       ))}
     </div>
@@ -30,6 +32,7 @@ function PostCard({ post }: { post: typeof MOCK_POSTS[0] }) {
   const [likeCount, setLikeCount] = useState(post.likes);
   const [showHeart, setShowHeart] = useState(false);
   const [comment, setComment] = useState("");
+  const [comments, setComments] = useState(post.comments);
 
   const handleLike = () => {
     setLiked((prev) => !prev);
@@ -45,6 +48,17 @@ function PostCard({ post }: { post: typeof MOCK_POSTS[0] }) {
     setTimeout(() => setShowHeart(false), 900);
   };
 
+  const submitComment = () => {
+    if (!comment.trim()) return;
+    setComments((prev) => [
+      ...prev,
+      { id: `c-new-${Date.now()}`, user: ME, text: comment.trim() },
+    ]);
+    setComment("");
+  };
+
+  const isMyPost = post.user.id === "me";
+
   return (
     <article className="border-b border-border pb-4" data-testid={`post-${post.id}`}>
       {/* Header */}
@@ -52,11 +66,13 @@ function PostCard({ post }: { post: typeof MOCK_POSTS[0] }) {
         <div className="flex items-center gap-3">
           <div className="story-ring">
             <div className="bg-background rounded-full p-[2px]">
-              <img src={post.user.avatar} alt={post.user.username} className="w-8 h-8 rounded-full object-cover" />
+              <img src={post.user.avatar} alt={post.user.username} className="w-9 h-9 rounded-full object-cover" />
             </div>
           </div>
           <div>
-            <p className="text-sm font-semibold" data-testid={`text-username-${post.id}`}>{post.user.username}</p>
+            <p className="text-sm font-semibold" data-testid={`text-username-${post.id}`}>
+              {isMyPost ? "You" : post.user.name}
+            </p>
             <p className="text-[11px] text-muted-foreground">{post.timeAgo}</p>
           </div>
         </div>
@@ -84,21 +100,16 @@ function PostCard({ post }: { post: typeof MOCK_POSTS[0] }) {
       <div className="px-4 pt-3">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-4">
-            <motion.button
-              whileTap={{ scale: 1.3 }}
-              onClick={handleLike}
-              className="transition-colors"
-              data-testid={`button-like-${post.id}`}
-            >
+            <motion.button whileTap={{ scale: 1.3 }} onClick={handleLike} data-testid={`button-like-${post.id}`}>
               <Heart
                 className={`w-6 h-6 transition-all ${liked ? "fill-red-500 text-red-500" : "text-foreground"}`}
                 strokeWidth={1.5}
               />
             </motion.button>
-            <button className="hover:text-muted-foreground transition-colors" data-testid={`button-comment-${post.id}`}>
+            <button className="text-foreground hover:text-muted-foreground transition-colors" data-testid={`button-comment-${post.id}`}>
               <MessageCircle className="w-6 h-6" strokeWidth={1.5} />
             </button>
-            <button className="hover:text-muted-foreground transition-colors" data-testid={`button-share-${post.id}`}>
+            <button className="text-foreground hover:text-muted-foreground transition-colors" data-testid={`button-share-${post.id}`}>
               <Send className="w-6 h-6" strokeWidth={1.5} />
             </button>
           </div>
@@ -110,18 +121,30 @@ function PostCard({ post }: { post: typeof MOCK_POSTS[0] }) {
           </motion.button>
         </div>
 
-        <p className="text-sm font-semibold mb-1" data-testid={`text-likes-${post.id}`}>{likeCount.toLocaleString()} likes</p>
+        {/* Liked by */}
+        <div className="flex items-center gap-2 mb-1.5">
+          <div className="flex -space-x-1.5">
+            <img src={liked ? ME.avatar : WIFE.avatar} className="w-5 h-5 rounded-full border border-background object-cover" alt="" />
+          </div>
+          <p className="text-sm">
+            {liked ? (
+              <span>Liked by <span className="font-semibold">{isMyPost ? "Luna" : "you"}</span></span>
+            ) : (
+              <span className="text-muted-foreground">Be the first to like</span>
+            )}
+          </p>
+        </div>
 
         <p className="text-sm leading-relaxed">
-          <span className="font-semibold mr-1">{post.user.username}</span>
+          <span className="font-semibold mr-1">{isMyPost ? "you" : post.user.username}</span>
           {post.caption}
         </p>
 
-        {post.comments.length > 0 && (
+        {comments.length > 0 && (
           <div className="mt-1.5 space-y-0.5">
-            {post.comments.slice(0, 2).map((c) => (
+            {comments.map((c) => (
               <p key={c.id} className="text-sm">
-                <span className="font-semibold mr-1">{c.user.username}</span>
+                <span className="font-semibold mr-1">{c.user.id === "me" ? "you" : c.user.username}</span>
                 <span className="text-foreground/80">{c.text}</span>
               </p>
             ))}
@@ -130,18 +153,20 @@ function PostCard({ post }: { post: typeof MOCK_POSTS[0] }) {
 
         {/* Comment input */}
         <div className="flex items-center gap-2 mt-3 border-t border-border pt-3">
+          <img src={ME.avatar} alt="" className="w-6 h-6 rounded-full object-cover shrink-0" />
           <input
             type="text"
             placeholder="Add a comment..."
             value={comment}
             onChange={(e) => setComment(e.target.value)}
-            className="flex-1 bg-transparent text-sm text-muted-foreground placeholder:text-muted-foreground/50 outline-none"
+            onKeyDown={(e) => e.key === "Enter" && submitComment()}
+            className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/50 outline-none"
             data-testid={`input-comment-${post.id}`}
           />
           {comment && (
             <button
-              onClick={() => setComment("")}
-              className="text-primary text-sm font-semibold"
+              onClick={submitComment}
+              className="text-primary text-sm font-semibold shrink-0"
               data-testid={`button-post-comment-${post.id}`}
             >
               Post
@@ -155,7 +180,14 @@ function PostCard({ post }: { post: typeof MOCK_POSTS[0] }) {
 
 export default function Home() {
   return (
-    <div className="max-w-[470px] mx-auto pb-16 md:pb-4">
+    <div className="max-w-[470px] mx-auto pb-20 md:pb-6">
+      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur px-4 py-3 flex items-center justify-between border-b border-border">
+        <span className="font-serif italic text-xl font-bold text-primary">Grova</span>
+        <div className="flex items-center gap-3">
+          <img src={WIFE.avatar} alt="Wife" className="w-7 h-7 rounded-full object-cover border border-primary/40" />
+          <img src={ME.avatar} alt="Me" className="w-7 h-7 rounded-full object-cover border border-primary/40" />
+        </div>
+      </div>
       <StoriesRow />
       <div className="mt-2">
         {MOCK_POSTS.map((post) => (
