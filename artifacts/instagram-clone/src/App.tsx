@@ -4,12 +4,10 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Layout } from "@/components/Layout";
 import Home from "@/pages/Home";
-import Explore from "@/pages/Explore";
-import Reels from "@/pages/Reels";
-import Profile from "@/pages/Profile";
-import Create from "@/pages/Create";
-import NotificationsPage from "@/pages/NotificationsPage";
 import Messages from "@/pages/Messages";
+import Create from "@/pages/Create";
+import Profile from "@/pages/Profile";
+import Settings from "@/pages/Settings";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -19,12 +17,11 @@ function Router() {
     <Layout>
       <Switch>
         <Route path="/" component={Home} />
-        <Route path="/explore" component={Explore} />
-        <Route path="/reels" component={Reels} />
-        <Route path="/profile" component={Profile} />
+        <Route path="/chat" component={Messages} />
         <Route path="/create" component={Create} />
-        <Route path="/messages" component={Messages} />
-        <Route path="/notifications" component={NotificationsPage} />
+        <Route path="/profile" component={Profile} />
+        <Route path="/profile/wife" component={Profile} />
+        <Route path="/settings" component={Settings} />
         <Route component={NotFound} />
       </Switch>
     </Layout>
