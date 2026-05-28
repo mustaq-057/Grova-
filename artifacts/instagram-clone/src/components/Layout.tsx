@@ -7,8 +7,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { user } = useAuth();
 
+  // Respect stored theme preference (do NOT force dark — let Settings control it)
   useEffect(() => {
-    document.documentElement.classList.add("dark");
+    const stored = localStorage.getItem("grova_theme");
+    if (stored === "light") {
+      document.documentElement.classList.remove("dark");
+    } else {
+      // Default to dark
+      document.documentElement.classList.add("dark");
+    }
   }, []);
 
   const navItems = [
@@ -30,7 +37,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <span className="font-serif text-2xl tracking-tighter block lg:hidden italic font-bold text-primary">G</span>
           </Link>
 
-          {/* User chip */}
           {user && (
             <div className="hidden lg:flex items-center gap-3 px-3 py-2 bg-secondary/40 rounded-xl">
               <img src={user.avatar} alt="" className="w-7 h-7 rounded-full object-cover shrink-0" />
@@ -44,21 +50,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <div className="flex flex-col gap-1">
             {navItems.map((item) => {
               const Icon = item.icon;
-              const isActive = location === item.href || (item.href === "/profile" && location.startsWith("/profile"));
+              const isActive =
+                location === item.href ||
+                (item.href === "/profile" && location.startsWith("/profile")) ||
+                (item.href === "/chat" && location === "/chat");
               return (
                 <Link key={item.href} href={item.href} className="group">
-                  <div
-                    className={`flex items-center gap-4 p-3 rounded-xl transition-all ${
-                      isActive ? "bg-primary/10 text-primary" : "hover:bg-white/5 text-foreground"
-                    }`}
-                  >
-                    <Icon
-                      className={`w-6 h-6 shrink-0 transition-transform group-hover:scale-105 ${isActive ? "text-primary" : ""}`}
-                      strokeWidth={isActive ? 2.5 : 1.5}
-                    />
-                    <span className={`hidden lg:block text-[15px] ${isActive ? "font-semibold" : ""}`}>
-                      {item.label}
-                    </span>
+                  <div className={`flex items-center gap-4 p-3 rounded-xl transition-all ${isActive ? "bg-primary/10 text-primary" : "hover:bg-white/5 text-foreground"}`}>
+                    <Icon className={`w-6 h-6 shrink-0 transition-transform group-hover:scale-105 ${isActive ? "text-primary" : ""}`} strokeWidth={isActive ? 2.5 : 1.5} />
+                    <span className={`hidden lg:block text-[15px] ${isActive ? "font-semibold" : ""}`}>{item.label}</span>
                   </div>
                 </Link>
               );
@@ -72,7 +72,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </button>
       </nav>
 
-      {/* Main Content */}
+      {/* Main */}
       <main className="flex-1 h-full overflow-y-auto relative">{children}</main>
 
       {/* Mobile Bottom Bar */}
@@ -82,10 +82,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           const isActive = location === item.href || (item.href === "/profile" && location.startsWith("/profile"));
           return (
             <Link key={item.href} href={item.href} className="p-2 flex flex-col items-center" data-testid={`nav-${item.label.toLowerCase()}`}>
-              <Icon
-                className={`w-6 h-6 ${isActive ? "text-primary" : "text-muted-foreground"}`}
-                strokeWidth={isActive ? 2.5 : 1.5}
-              />
+              <Icon className={`w-6 h-6 ${isActive ? "text-primary" : "text-muted-foreground"}`} strokeWidth={isActive ? 2.5 : 1.5} />
             </Link>
           );
         })}
