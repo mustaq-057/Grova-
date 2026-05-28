@@ -7,13 +7,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { user } = useAuth();
 
-  // Respect stored theme preference (do NOT force dark — let Settings control it)
+  const isChat = location === "/chat";
+
   useEffect(() => {
     const stored = localStorage.getItem("grova_theme");
     if (stored === "light") {
       document.documentElement.classList.remove("dark");
     } else {
-      // Default to dark
       document.documentElement.classList.add("dark");
     }
   }, []);
@@ -72,8 +72,20 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </button>
       </nav>
 
-      {/* Main */}
-      <main className="flex-1 h-full overflow-y-auto relative">{children}</main>
+      {/* Main content area */}
+      {isChat ? (
+        /* Chat page: overflow-hidden so Messages.tsx h-full works correctly */
+        <main className="flex-1 overflow-hidden relative">
+          {children}
+        </main>
+      ) : (
+        /* All other pages: scrollable wrapper with bottom padding for mobile nav */
+        <main className="flex-1 overflow-hidden relative">
+          <div className="h-full overflow-y-auto pb-14 md:pb-0">
+            {children}
+          </div>
+        </main>
+      )}
 
       {/* Mobile Bottom Bar */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 h-14 bg-background/95 backdrop-blur border-t border-border flex items-center justify-around px-2 z-50">
