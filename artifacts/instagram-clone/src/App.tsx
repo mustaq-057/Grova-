@@ -45,7 +45,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <AuthProvider>
-          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+          <WouterRouter base={(import.meta.env.BASE_URL ?? "/").replace(/\/$/, "") || ""}>
             <ProtectedRouter />
           </WouterRouter>
         </AuthProvider>

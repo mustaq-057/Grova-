@@ -24,7 +24,11 @@ interface Props {
   partnerName: string;
   partnerAvatar: string;
   myId: string;
-  onSendSignal: (data: { type: string; senderId: string; [k: string]: unknown }) => void;
+  onSendSignal: (data: {
+    type: "offer" | "answer" | "ice" | "end" | "reject";
+    senderId: string;
+    [k: string]: unknown;
+  }) => void;
   onEnd: () => void;
   incomingSignal?: { type: "answer" | "ice"; data: unknown };
 }
