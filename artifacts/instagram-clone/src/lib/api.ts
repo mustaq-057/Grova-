@@ -7,7 +7,7 @@ async function apiFetch(path: string, options?: RequestInit) {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: "Request failed" }));
-    throw new Error(err.error || "Request failed");
+    throw new Error((err as { error: string }).error || "Request failed");
   }
   return res.json();
 }
@@ -16,6 +16,7 @@ export type ApiUser = {
   id: "me" | "wife";
   username: string;
   name: string;
+  bio: string;
   avatar: string;
 };
 
@@ -23,8 +24,10 @@ export type ApiMessage = {
   id: string;
   senderId: string;
   text?: string;
-  type: "text" | "audio" | "heart";
+  type: "text" | "audio" | "heart" | "sticker" | "gif" | "image";
   audioData?: string;
+  gifUrl?: string;
+  imageData?: string;
   timestamp: string;
   liked: boolean;
 };
@@ -41,13 +44,17 @@ export const api = {
   login: (userId: string, code: string): Promise<{ user: ApiUser }> =>
     apiFetch("/auth/login", { method: "POST", body: JSON.stringify({ userId, code }) }),
 
-  updateCoupleCode: (currentCode: string, newCode: string): Promise<{ success: boolean }> =>
+  updateCoupleCode: (currentCode: string, newCode: string) =>
     apiFetch("/auth/couple-code", { method: "PUT", body: JSON.stringify({ currentCode, newCode }) }),
 
-  getMessages: (since?: string): Promise<ApiMessage[]> =>
-    apiFetch(since ? `/messages?since=${encodeURIComponent(since)}` : "/messages"),
+  getUsers: (): Promise<ApiUser[]> => apiFetch("/users"),
 
-  sendMessage: (msg: { senderId: string; text?: string; type?: string; audioData?: string }): Promise<ApiMessage> =>
+  updateProfile: (id: string, data: { name?: string; bio?: string }) =>
+    apiFetch(`/users/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+
+  getMessages: (): Promise<ApiMessage[]> => apiFetch("/messages"),
+
+  sendMessage: (msg: Partial<ApiMessage>): Promise<ApiMessage> =>
     apiFetch("/messages", { method: "POST", body: JSON.stringify(msg) }),
 
   likeMessage: (id: string): Promise<ApiMessage> =>
@@ -56,12 +63,16 @@ export const api = {
   deleteMessages: (): Promise<{ success: boolean }> =>
     apiFetch("/messages", { method: "DELETE" }),
 
-  getDuas: (): Promise<ApiDua[]> =>
-    apiFetch("/duas"),
+  sendCallSignal: (data: {
+    type: "offer" | "answer" | "ice" | "end" | "reject";
+    senderId: string;
+    [k: string]: unknown;
+  }) => apiFetch("/call/signal", { method: "POST", body: JSON.stringify(data) }),
+
+  getDuas: (): Promise<ApiDua[]> => apiFetch("/duas"),
 
   addDua: (dua: { arabic: string; translation?: string; author: string }): Promise<ApiDua> =>
     apiFetch("/duas", { method: "POST", body: JSON.stringify(dua) }),
 
-  deleteDua: (id: string): Promise<{ success: boolean }> =>
-    apiFetch(`/duas/${id}`, { method: "DELETE" }),
+  deleteDua: (id: string) => apiFetch(`/duas/${id}`, { method: "DELETE" }),
 };

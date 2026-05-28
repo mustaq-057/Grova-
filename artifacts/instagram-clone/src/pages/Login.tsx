@@ -16,8 +16,8 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
 
   const users = [
-    { id: "me" as const, name: "Mako", label: "That's me", avatar: "https://picsum.photos/seed/okaymako/150/150" },
-    { id: "wife" as const, name: "Luna", label: "That's me", avatar: "https://picsum.photos/seed/lunavault/150/150" },
+    { id: "me" as const, name: "Mustaq", label: "That's me", avatar: "https://picsum.photos/seed/mustaq/150/150" },
+    { id: "wife" as const, name: "Sara", label: "That's me", avatar: "https://picsum.photos/seed/sara/150/150" },
   ];
 
   const handlePick = (id: "me" | "wife") => {
