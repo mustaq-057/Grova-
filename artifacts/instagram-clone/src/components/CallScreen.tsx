@@ -31,12 +31,13 @@ interface Props {
 
 export default function CallScreen({
   call,
-  partnerId,
+  partnerId: _partnerId,
   partnerName,
   partnerAvatar,
   myId,
   onSendSignal,
   onEnd,
+  incomingSignal,
 }: Props) {
   const [muted, setMuted] = useState(false);
   const [speakerOff, setSpeakerOff] = useState(false);
