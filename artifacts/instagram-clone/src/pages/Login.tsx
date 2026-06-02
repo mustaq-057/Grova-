@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { Eye, EyeOff, Lock, Mail } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import type { ApiUser } from "@/lib/api";
 import { initEncryption } from "@/lib/crypto";
 import { getDefaultEmail, saveDefaultEmail } from "@/lib/session";
 import { AVATARS } from "@/lib/avatars";
@@ -13,7 +14,7 @@ type Step = "primary" | "pick" | "code";
 type PickUser = { id: "me" | "wife"; name: string; label: string; avatar: string };
 
 export default memo(function Login() {
-  const { setUser } = useAuth();
+  const { setUser, refreshTrustedDevice, trustedDevice } = useAuth();
   const [step, setStep] = useState<Step>("primary");
   const [selectedId, setSelectedId] = useState<"me" | "wife" | null>(null);
   const [email, setEmail] = useState(() => getDefaultEmail());
@@ -29,19 +30,22 @@ export default memo(function Login() {
   ]);
 
   useEffect(() => {
-    api.validatePrimarySession().then((ok) => {
+    refreshTrustedDevice().then((ok) => {
       if (!ok) {
         setStep("primary");
         return;
       }
-      api.getLoginProfiles().then((profiles) => {
-        setUsers((prev) =>
-          prev.map((u) => {
-            const p = profiles.find((x) => x.id === u.id);
-            return p ? { ...u, name: p.name, avatar: p.avatar } : u;
-          }),
-        );
-      }).catch(() => {});
+      api
+        .getLoginProfiles()
+        .then((profiles) => {
+          setUsers((prev) =>
+            prev.map((u) => {
+              const p = profiles.find((x) => x.id === u.id);
+              return p ? { ...u, name: p.name, avatar: p.avatar } : u;
+            }),
+          );
+        })
+        .catch(() => {});
       const remembered = localStorage.getItem("grova_last_profile");
       if (remembered === "me" || remembered === "wife") {
         setSelectedId(remembered);
@@ -49,8 +53,8 @@ export default memo(function Login() {
       } else {
         setStep("pick");
       }
-    }).catch(() => setStep("primary"));
-  }, []);
+    });
+  }, [refreshTrustedDevice]);
 
   const handlePrimaryLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,6 +64,7 @@ export default memo(function Login() {
     try {
       await api.primaryLogin(email.trim(), password);
       saveDefaultEmail(email.trim());
+      await refreshTrustedDevice();
       api.getLoginProfiles().then((profiles) => {
         setUsers((prev) =>
           prev.map((u) => {
@@ -104,8 +109,9 @@ export default memo(function Login() {
     try {
       const { user } = await api.login(selectedId, code);
       await initEncryption(code.trim());
-      setUser(user);
       localStorage.setItem("grova_last_profile", selectedId);
+      setUser(user as ApiUser);
+      window.dispatchEvent(new CustomEvent("grova-vault-unlocked"));
     } catch (err) {
       const msg = err instanceof Error ? err.message : "";
       if (msg.includes("fetch") || msg.includes("Failed") || msg.includes("Network")) {
@@ -227,12 +233,14 @@ export default memo(function Login() {
           </div>
         ) : (
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
-            <button
-              onClick={() => { setStep("pick"); setCode(""); setError(""); }}
-              className="text-sm text-muted-foreground hover:text-foreground mb-6 flex items-center gap-1"
-            >
-              ← Back
-            </button>
+            {!trustedDevice && (
+              <button
+                onClick={() => { setStep("pick"); setCode(""); setError(""); }}
+                className="text-sm text-muted-foreground hover:text-foreground mb-6 flex items-center gap-1"
+              >
+                ← Back
+              </button>
+            )}
 
             <div className="flex flex-col items-center gap-3 mb-8">
               <div className="story-ring">
@@ -245,7 +253,11 @@ export default memo(function Login() {
                   />
                 </div>
               </div>
-              <p className="font-semibold">Hi, {users.find(u => u.id === selectedId)?.name} ♥</p>
+              <p className="font-semibold">
+                {trustedDevice
+                  ? `Welcome back, ${users.find((u) => u.id === selectedId)?.name}`
+                  : `Hi, ${users.find((u) => u.id === selectedId)?.name} ♥`}
+              </p>
             </div>
 
             <form onSubmit={handleLogin} className="space-y-4">
@@ -288,7 +300,7 @@ export default memo(function Login() {
                 className="w-full py-3 bg-primary text-primary-foreground font-semibold rounded-xl disabled:opacity-50 transition-opacity"
                 data-testid="button-login"
               >
-                {loading ? "Checking..." : "Enter Grova ♥"}
+                {loading ? "Checking..." : trustedDevice ? "Unlock" : "Enter Grova ♥"}
               </motion.button>
             </form>
           </motion.div>

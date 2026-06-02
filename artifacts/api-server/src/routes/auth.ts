@@ -484,9 +484,28 @@ router.post("/auth/primary-login", rateLimiters.auth, validateBody({
     setAuthCookies(res as unknown as { cookie: (name: string, value: string, opts: Record<string, unknown>) => void }, {
       primaryToken,
     });
-    res.json({ primaryToken, expiresAt: now + PRIMARY_SESSION_MS });
+    res.json({ ok: true, expiresAt: now + PRIMARY_SESSION_MS });
   } catch {
     res.status(500).json({ error: "Primary login failed" });
+  }
+});
+
+/** Revoke trusted-device access on this browser (forces email+password again). */
+router.post("/auth/revoke-trust", rateLimiters.auth, async (req, res) => {
+  try {
+    const primaryFromCookie =
+      req && typeof (req as unknown as { cookies?: Record<string, string> }).cookies?.grova_primary === "string"
+        ? (req as unknown as { cookies: Record<string, string> }).cookies.grova_primary
+        : "";
+    const primaryToken = String(req.headers["x-primary-token"] || primaryFromCookie || "");
+    if (primaryToken) {
+      const tokenHash = sha256(primaryToken);
+      await db.execute("DELETE FROM primary_access_tokens WHERE token_hash = $1", [tokenHash]);
+    }
+    res.clearCookie("grova_primary", { path: "/" });
+    res.json({ success: true });
+  } catch {
+    res.status(500).json({ error: "Failed to revoke trust" });
   }
 });
 

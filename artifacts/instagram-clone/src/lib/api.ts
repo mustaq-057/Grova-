@@ -1,4 +1,4 @@
-import { getAuthHeaders, saveSession, clearSession, getRefreshToken, setDeviceId, savePrimaryToken } from "./session";
+import { getAuthHeaders, saveSession, clearSession, getRefreshToken, setDeviceId } from "./session";
 import type { CouplePrefs } from "./types";
 
 const BASE = "/api";
@@ -19,6 +19,7 @@ export async function tryRefreshSession(): Promise<boolean> {
     try {
       const res = await fetch(`${BASE}/auth/refresh`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ refreshToken }),
       });
@@ -44,6 +45,7 @@ async function apiFetch<T = unknown>(path: string, options?: RequestInit, attemp
   try {
     const res = await fetch(`${BASE}${path}`, {
       ...options,
+      credentials: "include",
       cache: "no-store",
       headers: {
         ...getAuthHeaders(),
@@ -255,11 +257,10 @@ export type { CouplePrefs } from "./types";
 
 export const api = {
   primaryLogin: async (email: string, password: string): Promise<void> => {
-    const data = (await apiFetch("/auth/primary-login", {
+    await apiFetch("/auth/primary-login", {
       method: "POST",
       body: JSON.stringify({ email, password }),
-    })) as { primaryToken: string };
-    if (data.primaryToken) savePrimaryToken(data.primaryToken);
+    });
   },
 
   validatePrimarySession: async (): Promise<boolean> => {
@@ -270,6 +271,9 @@ export const api = {
       return false;
     }
   },
+
+  revokeTrustedDevice: () =>
+    apiFetch<{ success: boolean }>("/auth/revoke-trust", { method: "POST", body: JSON.stringify({}) }),
 
   login: async (userId: string, code: string): Promise<{ user: ApiUser }> => {
     const data = (await apiFetch("/auth/login", {

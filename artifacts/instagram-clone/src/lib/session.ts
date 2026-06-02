@@ -10,7 +10,6 @@ function storage(): Storage | null {
   }
 }
 
-const PRIMARY_TOKEN_KEY = "grova_primary_token";
 const DEFAULT_EMAIL_KEY = "grova_default_email";
 
 export function saveSession(token: string, csrfToken: string, refreshToken?: string) {
@@ -62,23 +61,7 @@ export function getAuthHeaders(): Record<string, string> {
   const csrf = s.getItem(CSRF_KEY);
   if (token) headers.Authorization = `Bearer ${token}`;
   if (csrf) headers["X-CSRF-Token"] = csrf;
-  const primaryToken = s.getItem(PRIMARY_TOKEN_KEY);
-  if (primaryToken) headers["X-Primary-Token"] = primaryToken;
   return headers;
-}
-
-export function savePrimaryToken(primaryToken: string) {
-  const s = storage();
-  if (!s) return;
-  s.setItem(PRIMARY_TOKEN_KEY, primaryToken);
-}
-
-export function getPrimaryToken(): string | null {
-  return storage()?.getItem(PRIMARY_TOKEN_KEY) ?? null;
-}
-
-export function clearPrimaryToken() {
-  storage()?.removeItem(PRIMARY_TOKEN_KEY);
 }
 
 export function saveDefaultEmail(email: string) {

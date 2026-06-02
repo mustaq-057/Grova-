@@ -4,6 +4,8 @@
  */
 const BASE = process.env.API_BASE ?? "http://127.0.0.1:5001/api";
 const COUPLE_CODE = process.env.COUPLE_CODE ?? "grova2024";
+const PRIMARY_EMAIL = process.env.PRIMARY_AUTH_EMAIL ?? "";
+const PRIMARY_PASSWORD = process.env.PRIMARY_AUTH_PASSWORD_1 ?? process.env.PRIMARY_AUTH_PASSWORDS?.split(",")[0] ?? "";
 
 type Result = { name: string; ok: boolean; status?: number; detail?: string };
 
@@ -26,7 +28,7 @@ async function req(
   if (opts.token) headers.Authorization = `Bearer ${opts.token}`;
   if (opts.csrf) headers["X-CSRF-Token"] = opts.csrf;
   const { token: _t, csrf: _c, ...init } = opts;
-  return fetch(`${BASE}${path}`, { ...init, headers });
+  return fetch(`${BASE}${path}`, { ...init, credentials: "include", headers });
 }
 
 async function main() {
@@ -34,6 +36,18 @@ async function main() {
 
   const health = await fetch(`${BASE}/healthz`);
   record("healthz", health.ok, health.status);
+
+  if (PRIMARY_EMAIL && PRIMARY_PASSWORD) {
+    const primaryRes = await req("/auth/primary-login", {
+      method: "POST",
+      body: JSON.stringify({ email: PRIMARY_EMAIL, password: PRIMARY_PASSWORD }),
+    });
+    record("auth/primary-login", primaryRes.ok, primaryRes.status, primaryRes.ok ? undefined : (await primaryRes.text()).slice(0, 120));
+    if (!primaryRes.ok) {
+      printSummary();
+      process.exit(1);
+    }
+  }
 
   const loginRes = await req("/auth/login", {
     method: "POST",

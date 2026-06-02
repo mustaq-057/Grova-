@@ -13,20 +13,24 @@ import {
 } from "./couple-sync";
 import { applyAppTheme, type AppThemeId } from "./app-theme";
 import { clearClientMemory, purgeLegacyLocalStorage } from "./client-memory";
-import { clearSession, hasSession } from "./session";
+import { clearSession } from "./session";
 import { tryRefreshSession } from "./api";
 import { bumpAvatarVersion } from "./avatar-display";
+
+const INACTIVITY_LOCK_MS = 10 * 60 * 60 * 1000;
 
 type AuthContextType = {
   user: ApiUser | null;
   partner: ApiUser | null;
   chatThemeId: string;
   authReady: boolean;
+  trustedDevice: boolean;
   setUser: (u: ApiUser | null) => void;
   refreshProfiles: () => Promise<void>;
   refreshCouplePrefs: () => Promise<void>;
   updateChatTheme: (themeId: string) => Promise<void>;
   logout: () => void;
+  refreshTrustedDevice: () => Promise<boolean>;
 };
 
 const AuthContext = createContext<AuthContextType>(null!);
@@ -36,10 +40,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [partner, setPartner] = useState<ApiUser | null>(null);
   const [chatThemeId, setChatThemeId] = useState("default");
   const [authReady, setAuthReady] = useState(false);
+  const [trustedDevice, setTrustedDevice] = useState(false);
   const userRef = useRef(user);
   userRef.current = user;
   const partnerRef = useRef(partner);
   partnerRef.current = partner;
+
+  const refreshTrustedDevice = useCallback(async () => {
+    const ok = await api.validatePrimarySession();
+    setTrustedDevice(ok);
+    return ok;
+  }, []);
 
   const setUser = useCallback((u: ApiUser | null) => {
     setUserState(u);
@@ -90,10 +101,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [setUser]);
 
+  /** Logout: end session only — trusted-device cookie stays (vault code screen next). */
   const logout = useCallback(() => {
     clearEncryption();
     void api.logout();
-    clearSession();
     clearClientMemory();
     setNotificationViewer(null);
     setUser(null);
@@ -104,16 +115,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [setUser]);
 
-  // Restore Neon session on load (tokens live in localStorage)
   useEffect(() => {
     let cancelled = false;
     purgeLegacyLocalStorage();
+    try {
+      localStorage.removeItem("grova_primary_token");
+    } catch {
+      /* ignore */
+    }
 
     (async () => {
-      if (!hasSession()) {
-        if (!cancelled) setAuthReady(true);
-        return;
-      }
+      const trusted = await api.validatePrimarySession();
+      if (cancelled) return;
+      setTrustedDevice(trusted);
 
       try {
         const restore = () => api.restoreSession();
@@ -245,11 +259,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         partner,
         chatThemeId,
         authReady,
+        trustedDevice,
         setUser,
         refreshProfiles,
         refreshCouplePrefs,
         updateChatTheme,
         logout,
+        refreshTrustedDevice,
       }}
     >
       {children}
@@ -260,3 +276,5 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 export function useAuth() {
   return useContext(AuthContext);
 }
+
+export { INACTIVITY_LOCK_MS };

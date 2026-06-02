@@ -5,10 +5,10 @@ import { Toaster as SonnerToaster } from "@/components/Toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Layout } from "@/components/Layout";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { AuthProvider, useAuth } from "@/lib/auth";
+import { AuthProvider, useAuth, INACTIVITY_LOCK_MS } from "@/lib/auth";
 import Login from "@/pages/Login";
 import Home from "@/pages/Home";
-import { lazy, Suspense, type ReactNode, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, type ReactNode, useEffect, useRef, useState } from "react";
 
 const Messages = lazy(() => import("@/pages/Messages"));
 import Create from "@/pages/Create";
@@ -28,8 +28,6 @@ import { AppLockGate } from "@/components/AppLockGate";
 const queryClient = new QueryClient();
 
 function PageWrapper({ children }: { children: ReactNode }) {
-  const [location] = useLocation();
-  
   return (
     <div className="w-full h-full min-h-0">
       {children}
@@ -53,54 +51,49 @@ function AuthLoading() {
 function ProtectedRouter() {
   const { user, authReady } = useAuth();
   const [unlocked, setUnlocked] = useState(false);
-  const lockKey = useMemo(() => (user ? `grova_unlock_until_${user.id}` : ""), [user]);
-  const activityKey = useMemo(() => (user ? `grova_last_activity_${user.id}` : ""), [user]);
+  const lastActivityRef = useRef(Date.now());
+
+  const markUnlocked = () => {
+    lastActivityRef.current = Date.now();
+    setUnlocked(true);
+  };
 
   useEffect(() => {
-    if (!user || !lockKey) return;
-    const until = Number(localStorage.getItem(lockKey) || "0");
-    setUnlocked(until > Date.now());
-  }, [lockKey, user]);
+    const onVaultUnlocked = () => markUnlocked();
+    window.addEventListener("grova-vault-unlocked", onVaultUnlocked);
+    return () => window.removeEventListener("grova-vault-unlocked", onVaultUnlocked);
+  }, []);
 
   useEffect(() => {
-    if (!user || !unlocked || !activityKey || !lockKey) return;
-    const mark = () => localStorage.setItem(activityKey, String(Date.now()));
-    mark();
+    if (!user || !unlocked) return;
+    const mark = () => {
+      lastActivityRef.current = Date.now();
+    };
     const events: Array<keyof WindowEventMap> = ["mousemove", "keydown", "click", "touchstart", "focus"];
     events.forEach((evt) => window.addEventListener(evt, mark, { passive: true }));
     const timer = window.setInterval(() => {
-      const last = Number(localStorage.getItem(activityKey) || "0");
-      if (Date.now() - last > 10 * 60 * 60 * 1000) {
+      if (Date.now() - lastActivityRef.current > INACTIVITY_LOCK_MS) {
         setUnlocked(false);
-        localStorage.removeItem(lockKey);
       }
     }, 60_000);
     return () => {
       events.forEach((evt) => window.removeEventListener(evt, mark));
       window.clearInterval(timer);
     };
-  }, [user, unlocked, activityKey, lockKey]);
+  }, [user, unlocked]);
 
   if (!authReady) {
     return <AuthLoading />;
   }
 
+  // No session: new device → email+password+code; trusted device → code only (Login handles both)
   if (!user) {
     return <Login />;
   }
 
+  // Active session but vault locked (refresh, inactivity, reopen)
   if (!unlocked) {
-    return (
-      <AppLockGate
-        name={user.name}
-        onUnlocked={() => {
-          if (!lockKey) return;
-          localStorage.setItem(lockKey, String(Date.now() + 10 * 60 * 60 * 1000));
-          localStorage.setItem(activityKey, String(Date.now()));
-          setUnlocked(true);
-        }}
-      />
-    );
+    return <AppLockGate name={user.name} onUnlocked={markUnlocked} />;
   }
 
   return (
