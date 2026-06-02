@@ -21,8 +21,8 @@ interface SessionData {
   };
 }
 
-const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
-const REFRESH_TOKEN_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 days
+const SESSION_DURATION = 30 * 24 * 60 * 60 * 1000; // 30 days
+const REFRESH_TOKEN_DURATION = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 // Device tracking
 interface DeviceInfo {
@@ -278,13 +278,17 @@ export async function destroySession(token: string): Promise<void> {
 // Authentication middleware
 export async function authenticate(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
   const authHeader = req.headers.authorization;
+  const cookieToken =
+    req && typeof (req as unknown as { cookies?: Record<string, string> }).cookies?.grova_token === "string"
+      ? (req as unknown as { cookies: Record<string, string> }).cookies.grova_token
+      : undefined;
   
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  if ((!authHeader || !authHeader.startsWith('Bearer ')) && !cookieToken) {
     res.status(401).json({ error: 'Unauthorized: No token provided' });
     return;
   }
   
-  const token = authHeader.substring(7);
+  const token = authHeader?.startsWith("Bearer ") ? authHeader.substring(7) : cookieToken!;
   const session = await validateSession(token);
   
   if (!session) {

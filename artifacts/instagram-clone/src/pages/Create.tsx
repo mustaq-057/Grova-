@@ -1,161 +1,281 @@
-import { useState, useRef } from "react";
-import { ImagePlus, MapPin, Tag, ChevronRight, X } from "lucide-react";
+import { useState, useRef, useEffect, memo } from "react";
+import { ImagePlus, X, Check, MapPin, Plus } from "lucide-react";
 import { motion } from "framer-motion";
+import { useAuth } from "@/lib/auth";
+import { useLocation } from "wouter";
+import { savePost, getPosts, clearLegacyLocalMedia } from "@/lib/local-posts";
+import { uploadMediaToB2 } from "@/lib/media-upload";
+import { ImageCropModal } from "@/components/ImageCropModal";
 
-export default function Create() {
+const MAX_IMAGES = 20;
+
+type QueuedPhoto = {
+  id: string;
+  dataUrl: string;
+};
+
+export default memo(function Create() {
+  const { user } = useAuth();
+  const [, setLocation] = useLocation();
+  const [queue, setQueue] = useState<QueuedPhoto[]>([]);
+  const [cropId, setCropId] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
-  const [preview, setPreview] = useState<string | null>(null);
   const [caption, setCaption] = useState("");
-  const [location, setLocation] = useState("");
-  const [step, setStep] = useState<"upload" | "edit">("upload");
+  const [location, setLocationLabel] = useState("");
+  const [step, setStep] = useState<"pick" | "review">("pick");
+  const [sharing, setSharing] = useState(false);
+  const [photoCount, setPhotoCount] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFile = (file: File) => {
-    if (!file.type.startsWith("image/")) return;
-    const url = URL.createObjectURL(file);
-    setPreview(url);
-    setStep("edit");
+  const myId = user?.id ?? "me";
+  const slotsLeft = Math.max(0, MAX_IMAGES - photoCount);
+  const canAddMore = slotsLeft > queue.length;
+
+  useEffect(() => {
+    if (!user) return;
+    getPosts(user.id)
+      .then((posts) => setPhotoCount(posts.length))
+      .catch(() => setPhotoCount(0));
+  }, [user]);
+
+  const addFiles = (files: FileList | File[]) => {
+    const list = Array.from(files).filter((f) => f.type.startsWith("image/"));
+    if (list.length === 0) {
+      alert("Only photos are supported.");
+      return;
+    }
+    const room = slotsLeft - queue.length;
+    if (room <= 0) {
+      alert(`You already have ${MAX_IMAGES} photos. Delete some from your grid to add more.`);
+      return;
+    }
+    const toAdd = list.slice(0, room);
+    let added = 0;
+    toAdd.forEach((file) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const dataUrl = reader.result as string;
+        if (!dataUrl) return;
+        setQueue((prev) => [...prev, { id: crypto.randomUUID(), dataUrl }]);
+        added += 1;
+        if (added === 1) setStep("review");
+      };
+      reader.readAsDataURL(file);
+    });
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setDragging(false);
-    const file = e.dataTransfer.files[0];
-    if (file) handleFile(file);
+    if (e.dataTransfer.files.length) addFiles(e.dataTransfer.files);
   };
 
-  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) handleFile(file);
+  const removeFromQueue = (id: string) => {
+    setQueue((prev) => {
+      const next = prev.filter((p) => p.id !== id);
+      if (next.length === 0) setStep("pick");
+      return next;
+    });
   };
 
-  const handleReset = () => {
-    setPreview(null);
-    setCaption("");
-    setLocation("");
-    setStep("upload");
+  const applyCrop = (cropped: string) => {
+    if (!cropId) return;
+    setQueue((prev) => prev.map((p) => (p.id === cropId ? { ...p, dataUrl: cropped } : p)));
+    setCropId(null);
   };
+
+  const shareAll = async () => {
+    if (!user || queue.length === 0) return;
+    if (queue.length > slotsLeft) {
+      alert(`You can only add ${slotsLeft} more photo(s).`);
+      return;
+    }
+    setSharing(true);
+    try {
+      clearLegacyLocalMedia(myId);
+      for (const photo of queue) {
+        const mediaUrl = await uploadMediaToB2(photo.dataUrl);
+        await savePost(myId, {
+          image: mediaUrl,
+          caption: caption.trim(),
+          location: location.trim(),
+          ratio: "4:5",
+          at: new Date().toISOString(),
+        });
+      }
+      setQueue([]);
+      setCaption("");
+      setLocationLabel("");
+      setStep("pick");
+      setLocation("/");
+    } catch (err) {
+      console.error("Share failed:", err);
+      alert(err instanceof Error ? err.message : "Failed to upload. Check your connection.");
+    } finally {
+      setSharing(false);
+    }
+  };
+
+  const cropTarget = queue.find((p) => p.id === cropId);
 
   return (
-    <div className="max-w-[640px] mx-auto px-4 py-6 pb-16 md:pb-6">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-lg font-semibold">Create new post</h1>
-        {step === "edit" && (
+    <div className="max-w-[640px] mx-auto px-4 py-6 pb-24 md:pb-8">
+      <div className="flex items-center justify-between mb-2">
+        <h1 className="text-lg font-semibold">Upload photos</h1>
+        {step === "review" && (
           <button
-            onClick={handleReset}
-            className="text-muted-foreground hover:text-foreground transition-colors"
-            data-testid="button-reset"
+            type="button"
+            onClick={() => {
+              setQueue([]);
+              setStep("pick");
+            }}
+            className="p-2 hover:bg-secondary rounded-full"
+            aria-label="Cancel"
           >
             <X className="w-5 h-5" />
           </button>
         )}
       </div>
 
-      {step === "upload" ? (
+      <p className="text-xs text-muted-foreground mb-4">
+        Photos only · {photoCount + queue.length}/{MAX_IMAGES} · tap a photo to crop
+      </p>
+
+      {step === "pick" ? (
         <motion.div
-          initial={{ opacity: 0, y: 10 }}
+          initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          className={`border-2 border-dashed rounded-2xl flex flex-col items-center justify-center gap-4 py-20 cursor-pointer transition-colors ${
-            dragging ? "border-primary bg-primary/5" : "border-border hover:border-muted-foreground/50"
+          className={`border-2 border-dashed rounded-2xl flex flex-col items-center justify-center gap-4 py-16 px-6 transition-all ${
+            !canAddMore
+              ? "border-border opacity-60 cursor-not-allowed"
+              : dragging
+                ? "border-primary bg-primary/10 scale-[1.01] cursor-pointer"
+                : "border-border hover:border-primary/40 hover:bg-secondary/20 cursor-pointer"
           }`}
-          onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+          onDragOver={(e) => {
+            if (!canAddMore) return;
+            e.preventDefault();
+            setDragging(true);
+          }}
           onDragLeave={() => setDragging(false)}
-          onDrop={handleDrop}
-          onClick={() => fileInputRef.current?.click()}
+          onDrop={canAddMore ? handleDrop : undefined}
+          onClick={() => canAddMore && fileInputRef.current?.click()}
           data-testid="upload-dropzone"
         >
-          <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center">
-            <ImagePlus className="w-7 h-7 text-muted-foreground" />
+          <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 to-pink-500/20 flex items-center justify-center">
+            <ImagePlus className="w-9 h-9 text-primary" />
           </div>
           <div className="text-center">
-            <p className="font-medium">Drag and drop a photo</p>
-            <p className="text-sm text-muted-foreground mt-1">or click to select from your device</p>
+            <p className="font-semibold text-base">
+              {!canAddMore ? "Photo limit reached" : "Add photos to your feed"}
+            </p>
+            <p className="text-sm text-muted-foreground mt-1">Select one or many · crop each one</p>
           </div>
-          <button
-            className="px-5 py-2 bg-primary text-primary-foreground text-sm font-semibold rounded-lg hover:bg-primary/90 transition-colors"
-            data-testid="button-select-photo"
-          >
-            Select from device
-          </button>
+          {canAddMore && (
+            <button
+              type="button"
+              className="px-6 py-2.5 bg-primary text-primary-foreground text-sm font-semibold rounded-xl shadow-md"
+            >
+              Choose photos
+            </button>
+          )}
           <input
             ref={fileInputRef}
             type="file"
             accept="image/*"
+            multiple
             className="hidden"
-            onChange={handleFileInput}
-            data-testid="input-file"
+            onChange={(e) => {
+              if (e.target.files?.length) addFiles(e.target.files);
+              e.target.value = "";
+            }}
           />
         </motion.div>
       ) : (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex flex-col gap-4"
-        >
-          {/* Preview image */}
-          {preview && (
-            <div className="rounded-xl overflow-hidden aspect-square w-full">
-              <img src={preview} alt="Preview" className="w-full h-full object-cover" data-testid="img-preview" />
-            </div>
-          )}
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
+          <div className="grid grid-cols-3 gap-2">
+            {queue.map((photo) => (
+              <div key={photo.id} className="relative aspect-square rounded-xl overflow-hidden bg-secondary/30 group">
+                <button type="button" className="absolute inset-0" onClick={() => setCropId(photo.id)}>
+                  <img src={photo.dataUrl} alt="" className="w-full h-full object-cover" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => removeFromQueue(photo.id)}
+                  className="absolute top-1 right-1 w-7 h-7 bg-black/70 rounded-full flex items-center justify-center text-white z-10"
+                  aria-label="Remove"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+            {canAddMore && (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="aspect-square rounded-xl border-2 border-dashed border-primary/50 flex flex-col items-center justify-center gap-1 text-primary hover:bg-primary/10 transition-colors"
+                aria-label="Add more photos"
+              >
+                <Plus className="w-8 h-8" />
+                <span className="text-[10px] font-semibold">Add more</span>
+              </button>
+            )}
+          </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={(e) => {
+              if (e.target.files?.length) addFiles(e.target.files);
+              e.target.value = "";
+            }}
+          />
 
-          {/* Caption */}
-          <div className="border border-border rounded-xl p-3">
+          <div className="border border-border rounded-xl p-3 focus-within:ring-2 focus-within:ring-primary/30">
             <textarea
-              placeholder="Write a caption..."
+              placeholder="Caption for all photos (optional)..."
               value={caption}
               onChange={(e) => setCaption(e.target.value)}
-              rows={4}
-              className="w-full bg-transparent text-sm outline-none resize-none placeholder:text-muted-foreground text-foreground"
+              rows={3}
+              className="w-full bg-transparent text-sm outline-none resize-none"
               maxLength={2200}
-              data-testid="input-caption"
             />
-            <div className="flex justify-between items-center mt-2 border-t border-border pt-2">
-              <span className="text-xs text-muted-foreground">{caption.length} / 2200</span>
-            </div>
           </div>
 
-          {/* Location */}
-          <div className="flex items-center justify-between border border-border rounded-xl px-4 py-3 cursor-pointer hover:bg-secondary/50 transition-colors">
-            <div className="flex items-center gap-2 flex-1">
-              <MapPin className="w-4 h-4 text-muted-foreground shrink-0" />
-              <input
-                type="text"
-                placeholder="Add location"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                className="bg-transparent text-sm outline-none flex-1 placeholder:text-muted-foreground text-foreground"
-                data-testid="input-location"
-              />
-            </div>
-            <ChevronRight className="w-4 h-4 text-muted-foreground" />
+          <div className="flex items-center gap-2 border border-border rounded-xl px-4 py-3">
+            <MapPin className="w-4 h-4 text-muted-foreground shrink-0" />
+            <input
+              type="text"
+              placeholder="Location (optional)"
+              value={location}
+              onChange={(e) => setLocationLabel(e.target.value)}
+              className="flex-1 bg-transparent text-sm outline-none"
+            />
           </div>
 
-          {/* Tag people */}
-          <div className="flex items-center justify-between border border-border rounded-xl px-4 py-3 cursor-pointer hover:bg-secondary/50 transition-colors">
-            <div className="flex items-center gap-2">
-              <Tag className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Tag people</span>
-            </div>
-            <ChevronRight className="w-4 h-4 text-muted-foreground" />
-          </div>
-
-          {/* Advanced settings row */}
-          <div className="flex items-center justify-between border border-border rounded-xl px-4 py-3 cursor-pointer hover:bg-secondary/50 transition-colors">
-            <span className="text-sm text-muted-foreground">Advanced settings</span>
-            <ChevronRight className="w-4 h-4 text-muted-foreground" />
-          </div>
-
-          {/* Share button */}
           <motion.button
-            whileTap={{ scale: 0.97 }}
-            className="w-full py-3 bg-primary text-primary-foreground font-semibold rounded-xl hover:bg-primary/90 transition-colors"
-            data-testid="button-share"
+            whileTap={{ scale: 0.98 }}
+            type="button"
+            disabled={sharing || queue.length === 0}
+            onClick={shareAll}
+            className="w-full py-3.5 bg-primary text-primary-foreground font-semibold rounded-xl flex items-center justify-center gap-2 disabled:opacity-60"
           >
-            Share
+            <Check className="w-5 h-5" />
+            {sharing ? "Uploading…" : `Share ${queue.length} photo${queue.length === 1 ? "" : "s"}`}
           </motion.button>
         </motion.div>
       )}
+
+      {cropTarget && (
+        <ImageCropModal
+          imageSrc={cropTarget.dataUrl}
+          title="Crop photo"
+          onCancel={() => setCropId(null)}
+          onApply={applyCrop}
+        />
+      )}
     </div>
   );
-}
+});

@@ -5,6 +5,11 @@
   "type": "module",
   "scripts": {
     "hello": "tsx ./src/hello.ts",
+    "smoke:api": "tsx ./src/api-smoke-test.ts",
+    "cleanup": "tsx ./src/cleanup-notifications.ts",
+    "check:profiles": "tsx ./src/check-profiles.ts",
+    "debug:profiles": "tsx ./src/debug-profiles.ts",
+    "health:check": "tsx ./src/health-check.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {

@@ -1,199 +1,202 @@
-import { useState } from "react";
-import { Heart, MessageCircle, Bookmark, Send, MoreHorizontal } from "lucide-react";
+import { useEffect, useState, memo } from "react";
+import { Link } from "wouter";
+import { MessageCircle, BookOpen, Heart, ImagePlus, Shield, Clock } from "lucide-react";
 import { motion } from "framer-motion";
-import { MOCK_STORIES, MOCK_POSTS, ME, WIFE } from "@/lib/mock-data";
+import { useAuth } from "@/lib/auth";
+import { api, type ApiUser } from "@/lib/api";
+import { isEncryptionReady } from "@/lib/crypto";
+import { AvatarImage } from "@/components/AvatarImage";
+import { PostFeed } from "@/components/PostFeed";
+import { PARTNER_CHANGED } from "@/lib/couple-sync";
 
-function StoriesRow() {
-  return (
-    <div className="flex gap-5 px-4 py-4 border-b border-border">
-      {MOCK_STORIES.map((story) => (
-        <div key={story.id} className="flex flex-col items-center gap-1.5 cursor-pointer" data-testid={`story-${story.id}`}>
-          <div className="story-ring hover:scale-105 transition-transform">
-            <div className="bg-background rounded-full p-[2px]">
-              <img
-                src={story.user.avatar}
-                alt={story.user.username}
-                className="w-16 h-16 rounded-full object-cover"
-              />
-            </div>
-          </div>
-          <span className="text-[12px] text-muted-foreground font-medium">
-            {story.user.id === "me" ? "You" : story.user.name}
-          </span>
-        </div>
-      ))}
-    </div>
-  );
-}
+export default memo(function Home() {
+  const { user, partner: authPartner } = useAuth();
+  const [partner, setPartner] = useState<ApiUser | null>(authPartner);
+  const [moroccoTime, setMoroccoTime] = useState("");
+  const [indiaTime, setIndiaTime] = useState("");
+  const [loadingPartner, setLoadingPartner] = useState(true);
 
-function PostCard({ post }: { post: typeof MOCK_POSTS[0] }) {
-  const [liked, setLiked] = useState(post.isLiked);
-  const [saved, setSaved] = useState(post.isSaved);
-  const [likeCount, setLikeCount] = useState(post.likes);
-  const [showHeart, setShowHeart] = useState(false);
-  const [comment, setComment] = useState("");
-  const [comments, setComments] = useState(post.comments);
+  const partnerId = user?.id === "me" ? "wife" : "me";
 
-  const handleLike = () => {
-    setLiked((prev) => !prev);
-    setLikeCount((prev) => (liked ? prev - 1 : prev + 1));
-  };
-
-  const handleDoubleTap = () => {
-    if (!liked) {
-      setLiked(true);
-      setLikeCount((prev) => prev + 1);
+  useEffect(() => {
+    if (authPartner) {
+      setPartner(authPartner);
+      setLoadingPartner(false);
     }
-    setShowHeart(true);
-    setTimeout(() => setShowHeart(false), 900);
-  };
+  }, [authPartner]);
 
-  const submitComment = () => {
-    if (!comment.trim()) return;
-    setComments((prev) => [
-      ...prev,
-      { id: `c-new-${Date.now()}`, user: ME, text: comment.trim() },
-    ]);
-    setComment("");
-  };
+  useEffect(() => {
+    const onPartner = (e: Event) => {
+      setPartner((e as CustomEvent<ApiUser>).detail);
+      setLoadingPartner(false);
+    };
+    window.addEventListener(PARTNER_CHANGED, onPartner);
+    return () => window.removeEventListener(PARTNER_CHANGED, onPartner);
+  }, []);
 
-  const isMyPost = post.user.id === "me";
+  useEffect(() => {
+    if (partner) return;
+    setLoadingPartner(true);
+    api.getUsers().then((users) => {
+      const p = users.find((u) => u.id === partnerId);
+      if (p) setPartner(p);
+      setLoadingPartner(false);
+    }).catch((error) => {
+      console.error('Failed to fetch partner data:', error);
+      setLoadingPartner(false);
+    });
+    
+    api.getPresence().then((presence) => {
+      const partnerOnline = presence[partnerId];
+      setPartnerOnline(partnerOnline !== undefined && Date.now() - partnerOnline < 30000);
+    }).catch((error) => {
+      console.error('Failed to fetch presence data:', error);
+    });
+  }, [partnerId, partner]);
 
-  return (
-    <article className="border-b border-border pb-4" data-testid={`post-${post.id}`}>
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3">
-        <div className="flex items-center gap-3">
-          <div className="story-ring">
-            <div className="bg-background rounded-full p-[2px]">
-              <img src={post.user.avatar} alt={post.user.username} className="w-9 h-9 rounded-full object-cover" />
-            </div>
-          </div>
-          <div>
-            <p className="text-sm font-semibold" data-testid={`text-username-${post.id}`}>
-              {isMyPost ? "You" : post.user.name}
-            </p>
-            <p className="text-[11px] text-muted-foreground">{post.timeAgo}</p>
-          </div>
-        </div>
-        <button className="text-muted-foreground hover:text-foreground transition-colors p-1" data-testid={`button-more-${post.id}`}>
-          <MoreHorizontal className="w-5 h-5" />
-        </button>
-      </div>
+  const [partnerOnline, setPartnerOnline] = useState(false);
 
-      {/* Image */}
-      <div className="relative cursor-pointer select-none" onDoubleClick={handleDoubleTap} data-testid={`img-post-${post.id}`}>
-        <img src={post.image} alt="Post" className="w-full object-cover max-h-[600px]" />
-        {showHeart && (
-          <motion.div
-            className="absolute inset-0 flex items-center justify-center pointer-events-none"
-            initial={{ opacity: 0, scale: 0.5 }}
-            animate={{ opacity: 1, scale: 1.2 }}
-            transition={{ duration: 0.3 }}
-          >
-            <Heart className="w-24 h-24 fill-white text-white drop-shadow-2xl" />
-          </motion.div>
-        )}
-      </div>
+  // Update live time for Morocco and India
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      const timeOpts: Intl.DateTimeFormatOptions = {
+        timeZone: "Africa/Casablanca",
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+      };
+      const moroccoTimeStr = now.toLocaleTimeString("en-US", timeOpts);
+      const indiaTimeStr = now.toLocaleTimeString("en-US", { ...timeOpts, timeZone: "Asia/Kolkata" });
+      setMoroccoTime(moroccoTimeStr);
+      setIndiaTime(indiaTimeStr);
+    };
+    updateTime();
+    const interval = setInterval(updateTime, 30_000);
+    return () => clearInterval(interval);
+  }, []);
 
-      {/* Actions */}
-      <div className="px-4 pt-3">
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-4">
-            <motion.button whileTap={{ scale: 1.3 }} onClick={handleLike} data-testid={`button-like-${post.id}`}>
-              <Heart
-                className={`w-6 h-6 transition-all ${liked ? "fill-red-500 text-red-500" : "text-foreground"}`}
-                strokeWidth={1.5}
-              />
-            </motion.button>
-            <button className="text-foreground hover:text-muted-foreground transition-colors" data-testid={`button-comment-${post.id}`}>
-              <MessageCircle className="w-6 h-6" strokeWidth={1.5} />
-            </button>
-            <button className="text-foreground hover:text-muted-foreground transition-colors" data-testid={`button-share-${post.id}`}>
-              <Send className="w-6 h-6" strokeWidth={1.5} />
-            </button>
-          </div>
-          <motion.button whileTap={{ scale: 1.2 }} onClick={() => setSaved((s) => !s)} data-testid={`button-save-${post.id}`}>
-            <Bookmark
-              className={`w-6 h-6 transition-all ${saved ? "fill-foreground text-foreground" : "text-foreground"}`}
-              strokeWidth={1.5}
-            />
-          </motion.button>
-        </div>
+  const shortcuts = [
+    { href: "/chat", icon: MessageCircle, label: "Chat", desc: "Messages & calls" },
+    { href: "/dua", icon: BookOpen, label: "Duas", desc: "Shared prayers" },
+    { href: "/memories", icon: Heart, label: "Memories", desc: "Your moments" },
+    { href: "/create", icon: ImagePlus, label: "Photos", desc: "Upload an image" },
+  ];
 
-        {/* Liked by */}
-        <div className="flex items-center gap-2 mb-1.5">
-          <div className="flex -space-x-1.5">
-            <img src={liked ? ME.avatar : WIFE.avatar} className="w-5 h-5 rounded-full border border-background object-cover" alt="" />
-          </div>
-          <p className="text-sm">
-            {liked ? (
-              <span>Liked by <span className="font-semibold">{isMyPost ? "Luna" : "you"}</span></span>
-            ) : (
-              <span className="text-muted-foreground">Be the first to like</span>
-            )}
-          </p>
-        </div>
-
-        <p className="text-sm leading-relaxed">
-          <span className="font-semibold mr-1">{isMyPost ? "you" : post.user.username}</span>
-          {post.caption}
-        </p>
-
-        {comments.length > 0 && (
-          <div className="mt-1.5 space-y-0.5">
-            {comments.map((c) => (
-              <p key={c.id} className="text-sm">
-                <span className="font-semibold mr-1">{c.user.id === "me" ? "you" : c.user.username}</span>
-                <span className="text-foreground/80">{c.text}</span>
-              </p>
-            ))}
-          </div>
-        )}
-
-        {/* Comment input */}
-        <div className="flex items-center gap-2 mt-3 border-t border-border pt-3">
-          <img src={ME.avatar} alt="" className="w-6 h-6 rounded-full object-cover shrink-0" />
-          <input
-            type="text"
-            placeholder="Add a comment..."
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && submitComment()}
-            className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/50 outline-none"
-            data-testid={`input-comment-${post.id}`}
-          />
-          {comment && (
-            <button
-              onClick={submitComment}
-              className="text-primary text-sm font-semibold shrink-0"
-              data-testid={`button-post-comment-${post.id}`}
-            >
-              Post
-            </button>
-          )}
-        </div>
-      </div>
-    </article>
-  );
-}
-
-export default function Home() {
   return (
     <div className="max-w-[470px] mx-auto pb-20 md:pb-6">
-      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur px-4 py-3 flex items-center justify-between border-b border-border">
-        <span className="font-serif italic text-xl font-bold text-primary">Grova</span>
-        <div className="flex items-center gap-3">
-          <img src={WIFE.avatar} alt="Wife" className="w-7 h-7 rounded-full object-cover border border-primary/40" />
-          <img src={ME.avatar} alt="Me" className="w-7 h-7 rounded-full object-cover border border-primary/40" />
-        </div>
-      </div>
-      <StoriesRow />
-      <div className="mt-2">
-        {MOCK_POSTS.map((post) => (
-          <PostCard key={post.id} post={post} />
-        ))}
-      </div>
+      <motion.div 
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+        className="sticky top-0 z-10 bg-background/95 backdrop-blur px-4 py-3 flex items-center justify-between border-b border-border/50"
+      >
+        <span className="font-serif italic text-xl font-bold text-primary" aria-label="Grova app logo">Grova</span>
+        {isEncryptionReady() && (
+          <span className="flex items-center gap-1 text-[10px] text-green-500 bg-green-500/10 px-2 py-1 rounded-full border border-green-500/20" role="status" aria-label="End-to-end encryption active">
+            <Shield className="w-3 h-3" aria-hidden="true" /> Encrypted
+          </span>
+        )}
+      </motion.div>
+
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.1, duration: 0.3 }}
+        className="px-4 py-8 text-center"
+      >
+        <p className="text-sm text-muted-foreground">Welcome back</p>
+        <h1 className="text-2xl font-bold mt-1">{user?.name ?? "You"}</h1>
+        {loadingPartner ? (
+          <div className="flex items-center justify-center gap-3 mt-6">
+            <div className="w-16 h-16 rounded-full bg-secondary/50 animate-pulse" />
+            <Heart className="w-6 h-6 text-primary fill-primary" />
+            <div className="w-16 h-16 rounded-full bg-secondary/50 animate-pulse" />
+          </div>
+        ) : partner && (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.2, duration: 0.3 }}
+            className="flex items-center justify-center gap-3 mt-6"
+          >
+            <div className="relative">
+              <AvatarImage src={user?.avatar} userId={user?.id ?? "me"} alt="" className="w-16 h-16 rounded-full object-cover border-2 border-primary/30 shadow-lg" />
+              <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-2 border-background" aria-label="Online status" />
+            </div>
+            <motion.div 
+              animate={{ scale: [1, 1.2, 1] }}
+              transition={{ repeat: Infinity, duration: 1.5 }}
+              aria-hidden="true"
+            >
+              <Heart className="w-6 h-6 text-primary fill-primary" />
+            </motion.div>
+            <div className="relative">
+              <AvatarImage
+                src={partner.avatar}
+                userId={partner.id}
+                alt=""
+                className="w-16 h-16 rounded-full object-cover border-2 border-primary/30 shadow-lg"
+              />
+              <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-2 border-background ${partnerOnline ? "bg-green-500" : "bg-gray-400"}`} aria-label="Online status" />
+            </div>
+          </motion.div>
+        )}
+        <p className="text-sm text-muted-foreground mt-4">
+          {partner ? `You & ${partner.name}` : "Your private space"}
+        </p>
+        
+        {/* Live Time Display */}
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3, duration: 0.3 }}
+          className="flex items-center justify-center gap-4 mt-6"
+        >
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-secondary/50 rounded-full">
+            <Clock className="w-3.5 h-3.5 text-primary" />
+            <span className="text-xs font-medium">Morocco: {moroccoTime}</span>
+          </div>
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-secondary/50 rounded-full">
+            <Clock className="w-3.5 h-3.5 text-primary" />
+            <span className="text-xs font-medium">India: {indiaTime}</span>
+          </div>
+        </motion.div>
+      </motion.div>
+
+      <motion.div 
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3, duration: 0.3 }}
+        className="grid grid-cols-2 gap-3 px-4"
+      >
+        {shortcuts.map((s, i) => {
+          const Icon = s.icon;
+          return (
+            <Link key={s.href} href={s.href}>
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 + (i * 0.05) }}
+                whileHover={{ scale: 1.02, y: -2 }}
+                whileTap={{ scale: 0.98 }}
+                className="p-4 bg-gradient-to-br from-card to-card/50 border border-border/50 rounded-2xl hover:border-primary/40 hover:shadow-lg transition-all cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                role="button"
+                tabIndex={0}
+                aria-label={`Navigate to ${s.label}: ${s.desc}`}
+              >
+                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mb-3 group-hover:bg-primary/20 transition-colors">
+                  <Icon className="w-5 h-5 text-primary" aria-hidden="true" />
+                </div>
+                <p className="font-semibold text-sm">{s.label}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{s.desc}</p>
+              </motion.div>
+            </Link>
+          );
+        })}
+      </motion.div>
+
+      <PostFeed />
     </div>
   );
-}
+});
