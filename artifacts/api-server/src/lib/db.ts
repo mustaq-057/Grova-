@@ -334,6 +334,21 @@ export async function initDb() {
       [appConfig.defaultCoupleCode],
     );
 
+    await db.execute(`CREATE TABLE IF NOT EXISTS profile_codes (
+      profile_id TEXT PRIMARY KEY,
+      code TEXT NOT NULL
+    )`);
+
+    const sharedCodeRow = await db.execute("SELECT code FROM couple_code ORDER BY id LIMIT 1", []);
+    const seedCode =
+      String((sharedCodeRow.rows[0]?.code as string | undefined) ?? "").trim() || appConfig.defaultCoupleCode;
+    for (const profileId of ["me", "wife"]) {
+      await db.execute(
+        `INSERT INTO profile_codes (profile_id, code) VALUES ($1, $2) ON CONFLICT (profile_id) DO NOTHING`,
+        [profileId, seedCode],
+      );
+    }
+
     // Seed only missing profiles — never overwrite name/bio the user saved in Settings.
     for (const profile of appConfig.defaultProfiles) {
       await db.execute(

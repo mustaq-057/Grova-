@@ -70,7 +70,7 @@ import {
 } from "@/lib/hidden-messages";
 import { mergeMessagesById } from "@/lib/chat-sync";
 import { downloadChatAsImage } from "@/lib/chat-download";
-import { uploadMediaToB2, uploadMediaFile, readFileAsDataUrl } from "@/lib/media-upload";
+import { uploadMediaToB2, uploadMediaFile } from "@/lib/media-upload";
 import {
   classifyMediaFile,
   extractClipboardFiles,
@@ -187,6 +187,9 @@ export default function Messages() {
   const hasMessagesRef = useRef(false);
   const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const maxSseRetries = 10; // Maximum number of SSE reconnection attempts
+  const filePickInFlightRef = useRef(false);
+  const cropSendInFlightRef = useRef(false);
+  const shouldSendVoiceRef = useRef(false);
 
   const partnerId = useMemo(() => user?.id === "me" ? "wife" : "me", [user?.id]);
   const theme = THEMES.find(t => t.id === chatThemeId) ?? THEMES[0]!;
@@ -387,9 +390,23 @@ export default function Messages() {
             notifyPartnerChatActivity(msg, pName, pAvatar);
           }
           setMessages(prev => {
-            // Use Set for O(1) lookup instead of O(n) array.some
             const existingIds = new Set(prev.map(m => m.id));
-            return existingIds.has(msg.id) ? prev : [...prev, msg];
+            if (existingIds.has(msg.id)) return prev;
+            if (msg.senderId === user?.id) {
+              const optimisticIdx = prev.findIndex(
+                (m) =>
+                  m.senderId === user.id &&
+                  m.id !== msg.id &&
+                  m.type === msg.type &&
+                  Math.abs(new Date(m.timestamp).getTime() - new Date(msg.timestamp).getTime()) < 120_000,
+              );
+              if (optimisticIdx >= 0) {
+                const next = [...prev];
+                next[optimisticIdx] = msg;
+                return next;
+              }
+            }
+            return [...prev, msg];
           });
           
           if (msg.senderId === partnerId && !isNearBottomRef.current) {
@@ -1437,8 +1454,7 @@ export default function Messages() {
       scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
 
       try {
-        const dataUrl = await readFileAsDataUrl(file);
-        const url = await uploadMediaToB2(dataUrl, file.type || undefined);
+        const url = await uploadMediaFile(file, file.type || undefined);
         const outgoing = await prepareOutgoingMessage({
           senderId: user.id,
           type: "file",
@@ -1472,58 +1488,120 @@ export default function Messages() {
 
   const handlePickedFile = useCallback(
     async (file: File, clipboardItemType?: string) => {
+      if (!user || filePickInFlightRef.current) return;
+      filePickInFlightRef.current = true;
       const normalized = normalizePastedFile(file, clipboardItemType);
-      const kind = await classifyMediaFile(normalized, clipboardItemType);
+      const toastId = `media-pick-${Date.now()}`;
+      toast.loading("Preparing media…", { id: toastId });
+
+      let kind: "image" | "video" | "other";
+      try {
+        if (clipboardItemType?.startsWith("video/")) {
+          kind = "video";
+        } else if (clipboardItemType?.startsWith("image/")) {
+          kind = "image";
+        } else {
+          kind = await classifyMediaFile(normalized, clipboardItemType);
+        }
+      } catch {
+        toast.dismiss(toastId);
+        toast.error("Could not read pasted file.");
+        filePickInFlightRef.current = false;
+        return;
+      }
+
       const isEphemeral = mediaViewMode === "once" || mediaViewMode === "twice";
 
       const MAX_FILE_SIZE =
         kind === "video" ? 10 * 1024 * 1024 : kind === "image" ? 25 * 1024 * 1024 : 25 * 1024 * 1024;
       if (normalized.size > MAX_FILE_SIZE) {
-        alert(
+        toast.dismiss(toastId);
+        toast.error(
           kind === "video"
-            ? "Video too large. Maximum size is 10MB."
-            : "File too large. Maximum size is 25MB.",
+            ? "Video too large (max 10MB)."
+            : "File too large (max 25MB).",
         );
+        filePickInFlightRef.current = false;
         return;
       }
 
       try {
         if (kind === "image") {
+          toast.dismiss(toastId);
           if (isEphemeral) {
+            toast.loading("Sending photo…", { id: toastId });
             await uploadAndSendEphemeralMedia(normalized, "image", mediaViewMode);
+            toast.success("Photo sent", { id: toastId });
           } else {
-            const dataUrl = await readFileAsDataUrl(normalized);
-            setPendingImageType(normalized.type || "image/jpeg");
-            setImageToCrop(dataUrl);
+            setPendingImageType(normalized.type || clipboardItemType || "image/jpeg");
+            setImageToCrop(URL.createObjectURL(normalized));
           }
         } else if (kind === "video") {
-          const duration = await getVideoDurationSafe(normalized);
-          if (duration > 60) {
-            alert("Video duration must be 1 minute or less.");
-            return;
-          }
+          toast.loading("Sending video…", { id: toastId });
+          const mime = guessVideoMime(normalized, clipboardItemType);
+          const previewUrl = URL.createObjectURL(normalized);
+
           if (isEphemeral) {
             await uploadAndSendEphemeralMedia(normalized, "video", mediaViewMode);
-          } else {
-            const mime = guessVideoMime(normalized, clipboardItemType);
-            const url = await uploadMediaFile(normalized, mime);
-            await sendMsg({
+            URL.revokeObjectURL(previewUrl);
+            toast.dismiss(toastId);
+            return;
+          }
+
+          const tempId = crypto.randomUUID();
+          const optimistic = buildOptimisticMessage(
+            {
+              senderId: user.id,
               type: "video",
               text: normalized.name || "Video",
-              fileData: url,
+              fileData: previewUrl,
               fileType: mime,
               fileSize: normalized.size,
-            });
+            },
+            tempId,
+          );
+          setMessages((prev) => [...prev, optimistic]);
+          scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
+
+          const [duration, url] = await Promise.all([
+            getVideoDurationSafe(normalized),
+            uploadMediaFile(normalized, mime),
+          ]);
+
+          if (duration > 60) {
+            setMessages((prev) => prev.filter((m) => m.id !== tempId));
+            URL.revokeObjectURL(previewUrl);
+            toast.error("Video must be 1 minute or less.", { id: toastId });
+            return;
           }
+
+          const outgoing = await prepareOutgoingMessage({
+            senderId: user.id,
+            type: "video",
+            text: normalized.name || "Video",
+            fileData: url,
+            fileType: mime,
+            fileSize: normalized.size,
+          });
+          const saved = await api.sendMessage(outgoing);
+          const [display] = await normalizeMessages([saved]);
+          URL.revokeObjectURL(previewUrl);
+          setMessages((prev) => prev.map((m) => (m.id === tempId ? display : m)));
+          scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
+          toast.success("Video sent", { id: toastId });
         } else {
+          toast.loading("Uploading file…", { id: toastId });
           await uploadAndSendFile(normalized);
+          toast.dismiss(toastId);
         }
       } catch (error) {
         console.error("Failed to process file:", error);
-        alert(error instanceof Error ? error.message : "Failed to process file.");
+        toast.error(error instanceof Error ? error.message : "Failed to process file.", { id: toastId });
+      } finally {
+        filePickInFlightRef.current = false;
       }
     },
-    [uploadAndSendFile, sendMsg, uploadAndSendEphemeralMedia, mediaViewMode],
+    [uploadAndSendFile, uploadAndSendEphemeralMedia, mediaViewMode, user],
   );
 
   const handleFileChange = useCallback(
@@ -1540,19 +1618,20 @@ export default function Messages() {
     if (!user || blocked) return;
 
     const onDocumentPaste = (e: ClipboardEvent) => {
+      if (recording) return;
       const cd = e.clipboardData;
       const picked = extractClipboardFiles(cd);
       if (picked.length === 0) return;
 
       e.preventDefault();
-      for (const { file, itemType } of picked) {
-        void handlePickedFile(file, itemType);
-      }
+      e.stopImmediatePropagation();
+      const { file, itemType } = picked[0];
+      void handlePickedFile(file, itemType);
     };
 
-    document.addEventListener("paste", onDocumentPaste);
-    return () => document.removeEventListener("paste", onDocumentPaste);
-  }, [user, blocked, handlePickedFile]);
+    document.addEventListener("paste", onDocumentPaste, true);
+    return () => document.removeEventListener("paste", onDocumentPaste, true);
+  }, [user, blocked, handlePickedFile, recording]);
 
   useEffect(() => {
     if (!mediaViewer?.timed || mediaViewer.useVideoDuration) return;
@@ -1577,16 +1656,27 @@ export default function Messages() {
     };
   }, [mediaViewer?.timed, mediaViewer?.messageId]);
 
+  const dismissImageCrop = useCallback(() => {
+    setImageToCrop((prev) => {
+      if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
+      return null;
+    });
+  }, []);
+
   const handleCroppedImage = useCallback(async (croppedDataUrl: string) => {
-    setImageToCrop(null);
+    if (cropSendInFlightRef.current) return;
+    cropSendInFlightRef.current = true;
+    dismissImageCrop();
     try {
       const url = await uploadMediaToB2(croppedDataUrl, pendingImageType);
       await sendMsg({ type: "image", imageUrl: url, companionSticker: mediaModeSticker(mediaViewMode) });
     } catch (uploadError) {
       console.error("Failed to upload image:", uploadError);
       alert(uploadError instanceof Error ? uploadError.message : "Image upload failed.");
+    } finally {
+      cropSendInFlightRef.current = false;
     }
-  }, [pendingImageType, sendMsg, mediaModeSticker, mediaViewMode]);
+  }, [pendingImageType, sendMsg, mediaModeSticker, mediaViewMode, dismissImageCrop]);
 
   // Voice recording
   const startRecording = async () => {
@@ -1600,6 +1690,9 @@ export default function Messages() {
       recorder.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: mimeType || "audio/webm" });
         stream.getTracks().forEach(t => t.stop());
+        chunksRef.current = [];
+        if (!shouldSendVoiceRef.current) return;
+        shouldSendVoiceRef.current = false;
         const reader = new FileReader();
         reader.onloadend = async () => {
           const dataUrl = reader.result as string;
@@ -1637,24 +1730,25 @@ export default function Messages() {
     }
   };
 
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && recording) {
-      mediaRecorderRef.current.stop();
-      if (timerRef.current) clearInterval(timerRef.current);
-      setRecording(false);
-      setRecordingTime(0);
-    }
+  const sendVoiceRecording = () => {
+    if (!mediaRecorderRef.current || !recording) return;
+    shouldSendVoiceRef.current = true;
+    mediaRecorderRef.current.stop();
+    if (timerRef.current) clearInterval(timerRef.current);
+    setRecording(false);
+    setRecordingTime(0);
   };
 
   const cancelRecording = () => {
+    shouldSendVoiceRef.current = false;
     if (mediaRecorderRef.current) {
-      mediaRecorderRef.current.ondataavailable = null;
-      mediaRecorderRef.current.onstop = null;
       try { mediaRecorderRef.current.stop(); } catch { /**/ }
       streamRef.current?.getTracks().forEach(t => t.stop());
     }
     if (timerRef.current) clearInterval(timerRef.current);
-    setRecording(false); setRecordingTime(0); chunksRef.current = [];
+    setRecording(false);
+    setRecordingTime(0);
+    chunksRef.current = [];
   };
 
   // Call actions
@@ -2312,15 +2406,16 @@ export default function Messages() {
         onStickerSelect={sendSticker}
         onGifSelect={sendGif}
         onGreetingSelect={sendGreeting}
-        onImageSelect={(file) => {
-          void handlePickedFile(file);
+        onImageSelect={(file, itemType) => {
+          void handlePickedFile(file, itemType);
         }}
         mediaViewMode={mediaViewMode}
         onMediaViewModeChange={setMediaViewMode}
         onDoodleOpen={openDoodlePanel}
         doodleActive={doodleOpen}
         onStartRecording={startRecording}
-        onStopRecording={stopRecording}
+        onCancelRecording={cancelRecording}
+        onSendRecording={sendVoiceRecording}
         recording={recording}
         recordingTime={recordingTime}
         disabled={!online || blocked || editingMessage !== null}
@@ -2479,7 +2574,7 @@ export default function Messages() {
         <ImageCropModal
           imageSrc={imageToCrop}
           title="Crop before sending"
-          onCancel={() => setImageToCrop(null)}
+          onCancel={dismissImageCrop}
           onApply={handleCroppedImage}
         />
       )}

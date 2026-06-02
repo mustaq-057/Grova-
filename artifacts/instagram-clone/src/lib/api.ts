@@ -235,6 +235,7 @@ type LoginResponse = {
   csrfToken: string;
   refreshToken: string;
   deviceId?: string;
+  encryptionKey?: string;
   user: ApiUser;
 };
 
@@ -275,14 +276,14 @@ export const api = {
   revokeTrustedDevice: () =>
     apiFetch<{ success: boolean }>("/auth/revoke-trust", { method: "POST", body: JSON.stringify({}) }),
 
-  login: async (userId: string, code: string): Promise<{ user: ApiUser }> => {
+  login: async (userId: string, code: string): Promise<{ user: ApiUser; encryptionKey: string }> => {
     const data = (await apiFetch("/auth/login", {
       method: "POST",
       body: JSON.stringify({ userId, code }),
     })) as LoginResponse;
     if (data.token) saveSession(data.token, data.csrfToken, data.refreshToken);
     if (data.deviceId) setDeviceId(data.deviceId);
-    return { user: data.user };
+    return { user: data.user, encryptionKey: data.encryptionKey || code };
   },
 
   restoreSession: () => apiFetch<SessionResponse>("/auth/session"),

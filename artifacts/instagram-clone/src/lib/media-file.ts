@@ -31,21 +31,25 @@ export function extractClipboardFiles(cd: DataTransfer | null | undefined): { fi
   if (!cd) return [];
 
   const out: { file: File; itemType?: string }[] = [];
-  const seen = new Set<File>();
+  const seenKeys = new Set<string>();
+  const fileKey = (f: File) => `${f.name}|${f.size}|${f.lastModified}`;
 
   for (const item of cd.items) {
     if (item.kind !== "file") continue;
     const f = item.getAsFile();
-    if (!f || seen.has(f)) continue;
-    seen.add(f);
+    if (!f) continue;
+    const key = fileKey(f);
+    if (seenKeys.has(key)) continue;
+    seenKeys.add(key);
     out.push({ file: f, itemType: item.type || undefined });
   }
 
   for (const f of cd.files) {
-    if (seen.has(f)) continue;
-    seen.add(f);
+    const key = fileKey(f);
+    if (seenKeys.has(key)) continue;
+    seenKeys.add(key);
     const matched = [...cd.items].find((item) => item.kind === "file" && item.getAsFile() === f);
-    out.push({ file: f, itemType: matched?.type || undefined });
+    out.push({ file: f, itemType: matched?.type || f.type || undefined });
   }
 
   return out;
@@ -115,7 +119,7 @@ export async function sniffVideoFile(file: File): Promise<boolean> {
       resolve(value);
     };
 
-    const timer = setTimeout(() => finish(false), 5000);
+    const timer = setTimeout(() => finish(false), 2000);
     video.preload = "metadata";
     video.muted = true;
     video.playsInline = true;
@@ -135,7 +139,13 @@ export async function classifyMediaFile(file: File, hintType?: string): Promise<
 
   if (isVideoFile(file, hintType)) return "video";
   if (isImageFile(file, hintType)) return "image";
-  if (await sniffVideoFile(file)) return "video";
+
+  // Large clipboard blobs without MIME are usually screen recordings / videos.
+  if (file.size > 80_000 && (!file.name || GENERIC_CLIPBOARD_NAME.test(file.name))) {
+    if (await sniffVideoFile(file)) return "video";
+  } else if (await sniffVideoFile(file)) {
+    return "video";
+  }
   return "other";
 }
 
@@ -171,7 +181,7 @@ export function getVideoDurationSafe(file: File): Promise<number> {
       resolve(duration);
     };
 
-    const timer = setTimeout(() => finish(0), 5000);
+    const timer = setTimeout(() => finish(0), 2000);
     video.preload = "metadata";
     video.muted = true;
     video.playsInline = true;

@@ -94,17 +94,20 @@ export default memo(function Login() {
     setLoading(true);
     setError("");
     try {
-      const { user } = await api.login(selectedId, code);
-      await initEncryption(code.trim());
+      const { user, encryptionKey } = await api.login(selectedId, code);
+      await initEncryption(encryptionKey.trim());
       setUser(user as ApiUser);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "";
       if (msg.includes("fetch") || msg.includes("Failed") || msg.includes("Network")) {
         setError("Cannot reach the server. Run pnpm dev:grova and try again.");
       } else if (msg.toLowerCase().includes("too many")) {
-        setError("Too many wrong attempts. Please wait and try again.");
-      } else if (msg.includes("Attempts remaining: 1")) {
-        setError("Wrong code. One attempt left.");
+        setError("Too many wrong attempts. Wait 30 minutes or restart the server, then try again.");
+      } else if (/Attempts remaining: (\d+)/i.test(msg)) {
+        const left = Number(msg.match(/Attempts remaining: (\d+)/i)?.[1] ?? 0);
+        setError(
+          left === 1 ? "Wrong code. One attempt left." : `Wrong code. ${left} attempts left.`,
+        );
       } else if (msg.toLowerCase().includes("invalid code")) {
         setError("Wrong code. Check spelling and try again.");
       } else {
@@ -275,7 +278,7 @@ export default memo(function Login() {
                     {showCode ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1.5">Same shared code for both profiles. Change it anytime in Settings.</p>
+                <p className="text-xs text-muted-foreground mt-1.5">Your personal code for this profile. Change yours anytime in Settings.</p>
               </div>
 
               {error && (

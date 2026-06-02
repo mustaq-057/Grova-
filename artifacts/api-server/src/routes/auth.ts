@@ -22,7 +22,7 @@ const PRIMARY_SESSION_RENEW_MS = 30 * 24 * 60 * 60 * 1000;
 const PRIMARY_MAX_FAILED_ATTEMPTS = 2;
 const PRIMARY_BLOCK_MS = 30 * 60 * 1000;
 const primaryLoginAttempts = new Map<string, { count: number; blockedUntil: number }>();
-const CODE_MAX_FAILED_ATTEMPTS = 2;
+const CODE_MAX_FAILED_ATTEMPTS = 10;
 const CODE_BLOCK_MS = 30 * 60 * 1000;
 const coupleCodeAttempts = new Map<string, { count: number; blockedUntil: number }>();
 
@@ -152,7 +152,7 @@ function bootstrapCodeFromEnv(): string {
   return String(process.env.DEFAULT_COUPLE_CODE || "").trim();
 }
 
-/** Shared Grova code for both profiles — database wins; env only seeds empty DB. */
+/** Shared encryption secret for chat — separate from per-profile login codes. */
 async function getEffectiveCoupleCode(): Promise<string | null> {
   const codeResult = await db.execute("SELECT code FROM couple_code ORDER BY id LIMIT 1", []);
   const fromDb = String((codeResult.rows[0]?.code as string | undefined) ?? "").trim();
@@ -161,14 +161,21 @@ async function getEffectiveCoupleCode(): Promise<string | null> {
   return fromEnv || null;
 }
 
-async function setSharedGrovaCode(newCode: string): Promise<void> {
+/** Per-profile login code (Mustaq and Sara each have their own). */
+async function getProfileCode(profileId: string): Promise<string | null> {
+  const codeResult = await db.execute("SELECT code FROM profile_codes WHERE profile_id = $1", [profileId]);
+  const fromDb = String((codeResult.rows[0]?.code as string | undefined) ?? "").trim();
+  if (fromDb) return fromDb;
+  return getEffectiveCoupleCode();
+}
+
+async function setProfileCode(profileId: string, newCode: string): Promise<void> {
   const trimmed = newCode.trim();
-  const existing = await db.execute("SELECT id FROM couple_code ORDER BY id LIMIT 1", []);
-  if (existing.rows.length === 0) {
-    await db.execute("INSERT INTO couple_code (code) VALUES ($1)", [trimmed]);
-    return;
-  }
-  await db.execute("UPDATE couple_code SET code = $1", [trimmed]);
+  await db.execute(
+    `INSERT INTO profile_codes (profile_id, code) VALUES ($1, $2)
+     ON CONFLICT (profile_id) DO UPDATE SET code = $2`,
+    [profileId, trimmed],
+  );
 }
 
 function codeAttemptKey(req: { headers: Record<string, unknown>; socket: { remoteAddress?: string | null } }, userId: string): string {
@@ -318,7 +325,7 @@ router.post("/auth/login", validateBody({
       return;
     }
 
-    const storedCode = await getEffectiveCoupleCode();
+    const storedCode = await getProfileCode(userId);
     if (!storedCode || code.trim() !== storedCode.trim()) {
       const nextCount = (codeState?.count || 0) + 1;
       if (nextCount >= CODE_MAX_FAILED_ATTEMPTS) {
@@ -335,6 +342,8 @@ router.post("/auth/login", validateBody({
       return;
     }
     coupleCodeAttempts.delete(codeKey);
+
+    const encryptionKey = (await getEffectiveCoupleCode()) || storedCode;
 
     const profileResult = await db.execute("SELECT * FROM profiles WHERE id = $1", [userId]);
     const p = profileResult.rows[0];
@@ -375,6 +384,7 @@ router.post("/auth/login", validateBody({
         csrfToken,
         refreshToken,
         deviceId,
+        encryptionKey,
         user: {
           id: userId,
           username: userId === "me" ? "mustaq" : "sara",
@@ -405,6 +415,7 @@ router.post("/auth/login", validateBody({
       csrfToken,
       refreshToken,
       deviceId,
+      encryptionKey,
       user: {
         id: userId,
         username: userId === "me" ? "mustaq" : "sara",
@@ -559,7 +570,7 @@ router.post("/auth/unlock", authenticate, validateBody({
       });
       return;
     }
-    const storedCode = await getEffectiveCoupleCode();
+    const storedCode = await getProfileCode(userId);
     if (!storedCode || code.trim() !== storedCode.trim()) {
       const nextCount = (codeState?.count || 0) + 1;
       if (nextCount >= CODE_MAX_FAILED_ATTEMPTS) {
@@ -589,15 +600,16 @@ router.put("/auth/couple-code", authenticate, validateBody({
   const { newCode, currentCode } = req.body as { newCode: string; currentCode: string };
 
   try {
-    const coupleCode = await getEffectiveCoupleCode();
+    const profileId = (req as unknown as { user: { id: string } }).user.id;
+    const profileCode = await getProfileCode(profileId);
 
-    if (!coupleCode || currentCode !== coupleCode) {
+    if (!profileCode || currentCode.trim() !== profileCode.trim()) {
       res.status(401).json({ error: "Current code is wrong" });
       return;
     }
 
-    await setSharedGrovaCode(newCode);
-    res.json({ success: true, message: "Shared code updated for both of you" });
+    await setProfileCode(profileId, newCode);
+    res.json({ success: true, message: "Profile code updated for your account only" });
   } catch (err) {
     res.status(500).json({ error: "Failed to update code" });
   }

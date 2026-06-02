@@ -1,6 +1,5 @@
 import { memo, useRef, useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { extractClipboardFiles, normalizePastedFile } from "@/lib/media-file";
 import { Smile, Mic, Send, Sticker, Paperclip, X, MessageCircle, MapPin, PenTool, Zap } from "lucide-react";
 import { motion } from "framer-motion";
 import EmojiPicker from "@/components/EmojiPicker";
@@ -20,13 +19,14 @@ interface MessageInputProps {
   onStickerSelect: (sticker: string) => void;
   onGifSelect: (gif: string) => void;
   onGreetingSelect: (greeting: unknown) => void;
-  onImageSelect: (file: File) => void;
+  onImageSelect: (file: File, clipboardItemType?: string) => void;
   mediaViewMode?: "keep" | "once" | "twice";
   onMediaViewModeChange?: (mode: "keep" | "once" | "twice") => void;
   onDoodleOpen?: () => void;
   doodleActive?: boolean;
   onStartRecording: () => void;
-  onStopRecording: () => void;
+  onCancelRecording: () => void;
+  onSendRecording: () => void;
   recording: boolean;
   recordingTime: number;
   disabled: boolean;
@@ -54,7 +54,8 @@ export const MessageInput = memo(function MessageInput({
   onDoodleOpen,
   doodleActive = false,
   onStartRecording,
-  onStopRecording,
+  onCancelRecording,
+  onSendRecording,
   recording,
   recordingTime,
   disabled,
@@ -89,24 +90,6 @@ export const MessageInput = memo(function MessageInput({
     setInput(value);
     onInputActivity?.(value);
   }, [setInput, onInputActivity]);
-
-  const handlePaste = useCallback(
-    (e: React.ClipboardEvent) => {
-      if (disabled || recording) return;
-      const cd = e.clipboardData;
-      if (!cd) return;
-
-      const picked = extractClipboardFiles(cd);
-      if (picked.length === 0) return;
-
-      e.preventDefault();
-      e.stopPropagation();
-      for (const { file, itemType } of picked) {
-        onImageSelect(normalizePastedFile(file, itemType));
-      }
-    },
-    [disabled, recording, onImageSelect],
-  );
 
   const handleImageClick = useCallback(() => {
     fileInputRef.current?.click();
@@ -189,14 +172,24 @@ export const MessageInput = memo(function MessageInput({
   const iconBtnDisabled = `${iconBtn} opacity-50 cursor-not-allowed text-muted-foreground/50`;
 
   const sendOrMic = recording ? (
-    <button
-      type="button"
-      onClick={onStopRecording}
-      className="p-2.5 bg-destructive text-destructive-foreground rounded-full hover:bg-destructive/90 transition-all shrink-0"
-      aria-label="Stop recording"
-    >
-      <X className="w-5 h-5" />
-    </button>
+    <div className="flex items-center gap-1.5 shrink-0">
+      <button
+        type="button"
+        onClick={onCancelRecording}
+        className="p-2.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-all"
+        aria-label="Cancel recording"
+      >
+        <X className="w-5 h-5" />
+      </button>
+      <button
+        type="button"
+        onClick={onSendRecording}
+        className="p-2.5 bg-primary text-primary-foreground rounded-full hover:bg-primary/90 transition-all"
+        aria-label="Send voice message"
+      >
+        <Send className="w-5 h-5" />
+      </button>
+    </div>
   ) : input.trim() ? (
     <button
       type="button"
@@ -228,7 +221,6 @@ export const MessageInput = memo(function MessageInput({
       value={input}
       onChange={handleInputChange}
       onKeyDown={handleKeyDown}
-      onPaste={handlePaste}
       placeholder="Message..."
       className={`w-full min-w-0 px-4 py-2.5 bg-secondary/50 border border-border/50 rounded-full text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/50 transition-all ${
         disabled || recording ? "opacity-60 cursor-not-allowed" : ""

@@ -18,7 +18,7 @@ export function groupByDay(msgs: ApiMessage[]) {
     const dayKey = d.toDateString();
     const label =
       dayKey === now.toDateString()
-        ? "Today"
+        ? d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false })
         : dayKey === yesterday.toDateString()
           ? "Yesterday"
           : d.toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" });
