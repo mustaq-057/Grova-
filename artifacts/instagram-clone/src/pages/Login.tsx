@@ -286,7 +286,7 @@ export default memo(function Login() {
                     {showCode ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1.5">Enter code to unlock your profile.</p>
+                <p className="text-xs text-muted-foreground mt-1.5">Same code for you and Sara — unlocks your profile.</p>
               </div>
 
               {error && (

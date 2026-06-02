@@ -25,7 +25,7 @@ function scrubLockedE2E(msg: ApiMessage): ApiMessage {
   if (isE2ECiphertext(msg.text)) {
     return {
       ...msg,
-      text: "🔒 Encrypted message — log out and sign in again with your couple code.",
+      text: "🔒 Encrypted message — log out and sign in again with your code.",
     };
   }
   return msg;

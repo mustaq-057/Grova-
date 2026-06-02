@@ -29,7 +29,7 @@ function Toggle({ on, toggle }: { on: boolean; toggle: () => void }) {
 }
 
 export default memo(function Settings() {
-  const { user, setUser, logout, refreshProfiles } = useAuth();
+  const { user, partner, setUser, logout, refreshProfiles } = useAuth();
 
   const [darkMode, setDarkMode] = useState(() => getStoredDarkMode());
   const [appTheme, setAppTheme] = useState<AppThemeId>(() => getStoredAppTheme());
@@ -136,6 +136,7 @@ export default memo(function Settings() {
       await initEncryption(newCode);
       setCodeSuccess(true);
       setCurrentCode(""); setNewCode(""); setConfirmCode("");
+      toast.success(`Code updated. You and ${partner?.name ?? "your partner"} both use this same code to unlock.`);
       setTimeout(() => { setCodeSuccess(false); setShowCodeModal(false); }, 1500);
     } catch (err: unknown) {
       console.error('Failed to change code:', err);
@@ -243,7 +244,7 @@ export default memo(function Settings() {
           <motion.div whileTap={{ scale: 0.99 }} onClick={() => setShowCodeModal(true)}
             className="flex items-center gap-4 px-4 py-3.5 hover:bg-secondary/30 transition-colors cursor-pointer" data-testid="button-change-code">
             <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center"><Lock className="w-5 h-5 text-primary" strokeWidth={1.5} /></div>
-            <div className="flex-1"><p className="text-sm font-medium">Change couple code</p><p className="text-xs text-muted-foreground">Update your private login code</p></div>
+            <div className="flex-1"><p className="text-sm font-medium">Change code</p><p className="text-xs text-muted-foreground">One shared code for both of you</p></div>
             <ChevronRight className="w-4 h-4 text-muted-foreground" />
           </motion.div>
           <div className="flex items-center gap-4 px-4 py-3.5">
@@ -366,7 +367,7 @@ export default memo(function Settings() {
           <motion.div initial={{ scale: 0.92, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
             className="bg-card/95 backdrop-blur-xl border border-border/50 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-bold text-lg">Change Couple Code</h3>
+              <h3 className="font-bold text-lg">Change Code</h3>
               <button onClick={() => { setShowCodeModal(false); setCodeError(""); setCurrentCode(""); setNewCode(""); setConfirmCode(""); }} className="text-muted-foreground hover:text-foreground w-8 h-8 rounded-full flex items-center justify-center hover:bg-secondary/50 transition-all">✕</button>
             </div>
             {codeSuccess ? (
@@ -380,7 +381,7 @@ export default memo(function Settings() {
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCurrentCode(e.target.value)} 
                     placeholder="Current code"
                     className="w-full bg-secondary/50 border border-border/50 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/50 focus:ring-offset-1 transition-all pr-9 glass-input" 
-                    aria-label="Current couple code"
+                    aria-label="Current code"
                   />
                   <button 
                     type="button" 
@@ -398,7 +399,7 @@ export default memo(function Settings() {
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewCode(e.target.value)} 
                     placeholder="New code (min 4 chars)"
                     className="w-full bg-secondary/50 border border-border/50 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/50 focus:ring-offset-1 transition-all pr-9 glass-input" 
-                    aria-label="New couple code"
+                    aria-label="New code"
                   />
                   <button 
                     type="button" 
@@ -415,7 +416,7 @@ export default memo(function Settings() {
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfirmCode(e.target.value)} 
                   placeholder="Confirm new code"
                   className="w-full bg-secondary/50 border border-border/50 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/50 focus:ring-offset-1 transition-all glass-input" 
-                  aria-label="Confirm new couple code"
+                  aria-label="Confirm new code"
                 />
                 {codeError && <p className="text-destructive text-xs font-medium">{codeError}</p>}
                 <button 

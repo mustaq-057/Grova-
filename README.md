@@ -19,7 +19,7 @@ pnpm dev:grova
 | **App (use this)** | http://localhost:5000 |
 | API (direct, dev) | http://localhost:5001/api |
 
-Default couple code: `grova2024`
+Set your shared unlock **code** in Settings (or `DEFAULT_COUPLE_CODE` in `.env` for first-time seed only).
 
 `dev:grova` starts the API first, waits until it is healthy, then starts Vite.
 
@@ -102,11 +102,11 @@ Without a key, the GIF picker shows setup instructions instead of GIFs.
 
 ## End-to-end encryption
 
-Messages are encrypted in the browser with **AES-256-GCM**. The key is derived from your **couple code** (PBKDF2) and kept in session storage for that browser session.
+Messages are encrypted in the browser with **AES-256-GCM**. The key is derived from your shared **code** (PBKDF2) and kept in session storage for that browser session.
 
-- Both partners must use the **same couple code** to read each other's messages
+- Both partners must use the **same code** to read each other's messages
 - The server only stores encrypted blobs — it cannot read message text
-- Log out and log in again after changing the couple code in Settings
+- Log out and log in again after changing the code in Settings
 
 **Note:** Voice, video calls use WebRTC (not E2E through the chat encryption layer). For production-grade call privacy you would add a TURN server and optional DTLS.
 

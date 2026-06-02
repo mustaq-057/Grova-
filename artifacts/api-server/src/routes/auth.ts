@@ -148,15 +148,27 @@ async function clearExpiredPrimaryTokens(): Promise<void> {
   await db.execute("DELETE FROM primary_access_tokens WHERE expires_at <= $1", [Date.now()]);
 }
 
-function configuredCoupleCode(): string {
+function bootstrapCodeFromEnv(): string {
   return String(process.env.DEFAULT_COUPLE_CODE || "").trim();
 }
 
+/** Shared Grova code for both profiles — database wins; env only seeds empty DB. */
 async function getEffectiveCoupleCode(): Promise<string | null> {
-  const fromEnv = configuredCoupleCode();
-  if (fromEnv) return fromEnv;
   const codeResult = await db.execute("SELECT code FROM couple_code ORDER BY id LIMIT 1", []);
-  return (codeResult.rows[0]?.code as string | undefined) ?? null;
+  const fromDb = String((codeResult.rows[0]?.code as string | undefined) ?? "").trim();
+  if (fromDb) return fromDb;
+  const fromEnv = bootstrapCodeFromEnv();
+  return fromEnv || null;
+}
+
+async function setSharedGrovaCode(newCode: string): Promise<void> {
+  const trimmed = newCode.trim();
+  const existing = await db.execute("SELECT id FROM couple_code ORDER BY id LIMIT 1", []);
+  if (existing.rows.length === 0) {
+    await db.execute("INSERT INTO couple_code (code) VALUES ($1)", [trimmed]);
+    return;
+  }
+  await db.execute("UPDATE couple_code SET code = $1", [trimmed]);
 }
 
 function codeAttemptKey(req: { headers: Record<string, unknown>; socket: { remoteAddress?: string | null } }, userId: string): string {
@@ -307,7 +319,7 @@ router.post("/auth/login", validateBody({
     }
 
     const storedCode = await getEffectiveCoupleCode();
-    if (!storedCode || code.trim() !== storedCode) {
+    if (!storedCode || code.trim() !== storedCode.trim()) {
       const nextCount = (codeState?.count || 0) + 1;
       if (nextCount >= CODE_MAX_FAILED_ATTEMPTS) {
         coupleCodeAttempts.set(codeKey, { count: nextCount, blockedUntil: Date.now() + CODE_BLOCK_MS });
@@ -548,7 +560,7 @@ router.post("/auth/unlock", authenticate, validateBody({
       return;
     }
     const storedCode = await getEffectiveCoupleCode();
-    if (!storedCode || code.trim() !== storedCode) {
+    if (!storedCode || code.trim() !== storedCode.trim()) {
       const nextCount = (codeState?.count || 0) + 1;
       if (nextCount >= CODE_MAX_FAILED_ATTEMPTS) {
         coupleCodeAttempts.set(codeKey, { count: nextCount, blockedUntil: Date.now() + CODE_BLOCK_MS });
@@ -584,10 +596,10 @@ router.put("/auth/couple-code", authenticate, validateBody({
       return;
     }
 
-    await db.execute("UPDATE couple_code SET code = $1 WHERE id = 1", [newCode]);
-    res.json({ success: true });
+    await setSharedGrovaCode(newCode);
+    res.json({ success: true, message: "Shared code updated for both of you" });
   } catch (err) {
-    res.status(500).json({ error: "Failed to update couple code" });
+    res.status(500).json({ error: "Failed to update code" });
   }
 });
 
