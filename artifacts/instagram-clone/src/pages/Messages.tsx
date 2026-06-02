@@ -193,6 +193,8 @@ export default function Messages() {
   const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const maxSseRetries = 10; // Maximum number of SSE reconnection attempts
   const filePickInFlightRef = useRef(false);
+  /** Optimistic message ids still uploading — must survive loadMessages() refresh */
+  const pendingOutgoingRef = useRef<Set<string>>(new Set());
   const cropSendInFlightRef = useRef(false);
   const shouldSendVoiceRef = useRef(false);
 
@@ -277,11 +279,15 @@ export default function Messages() {
 
     const requestPromise = api.getMessages()
       .then(async (data) => {
-        const messages = await normalizeMessages(data.messages || []);
+        const fromServer = await normalizeMessages(data.messages || []);
         isInitialLoadRef.current = true;
-        setMessages(messages);
+        setMessages((prev) => {
+          const pending = prev.filter((m) => pendingOutgoingRef.current.has(m.id));
+          return mergeMessagesById(fromServer, pending);
+        });
+        const mergedCount = fromServer.length;
         const more = data.pagination?.hasMore ?? false;
-        setHasMore(messages.length > 0 && more);
+        setHasMore(mergedCount > 0 && more);
         return data;
       })
       .catch((err) => {
@@ -1069,6 +1075,9 @@ export default function Messages() {
 
       const sticker = mode === "once" ? "__vm:once" : "__vm:twice";
       const tempId = crypto.randomUUID();
+      const mime = kind === "video" ? guessVideoMime(file) : file.type || "image/jpeg";
+      const localPreview = URL.createObjectURL(file);
+      pendingOutgoingRef.current.add(tempId);
       const optimistic = buildOptimisticMessage(
         {
           senderId: user.id,
@@ -1076,6 +1085,11 @@ export default function Messages() {
           companionSticker: sticker,
           mediaViewMode: mode,
           text: kind === "video" ? file.name || "Video" : undefined,
+          ...(kind === "video"
+            ? { fileData: localPreview, fileType: mime, fileSize: file.size }
+            : localPreview
+              ? { imageUrl: localPreview }
+              : {}),
         },
         tempId,
       );
@@ -1083,7 +1097,6 @@ export default function Messages() {
       scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
 
       try {
-        const mime = kind === "video" ? guessVideoMime(file) : file.type || "image/jpeg";
         const url = await uploadMediaFile(file, mime);
         const outgoing = await prepareOutgoingMessage({
           senderId: user.id,
@@ -1100,12 +1113,17 @@ export default function Messages() {
         });
         const saved = await api.sendMessage(outgoing);
         const [display] = await normalizeMessages([saved]);
+        if (localPreview) URL.revokeObjectURL(localPreview);
+        pendingOutgoingRef.current.delete(tempId);
         setMessages((prev) => prev.map((m) => (m.id === tempId ? display : m)));
         scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
       } catch (err) {
         console.error("Failed to send ephemeral media:", err);
+        pendingOutgoingRef.current.delete(tempId);
+        if (localPreview) URL.revokeObjectURL(localPreview);
         setMessages((prev) => prev.filter((m) => m.id !== tempId));
         setError("Message did not send. Check your connection and try again.");
+        throw err;
       }
     },
     [user, online],
@@ -1535,18 +1553,11 @@ export default function Messages() {
             setImageToCrop(URL.createObjectURL(normalized));
           }
         } else if (kind === "video") {
-          toast.loading("Sending video…", { id: toastId });
           const mime = guessVideoMime(normalized, clipboardItemType);
           const previewUrl = URL.createObjectURL(normalized);
-
-          if (isEphemeral) {
-            await uploadAndSendEphemeralMedia(normalized, "video", mediaViewMode);
-            URL.revokeObjectURL(previewUrl);
-            finishToast(toastId, { type: "success", message: "Video sent" });
-            return;
-          }
-
           const tempId = crypto.randomUUID();
+          pendingOutgoingRef.current.add(tempId);
+
           const optimistic = buildOptimisticMessage(
             {
               senderId: user.id,
@@ -1555,38 +1566,54 @@ export default function Messages() {
               fileData: previewUrl,
               fileType: mime,
               fileSize: normalized.size,
+              ...(isEphemeral
+                ? {
+                    companionSticker: mediaModeSticker(mediaViewMode),
+                    mediaViewMode: mediaViewMode === "keep" ? undefined : mediaViewMode,
+                  }
+                : {}),
             },
             tempId,
           );
           setMessages((prev) => [...prev, optimistic]);
           scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
+          finishToast(toastId, { type: "none" });
+          toast.loading("Uploading video…", { id: toastId });
 
-          const [duration, url] = await Promise.all([
-            getVideoDurationSafe(normalized),
-            uploadMediaFile(normalized, mime),
-          ]);
+          try {
+            const duration = await getVideoDurationSafe(normalized);
+            if (duration > 60) {
+              pendingOutgoingRef.current.delete(tempId);
+              setMessages((prev) => prev.filter((m) => m.id !== tempId));
+              URL.revokeObjectURL(previewUrl);
+              finishToast(toastId, { type: "error", message: "Video must be 1 minute or less." });
+              return;
+            }
 
-          if (duration > 60) {
+            const url = await uploadMediaFile(normalized, mime);
+            const sticker = mediaModeSticker(mediaViewMode);
+            const outgoing = await prepareOutgoingMessage({
+              senderId: user.id,
+              type: "video",
+              text: normalized.name || "Video",
+              fileData: url,
+              fileType: mime,
+              fileSize: normalized.size,
+              ...(sticker ? { companionSticker: sticker } : {}),
+            });
+            const saved = await api.sendMessage(outgoing);
+            const [display] = await normalizeMessages([saved]);
+            URL.revokeObjectURL(previewUrl);
+            pendingOutgoingRef.current.delete(tempId);
+            setMessages((prev) => prev.map((m) => (m.id === tempId ? display : m)));
+            scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
+            finishToast(toastId, { type: "success", message: "Video sent" });
+          } catch (videoErr) {
+            pendingOutgoingRef.current.delete(tempId);
             setMessages((prev) => prev.filter((m) => m.id !== tempId));
             URL.revokeObjectURL(previewUrl);
-            finishToast(toastId, { type: "error", message: "Video must be 1 minute or less." });
-            return;
+            throw videoErr;
           }
-
-          const outgoing = await prepareOutgoingMessage({
-            senderId: user.id,
-            type: "video",
-            text: normalized.name || "Video",
-            fileData: url,
-            fileType: mime,
-            fileSize: normalized.size,
-          });
-          const saved = await api.sendMessage(outgoing);
-          const [display] = await normalizeMessages([saved]);
-          URL.revokeObjectURL(previewUrl);
-          setMessages((prev) => prev.map((m) => (m.id === tempId ? display : m)));
-          scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
-          finishToast(toastId, { type: "success", message: "Video sent" });
         } else {
           toast.loading("Uploading file…", { id: toastId });
           await uploadAndSendFile(normalized);
@@ -1596,14 +1623,13 @@ export default function Messages() {
         console.error("Failed to process file:", error);
         finishToast(toastId, {
           type: "error",
-          message: error instanceof Error ? error.message : "Failed to process file.",
+          message: error instanceof Error ? error.message : "Failed to send video. Try a shorter clip or check your connection.",
         });
       } finally {
-        toast.dismiss(toastId);
         filePickInFlightRef.current = false;
       }
     },
-    [uploadAndSendFile, uploadAndSendEphemeralMedia, mediaViewMode, user],
+    [uploadAndSendFile, uploadAndSendEphemeralMedia, mediaViewMode, mediaModeSticker, user],
   );
 
   const handleFileChange = useCallback(

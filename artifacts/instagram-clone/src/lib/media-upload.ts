@@ -14,12 +14,22 @@ function uploadHeaders(contentType: string): Record<string, string> {
 
 /** Raw body upload — much faster than base64 for photos and videos. */
 export async function uploadMediaBinary(file: File | Blob, contentType: string): Promise<string> {
-  const res = await fetch("/api/media/upload-binary", {
-    method: "POST",
-    credentials: "include",
-    headers: uploadHeaders(contentType),
-    body: await file.arrayBuffer(),
-  });
+  const controller = new AbortController();
+  const timeoutMs = contentType.startsWith("video/") ? 300_000 : 120_000;
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  let res: Response;
+  try {
+    res = await fetch("/api/media/upload-binary", {
+      method: "POST",
+      credentials: "include",
+      headers: uploadHeaders(contentType),
+      body: await file.arrayBuffer(),
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
   if (!res.ok) {
     const err = (await res.json().catch(() => ({ error: "Upload failed" }))) as { error?: string };
     throw new Error(err.error ?? "Failed to upload to cloud storage");

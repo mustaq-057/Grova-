@@ -1,3 +1,4 @@
+import { Readable } from "node:stream";
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { v2 as cloudinary } from "cloudinary";
 
@@ -50,14 +51,26 @@ function cloudinaryResourceType(contentType: string): "image" | "video" | "raw" 
 async function uploadToCloudinary(key: string, buffer: Buffer, contentType: string): Promise<string> {
   const resourceType = cloudinaryResourceType(contentType);
   const publicId = `grova/${key.replace(/\.[^.]+$/, "")}`;
+  const opts = {
+    public_id: publicId,
+    resource_type: resourceType,
+    overwrite: true,
+  };
+
+  if (resourceType === "video" || buffer.length > 512 * 1024) {
+    return new Promise((resolve, reject) => {
+      const upload = cloudinary.uploader.upload_stream(opts, (err, result) => {
+        if (err) reject(err);
+        else if (!result?.secure_url) reject(new Error("Cloudinary upload returned no URL"));
+        else resolve(result.secure_url);
+      });
+      Readable.from(buffer).pipe(upload);
+    });
+  }
 
   const result = await cloudinary.uploader.upload(
     `data:${contentType};base64,${buffer.toString("base64")}`,
-    {
-      public_id: publicId,
-      resource_type: resourceType,
-      overwrite: true,
-    },
+    opts,
   );
 
   return result.secure_url;

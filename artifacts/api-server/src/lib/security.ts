@@ -139,7 +139,7 @@ export function sanitizeInput(req: Request, res: Response, next: NextFunction): 
         // Skip sanitization for base64 data-URIs (images, audio, etc.)
         // and E2E encrypted payloads — these are binary data that must
         // not be character-encoded or they will be corrupted.
-        if (obj.startsWith('data:') || obj.startsWith('e2e:')) {
+        if (obj.startsWith('data:') || obj.startsWith('e2e:') || /^https?:\/\//i.test(obj)) {
           return obj;
         }
 
