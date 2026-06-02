@@ -197,6 +197,9 @@ export default function Messages() {
   const pendingOutgoingRef = useRef<Set<string>>(new Set());
   const cropSendInFlightRef = useRef(false);
   const shouldSendVoiceRef = useRef(false);
+  const voiceSendInFlightRef = useRef(false);
+  const sendMsgRef = useRef<(partial: Partial<ApiMessage>) => Promise<void>>(async () => {});
+  const userIdRef = useRef<string | undefined>(undefined);
 
   const partnerId = useMemo(() => user?.id === "me" ? "wife" : "me", [user?.id]);
   const theme = THEMES.find(t => t.id === chatThemeId) ?? THEMES[0]!;
@@ -385,7 +388,7 @@ export default function Messages() {
     function connectSSE() {
       if (!mounted || !user) return;
 
-      es = new EventSource(`/api/sse?userId=${user.id}`);
+      es = new EventSource(`/api/sse?userId=${user.id}`, { withCredentials: true });
 
       es.addEventListener("connected", () => {
         sseRetryCountRef.current = 0;
@@ -1039,6 +1042,7 @@ export default function Messages() {
     try {
       const outgoing = await prepareOutgoingMessage({ senderId: user.id, ...partial });
       tempId = crypto.randomUUID();
+      pendingOutgoingRef.current.add(tempId);
       const optimistic = buildOptimisticMessage({ senderId: user.id, ...partial }, tempId);
 
       setMessages((prev) => [...prev, optimistic]);
@@ -1046,6 +1050,7 @@ export default function Messages() {
 
       const saved = await api.sendMessage(outgoing);
       const [display] = await normalizeMessages([saved]);
+      pendingOutgoingRef.current.delete(tempId);
       setMessages((prev) => {
         const found = prev.find(m => m.id === tempId);
         if (!found) return prev;
@@ -1055,11 +1060,16 @@ export default function Messages() {
     } catch (err) {
       console.error("Failed to send message:", err);
       if (tempId) {
+        pendingOutgoingRef.current.delete(tempId);
         setMessages((prev) => prev.filter((m) => m.id !== tempId));
       }
       setError("Message did not send. Check your connection and try again.");
+      throw err;
     }
   }, [user, online]);
+
+  sendMsgRef.current = sendMsg;
+  userIdRef.current = user?.id;
 
   const uploadAndSendEphemeralMedia = useCallback(
     async (
@@ -1707,77 +1717,129 @@ export default function Messages() {
   }, [pendingImageType, sendMsg, mediaModeSticker, mediaViewMode, dismissImageCrop]);
 
   // Voice recording
-  const startRecording = async () => {
+  const startRecording = useCallback(async () => {
+    if (voiceSendInFlightRef.current || recording) return;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
-      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus") ? "audio/webm;codecs=opus" : undefined;
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : MediaRecorder.isTypeSupported("audio/webm")
+          ? "audio/webm"
+          : MediaRecorder.isTypeSupported("audio/mp4")
+            ? "audio/mp4"
+            : undefined;
       const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
       chunksRef.current = [];
-      recorder.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
       recorder.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: mimeType || "audio/webm" });
-        stream.getTracks().forEach(t => t.stop());
+        stream.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
         chunksRef.current = [];
+        mediaRecorderRef.current = null;
+
         if (!shouldSendVoiceRef.current) return;
         shouldSendVoiceRef.current = false;
-        const reader = new FileReader();
-        reader.onloadend = async () => {
-          const dataUrl = reader.result as string;
-          if (!dataUrl) return;
+
+        const senderId = userIdRef.current;
+        if (!senderId || voiceSendInFlightRef.current) return;
+
+        voiceSendInFlightRef.current = true;
+        const tempId = crypto.randomUUID();
+        pendingOutgoingRef.current.add(tempId);
+        setMessages((prev) => [
+          ...prev,
+          buildOptimisticMessage({ senderId, type: "audio" }, tempId),
+        ]);
+        scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
+        const loadingId = toast.loading("Sending voice message…");
+
+        void (async () => {
           try {
-            const url = await uploadMediaToB2(dataUrl, mimeType || "audio/webm");
-            sendMsg({ type: "audio", audioData: url });
+            const url = await uploadMediaFile(blob, mimeType || "audio/webm");
+            const outgoing = await prepareOutgoingMessage({
+              senderId,
+              type: "audio",
+              audioData: url,
+            });
+            const saved = await api.sendMessage(outgoing);
+            const [display] = await normalizeMessages([saved]);
+            pendingOutgoingRef.current.delete(tempId);
+            setMessages((prev) => prev.map((m) => (m.id === tempId ? display : m)));
+            scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
+            finishToast(loadingId, { type: "success", message: "Voice message sent" });
           } catch (err) {
             console.error("Voice upload failed:", err);
-            alert(err instanceof Error ? err.message : "Voice upload failed — check cloud storage in .env");
+            pendingOutgoingRef.current.delete(tempId);
+            setMessages((prev) => prev.filter((m) => m.id !== tempId));
+            finishToast(loadingId, {
+              type: "error",
+              message: err instanceof Error ? err.message : "Voice message failed to send",
+            });
+          } finally {
+            voiceSendInFlightRef.current = false;
           }
-        };
-        reader.readAsDataURL(blob);
+        })();
       };
       mediaRecorderRef.current = recorder;
-      recorder.start(100);
+      recorder.start(250);
       setRecording(true);
       setRecordingTime(0);
-      timerRef.current = setInterval(() => setRecordingTime(t => t + 1), 1000);
+      timerRef.current = setInterval(() => setRecordingTime((t) => t + 1), 1000);
     } catch (err) {
       console.error("Microphone error:", err);
       if (err instanceof Error) {
         if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
-          alert("Microphone permission denied. Please allow microphone access in your browser settings.");
+          toast.error("Microphone permission denied. Allow mic access in browser settings.");
         } else if (err.name === "NotFoundError") {
-          alert("No microphone found. Please connect a microphone and try again.");
+          toast.error("No microphone found.");
         } else if (err.name === "NotReadableError") {
-          alert("Microphone is being used by another application. Please close other apps using the microphone.");
+          toast.error("Microphone is in use by another app.");
         } else {
-          alert("Failed to access microphone. Please check your browser settings and try again.");
+          toast.error("Could not access microphone.");
         }
       } else {
-        alert("Failed to access microphone. Please check your browser settings and try again.");
+        toast.error("Could not access microphone.");
       }
     }
-  };
+  }, [recording]);
 
-  const sendVoiceRecording = () => {
-    if (!mediaRecorderRef.current || !recording) return;
+  const sendVoiceRecording = useCallback(() => {
+    const recorder = mediaRecorderRef.current;
+    if (!recorder || !recording || recorder.state === "inactive") return;
     shouldSendVoiceRef.current = true;
-    mediaRecorderRef.current.stop();
+    try {
+      if (recorder.state === "recording") recorder.requestData();
+      recorder.stop();
+    } catch {
+      /* ignore */
+    }
     if (timerRef.current) clearInterval(timerRef.current);
     setRecording(false);
     setRecordingTime(0);
-  };
+  }, [recording]);
 
-  const cancelRecording = () => {
+  const cancelRecording = useCallback(() => {
     shouldSendVoiceRef.current = false;
-    if (mediaRecorderRef.current) {
-      try { mediaRecorderRef.current.stop(); } catch { /**/ }
-      streamRef.current?.getTracks().forEach(t => t.stop());
+    const recorder = mediaRecorderRef.current;
+    if (recorder && recorder.state !== "inactive") {
+      try {
+        recorder.stop();
+      } catch {
+        /* ignore */
+      }
     }
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    mediaRecorderRef.current = null;
     if (timerRef.current) clearInterval(timerRef.current);
     setRecording(false);
     setRecordingTime(0);
     chunksRef.current = [];
-  };
+  }, []);
 
   // Call actions
   const startCall = useCallback((type: "audio" | "video") => {

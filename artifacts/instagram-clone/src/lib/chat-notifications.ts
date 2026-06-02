@@ -1,7 +1,7 @@
 import type { ApiMessage } from "./api";
 import { normalizeMessages, messagePreview } from "./message-utils";
 import { bumpUnreadChatBadge } from "./notifications-feed";
-import { showNotification } from "./notifications";
+import { requestNotificationPermission, showNotification } from "./notifications";
 import { areNotificationsEnabled } from "./couple-sync";
 import { toast } from "sonner";
 
@@ -13,63 +13,79 @@ export type ChatNotifyContext = {
 };
 
 function onChatRoute(): boolean {
-  return window.location.pathname.includes("/chat");
+  return typeof window !== "undefined" && window.location.pathname.includes("/chat");
 }
 
-function shouldSurfaceAlert(): boolean {
-  if (!areNotificationsEnabled()) return false;
-  if (document.visibilityState === "hidden") return true;
-  return !onChatRoute();
+function showChatToast(title: string, body: string) {
+  toast.message(title, {
+    description: body,
+    duration: 5000,
+    action: {
+      label: "Open chat",
+      onClick: () => {
+        window.location.href = "/chat";
+      },
+    },
+  });
 }
 
-function bumpIfAway(): void {
-  if (!onChatRoute() || document.visibilityState === "hidden") {
-    bumpUnreadChatBadge();
-  }
-}
-
-/** New message, gif, photo, video, file, reply, etc. */
+/** New message, gif, photo, video, voice, file, etc. */
 export async function alertIncomingChatMessage(raw: ApiMessage, ctx: ChatNotifyContext): Promise<void> {
   if (raw.senderId !== ctx.partnerId) return;
 
-  const [msg] = await normalizeMessages([raw]);
-  bumpIfAway();
+  let msg = raw;
+  try {
+    [msg] = await normalizeMessages([raw]);
+  } catch {
+    /* use raw for preview */
+  }
 
-  if (!shouldSurfaceAlert()) return;
+  const hidden = document.visibilityState === "hidden";
+  const onChat = onChatRoute();
 
-  const preview = messagePreview(msg);
-  showNotification(ctx.partnerName, preview, ctx.partnerAvatar || undefined);
+  if (!onChat || hidden) {
+    bumpUnreadChatBadge();
+  }
 
-  if (document.visibilityState === "visible" && !onChatRoute()) {
-    toast.message(ctx.partnerName, { description: preview, duration: 4000 });
+  const preview = messagePreview(msg) || "New message";
+
+  showChatToast(ctx.partnerName, preview);
+
+  if (!areNotificationsEnabled()) return;
+
+  const granted =
+    Notification.permission === "granted"
+      ? true
+      : Notification.permission !== "denied"
+        ? await requestNotificationPermission()
+        : false;
+
+  if (granted && (!onChat || hidden)) {
+    showNotification(ctx.partnerName, preview, ctx.partnerAvatar || undefined);
   }
 }
 
-/** Heart / like on your message */
 export function alertIncomingChatLike(ctx: Pick<ChatNotifyContext, "partnerName" | "partnerAvatar">): void {
-  bumpIfAway();
-  if (!shouldSurfaceAlert()) return;
-
+  if (!onChatRoute() || document.visibilityState === "hidden") {
+    bumpUnreadChatBadge();
+  }
   const body = "liked your message";
-  showNotification(ctx.partnerName, body, ctx.partnerAvatar || undefined);
-
-  if (document.visibilityState === "visible" && !onChatRoute()) {
-    toast.message(ctx.partnerName, { description: body, duration: 3500 });
+  showChatToast(ctx.partnerName, body);
+  if (areNotificationsEnabled() && Notification.permission === "granted") {
+    showNotification(ctx.partnerName, body, ctx.partnerAvatar || undefined);
   }
 }
 
-/** Emoji reaction on your message */
 export function alertIncomingChatReaction(
   emoji: string,
   ctx: Pick<ChatNotifyContext, "partnerName" | "partnerAvatar">,
 ): void {
-  bumpIfAway();
-  if (!shouldSurfaceAlert()) return;
-
+  if (!onChatRoute() || document.visibilityState === "hidden") {
+    bumpUnreadChatBadge();
+  }
   const body = `reacted ${emoji} to your message`;
-  showNotification(ctx.partnerName, body, ctx.partnerAvatar || undefined);
-
-  if (document.visibilityState === "visible" && !onChatRoute()) {
-    toast.message(ctx.partnerName, { description: body, duration: 3500 });
+  showChatToast(ctx.partnerName, body);
+  if (areNotificationsEnabled() && Notification.permission === "granted") {
+    showNotification(ctx.partnerName, body, ctx.partnerAvatar || undefined);
   }
 }

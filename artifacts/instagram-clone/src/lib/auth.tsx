@@ -14,6 +14,7 @@ import {
   alertIncomingChatLike,
   type ChatNotifyContext,
 } from "./chat-notifications";
+import { requestNotificationPermission } from "./notifications";
 import { hydrateNotes } from "./notes";
 import { applyQuickReactions } from "./quick-reactions";
 import {
@@ -196,10 +197,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         /* ignore */
       }
       await refreshProfiles();
+      void requestNotificationPermission();
     };
     init();
 
-    es = new EventSource(`/api/sse?userId=${user.id}`);
+    es = new EventSource(`/api/sse?userId=${user.id}`, { withCredentials: true });
 
     es.addEventListener("profile-updated", (e) => {
       try {

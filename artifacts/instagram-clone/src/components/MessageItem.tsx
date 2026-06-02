@@ -177,7 +177,9 @@ export const MessageItem = memo(function MessageItem({
 
   const bubbleContent = (
     <>
-      {msg.type === "audio" && msg.audioData ? (
+      {msg.type === "audio" && !msg.audioData ? (
+        <p className="text-sm text-muted-foreground italic px-1">Sending voice…</p>
+      ) : msg.type === "audio" && msg.audioData ? (
         <AudioMessage audioData={msg.audioData} isMe={isMe} />
       ) : isGif && msg.gifUrl ? (
         <img
