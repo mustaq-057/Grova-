@@ -5,7 +5,8 @@ import { api, type ApiTask } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 
 export default function Tasks() {
-  const { user } = useAuth();
+  const { user, partner } = useAuth();
+  const otherLabel = partner?.name?.split(" ")[0] ?? "Them";
   const [tasks, setTasks] = useState<ApiTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
@@ -79,8 +80,8 @@ export default function Tasks() {
 
   const getAssignedLabel = (assignedTo: string) => {
     switch (assignedTo) {
-      case "me": return user?.id === "me" ? "You" : "Partner";
-      case "wife": return user?.id === "wife" ? "You" : "Partner";
+      case "me": return user?.id === "me" ? "You" : otherLabel;
+      case "wife": return user?.id === "wife" ? "You" : otherLabel;
       case "both": return "Both";
       default: return assignedTo;
     }
@@ -145,7 +146,7 @@ export default function Tasks() {
                 >
                   <option value="both">Both</option>
                   <option value="me">You</option>
-                  <option value="wife">Partner</option>
+                  <option value="wife">{otherLabel}</option>
                 </select>
               </div>
               <div>

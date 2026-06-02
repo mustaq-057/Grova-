@@ -120,7 +120,7 @@ export default memo(function Profile() {
         <div className="flex items-center justify-center gap-8 mb-6 w-full">
           <div className="flex flex-col items-center gap-1">
             <AvatarImage src={partner?.avatar} userId={partnerId} alt="" className="w-16 h-16 rounded-full object-cover border-2 border-border" />
-            <span className="text-[10px] text-muted-foreground truncate max-w-[64px]">{partner?.name?.split(" ")[0] ?? "Partner"}</span>
+            <span className="text-[10px] text-muted-foreground truncate max-w-[64px]">{partner?.name?.split(" ")[0] ?? "…"}</span>
           </div>
 
           <div className="relative shrink-0">

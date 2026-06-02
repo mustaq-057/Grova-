@@ -8,7 +8,7 @@ import { useAuth } from "@/lib/auth";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 export default function Dua() {
-  const { user } = useAuth();
+  const { user, partner } = useAuth();
   const [duas, setDuas] = useState<ApiDua[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
@@ -87,7 +87,7 @@ export default function Dua() {
           translation: dua.translation || "",
         },
       } as any);
-      toast.success("Sent to chat! Your partner will see it there ♥");
+      toast.success(`Sent to chat! ${partner?.name?.split(" ")[0] ?? "They"} will see it there ♥`);
     } catch (err) {
       console.error("Failed to share dua:", err);
       setError("Could not share to chat. Check your connection.");
@@ -283,7 +283,7 @@ export default function Dua() {
         <div className="flex flex-col items-center gap-3 py-16 text-center px-4">
           <BookOpen className="w-12 h-12 text-muted-foreground/20" />
           <p className="text-muted-foreground text-sm">No duas yet</p>
-          <p className="text-xs text-muted-foreground/60">Add your first dua and share it with your partner</p>
+          <p className="text-xs text-muted-foreground/60">Add your first dua and share it in chat</p>
         </div>
       )}
 

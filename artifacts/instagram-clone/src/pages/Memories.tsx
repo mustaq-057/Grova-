@@ -5,7 +5,8 @@ import { getMemories, type MemoryItem } from "@/lib/memories";
 import { useAuth } from "@/lib/auth";
 
 export default function Memories() {
-  const { user } = useAuth();
+  const { user, partner } = useAuth();
+  const otherLabel = partner?.name?.split(" ")[0] ?? "Them";
   const [, setLocation] = useLocation();
   const [items, setItems] = useState<MemoryItem[]>([]);
 
@@ -52,7 +53,7 @@ export default function Memories() {
                 className="w-full text-left px-4 py-4 hover:bg-secondary/50 transition-colors"
               >
                 <p className="text-xs text-muted-foreground mb-1">
-                  {m.senderId === user?.id ? "You" : "Partner"} · {new Date(m.timestamp).toLocaleString()}
+                  {m.senderId === user?.id ? "You" : otherLabel} · {new Date(m.timestamp).toLocaleString()}
                 </p>
                 <p className="text-sm line-clamp-3">{m.text || `[${m.type}]`}</p>
                 <span className="text-xs text-primary mt-2 inline-block">Jump to message →</span>

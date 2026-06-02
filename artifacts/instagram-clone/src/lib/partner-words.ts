@@ -1,4 +1,4 @@
-/** Pronouns for the other person in the couple (wife = her, me/Mustaq = him). */
+/** Pronouns for the other profile (wife = her, me = him). */
 export function partnerIsFemale(partnerId: string): boolean {
   return partnerId === "wife";
 }

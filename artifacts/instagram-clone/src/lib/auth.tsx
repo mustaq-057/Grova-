@@ -214,7 +214,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const p: ApiUser = {
             id: id as "me" | "wife",
             username: d.username ?? partnerRef.current?.username ?? (id === "wife" ? "sara" : "mustaq"),
-            name: d.name ?? partnerRef.current?.name ?? "Partner",
+            name: d.name ?? partnerRef.current?.name ?? (id === "wife" ? "Sara" : "Mustaq"),
             bio: d.bio ?? partnerRef.current?.bio ?? "",
             avatar: d.avatar ?? partnerRef.current?.avatar ?? "",
           };

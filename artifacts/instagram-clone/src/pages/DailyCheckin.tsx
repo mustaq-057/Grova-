@@ -28,7 +28,8 @@ const dailyQuestions = [
 ];
 
 export default function DailyCheckin() {
-  const { user } = useAuth();
+  const { user, partner } = useAuth();
+  const otherLabel = partner?.name?.split(" ")[0] ?? "Them";
   const [checkins, setCheckins] = useState<ApiCheckin[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
@@ -258,7 +259,7 @@ export default function DailyCheckin() {
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex-1">
                       <p className="text-xs text-muted-foreground mb-1">
-                        {checkin.author === user?.id ? "You" : "Partner"} · {new Date(checkin.timestamp).toLocaleDateString()}
+                        {checkin.author === user?.id ? "You" : otherLabel} · {new Date(checkin.timestamp).toLocaleDateString()}
                       </p>
                       <p className="text-sm font-medium mb-1">{checkin.question}</p>
                     </div>

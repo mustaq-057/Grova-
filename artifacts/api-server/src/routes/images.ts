@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Request, type Response } from "express";
 import { randomUUID } from "crypto";
 import { uploadMedia, deleteImage } from "../lib/storage";
 import db from "../lib/db";
@@ -133,6 +133,38 @@ router.post("/images/upload", rateLimiters.upload, authenticate, async (req, res
 router.post("/media/upload", rateLimiters.upload, authenticate, async (req, res) => {
   await handleMediaUpload(req, res);
 });
+
+/** Binary body upload (registered early in app.ts before JSON parser). */
+export async function handleBinaryMediaUpload(req: Request, res: Response): Promise<void> {
+  try {
+    const raw = req.body;
+    if (!raw || (typeof raw !== "object" && typeof raw !== "string")) {
+      res.status(400).json({ error: "No media data provided" });
+      return;
+    }
+
+    const buffer = Buffer.isBuffer(raw) ? raw : Buffer.from(raw as ArrayBuffer);
+    if (buffer.length === 0) {
+      res.status(400).json({ error: "Empty upload" });
+      return;
+    }
+    if (buffer.length > 60 * 1024 * 1024) {
+      res.status(400).json({ error: "File too large (max 60MB)" });
+      return;
+    }
+
+    const headerMime = String(req.headers["content-type"] || "application/octet-stream").split(";")[0].trim();
+    const mime = headerMime || "application/octet-stream";
+    const key = `${randomUUID()}.${extForContentType(mime)}`;
+    const url = await uploadMedia(key, buffer, mime);
+
+    res.json({ url, key });
+  } catch (error) {
+    console.error("Binary media upload error:", error);
+    const msg = error instanceof Error ? error.message : "Failed to upload media";
+    res.status(500).json({ error: msg });
+  }
+}
 
 router.delete("/images/:key", rateLimiters.upload, authenticate, async (req, res) => {
   try {
