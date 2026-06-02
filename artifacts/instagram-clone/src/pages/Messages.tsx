@@ -1569,7 +1569,7 @@ export default function Messages() {
               ...(isEphemeral
                 ? {
                     companionSticker: mediaModeSticker(mediaViewMode),
-                    mediaViewMode: mediaViewMode === "keep" ? undefined : mediaViewMode,
+                    mediaViewMode,
                   }
                 : {}),
             },
