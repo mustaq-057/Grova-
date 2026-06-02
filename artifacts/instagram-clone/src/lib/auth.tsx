@@ -17,8 +17,6 @@ import { clearSession } from "./session";
 import { tryRefreshSession } from "./api";
 import { bumpAvatarVersion } from "./avatar-display";
 
-const INACTIVITY_LOCK_MS = 10 * 60 * 60 * 1000;
-
 type AuthContextType = {
   user: ApiUser | null;
   partner: ApiUser | null;
@@ -101,15 +99,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [setUser]);
 
-  /** Logout: end session only — trusted-device cookie stays (vault code screen next). */
+  /** Logout: full sign-out — next visit starts at email + profile pick. */
   const logout = useCallback(() => {
     clearEncryption();
+    void api.revokeTrustedDevice().catch(() => {});
     void api.logout();
+    clearSession();
     clearClientMemory();
+    setTrustedDevice(false);
     setNotificationViewer(null);
     setUser(null);
     try {
       sessionStorage.removeItem("grova_e2e_key");
+      localStorage.removeItem("grova_last_profile");
     } catch {
       /* ignore */
     }
@@ -276,5 +278,3 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 export function useAuth() {
   return useContext(AuthContext);
 }
-
-export { INACTIVITY_LOCK_MS };

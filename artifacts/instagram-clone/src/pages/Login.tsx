@@ -14,7 +14,7 @@ type Step = "primary" | "pick" | "code";
 type PickUser = { id: "me" | "wife"; name: string; label: string; avatar: string };
 
 export default memo(function Login() {
-  const { setUser, refreshTrustedDevice, trustedDevice } = useAuth();
+  const { setUser, refreshTrustedDevice } = useAuth();
   const [step, setStep] = useState<Step>("primary");
   const [selectedId, setSelectedId] = useState<"me" | "wife" | null>(null);
   const [email, setEmail] = useState(() => getDefaultEmail());
@@ -30,31 +30,22 @@ export default memo(function Login() {
   ]);
 
   useEffect(() => {
-    refreshTrustedDevice().then((ok) => {
-      if (!ok) {
-        setStep("primary");
-        return;
-      }
-      api
-        .getLoginProfiles()
-        .then((profiles) => {
-          setUsers((prev) =>
-            prev.map((u) => {
-              const p = profiles.find((x) => x.id === u.id);
-              return p ? { ...u, name: p.name, avatar: p.avatar } : u;
-            }),
-          );
-        })
-        .catch(() => {});
-      const remembered = localStorage.getItem("grova_last_profile");
-      if (remembered === "me" || remembered === "wife") {
-        setSelectedId(remembered);
-        setStep("code");
-      } else {
-        setStep("pick");
-      }
-    });
-  }, [refreshTrustedDevice]);
+    setStep("primary");
+    setSelectedId(null);
+    setCode("");
+    setError("");
+    api
+      .getLoginProfiles()
+      .then((profiles) => {
+        setUsers((prev) =>
+          prev.map((u) => {
+            const p = profiles.find((x) => x.id === u.id);
+            return p ? { ...u, name: p.name, avatar: p.avatar } : u;
+          }),
+        );
+      })
+      .catch(() => {});
+  }, []);
 
   const handlePrimaryLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,13 +64,8 @@ export default memo(function Login() {
           }),
         );
       }).catch(() => {});
-      const remembered = localStorage.getItem("grova_last_profile");
-      if (remembered === "me" || remembered === "wife") {
-        setSelectedId(remembered);
-        setStep("code");
-      } else {
-        setStep("pick");
-      }
+      setStep("pick");
+      setSelectedId(null);
       setPassword("");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "";
@@ -111,7 +97,6 @@ export default memo(function Login() {
       await initEncryption(code.trim());
       localStorage.setItem("grova_last_profile", selectedId);
       setUser(user as ApiUser);
-      window.dispatchEvent(new CustomEvent("grova-vault-unlocked"));
     } catch (err) {
       const msg = err instanceof Error ? err.message : "";
       if (msg.includes("fetch") || msg.includes("Failed") || msg.includes("Network")) {
@@ -202,6 +187,13 @@ export default memo(function Login() {
           </motion.div>
         ) : step === "pick" ? (
           <div>
+            <button
+              type="button"
+              onClick={() => { setStep("primary"); setError(""); }}
+              className="text-sm text-muted-foreground hover:text-foreground mb-6 flex items-center gap-1"
+            >
+              ← Back to email
+            </button>
             <p className="text-center text-sm text-muted-foreground mb-6">Who are you?</p>
             <div className="flex gap-4">
               {users.map((u) => (
@@ -233,14 +225,13 @@ export default memo(function Login() {
           </div>
         ) : (
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
-            {!trustedDevice && (
-              <button
-                onClick={() => { setStep("pick"); setCode(""); setError(""); }}
-                className="text-sm text-muted-foreground hover:text-foreground mb-6 flex items-center gap-1"
-              >
-                ← Back
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => { setStep("pick"); setCode(""); setError(""); }}
+              className="text-sm text-muted-foreground hover:text-foreground mb-6 flex items-center gap-1"
+            >
+              ← Back
+            </button>
 
             <div className="flex flex-col items-center gap-3 mb-8">
               <div className="story-ring">
@@ -254,9 +245,7 @@ export default memo(function Login() {
                 </div>
               </div>
               <p className="font-semibold">
-                {trustedDevice
-                  ? `Welcome back, ${users.find((u) => u.id === selectedId)?.name}`
-                  : `Hi, ${users.find((u) => u.id === selectedId)?.name} ♥`}
+                Hi, {users.find((u) => u.id === selectedId)?.name} ♥
               </p>
             </div>
 
@@ -300,7 +289,7 @@ export default memo(function Login() {
                 className="w-full py-3 bg-primary text-primary-foreground font-semibold rounded-xl disabled:opacity-50 transition-opacity"
                 data-testid="button-login"
               >
-                {loading ? "Checking..." : trustedDevice ? "Unlock" : "Enter Grova ♥"}
+                {loading ? "Checking..." : "Enter Grova ♥"}
               </motion.button>
             </form>
           </motion.div>

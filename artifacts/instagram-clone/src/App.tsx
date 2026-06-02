@@ -1,14 +1,14 @@
-import { Switch, Route, Router as WouterRouter, Redirect, useLocation } from "wouter";
+import { Switch, Route, Router as WouterRouter, Redirect } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "@/components/Toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Layout } from "@/components/Layout";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { AuthProvider, useAuth, INACTIVITY_LOCK_MS } from "@/lib/auth";
+import { AuthProvider, useAuth } from "@/lib/auth";
 import Login from "@/pages/Login";
 import Home from "@/pages/Home";
-import { lazy, Suspense, type ReactNode, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, type ReactNode } from "react";
 
 const Messages = lazy(() => import("@/pages/Messages"));
 import Create from "@/pages/Create";
@@ -23,8 +23,6 @@ import Tasks from "@/pages/Tasks";
 import Milestones from "@/pages/Milestones";
 import SecretNotes from "@/pages/SecretNotes";
 import NotFound from "@/pages/not-found";
-import { AppLockGate } from "@/components/AppLockGate";
-
 const queryClient = new QueryClient();
 
 function PageWrapper({ children }: { children: ReactNode }) {
@@ -50,50 +48,13 @@ function AuthLoading() {
 
 function ProtectedRouter() {
   const { user, authReady } = useAuth();
-  const [unlocked, setUnlocked] = useState(false);
-  const lastActivityRef = useRef(Date.now());
-
-  const markUnlocked = () => {
-    lastActivityRef.current = Date.now();
-    setUnlocked(true);
-  };
-
-  useEffect(() => {
-    const onVaultUnlocked = () => markUnlocked();
-    window.addEventListener("grova-vault-unlocked", onVaultUnlocked);
-    return () => window.removeEventListener("grova-vault-unlocked", onVaultUnlocked);
-  }, []);
-
-  useEffect(() => {
-    if (!user || !unlocked) return;
-    const mark = () => {
-      lastActivityRef.current = Date.now();
-    };
-    const events: Array<keyof WindowEventMap> = ["mousemove", "keydown", "click", "touchstart", "focus"];
-    events.forEach((evt) => window.addEventListener(evt, mark, { passive: true }));
-    const timer = window.setInterval(() => {
-      if (Date.now() - lastActivityRef.current > INACTIVITY_LOCK_MS) {
-        setUnlocked(false);
-      }
-    }, 60_000);
-    return () => {
-      events.forEach((evt) => window.removeEventListener(evt, mark));
-      window.clearInterval(timer);
-    };
-  }, [user, unlocked]);
 
   if (!authReady) {
     return <AuthLoading />;
   }
 
-  // No session: new device → email+password+code; trusted device → code only (Login handles both)
   if (!user) {
     return <Login />;
-  }
-
-  // Active session but vault locked (refresh, inactivity, reopen)
-  if (!unlocked) {
-    return <AppLockGate name={user.name} onUnlocked={markUnlocked} />;
   }
 
   return (
