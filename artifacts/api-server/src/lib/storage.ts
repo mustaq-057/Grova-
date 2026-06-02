@@ -57,7 +57,7 @@ async function uploadToCloudinary(key: string, buffer: Buffer, contentType: stri
     overwrite: true,
   };
 
-  if (resourceType === "video" || buffer.length > 512 * 1024) {
+  if (resourceType === "video" || resourceType === "raw" || buffer.length > 512 * 1024) {
     return new Promise((resolve, reject) => {
       const upload = cloudinary.uploader.upload_stream(opts, (err, result) => {
         if (err) reject(err);

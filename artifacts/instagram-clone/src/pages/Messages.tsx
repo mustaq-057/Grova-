@@ -52,10 +52,12 @@ import { downloadChatAsImage } from "@/lib/chat-download";
 import { uploadMediaToB2, uploadMediaFile } from "@/lib/media-upload";
 import {
   classifyMediaFile,
+  detectMediaByMagicBytes,
   extractClipboardFiles,
   getVideoDurationSafe,
   guessVideoMime,
   isDocumentFile,
+  isVideoFile,
   normalizePastedFile,
 } from "@/lib/media-file";
 import {
@@ -1531,12 +1533,16 @@ export default function Messages() {
       try {
         if (quickDoc) {
           kind = "other";
-        } else if (clipboardItemType?.startsWith("video/")) {
+        } else if (clipboardItemType?.startsWith("video/") || isVideoFile(normalized, clipboardItemType)) {
           kind = "video";
         } else if (clipboardItemType?.startsWith("image/")) {
           kind = "image";
         } else {
           kind = await classifyMediaFile(normalized, clipboardItemType);
+        }
+        if (kind === "image") {
+          const magic = await detectMediaByMagicBytes(normalized);
+          if (magic === "video") kind = "video";
         }
       } catch {
         finishToast(toastId, { type: "error", message: "Could not read pasted file." });
@@ -1765,7 +1771,8 @@ export default function Messages() {
 
         void (async () => {
           try {
-            const url = await uploadMediaFile(blob, mimeType || "audio/webm");
+            const voiceMime = (mimeType || "audio/webm").split(";")[0]?.trim() || "audio/webm";
+            const url = await uploadMediaFile(blob, voiceMime);
             const outgoing = await prepareOutgoingMessage({
               senderId,
               type: "audio",
@@ -1967,6 +1974,24 @@ export default function Messages() {
 
   const handleUnsend = useCallback(async (id: string) => {
     setContextMenu(null);
+    let snapshot: ApiMessage | undefined;
+    setMessages((prev) => {
+      snapshot = prev.find((m) => m.id === id);
+      return prev.map((m) =>
+        m.id === id
+          ? {
+              ...m,
+              deleted: true,
+              text: undefined,
+              audioData: undefined,
+              fileData: undefined,
+              imageUrl: undefined,
+              imageData: undefined,
+              gifUrl: undefined,
+            }
+          : m,
+      );
+    });
     try {
       const deleted = await api.deleteMessage(id);
       setMessages((prev) =>
@@ -1975,10 +2000,12 @@ export default function Messages() {
         ),
       );
     } catch (err) {
-      window.alert(unsendErrorMessage(err));
-      if (err instanceof Error && /not found/i.test(err.message)) {
+      if (snapshot) {
+        setMessages((prev) => prev.map((m) => (m.id === id ? snapshot! : m)));
+      } else if (err instanceof Error && /not found/i.test(err.message)) {
         setMessages((prev) => prev.filter((m) => m.id !== id));
       }
+      toast.error(unsendErrorMessage(err));
     }
   }, []);
 

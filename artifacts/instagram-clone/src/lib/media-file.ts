@@ -89,7 +89,7 @@ export function isImageFile(file: File, hintType?: string): boolean {
   return IMAGE_EXT.test(file.name);
 }
 
-async function detectMediaByMagicBytes(file: File): Promise<"image" | "video" | null> {
+export async function detectMediaByMagicBytes(file: File): Promise<"image" | "video" | null> {
   try {
     const bytes = new Uint8Array(await file.slice(0, 16).arrayBuffer());
     if (bytes.length < 4) return null;
@@ -97,7 +97,12 @@ async function detectMediaByMagicBytes(file: File): Promise<"image" | "video" | 
     if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "image";
     if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) return "image";
     if (bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46) return "image";
-    if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46) return "image";
+    if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 && bytes.length >= 12) {
+      const riffTag = String.fromCharCode(bytes[8], bytes[9], bytes[10], bytes[11]);
+      if (riffTag === "WEBP") return "image";
+      if (riffTag === "AVI ") return "video";
+      return null;
+    }
     if (bytes[0] === 0x1a && bytes[1] === 0x45 && bytes[2] === 0xdf && bytes[3] === 0xa3) return "video";
     if (
       bytes.length >= 8 &&
@@ -159,12 +164,10 @@ export async function classifyMediaFile(file: File, hintType?: string): Promise<
   if (isVideoFile(file, hintType)) return "video";
   if (isImageFile(file, hintType)) return "image";
 
-  // Large clipboard blobs without MIME are usually screen recordings / videos.
+  // Pasted screen recordings often lack MIME/filename — sniff before treating as a generic file.
   const ambiguousName = !file.name || GENERIC_CLIPBOARD_NAME.test(file.name);
-  if (file.size > 80_000 && ambiguousName) {
+  if (ambiguousName || file.size > 32_000) {
     if (await sniffVideoFile(file)) return "video";
-  } else if (!ambiguousName && (await sniffVideoFile(file))) {
-    return "video";
   }
   return "other";
 }

@@ -61,8 +61,8 @@ export const MessageContextMenu = memo(function MessageContextMenu({
     <button
       type="button"
       onClick={() => {
-        onClick();
         onClose();
+        onClick();
       }}
       className={`w-full flex items-center justify-between px-4 py-2.5 text-sm hover:bg-white/10 ${
         destructive ? "text-red-400" : ""

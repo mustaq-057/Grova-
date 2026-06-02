@@ -2,20 +2,28 @@ import { getAuthHeaders } from "./session";
 
 const BINARY_UPLOAD_MIN_BYTES = 200 * 1024;
 
+function normalizeUploadMime(mime: string): string {
+  return mime.split(";")[0]?.trim().toLowerCase() || "application/octet-stream";
+}
+
+function binaryUploadHeaders(contentType: string): Record<string, string> {
+  const headers: Record<string, string> = { "Content-Type": contentType };
+  const auth = getAuthHeaders();
+  if (auth.Authorization) headers.Authorization = auth.Authorization;
+  if (auth["X-CSRF-Token"]) headers["X-CSRF-Token"] = auth["X-CSRF-Token"];
+  return headers;
+}
+
 function guessContentType(dataUrl: string): string {
   const match = dataUrl.match(/^data:([^;]+);/);
   return match?.[1] ?? "image/jpeg";
 }
 
-function uploadHeaders(contentType: string): Record<string, string> {
-  const headers = { ...getAuthHeaders(), "Content-Type": contentType };
-  return headers;
-}
-
 /** Raw body upload — much faster than base64 for photos and videos. */
 export async function uploadMediaBinary(file: File | Blob, contentType: string): Promise<string> {
+  const mime = normalizeUploadMime(contentType);
   const controller = new AbortController();
-  const timeoutMs = contentType.startsWith("video/") ? 300_000 : 120_000;
+  const timeoutMs = mime.startsWith("video/") ? 300_000 : 120_000;
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
   let res: Response;
@@ -23,7 +31,7 @@ export async function uploadMediaBinary(file: File | Blob, contentType: string):
     res = await fetch("/api/media/upload-binary", {
       method: "POST",
       credentials: "include",
-      headers: uploadHeaders(contentType),
+      headers: binaryUploadHeaders(mime),
       body: await file.arrayBuffer(),
       signal: controller.signal,
     });
@@ -67,17 +75,19 @@ export async function uploadMediaToB2(dataUrl: string, contentType?: string): Pr
 
 /** Upload a File/Blob — binary path to B2/Cloudinary (best for mobile camera, docs, video). */
 export async function uploadMediaFile(file: File | Blob, contentType?: string): Promise<string> {
-  const mime =
+  const mime = normalizeUploadMime(
     contentType ||
-    (file instanceof File ? file.type : "") ||
-    "application/octet-stream";
+      (file instanceof File ? file.type : "") ||
+      "application/octet-stream",
+  );
   const useBinary =
     file instanceof File ||
     mime.startsWith("video/") ||
+    mime.startsWith("audio/") ||
     mime.startsWith("application/") ||
     file.size >= BINARY_UPLOAD_MIN_BYTES;
   if (useBinary) {
-    return uploadMediaBinary(file, mime.startsWith("video/") ? mime : mime || "application/octet-stream");
+    return uploadMediaBinary(file, mime);
   }
   const dataUrl = await readFileAsDataUrl(file);
   return uploadMediaToB2(dataUrl, mime || guessContentType(dataUrl));
