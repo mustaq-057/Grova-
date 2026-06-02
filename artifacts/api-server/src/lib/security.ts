@@ -84,7 +84,7 @@ export const rateLimiters = {
   // Strict rate limit for file uploads
   upload: rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 10, // 10 uploads per 15 minutes
+    max: process.env.NODE_ENV === "production" ? 30 : 60,
     message: { error: 'Too many upload attempts, please try again later' },
     standardHeaders: true,
     legacyHeaders: false,

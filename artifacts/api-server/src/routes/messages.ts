@@ -358,7 +358,7 @@ router.patch("/messages/:id/like", authenticate, async (req, res) => {
     const msg = rowToMessage(row);
     msg.liked = newLiked === 1;
 
-    broadcast("message-liked", { ...msg, likedBy: authenticatedUserId });
+    broadcast("message-liked", { ...msg, likedBy: authenticatedUserId }, String(row.sender_id));
     res.json({ ...msg, likedBy: authenticatedUserId });
   } catch (err) {
     res.status(500).json({ error: "Failed to like message" });

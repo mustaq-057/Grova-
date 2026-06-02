@@ -87,10 +87,9 @@ export async function markAllRead() {
   await api.markActivityReadAll();
 }
 
-/** Wipe notification list locally and on server. */
+/** Wipe activity notification list (bell page) — keeps chat unread badge. */
 export async function clearAllNotifications() {
   setNotificationsCache([]);
-  clearUnreadChatBadge();
   emitNotifyChanged();
   try {
     await api.clearActivityFeed();

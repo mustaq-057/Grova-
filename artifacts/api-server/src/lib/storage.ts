@@ -8,13 +8,18 @@ const b2BucketName = process.env.B2_BUCKET_NAME || "grova-images";
 const b2Endpoint = process.env.B2_ENDPOINT;
 
 const useCloudinary = Boolean(cloudinaryUrl);
+const useB2 = Boolean(b2KeyId && b2ApplicationKey && b2Endpoint);
 
-if (!useCloudinary && (!b2KeyId || !b2ApplicationKey || !b2Endpoint)) {
+if (!useCloudinary && !useB2) {
   throw new Error("FATAL: Storage not configured. Set CLOUDINARY_URL or B2_KEY_ID + B2_APPLICATION_KEY + B2_ENDPOINT in .env");
 }
 
 if (useCloudinary) {
   cloudinary.config({ secure: true });
+}
+if (useCloudinary && useB2) {
+  console.info("[storage] Primary: Cloudinary, fallback: Backblaze B2");
+} else if (useCloudinary) {
   console.info("[storage] Using Cloudinary for media uploads");
 } else {
   console.info("[storage] Using Backblaze B2 for media uploads");
@@ -80,15 +85,22 @@ export async function uploadImage(key: string, buffer: Buffer, contentType: stri
 }
 
 export async function uploadMedia(key: string, buffer: Buffer, contentType: string): Promise<string> {
-  try {
-    if (useCloudinary) {
-      return await uploadToCloudinary(key, buffer, contentType);
+  const attempts: Array<() => Promise<string>> = [];
+  if (useCloudinary) attempts.push(() => uploadToCloudinary(key, buffer, contentType));
+  if (s3Client) attempts.push(() => uploadToB2(key, buffer, contentType));
+
+  let lastError: unknown;
+  for (const attempt of attempts) {
+    try {
+      return await attempt();
+    } catch (error) {
+      lastError = error;
+      console.warn("[storage] Upload attempt failed, trying fallback if available:", error);
     }
-    return await uploadToB2(key, buffer, contentType);
-  } catch (error) {
-    console.error("Failed to upload media:", error);
-    throw new Error("Failed to upload media");
   }
+
+  console.error("Failed to upload media (all backends):", lastError);
+  throw new Error("Failed to upload media");
 }
 
 export async function getImageUrl(key: string): Promise<string> {

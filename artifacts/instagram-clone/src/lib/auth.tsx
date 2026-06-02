@@ -1,14 +1,19 @@
 import { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
-import type { ApiUser } from "./api";
+import type { ApiUser, ApiMessage } from "./api";
 import { clearEncryption, loadEncryptionKey } from "./crypto";
 import { api } from "./api";
 import {
   hydrateNotifications,
   markAllReadLocal,
   setNotificationViewer,
-  bumpUnreadChatBadge,
   clearAllNotifications,
 } from "./notifications-feed";
+import {
+  alertIncomingChatMessage,
+  alertIncomingChatReaction,
+  alertIncomingChatLike,
+  type ChatNotifyContext,
+} from "./chat-notifications";
 import { hydrateNotes } from "./notes";
 import { applyQuickReactions } from "./quick-reactions";
 import {
@@ -238,17 +243,54 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       hydrateNotes();
     });
 
+    const chatNotifyCtx = (): ChatNotifyContext | null => {
+      const me = userRef.current?.id;
+      const p = partnerRef.current;
+      if (!me) return null;
+      const partnerId = me === "me" ? "wife" : "me";
+      return {
+        myId: me,
+        partnerId,
+        partnerName: p?.name ?? (partnerId === "wife" ? "Sara" : "Mustaq"),
+        partnerAvatar: p?.avatar ?? "",
+      };
+    };
+
     es.addEventListener("new-message", (e) => {
-      try {
-        const msg = JSON.parse((e as MessageEvent).data) as { senderId: string };
-        const me = userRef.current?.id;
-        if (!me || msg.senderId === me) return;
-        const partnerId = me === "me" ? "wife" : "me";
-        if (msg.senderId !== partnerId) return;
-        window.dispatchEvent(new CustomEvent("grova-partner-message", { detail: msg }));
-        if (!window.location.pathname.includes("/chat")) {
-          bumpUnreadChatBadge();
+      void (async () => {
+        try {
+          const msg = JSON.parse((e as MessageEvent).data) as ApiMessage;
+          const ctx = chatNotifyCtx();
+          if (!ctx || msg.senderId !== ctx.partnerId) return;
+          window.dispatchEvent(new CustomEvent("grova-partner-message", { detail: msg }));
+          await alertIncomingChatMessage(msg, ctx);
+        } catch {
+          /* ignore */
         }
+      })();
+    });
+
+    es.addEventListener("message-reaction", (e) => {
+      try {
+        const d = JSON.parse((e as MessageEvent).data) as {
+          reactions: { emoji: string; userId: string }[];
+          byUserId?: string;
+        };
+        const ctx = chatNotifyCtx();
+        if (!ctx || d.byUserId !== ctx.partnerId) return;
+        const emoji = d.reactions.find((r) => r.userId === ctx.partnerId)?.emoji;
+        if (emoji) alertIncomingChatReaction(emoji, ctx);
+      } catch {
+        /* ignore */
+      }
+    });
+
+    es.addEventListener("message-liked", (e) => {
+      try {
+        const msg = JSON.parse((e as MessageEvent).data) as ApiMessage & { likedBy?: string };
+        const ctx = chatNotifyCtx();
+        if (!ctx || msg.likedBy !== ctx.partnerId || msg.senderId !== ctx.myId || !msg.liked) return;
+        alertIncomingChatLike(ctx);
       } catch {
         /* ignore */
       }

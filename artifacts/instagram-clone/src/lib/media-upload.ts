@@ -55,13 +55,18 @@ export async function uploadMediaToB2(dataUrl: string, contentType?: string): Pr
   return body.url;
 }
 
-/** Upload a File/Blob — uses binary upload for large files and all videos. */
+/** Upload a File/Blob — binary path to B2/Cloudinary (best for mobile camera, docs, video). */
 export async function uploadMediaFile(file: File | Blob, contentType?: string): Promise<string> {
   const mime =
     contentType ||
     (file instanceof File ? file.type : "") ||
     "application/octet-stream";
-  if (mime.startsWith("video/") || file.size >= BINARY_UPLOAD_MIN_BYTES) {
+  const useBinary =
+    file instanceof File ||
+    mime.startsWith("video/") ||
+    mime.startsWith("application/") ||
+    file.size >= BINARY_UPLOAD_MIN_BYTES;
+  if (useBinary) {
     return uploadMediaBinary(file, mime.startsWith("video/") ? mime : mime || "application/octet-stream");
   }
   const dataUrl = await readFileAsDataUrl(file);

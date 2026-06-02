@@ -21,16 +21,6 @@ import { requestNotificationPermission, subscribeToPush, sendSubscriptionToServe
 
 import { THEMES } from "@/lib/themes";
 
-function notifyPartnerChatActivity(
-  msg: ApiMessage,
-  partnerDisplayName: string,
-  partnerAvatarUrl: string,
-) {
-  if (!areNotificationsEnabled()) return;
-  const preview = messagePreview(msg);
-  if (preview) showNotification(partnerDisplayName, preview, partnerAvatarUrl);
-}
-
 function unsendErrorMessage(err: unknown): string {
   if (!(err instanceof Error)) return "Could not unsend. Try again.";
   const msg = err.message;
@@ -74,7 +64,6 @@ import {
   hydrateNotifications,
   clearUnreadChatBadge,
 } from "@/lib/notifications-feed";
-import { showNotification } from "@/lib/notifications";
 import { isReadReceiptsEnabled, isShowPresenceEnabled, areNotificationsEnabled } from "@/lib/couple-sync";
 import { isChatBlocked, setChatBlocked, getCuteMode, setCuteMode } from "@/lib/client-memory";
 import { hydrateQuickReactions } from "@/lib/quick-reactions";
@@ -402,9 +391,6 @@ export default function Messages() {
         try {
           const raw = JSON.parse(e.data) as ApiMessage;
           const [msg] = await normalizeMessages([raw]);
-          if (msg.senderId === partnerId) {
-            notifyPartnerChatActivity(msg, pName, pAvatar);
-          }
           setMessages(prev => {
             const existingIds = new Set(prev.map(m => m.id));
             if (existingIds.has(msg.id)) return prev;
@@ -441,15 +427,6 @@ export default function Messages() {
           const raw = JSON.parse(e.data) as ApiMessage;
           const likedBy = (raw as ApiMessage & { likedBy?: string }).likedBy;
           const [msg] = await normalizeMessages([raw]);
-          if (
-            msg.senderId === user?.id &&
-            msg.liked &&
-            likedBy === partnerId &&
-            areNotificationsEnabled()
-          ) {
-            addNotification({ type: "like", fromName: pName, text: "liked your message" });
-            showNotification(pName, "liked your message", pAvatar);
-          }
           setMessages((prev) => {
             const found = prev.find(m => m.id === msg.id);
             if (!found) return prev;
@@ -531,18 +508,6 @@ export default function Messages() {
                 m.senderId === user.id
                   ? (partnerReaction ?? myReaction)
                   : (myReaction ?? partnerReaction);
-              if (
-                partnerReaction &&
-                m.senderId === user.id &&
-                d.byUserId === partnerId &&
-                areNotificationsEnabled()
-              ) {
-                addNotification({
-                  type: "like",
-                  fromName: pName,
-                  text: `reacted ${partnerReaction} to your message`,
-                });
-              }
               return { ...m, reaction: displayReaction };
             });
           });
@@ -912,7 +877,6 @@ export default function Messages() {
         const raw = (e as CustomEvent<ApiMessage>).detail;
         const [msg] = await normalizeMessages([raw]);
         if (msg.senderId !== partnerId) return;
-        notifyPartnerChatActivity(msg, pName, pAvatar);
         setMessages((prev) => {
           if (prev.some((m) => m.id === msg.id)) return prev;
           return [...prev, msg];
