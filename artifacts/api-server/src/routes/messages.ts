@@ -254,7 +254,8 @@ router.post("/messages", authenticate, validateBody({
       companionSticker,
     };
 
-    broadcast("new-message", msg);
+    const partnerId = senderId === "me" ? "wife" : "me";
+    broadcast("new-message", msg, partnerId);
 
     const fromName = await profileDisplayName(senderId!);
     if (companionSticker === "🤲") {
@@ -264,22 +265,6 @@ router.post("/messages", authenticate, validateBody({
     } else if (type === "text" && text && /^📞 (Audio|Video) call (started|ended)/.test(text)) {
       const snippet = text.includes("ended") ? "ended a call" : "started a call";
       await postCoupleActivity("call", senderId!, fromName, snippet).catch(() => {});
-    } else if (type === "text" || type === "image" || type === "video" || type === "file" || type === "audio" || type === "sticker" || type === "gif") {
-      const preview =
-        type === "image"
-          ? "sent a photo"
-          : type === "video"
-            ? "sent a video"
-          : type === "file"
-            ? "sent a file"
-            : type === "audio"
-              ? "sent a voice message"
-              : type === "sticker"
-                ? "sent a sticker"
-                : type === "gif"
-                  ? "sent a GIF"
-                  : (text?.slice(0, 80) || "sent a message");
-      await postCoupleActivity("message", senderId!, fromName, preview).catch(() => {});
     }
 
     res.json(msg);

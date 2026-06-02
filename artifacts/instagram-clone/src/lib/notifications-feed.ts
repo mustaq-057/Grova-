@@ -46,19 +46,23 @@ export function getNotifications(): AppNotification[] {
 
 export async function hydrateNotifications(): Promise<void> {
   const { notifications } = await api.getActivityFeed();
-  const filtered = filterForViewer(
-    notifications
-      .filter((n) => !isSecretNoteActivity(n))
-      .filter((n) => ["like", "comment", "story", "dua", "call", "location", "message"].includes(n.type))
-      .slice(0, 50),
+  const filtered = dedupeActivities(
+    filterForViewer(
+      notifications
+        .filter((n) => !isSecretNoteActivity(n))
+        .filter((n) => ["like", "comment", "story", "dua", "call", "location"].includes(n.type))
+        .filter((n) => n.type !== "message")
+        .slice(0, 50),
+    ),
   );
   setNotificationsCache(filtered);
   emitNotifyChanged();
 }
 
 export function addNotification(n: Omit<AppNotification, "id" | "read" | "timestamp">) {
-  const allowedTypes = ["like", "comment", "share", "story", "dua", "call", "location", "message"];
+  const allowedTypes = ["like", "comment", "share", "story", "dua", "call", "location"];
   if (!allowedTypes.includes(n.type)) return;
+  if (n.type === "message") return;
   if (isSecretNoteActivity(n)) return;
   if (isOwnActivity(n)) return;
 
@@ -88,8 +92,27 @@ export function unreadCount(): number {
 }
 
 export function setUnreadChatBadge(count: number) {
-  writeUnreadChatBadge(count);
+  writeUnreadChatBadge(Math.max(0, count));
   window.dispatchEvent(new Event(UNREAD_CHAT_CHANGED));
+}
+
+export function bumpUnreadChatBadge(delta = 1) {
+  setUnreadChatBadge(readUnreadChatBadge() + delta);
+}
+
+export function clearUnreadChatBadge() {
+  setUnreadChatBadge(0);
+}
+
+function dedupeActivities(list: AppNotification[]): AppNotification[] {
+  const seen = new Set<string>();
+  return list.filter((n) => {
+    const bucket = Math.floor(new Date(n.timestamp).getTime() / 2000);
+    const key = `${n.actorId ?? ""}|${n.type}|${n.text}|${bucket}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 export { readUnreadChatBadge as getUnreadChatBadge };

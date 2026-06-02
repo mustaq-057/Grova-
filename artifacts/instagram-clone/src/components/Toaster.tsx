@@ -6,6 +6,7 @@ export function Toaster() {
       position="top-right"
       richColors
       closeButton
+      duration={3500}
       toastOptions={{
         style: {
           background: "hsl(var(--background))",

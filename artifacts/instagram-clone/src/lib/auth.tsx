@@ -2,7 +2,12 @@ import { createContext, useContext, useEffect, useState, useCallback, useRef } f
 import type { ApiUser } from "./api";
 import { clearEncryption, loadEncryptionKey } from "./crypto";
 import { api } from "./api";
-import { hydrateNotifications, markAllReadLocal, setNotificationViewer } from "./notifications-feed";
+import {
+  hydrateNotifications,
+  markAllReadLocal,
+  setNotificationViewer,
+  bumpUnreadChatBadge,
+} from "./notifications-feed";
 import { hydrateNotes } from "./notes";
 import { applyQuickReactions } from "./quick-reactions";
 import {
@@ -222,6 +227,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     es.addEventListener("note-updated", () => {
       hydrateNotes();
+    });
+
+    es.addEventListener("new-message", (e) => {
+      try {
+        const msg = JSON.parse((e as MessageEvent).data) as { senderId: string };
+        const me = userRef.current?.id;
+        if (!me || msg.senderId === me) return;
+        const partnerId = me === "me" ? "wife" : "me";
+        if (msg.senderId !== partnerId) return;
+        window.dispatchEvent(new CustomEvent("grova-partner-message", { detail: msg }));
+        if (!window.location.pathname.includes("/chat")) {
+          bumpUnreadChatBadge();
+        }
+      } catch {
+        /* ignore */
+      }
     });
 
     es.addEventListener("activity-added", () => {

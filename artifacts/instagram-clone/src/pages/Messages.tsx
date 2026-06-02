@@ -27,19 +27,8 @@ function notifyPartnerChatActivity(
   partnerAvatarUrl: string,
 ) {
   if (!areNotificationsEnabled()) return;
-  const rawText = msg.text?.trim() ?? "";
-  const isPostShare =
-    rawText.toLowerCase().includes("shared a post") ||
-    rawText.includes("grova://post/");
-  const isPlainTextMessage =
-    (msg.type === "text" || msg.type === "heart") &&
-    !isCallLogMessage(rawText) &&
-    rawText.length > 0;
-  if (!isPostShare && !isPlainTextMessage) return;
-
-  const text = isPostShare ? "shared a post" : rawText;
-  showNotification(partnerDisplayName, text, partnerAvatarUrl);
-  addNotification({ type: "message", fromName: partnerDisplayName, text });
+  const preview = messagePreview(msg);
+  if (preview) showNotification(partnerDisplayName, preview, partnerAvatarUrl);
 }
 
 function unsendErrorMessage(err: unknown): string {
@@ -78,7 +67,13 @@ import {
   guessVideoMime,
   normalizePastedFile,
 } from "@/lib/media-file";
-import { addNotification, unreadCount, NOTIFY_CHANGED, hydrateNotifications, setUnreadChatBadge } from "@/lib/notifications-feed";
+import {
+  addNotification,
+  unreadCount,
+  NOTIFY_CHANGED,
+  hydrateNotifications,
+  clearUnreadChatBadge,
+} from "@/lib/notifications-feed";
 import { showNotification } from "@/lib/notifications";
 import { isReadReceiptsEnabled, isShowPresenceEnabled, areNotificationsEnabled } from "@/lib/couple-sync";
 import { isChatBlocked, setChatBlocked, getCuteMode, setCuteMode } from "@/lib/client-memory";
@@ -89,6 +84,16 @@ import DoodleCanvas, { DOODLE_HEIGHT_STEP, DOODLE_MIN_HEIGHT } from "@/component
 import { ImageCropModal } from "@/components/ImageCropModal";
 import { partnerTypingLine } from "@/lib/partner-words";
 import { toast } from "sonner";
+
+/** Always dismiss loading toasts before success/error so the spinner cannot stick. */
+function finishToast(
+  loadingId: string | number,
+  result: { type: "success"; message: string } | { type: "error"; message: string } | { type: "none" },
+) {
+  toast.dismiss(loadingId);
+  if (result.type === "success") toast.success(result.message, { duration: 2500 });
+  else if (result.type === "error") toast.error(result.message, { duration: 4000 });
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 type CallState = { status: "outgoing" | "incoming" | "active"; type: "audio" | "video"; incomingOffer?: RTCSessionDescriptionInit } | null;
@@ -885,20 +890,34 @@ export default function Messages() {
   }, [messages, user, partnerId]);
 
   useEffect(() => {
+    clearUnreadChatBadge();
+    setUnreadChat(0);
+  }, []);
+
+  useEffect(() => {
     if (!user) return;
-    const n = messages.filter((m) => {
-      if (m.senderId !== partnerId || m.deleted || m.read) return false;
-      const rawText = m.text?.trim() ?? "";
-      const isPostShare =
-        rawText.toLowerCase().includes("shared a post") ||
-        rawText.includes("grova://post/");
-      const isPlainTextMessage =
-        (m.type === "text" || m.type === "heart") &&
-        !isCallLogMessage(rawText) &&
-        rawText.length > 0;
-      return isPostShare || isPlainTextMessage;
-    }).length;
-    setUnreadChatBadge(n);
+    const onPartnerMessage = async (e: Event) => {
+      try {
+        const raw = (e as CustomEvent<ApiMessage>).detail;
+        const [msg] = await normalizeMessages([raw]);
+        if (msg.senderId !== partnerId) return;
+        notifyPartnerChatActivity(msg, pName, pAvatar);
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === msg.id)) return prev;
+          return [...prev, msg];
+        });
+        scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
+      } catch {
+        /* ignore */
+      }
+    };
+    window.addEventListener("grova-partner-message", onPartnerMessage);
+    return () => window.removeEventListener("grova-partner-message", onPartnerMessage);
+  }, [user, partnerId, pName, pAvatar]);
+
+  useEffect(() => {
+    if (!user) return;
+    const n = messages.filter((m) => m.senderId === partnerId && !m.deleted && !m.read).length;
     setUnreadChat(n);
   }, [messages, user, partnerId]);
 
@@ -971,19 +990,26 @@ export default function Messages() {
       const all = await fetchAllMessagesForExport();
       const visible = filterVisibleMessages(user.id, all);
       if (visible.length === 0) {
-        toast.error("No messages to export", { id: toastId });
+        finishToast(toastId, { type: "error", message: "No messages to export" });
         return;
       }
       toast.loading(`Exporting ${visible.length} messages…`, { id: toastId });
       const pages = await downloadChatAsImage(visible, user.id, user.name, pName, (cur, total) => {
         toast.loading(`Downloading part ${cur} of ${total}…`, { id: toastId });
       });
-      toast.success(
-        pages > 1 ? `Saved ${pages} images (${visible.length} messages).` : `Chat saved (${visible.length} messages).`,
-        { id: toastId },
+      finishToast(
+        toastId,
+        {
+          type: "success",
+          message:
+            pages > 1 ? `Saved ${pages} images (${visible.length} messages).` : `Chat saved (${visible.length} messages).`,
+        },
       );
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not export chat.", { id: toastId });
+      finishToast(toastId, {
+        type: "error",
+        message: err instanceof Error ? err.message : "Could not export chat.",
+      });
     }
   }, [user, pName, fetchAllMessagesForExport]);
 
@@ -1504,8 +1530,7 @@ export default function Messages() {
           kind = await classifyMediaFile(normalized, clipboardItemType);
         }
       } catch {
-        toast.dismiss(toastId);
-        toast.error("Could not read pasted file.");
+        finishToast(toastId, { type: "error", message: "Could not read pasted file." });
         filePickInFlightRef.current = false;
         return;
       }
@@ -1515,24 +1540,22 @@ export default function Messages() {
       const MAX_FILE_SIZE =
         kind === "video" ? 10 * 1024 * 1024 : kind === "image" ? 25 * 1024 * 1024 : 25 * 1024 * 1024;
       if (normalized.size > MAX_FILE_SIZE) {
-        toast.dismiss(toastId);
-        toast.error(
-          kind === "video"
-            ? "Video too large (max 10MB)."
-            : "File too large (max 25MB).",
-        );
+        finishToast(toastId, {
+          type: "error",
+          message: kind === "video" ? "Video too large (max 10MB)." : "File too large (max 25MB).",
+        });
         filePickInFlightRef.current = false;
         return;
       }
 
       try {
         if (kind === "image") {
-          toast.dismiss(toastId);
           if (isEphemeral) {
             toast.loading("Sending photo…", { id: toastId });
             await uploadAndSendEphemeralMedia(normalized, "image", mediaViewMode);
-            toast.success("Photo sent", { id: toastId });
+            finishToast(toastId, { type: "success", message: "Photo sent" });
           } else {
+            finishToast(toastId, { type: "none" });
             setPendingImageType(normalized.type || clipboardItemType || "image/jpeg");
             setImageToCrop(URL.createObjectURL(normalized));
           }
@@ -1544,7 +1567,7 @@ export default function Messages() {
           if (isEphemeral) {
             await uploadAndSendEphemeralMedia(normalized, "video", mediaViewMode);
             URL.revokeObjectURL(previewUrl);
-            toast.dismiss(toastId);
+            finishToast(toastId, { type: "success", message: "Video sent" });
             return;
           }
 
@@ -1571,7 +1594,7 @@ export default function Messages() {
           if (duration > 60) {
             setMessages((prev) => prev.filter((m) => m.id !== tempId));
             URL.revokeObjectURL(previewUrl);
-            toast.error("Video must be 1 minute or less.", { id: toastId });
+            finishToast(toastId, { type: "error", message: "Video must be 1 minute or less." });
             return;
           }
 
@@ -1588,16 +1611,20 @@ export default function Messages() {
           URL.revokeObjectURL(previewUrl);
           setMessages((prev) => prev.map((m) => (m.id === tempId ? display : m)));
           scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
-          toast.success("Video sent", { id: toastId });
+          finishToast(toastId, { type: "success", message: "Video sent" });
         } else {
           toast.loading("Uploading file…", { id: toastId });
           await uploadAndSendFile(normalized);
-          toast.dismiss(toastId);
+          finishToast(toastId, { type: "success", message: "File sent" });
         }
       } catch (error) {
         console.error("Failed to process file:", error);
-        toast.error(error instanceof Error ? error.message : "Failed to process file.", { id: toastId });
+        finishToast(toastId, {
+          type: "error",
+          message: error instanceof Error ? error.message : "Failed to process file.",
+        });
       } finally {
+        toast.dismiss(toastId);
         filePickInFlightRef.current = false;
       }
     },
