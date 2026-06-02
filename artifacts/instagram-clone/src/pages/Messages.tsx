@@ -27,30 +27,17 @@ function notifyPartnerChatActivity(
   partnerAvatarUrl: string,
 ) {
   if (!areNotificationsEnabled()) return;
-  const isDua = msg.companionSticker === "🤲";
-  if (isDua) {
-    showNotification(partnerDisplayName, "shared a dua with you 🤲", partnerAvatarUrl);
-    addNotification({ type: "dua", fromName: partnerDisplayName, text: "shared a dua with you 🤲" });
-    return;
-  }
-  if (isCallLogMessage(msg.text)) {
-    const ended = Boolean(msg.text?.includes("ended"));
-    const text = ended ? "ended a call" : "started a call";
-    showNotification(partnerDisplayName, text, partnerAvatarUrl);
-    addNotification({ type: "call", fromName: partnerDisplayName, text });
-    return;
-  }
-  if (msg.type === "location") {
-    showNotification(partnerDisplayName, "shared their location", partnerAvatarUrl);
-    addNotification({ type: "location", fromName: partnerDisplayName, text: "shared their location" });
-    return;
-  }
-  let text = messagePreview(msg);
-  if (msg.type === "image") text = "sent a photo";
-  else if (msg.type === "file") text = "sent a file";
-  else if (msg.type === "audio") text = "sent a voice message";
-  else if (msg.type === "gif") text = "sent a GIF";
-  else if (msg.type === "sticker") text = "sent a sticker";
+  const rawText = msg.text?.trim() ?? "";
+  const isPostShare =
+    rawText.toLowerCase().includes("shared a post") ||
+    rawText.includes("grova://post/");
+  const isPlainTextMessage =
+    (msg.type === "text" || msg.type === "heart") &&
+    !isCallLogMessage(rawText) &&
+    rawText.length > 0;
+  if (!isPostShare && !isPlainTextMessage) return;
+
+  const text = isPostShare ? "shared a post" : rawText;
   showNotification(partnerDisplayName, text, partnerAvatarUrl);
   addNotification({ type: "message", fromName: partnerDisplayName, text });
 }
@@ -83,7 +70,14 @@ import {
 } from "@/lib/hidden-messages";
 import { mergeMessagesById } from "@/lib/chat-sync";
 import { downloadChatAsImage } from "@/lib/chat-download";
-import { uploadMediaToB2, readFileAsDataUrl } from "@/lib/media-upload";
+import { uploadMediaToB2, uploadMediaFile, readFileAsDataUrl } from "@/lib/media-upload";
+import {
+  classifyMediaFile,
+  extractClipboardFiles,
+  getVideoDurationSafe,
+  guessVideoMime,
+  normalizePastedFile,
+} from "@/lib/media-file";
 import { addNotification, unreadCount, NOTIFY_CHANGED, hydrateNotifications, setUnreadChatBadge } from "@/lib/notifications-feed";
 import { showNotification } from "@/lib/notifications";
 import { isReadReceiptsEnabled, isShowPresenceEnabled, areNotificationsEnabled } from "@/lib/couple-sync";
@@ -154,6 +148,15 @@ export default function Messages() {
   const [doodleOpen, setDoodleOpen] = useState(false);
   const [doodleHeight, setDoodleHeight] = useState(0);
   const [pendingImageType, setPendingImageType] = useState("image/jpeg");
+  const [mediaViewMode, setMediaViewMode] = useState<"keep" | "once" | "twice">("keep");
+  const [mediaViewer, setMediaViewer] = useState<{
+    messageId: string;
+    url: string;
+    kind: "image" | "video";
+    timed: boolean;
+    useVideoDuration: boolean;
+    secondsLeft: number;
+  } | null>(null);
   const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [activeThread, setActiveThread] = useState<string | null>(null);
   const [showThreadPanel, setShowThreadPanel] = useState(false);
@@ -212,8 +215,14 @@ export default function Messages() {
   // Define partner info early to avoid hoisting issues
   const pAvatar = partner?.avatar || partnerAvatar || defaultAvatar(partnerId);
   const pName = partner?.name || partnerName || (partnerId === "wife" ? "Sara" : "Mustaq");
-  const lastMsg = messages.filter((m) => !m.deleted).slice(-1)[0];
-  const lastPreview = lastMsg ? messagePreview(lastMsg) : undefined;
+  const lastMsg = useMemo(
+    () => messages.filter((m) => !m.deleted).slice(-1)[0],
+    [messages],
+  );
+  const lastPreview = useMemo(
+    () => (lastMsg ? messagePreview(lastMsg) : undefined),
+    [lastMsg],
+  );
 
   useEffect(() => {
     const refresh = () => setNotifCount(unreadCount());
@@ -240,7 +249,9 @@ export default function Messages() {
     const hb = setInterval(() => {
       if (isShowPresenceEnabled()) api.heartbeat(user.id).catch(() => {});
     }, 30_000);
-    const poll = setInterval(refreshPresence, 15_000);
+    const poll = setInterval(() => {
+      if (document.visibilityState === "visible") refreshPresence();
+    }, 30_000);
     return () => { clearInterval(hb); clearInterval(poll); };
   }, [user?.id, partnerId]);
 
@@ -637,6 +648,26 @@ export default function Messages() {
         }
       };
 
+      const handleMessageMediaOpened = (e: MessageEvent) => {
+        if (!mounted || !user) return;
+        try {
+          const d = JSON.parse(e.data) as { messageId: string; userId: string; mediaOpenCount: number; mediaOpenedAt: string };
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === d.messageId
+                ? {
+                    ...m,
+                    mediaOpenedAt: d.userId === partnerId ? d.mediaOpenedAt : m.mediaOpenedAt,
+                    mediaOpenCount: d.userId === user.id ? d.mediaOpenCount : m.mediaOpenCount,
+                  }
+                : m,
+            ),
+          );
+        } catch (err) {
+          console.error("Failed to handle media open:", err);
+        }
+      };
+
       const handleDuaAdded = () => { hydrateNotifications(); };
       const handleDuaDeleted = () => { api.getDuas().catch(() => {}); };
       const handlePrefsUpdated = () => { refreshCouplePrefs(); };
@@ -658,6 +689,7 @@ export default function Messages() {
       es.addEventListener("profile-updated", handleProfileUpdated);
       es.addEventListener("typing-indicator", handleTypingIndicator);
       es.addEventListener("message-read", handleMessageRead);
+      es.addEventListener("message-media-opened", handleMessageMediaOpened);
       es.addEventListener("dua-added", handleDuaAdded);
       es.addEventListener("dua-deleted", handleDuaDeleted);
       es.addEventListener("prefs-updated", handlePrefsUpdated);
@@ -723,7 +755,9 @@ export default function Messages() {
     };
 
     document.addEventListener("visibilitychange", onVisible);
-    const interval = setInterval(syncFromServer, 120_000);
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") syncFromServer();
+    }, 180_000);
 
     return () => {
       document.removeEventListener("visibilitychange", onVisible);
@@ -751,7 +785,7 @@ export default function Messages() {
     }
     const last = messages[messages.length - 1];
     const isOwn = last?.senderId === user?.id;
-    const isMedia = last?.type === "gif" || last?.type === "image";
+    const isMedia = last?.type === "gif" || last?.type === "image" || last?.type === "video";
 
     if (isOwn || isNearBottom || (isOwn && isMedia)) {
       if (isMedia) {
@@ -835,7 +869,18 @@ export default function Messages() {
 
   useEffect(() => {
     if (!user) return;
-    const n = messages.filter(m => m.senderId === partnerId && !m.deleted && !m.read).length;
+    const n = messages.filter((m) => {
+      if (m.senderId !== partnerId || m.deleted || m.read) return false;
+      const rawText = m.text?.trim() ?? "";
+      const isPostShare =
+        rawText.toLowerCase().includes("shared a post") ||
+        rawText.includes("grova://post/");
+      const isPlainTextMessage =
+        (m.type === "text" || m.type === "heart") &&
+        !isCallLogMessage(rawText) &&
+        rawText.length > 0;
+      return isPostShare || isPlainTextMessage;
+    }).length;
     setUnreadChatBadge(n);
     setUnreadChat(n);
   }, [messages, user, partnerId]);
@@ -876,24 +921,35 @@ export default function Messages() {
 
   const fetchAllMessagesForExport = useCallback(async () => {
     const collected: ApiMessage[] = [];
-    let offset = 0;
+    const seen = new Set<string>();
+    let cursor: string | undefined;
     let hasMore = true;
-    while (hasMore) {
-      const data = await api.getMessages({ offset });
+    let guard = 0;
+
+    while (hasMore && guard < 200) {
+      const data = await api.getMessages({ cursor, limit: 100 });
       const batch = await normalizeMessages(data.messages || []);
       if (batch.length === 0) break;
-      collected.push(...batch);
+
+      for (const msg of batch) {
+        if (!seen.has(msg.id)) {
+          seen.add(msg.id);
+          collected.push(msg);
+        }
+      }
+
       hasMore = Boolean(data.pagination?.hasMore);
-      offset += batch.length;
+      cursor = data.pagination?.nextCursor || undefined;
+      guard += 1;
     }
-    const byId = new Map(collected.map((m) => [m.id, m]));
-    return [...byId.values()];
+
+    return collected.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
   }, []);
 
   const downloadChatImages = useCallback(async () => {
     if (!user) return;
+    const toastId = "chat-export";
     try {
-      const toastId = "chat-export";
       toast.loading("Loading full chat history…", { id: toastId });
       const all = await fetchAllMessagesForExport();
       const visible = filterVisibleMessages(user.id, all);
@@ -910,7 +966,7 @@ export default function Messages() {
         { id: toastId },
       );
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not export chat.");
+      toast.error(err instanceof Error ? err.message : "Could not export chat.", { id: toastId });
     }
   }, [user, pName, fetchAllMessagesForExport]);
 
@@ -981,6 +1037,104 @@ export default function Messages() {
     }
   }, [user, online]);
 
+  const uploadAndSendEphemeralMedia = useCallback(
+    async (
+      file: File,
+      kind: "image" | "video",
+      mode: "once" | "twice",
+    ) => {
+      if (!user) return;
+      if (!online) {
+        setError("You're offline. Connect to the internet to send messages.");
+        return;
+      }
+
+      const sticker = mode === "once" ? "__vm:once" : "__vm:twice";
+      const tempId = crypto.randomUUID();
+      const optimistic = buildOptimisticMessage(
+        {
+          senderId: user.id,
+          type: kind,
+          companionSticker: sticker,
+          mediaViewMode: mode,
+          text: kind === "video" ? file.name || "Video" : undefined,
+        },
+        tempId,
+      );
+      setMessages((prev) => [...prev, optimistic]);
+      scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
+
+      try {
+        const mime = kind === "video" ? guessVideoMime(file) : file.type || "image/jpeg";
+        const url = await uploadMediaFile(file, mime);
+        const outgoing = await prepareOutgoingMessage({
+          senderId: user.id,
+          ...(kind === "image"
+            ? { type: "image" as const, imageUrl: url, companionSticker: sticker }
+            : {
+                type: "video" as const,
+                text: file.name || "Video",
+                fileData: url,
+                fileType: mime,
+                fileSize: file.size,
+                companionSticker: sticker,
+              }),
+        });
+        const saved = await api.sendMessage(outgoing);
+        const [display] = await normalizeMessages([saved]);
+        setMessages((prev) => prev.map((m) => (m.id === tempId ? display : m)));
+        scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
+      } catch (err) {
+        console.error("Failed to send ephemeral media:", err);
+        setMessages((prev) => prev.filter((m) => m.id !== tempId));
+        setError("Message did not send. Check your connection and try again.");
+      }
+    },
+    [user, online],
+  );
+
+  const openMediaMessage = useCallback(async (msg: ApiMessage) => {
+    const timed = msg.mediaViewMode === "once" || msg.mediaViewMode === "twice";
+    try {
+      if (timed) {
+        const opened = await api.openMediaMessage(msg.id);
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === msg.id
+              ? {
+                  ...m,
+                  mediaOpenCount: opened.mediaOpenCount,
+                  mediaOpenedAt: opened.mediaOpenedAt ?? m.mediaOpenedAt,
+                }
+              : m,
+          ),
+        );
+        setMediaViewer({
+          messageId: msg.id,
+          url: opened.url,
+          kind: opened.kind,
+          timed: true,
+          useVideoDuration: opened.kind === "video",
+          secondsLeft: opened.kind === "video" ? 0 : 10,
+        });
+        return;
+      }
+
+      const url = msg.type === "image" ? msg.imageUrl || msg.imageData : msg.fileData;
+      if (!url) return;
+      setMediaViewer({
+        messageId: msg.id,
+        url,
+        kind: msg.type === "video" ? "video" : "image",
+        timed: false,
+        useVideoDuration: false,
+        secondsLeft: 0,
+      });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not open media");
+    }
+  }, []);
+
   const toggleCuteMode = useCallback((mode: string | null) => {
     setCuteMode(mode);
     setCuteModeState(mode);
@@ -1024,34 +1178,17 @@ export default function Messages() {
     }, 300);
   }, []);
 
-  // Handle typing indicator with debouncing
-  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setInput(e.target.value);
-
-    if (user && e.target.value.length > 0) {
-      // Clear previous timeout
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
-      }
-
-      // Debounce typing indicator - only send after 500ms of typing
-      typingTimeoutRef.current = setTimeout(() => {
-        fetch('/api/typing', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId: user.id, partnerId, typing: true })
-        }).catch(() => {});
-
-        // Set timeout to send stopped typing after 2 seconds
-        setTimeout(() => {
-          fetch('/api/typing', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: user.id, partnerId, typing: false })
-          }).catch(() => {});
-        }, 2000);
-      }, 500);
+  const handleInputActivity = useCallback((value: string) => {
+    if (!user) return;
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    if (!value.trim()) {
+      void api.sendTyping(user.id, partnerId, false);
+      return;
     }
+    void api.sendTyping(user.id, partnerId, true);
+    typingTimeoutRef.current = setTimeout(() => {
+      void api.sendTyping(user.id, partnerId, false);
+    }, 1500);
   }, [user, partnerId]);
 
   const sendGreeting = useCallback((g: GreetingTemplate) => {
@@ -1327,28 +1464,66 @@ export default function Messages() {
     [user],
   );
 
+  const mediaModeSticker = useCallback(
+    (mode: "keep" | "once" | "twice"): string | undefined =>
+      mode === "once" ? "__vm:once" : mode === "twice" ? "__vm:twice" : undefined,
+    [],
+  );
+
   const handlePickedFile = useCallback(
-    async (file: File) => {
-      const MAX_FILE_SIZE = 25 * 1024 * 1024;
-      if (file.size > MAX_FILE_SIZE) {
-        alert("File too large. Maximum size is 25MB.");
+    async (file: File, clipboardItemType?: string) => {
+      const normalized = normalizePastedFile(file, clipboardItemType);
+      const kind = await classifyMediaFile(normalized, clipboardItemType);
+      const isEphemeral = mediaViewMode === "once" || mediaViewMode === "twice";
+
+      const MAX_FILE_SIZE =
+        kind === "video" ? 10 * 1024 * 1024 : kind === "image" ? 25 * 1024 * 1024 : 25 * 1024 * 1024;
+      if (normalized.size > MAX_FILE_SIZE) {
+        alert(
+          kind === "video"
+            ? "Video too large. Maximum size is 10MB."
+            : "File too large. Maximum size is 25MB.",
+        );
         return;
       }
 
       try {
-        if (file.type.startsWith("image/")) {
-          const dataUrl = await readFileAsDataUrl(file);
-          setPendingImageType(file.type);
-          setImageToCrop(dataUrl);
+        if (kind === "image") {
+          if (isEphemeral) {
+            await uploadAndSendEphemeralMedia(normalized, "image", mediaViewMode);
+          } else {
+            const dataUrl = await readFileAsDataUrl(normalized);
+            setPendingImageType(normalized.type || "image/jpeg");
+            setImageToCrop(dataUrl);
+          }
+        } else if (kind === "video") {
+          const duration = await getVideoDurationSafe(normalized);
+          if (duration > 60) {
+            alert("Video duration must be 1 minute or less.");
+            return;
+          }
+          if (isEphemeral) {
+            await uploadAndSendEphemeralMedia(normalized, "video", mediaViewMode);
+          } else {
+            const mime = guessVideoMime(normalized, clipboardItemType);
+            const url = await uploadMediaFile(normalized, mime);
+            await sendMsg({
+              type: "video",
+              text: normalized.name || "Video",
+              fileData: url,
+              fileType: mime,
+              fileSize: normalized.size,
+            });
+          }
         } else {
-          await uploadAndSendFile(file);
+          await uploadAndSendFile(normalized);
         }
       } catch (error) {
         console.error("Failed to process file:", error);
-        alert("Failed to process file.");
+        alert(error instanceof Error ? error.message : "Failed to process file.");
       }
     },
-    [uploadAndSendFile],
+    [uploadAndSendFile, sendMsg, uploadAndSendEphemeralMedia, mediaViewMode],
   );
 
   const handleFileChange = useCallback(
@@ -1365,27 +1540,13 @@ export default function Messages() {
     if (!user || blocked) return;
 
     const onDocumentPaste = (e: ClipboardEvent) => {
-      const target = e.target as HTMLElement | null;
-      if (target?.closest("input, textarea, [contenteditable='true']")) return;
-
       const cd = e.clipboardData;
-      if (!cd) return;
-
-      const files: File[] = [];
-      for (const item of cd.items) {
-        if (item.kind === "file") {
-          const f = item.getAsFile();
-          if (f) files.push(f);
-        }
-      }
-      if (files.length === 0 && cd.files.length > 0) {
-        files.push(...Array.from(cd.files));
-      }
-      if (files.length === 0) return;
+      const picked = extractClipboardFiles(cd);
+      if (picked.length === 0) return;
 
       e.preventDefault();
-      for (const file of files) {
-        void handlePickedFile(file);
+      for (const { file, itemType } of picked) {
+        void handlePickedFile(file, itemType);
       }
     };
 
@@ -1393,16 +1554,39 @@ export default function Messages() {
     return () => document.removeEventListener("paste", onDocumentPaste);
   }, [user, blocked, handlePickedFile]);
 
+  useEffect(() => {
+    if (!mediaViewer?.timed || mediaViewer.useVideoDuration) return;
+    const interval = setInterval(() => {
+      setMediaViewer((prev) => {
+        if (!prev || !prev.timed || prev.useVideoDuration) return prev;
+        if (prev.secondsLeft <= 1) return null;
+        return { ...prev, secondsLeft: prev.secondsLeft - 1 };
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [mediaViewer?.timed, mediaViewer?.useVideoDuration, mediaViewer?.messageId]);
+
+  useEffect(() => {
+    if (!mediaViewer?.timed) return;
+    const onBlur = () => setMediaViewer(null);
+    window.addEventListener("blur", onBlur);
+    document.addEventListener("visibilitychange", onBlur);
+    return () => {
+      window.removeEventListener("blur", onBlur);
+      document.removeEventListener("visibilitychange", onBlur);
+    };
+  }, [mediaViewer?.timed, mediaViewer?.messageId]);
+
   const handleCroppedImage = useCallback(async (croppedDataUrl: string) => {
     setImageToCrop(null);
     try {
       const url = await uploadMediaToB2(croppedDataUrl, pendingImageType);
-      sendMsg({ type: "image", imageUrl: url });
+      await sendMsg({ type: "image", imageUrl: url, companionSticker: mediaModeSticker(mediaViewMode) });
     } catch (uploadError) {
       console.error("Failed to upload image:", uploadError);
       alert(uploadError instanceof Error ? uploadError.message : "Image upload failed.");
     }
-  }, [pendingImageType, sendMsg]);
+  }, [pendingImageType, sendMsg, mediaModeSticker, mediaViewMode]);
 
   // Voice recording
   const startRecording = async () => {
@@ -1874,6 +2058,7 @@ export default function Messages() {
                   onReply={setReplyTo}
                   onEdit={handleEdit}
                   onOpenMenu={(m, rect) => setContextMenu({ msg: m, top: rect.bottom + 4, left: rect.left })}
+                  onOpenMedia={openMediaMessage}
                   seenLabel={buildSeenLabel(msg, isMe, lastSeenOutgoingId)}
                   onStartThread={handleStartThread}
                   onReplyToThread={handleReplyToThread}
@@ -2035,6 +2220,7 @@ export default function Messages() {
                     onPin={handlePin}
                     onReply={setReplyTo}
                     onOpenMenu={(m, rect) => setContextMenu({ msg: m, top: rect.bottom + 4, left: rect.left })}
+                    onOpenMedia={openMediaMessage}
                     prevMsg={prevMsg}
                     seenLabel={buildSeenLabel(msg, isMe, lastSeenOutgoingId)}
                     onStartThread={handleStartThread}
@@ -2106,6 +2292,7 @@ export default function Messages() {
       <MessageInput
         input={input}
         setInput={setInput}
+        onInputActivity={handleInputActivity}
         onSend={sendText}
         cuteMode={cuteMode}
         onToggleCuteMode={toggleCuteMode}
@@ -2128,6 +2315,8 @@ export default function Messages() {
         onImageSelect={(file) => {
           void handlePickedFile(file);
         }}
+        mediaViewMode={mediaViewMode}
+        onMediaViewModeChange={setMediaViewMode}
         onDoodleOpen={openDoodlePanel}
         doodleActive={doodleOpen}
         onStartRecording={startRecording}
@@ -2218,6 +2407,41 @@ export default function Messages() {
           onEnd={endCall}
           incomingSignal={callSignal ?? undefined}
         />
+      )}
+
+      {mediaViewer && (
+        <div
+          className="fixed inset-0 z-[120] bg-black/95 flex items-center justify-center p-4"
+          onContextMenu={(e) => e.preventDefault()}
+        >
+          <button
+            type="button"
+            onClick={() => setMediaViewer(null)}
+            className="absolute top-4 right-4 w-10 h-10 rounded-full bg-black/60 text-white flex items-center justify-center"
+            aria-label="Close media"
+          >
+            <X className="w-5 h-5" />
+          </button>
+          {mediaViewer.timed && !mediaViewer.useVideoDuration && (
+            <div className="absolute top-4 left-4 px-3 py-1.5 rounded-full bg-primary/30 text-white text-sm font-semibold">
+              {mediaViewer.secondsLeft}s
+            </div>
+          )}
+          {mediaViewer.kind === "video" ? (
+            <video
+              src={mediaViewer.url}
+              controls={!mediaViewer.timed}
+              autoPlay
+              playsInline
+              onEnded={() => {
+                if (mediaViewer.timed) setMediaViewer(null);
+              }}
+              className="max-w-full max-h-full rounded-xl"
+            />
+          ) : (
+            <img src={mediaViewer.url} alt="" className="max-w-full max-h-full rounded-xl object-contain" />
+          )}
+        </div>
       )}
 
       {contextMenu && user && (

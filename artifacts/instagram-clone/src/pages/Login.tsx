@@ -4,6 +4,7 @@ import { Eye, EyeOff, Lock, Mail } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { initEncryption } from "@/lib/crypto";
+import { getDefaultEmail, saveDefaultEmail } from "@/lib/session";
 import { AVATARS } from "@/lib/avatars";
 import { AvatarImage } from "@/components/AvatarImage";
 
@@ -15,7 +16,7 @@ export default memo(function Login() {
   const { setUser } = useAuth();
   const [step, setStep] = useState<Step>("primary");
   const [selectedId, setSelectedId] = useState<"me" | "wife" | null>(null);
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(() => getDefaultEmail());
   const [password, setPassword] = useState("");
   const [showPrimaryPassword, setShowPrimaryPassword] = useState(false);
   const [code, setCode] = useState("");
@@ -58,6 +59,7 @@ export default memo(function Login() {
     setError("");
     try {
       await api.primaryLogin(email.trim(), password);
+      saveDefaultEmail(email.trim());
       api.getLoginProfiles().then((profiles) => {
         setUsers((prev) =>
           prev.map((u) => {

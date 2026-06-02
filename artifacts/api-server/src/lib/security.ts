@@ -208,8 +208,15 @@ export function validateEnv(): void {
 
   const primaryEmails = (process.env.PRIMARY_AUTH_EMAILS || "").trim();
   const primaryPasswords = (process.env.PRIMARY_AUTH_PASSWORDS || "").trim();
-  if (!primaryEmails || !primaryPasswords) {
-    throw new Error("PRIMARY_AUTH_EMAILS and PRIMARY_AUTH_PASSWORDS are required");
+  const primaryPasswordDirect = [
+    process.env.PRIMARY_AUTH_PASSWORD_1,
+    process.env.PRIMARY_AUTH_PASSWORD_2,
+    process.env.PRIMARY_AUTH_PASSWORD_3,
+    process.env.PRIMARY_AUTH_PASSWORD_4,
+  ].some((p) => String(p || "").trim());
+  const primaryPasswordHashes = (process.env.PRIMARY_AUTH_PASSWORD_HASHES || "").trim();
+  if (!primaryEmails || (!primaryPasswords && !primaryPasswordDirect && !primaryPasswordHashes)) {
+    throw new Error("PRIMARY_AUTH_EMAILS and at least one PRIMARY_AUTH_PASSWORD (or hash) are required");
   }
 
   if (process.env.NODE_ENV === "production") {
