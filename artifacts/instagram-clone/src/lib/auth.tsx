@@ -14,8 +14,10 @@ import {
 import { applyAppTheme, type AppThemeId } from "./app-theme";
 import { clearClientMemory, purgeLegacyLocalStorage } from "./client-memory";
 import { clearSession } from "./session";
-import { tryRefreshSession } from "./api";
 import { bumpAvatarVersion } from "./avatar-display";
+
+/** After this idle time, profile session ends — user picks profile + enters code again. */
+export const PROFILE_INACTIVITY_MS = 60 * 60 * 1000;
 
 type AuthContextType = {
   user: ApiUser | null;
@@ -28,6 +30,7 @@ type AuthContextType = {
   refreshCouplePrefs: () => Promise<void>;
   updateChatTheme: (themeId: string) => Promise<void>;
   logout: () => void;
+  lockProfileSession: () => void;
   refreshTrustedDevice: () => Promise<boolean>;
 };
 
@@ -99,7 +102,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [setUser]);
 
-  /** Logout: full sign-out — next visit starts at email + profile pick. */
+  /** End profile session only — next step is profile pick + code (email session kept). */
+  const lockProfileSession = useCallback(() => {
+    clearEncryption();
+    void api.logout();
+    clearSession();
+    setUser(null);
+    try {
+      sessionStorage.removeItem("grova_e2e_key");
+      localStorage.removeItem("grova_last_profile");
+    } catch {
+      /* ignore */
+    }
+  }, [setUser]);
+
+  /** Logout: full sign-out — next visit starts at email + profile pick + code. */
   const logout = useCallback(() => {
     clearEncryption();
     void api.revokeTrustedDevice().catch(() => {});
@@ -130,40 +147,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const trusted = await api.validatePrimarySession();
       if (cancelled) return;
       setTrustedDevice(trusted);
-
-      try {
-        const restore = () => api.restoreSession();
-        let session = await restore().catch(async () => {
-          const ok = await tryRefreshSession();
-          if (!ok) throw new Error("refresh failed");
-          return restore();
-        });
-
-        if (cancelled) return;
-        setUser(session.user);
-        if (session.partner) {
-          setPartner(session.partner);
-        }
-        await loadEncryptionKey();
-
-        try {
-          const prefs = await api.getCouplePrefs();
-          if (!cancelled) applyPrefs(prefs);
-        } catch {
-          /* prefs load optional on boot */
-        }
-      } catch {
-        clearSession();
-        clearClientMemory();
-      } finally {
-        if (!cancelled) setAuthReady(true);
-      }
+      clearSession();
+      if (!cancelled) setAuthReady(true);
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [applyPrefs, setUser]);
+  }, []);
 
   useEffect(() => {
     if (user) loadEncryptionKey();
@@ -267,6 +258,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         refreshCouplePrefs,
         updateChatTheme,
         logout,
+        lockProfileSession,
         refreshTrustedDevice,
       }}
     >

@@ -244,7 +244,7 @@ export default memo(function Settings() {
           <motion.div whileTap={{ scale: 0.99 }} onClick={() => setShowCodeModal(true)}
             className="flex items-center gap-4 px-4 py-3.5 hover:bg-secondary/30 transition-colors cursor-pointer" data-testid="button-change-code">
             <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center"><Lock className="w-5 h-5 text-primary" strokeWidth={1.5} /></div>
-            <div className="flex-1"><p className="text-sm font-medium">Change code</p><p className="text-xs text-muted-foreground">One shared code for both of you</p></div>
+            <div className="flex-1"><p className="text-sm font-medium">Change code</p><p className="text-xs text-muted-foreground">Replace the default couple code — both profiles use the new one</p></div>
             <ChevronRight className="w-4 h-4 text-muted-foreground" />
           </motion.div>
           <div className="flex items-center gap-4 px-4 py-3.5">

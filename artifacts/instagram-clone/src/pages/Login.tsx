@@ -14,7 +14,7 @@ type Step = "primary" | "pick" | "code";
 type PickUser = { id: "me" | "wife"; name: string; label: string; avatar: string };
 
 export default memo(function Login() {
-  const { setUser, refreshTrustedDevice } = useAuth();
+  const { setUser, refreshTrustedDevice, trustedDevice, authReady } = useAuth();
   const [step, setStep] = useState<Step>("primary");
   const [selectedId, setSelectedId] = useState<"me" | "wife" | null>(null);
   const [email, setEmail] = useState(() => getDefaultEmail());
@@ -30,10 +30,11 @@ export default memo(function Login() {
   ]);
 
   useEffect(() => {
-    setStep("primary");
-    setSelectedId(null);
+    if (!authReady) return;
     setCode("");
     setError("");
+    setSelectedId(null);
+    setStep(trustedDevice ? "pick" : "primary");
     api
       .getLoginProfiles()
       .then((profiles) => {
@@ -45,7 +46,7 @@ export default memo(function Login() {
         );
       })
       .catch(() => {});
-  }, []);
+  }, [authReady, trustedDevice]);
 
   const handlePrimaryLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,7 +96,6 @@ export default memo(function Login() {
     try {
       const { user } = await api.login(selectedId, code);
       await initEncryption(code.trim());
-      localStorage.setItem("grova_last_profile", selectedId);
       setUser(user as ApiUser);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "";
@@ -275,7 +275,7 @@ export default memo(function Login() {
                     {showCode ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1.5">Same code for you and Sara — unlocks your profile.</p>
+                <p className="text-xs text-muted-foreground mt-1.5">Same shared code for both profiles. Change it anytime in Settings.</p>
               </div>
 
               {error && (

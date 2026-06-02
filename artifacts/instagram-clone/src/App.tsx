@@ -5,10 +5,10 @@ import { Toaster as SonnerToaster } from "@/components/Toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Layout } from "@/components/Layout";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { AuthProvider, useAuth } from "@/lib/auth";
+import { AuthProvider, useAuth, PROFILE_INACTIVITY_MS } from "@/lib/auth";
 import Login from "@/pages/Login";
 import Home from "@/pages/Home";
-import { lazy, Suspense, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useRef, type ReactNode } from "react";
 
 const Messages = lazy(() => import("@/pages/Messages"));
 import Create from "@/pages/Create";
@@ -47,7 +47,27 @@ function AuthLoading() {
 }
 
 function ProtectedRouter() {
-  const { user, authReady } = useAuth();
+  const { user, authReady, lockProfileSession } = useAuth();
+  const lastActivityRef = useRef(Date.now());
+
+  useEffect(() => {
+    if (!user) return;
+    lastActivityRef.current = Date.now();
+    const mark = () => {
+      lastActivityRef.current = Date.now();
+    };
+    const events: Array<keyof WindowEventMap> = ["mousemove", "keydown", "click", "touchstart", "focus"];
+    events.forEach((evt) => window.addEventListener(evt, mark, { passive: true }));
+    const timer = window.setInterval(() => {
+      if (Date.now() - lastActivityRef.current > PROFILE_INACTIVITY_MS) {
+        lockProfileSession();
+      }
+    }, 60_000);
+    return () => {
+      events.forEach((evt) => window.removeEventListener(evt, mark));
+      window.clearInterval(timer);
+    };
+  }, [user, lockProfileSession]);
 
   if (!authReady) {
     return <AuthLoading />;
