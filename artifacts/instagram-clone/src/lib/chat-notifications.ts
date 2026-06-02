@@ -1,6 +1,5 @@
 import type { ApiMessage } from "./api";
 import { normalizeMessages, messagePreview } from "./message-utils";
-import { bumpUnreadChatBadge } from "./notifications-feed";
 import { requestNotificationPermission, showNotification } from "./notifications";
 import { areNotificationsEnabled } from "./couple-sync";
 import { toast } from "sonner";
@@ -37,10 +36,6 @@ function showChatToast(title: string, body: string) {
 export async function alertIncomingChatMessage(raw: ApiMessage, ctx: ChatNotifyContext): Promise<void> {
   if (raw.senderId !== ctx.partnerId) return;
 
-  if (shouldBumpChatBadge()) {
-    bumpUnreadChatBadge();
-  }
-
   let msg = raw;
   try {
     [msg] = await normalizeMessages([raw]);
@@ -66,10 +61,9 @@ export async function alertIncomingChatMessage(raw: ApiMessage, ctx: ChatNotifyC
 }
 
 export function alertIncomingChatLike(ctx: Pick<ChatNotifyContext, "partnerName" | "partnerAvatar">): void {
-  if (shouldBumpChatBadge()) bumpUnreadChatBadge();
   const body = "liked your message";
   showChatToast(ctx.partnerName, body);
-  if (areNotificationsEnabled() && Notification.permission === "granted") {
+  if (areNotificationsEnabled() && Notification.permission === "granted" && shouldBumpChatBadge()) {
     showNotification(ctx.partnerName, body, ctx.partnerAvatar || undefined);
   }
 }
@@ -78,10 +72,9 @@ export function alertIncomingChatReaction(
   emoji: string,
   ctx: Pick<ChatNotifyContext, "partnerName" | "partnerAvatar">,
 ): void {
-  if (shouldBumpChatBadge()) bumpUnreadChatBadge();
   const body = `reacted ${emoji} to your message`;
   showChatToast(ctx.partnerName, body);
-  if (areNotificationsEnabled() && Notification.permission === "granted") {
+  if (areNotificationsEnabled() && Notification.permission === "granted" && shouldBumpChatBadge()) {
     showNotification(ctx.partnerName, body, ctx.partnerAvatar || undefined);
   }
 }

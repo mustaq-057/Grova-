@@ -175,6 +175,15 @@ router.get("/messages/unread-count", authenticate, async (req, res) => {
     const authenticatedUserId = (req as AuthenticatedRequest).user!.id;
     const partnerId = authenticatedUserId === "me" ? "wife" : "me";
     const chatClearedAt = await getChatClearedAtForUser(authenticatedUserId);
+    const sinceRaw = typeof req.query.since === "string" ? req.query.since : undefined;
+    const sinceOpened = sinceRaw && !Number.isNaN(new Date(sinceRaw).getTime()) ? sinceRaw : undefined;
+
+    let effectiveSince = chatClearedAt;
+    if (sinceOpened) {
+      if (!effectiveSince || sinceOpened > effectiveSince) {
+        effectiveSince = sinceOpened;
+      }
+    }
 
     let sql = `
       SELECT COUNT(*) AS count
@@ -187,13 +196,14 @@ router.get("/messages/unread-count", authenticate, async (req, res) => {
         )
     `;
     const params: unknown[] = [partnerId, authenticatedUserId];
-    if (chatClearedAt) {
+    if (effectiveSince) {
       sql += " AND m.timestamp > ?";
-      params.push(chatClearedAt);
+      params.push(effectiveSince);
     }
 
     const result = await db.query(sql, params);
-    const count = Number((result.rows[0] as { count?: number })?.count ?? 0);
+    const row = result.rows[0] as { count?: number | string };
+    const count = Number(row?.count ?? 0);
     res.json({ count: Number.isFinite(count) ? count : 0 });
   } catch (err) {
     console.error("Failed to fetch unread chat count:", err);

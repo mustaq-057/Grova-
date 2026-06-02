@@ -1,7 +1,7 @@
-import { memo } from "react";
+import { memo, type KeyboardEvent, type MouseEvent } from "react";
 import { Download, ExternalLink, Loader2 } from "lucide-react";
 import type { ApiMessage } from "@/lib/api";
-import { inlineMediaDownloadUrl, inlineMediaViewUrl } from "@/lib/file-view";
+import { browserViewUrl, inlineMediaDownloadUrl, openFileInBrowser } from "@/lib/file-view";
 
 type Props = {
   msg: ApiMessage;
@@ -26,8 +26,14 @@ export const ChatFileBubble = memo(function ChatFileBubble({ msg, isMe }: Props)
   const url = msg.fileData ?? "";
   const name = msg.text?.replace(/ · Uploading…$/, "") || "document";
   const uploading = msg.type === "file" && !url;
-  const viewHref = url ? inlineMediaViewUrl(url, name, msg.fileType) : "";
+  const viewHref = url ? browserViewUrl(url, name, msg.fileType) : "";
   const saveHref = url ? inlineMediaDownloadUrl(url, name, msg.fileType) : "";
+
+  const openView = (e: MouseEvent) => {
+    e.preventDefault();
+    if (!url) return;
+    openFileInBrowser(url, name, msg.fileType);
+  };
 
   const textClass = isMe ? "text-white" : "text-foreground";
   const subClass = isMe ? "text-white/70" : "text-muted-foreground";
@@ -41,7 +47,22 @@ export const ChatFileBubble = memo(function ChatFileBubble({ msg, isMe }: Props)
         isMe ? "bg-black/20" : "bg-secondary/80"
       }`}
     >
-      <div className="flex items-center gap-3">
+      <div
+        className={`flex items-center gap-3 ${!uploading && url ? "cursor-pointer" : ""}`}
+        role={!uploading && url ? "button" : undefined}
+        tabIndex={!uploading && url ? 0 : undefined}
+        onClick={!uploading && url ? openView : undefined}
+        onKeyDown={
+          !uploading && url
+            ? (e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  openFileInBrowser(url, name, msg.fileType);
+                }
+              }
+            : undefined
+        }
+      >
         <div
           className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
             isMe ? "bg-white/10" : "bg-background/50"
@@ -71,6 +92,7 @@ export const ChatFileBubble = memo(function ChatFileBubble({ msg, isMe }: Props)
             href={viewHref}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={openView}
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${btnClass}`}
           >
             <ExternalLink className="w-3.5 h-3.5" />

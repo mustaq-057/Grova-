@@ -18,6 +18,30 @@ function badgeStorageKey(userId: string) {
   return `grova_chat_badge_${userId}`;
 }
 
+function chatOpenedKey(userId: string) {
+  return `grova_chat_opened_${userId}`;
+}
+
+export function getChatOpenedAt(): string | null {
+  if (!viewer?.id) return null;
+  try {
+    return sessionStorage.getItem(chatOpenedKey(viewer.id));
+  } catch {
+    return null;
+  }
+}
+
+/** Call when user opens chat — messages before this time won't count toward the badge. */
+export function markChatOpened() {
+  if (!viewer?.id) return;
+  try {
+    sessionStorage.setItem(chatOpenedKey(viewer.id), new Date().toISOString());
+  } catch {
+    /* ignore */
+  }
+  setUnreadChatBadge(0);
+}
+
 function persistBadgeCount(userId: string, count: number) {
   try {
     sessionStorage.setItem(badgeStorageKey(userId), String(Math.max(0, count)));
@@ -133,8 +157,11 @@ export function setUnreadChatBadge(count: number) {
 /** Restore badge from server (and session) after login or when SSE may have missed an event. */
 export async function syncChatBadgeFromServer(): Promise<void> {
   if (!viewer?.id) return;
+  if (typeof window !== "undefined" && window.location.pathname.includes("/chat")) return;
+
   try {
-    const { count } = await api.getUnreadChatCount();
+    const since = getChatOpenedAt();
+    const { count } = await api.getUnreadChatCount(since ?? undefined);
     const serverCount = Number.isFinite(count) ? Math.max(0, count) : 0;
     const localCount = Math.max(readUnreadChatBadge(), readPersistedBadgeCount(viewer.id));
     setUnreadChatBadge(Math.max(serverCount, localCount));
@@ -148,8 +175,21 @@ export function bumpUnreadChatBadge(delta = 1) {
   setUnreadChatBadge(readUnreadChatBadge() + delta);
 }
 
+function shouldShowChatBadge(): boolean {
+  if (typeof window === "undefined") return true;
+  const onChat = window.location.pathname.includes("/chat");
+  if (!onChat) return true;
+  return typeof document !== "undefined" && document.visibilityState === "hidden";
+}
+
+/** Single entry point when a partner message arrives over SSE. */
+export function notifyPartnerChatIncoming() {
+  if (!shouldShowChatBadge()) return;
+  bumpUnreadChatBadge();
+}
+
 export function clearUnreadChatBadge() {
-  setUnreadChatBadge(0);
+  markChatOpened();
 }
 
 function dedupeActivities(list: AppNotification[]): AppNotification[] {

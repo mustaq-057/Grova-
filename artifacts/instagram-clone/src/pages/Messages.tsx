@@ -55,6 +55,7 @@ import {
   extractClipboardFiles,
   getVideoDurationSafe,
   guessVideoMime,
+  isDocumentFile,
   normalizePastedFile,
 } from "@/lib/media-file";
 import {
@@ -1521,11 +1522,16 @@ export default function Messages() {
       filePickInFlightRef.current = true;
       const normalized = normalizePastedFile(file, clipboardItemType);
       const toastId = `media-pick-${Date.now()}`;
-      toast.loading("Preparing media…", { id: toastId });
+      const quickDoc = isDocumentFile(normalized, clipboardItemType);
+      if (!quickDoc) {
+        toast.loading("Preparing media…", { id: toastId });
+      }
 
       let kind: "image" | "video" | "other";
       try {
-        if (clipboardItemType?.startsWith("video/")) {
+        if (quickDoc) {
+          kind = "other";
+        } else if (clipboardItemType?.startsWith("video/")) {
           kind = "video";
         } else if (clipboardItemType?.startsWith("image/")) {
           kind = "image";
@@ -1658,7 +1664,7 @@ export default function Messages() {
     const onDocumentPaste = (e: ClipboardEvent) => {
       if (recording) return;
       const cd = e.clipboardData;
-      const picked = extractClipboardFiles(cd);
+      const picked = extractClipboardFiles(cd).filter(({ file }) => file.size > 0);
       if (picked.length === 0) return;
 
       e.preventDefault();

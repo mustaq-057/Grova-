@@ -8,6 +8,7 @@ import {
   setNotificationViewer,
   clearAllNotifications,
   syncChatBadgeFromServer,
+  notifyPartnerChatIncoming,
 } from "./notifications-feed";
 import {
   alertIncomingChatMessage,
@@ -266,6 +267,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const msg = JSON.parse((e as MessageEvent).data) as ApiMessage;
           const ctx = chatNotifyCtx();
           if (!ctx || msg.senderId !== ctx.partnerId) return;
+          notifyPartnerChatIncoming();
           window.dispatchEvent(new CustomEvent("grova-partner-message", { detail: msg }));
           await alertIncomingChatMessage(msg, ctx);
         } catch {

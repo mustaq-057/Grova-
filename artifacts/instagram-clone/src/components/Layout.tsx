@@ -9,6 +9,8 @@ import {
   getUnreadChatBadge,
   UNREAD_CHAT_CHANGED,
   syncChatBadgeFromServer,
+  markChatOpened,
+  bumpUnreadChatBadge,
 } from "@/lib/notifications-feed";
 import { AvatarImage } from "@/components/AvatarImage";
 import { FallingFlowersOverlay } from "@/components/FallingFlowersOverlay";
@@ -49,7 +51,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
     refresh();
     window.addEventListener(UNREAD_CHAT_CHANGED, refresh);
     const onPartnerMsg = () => {
-      if (location !== "/chat") refresh();
+      const onChat = location === "/chat";
+      if (!onChat || document.visibilityState === "hidden") {
+        bumpUnreadChatBadge();
+      }
+      setChatBadge(getUnreadChatBadge());
     };
     window.addEventListener("grova-partner-message", onPartnerMsg);
     return () => {
@@ -59,11 +65,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
   }, [location]);
 
   useEffect(() => {
-    if (!user || location === "/chat") return;
+    if (!user) return;
+    if (location === "/chat") return;
     void syncChatBadgeFromServer();
-    const t = setInterval(() => void syncChatBadgeFromServer(), 20_000);
+    const t = setInterval(() => void syncChatBadgeFromServer(), 8_000);
     return () => clearInterval(t);
   }, [user?.id, location]);
+
+  useEffect(() => {
+    if (location === "/chat") markChatOpened();
+  }, [location]);
 
   const navItems: NavItem[] = [
     { icon: Home, label: "Home", href: "/" },
@@ -120,7 +131,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     <div className="relative shrink-0">
                       <Icon className={`w-6 h-6 ${isActive ? "text-primary" : ""}`} strokeWidth={isActive ? 2.5 : 1.5} />
                       {badge > 0 && (
-                        <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-0.5 bg-red-500 text-[9px] text-white rounded-full flex items-center justify-center font-bold">
+                        <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 bg-red-600 text-[10px] text-white rounded-full flex items-center justify-center font-bold shadow-md ring-2 ring-background z-30">
                           {badge > 9 ? "9+" : badge}
                         </span>
                       )}
@@ -168,7 +179,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 <div className={`relative p-2 sm:p-1.5 rounded-xl ${isActive ? "bg-primary/10" : "group-hover:bg-secondary/50"}`}>
                   <Icon className={`w-5 h-5 sm:w-5 sm:h-5`} strokeWidth={isActive ? 2.5 : 1.5} />
                   {badge > 0 && (
-                    <span className="absolute -top-1 -right-1 z-20 min-w-[18px] h-[18px] px-1 bg-red-500 text-[10px] text-white rounded-full flex items-center justify-center font-bold ring-2 ring-background">
+                    <span className="absolute -top-1.5 -right-1.5 z-30 min-w-[20px] h-5 px-1 bg-red-600 text-[11px] text-white rounded-full flex items-center justify-center font-bold shadow-lg ring-2 ring-background">
                       {badge > 9 ? "9+" : badge}
                     </span>
                   )}

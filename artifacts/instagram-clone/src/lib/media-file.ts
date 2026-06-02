@@ -1,6 +1,24 @@
 const VIDEO_EXT = /\.(mp4|webm|mov|avi|mkv|m4v|3gp|mpeg|mpg)$/i;
 const IMAGE_EXT = /\.(jpe?g|png|gif|webp|bmp|heic|heif|avif)$/i;
+const DOCUMENT_EXT =
+  /\.(pdf|docx?|xlsx?|pptx?|txt|csv|rtf|odt|ods|odp|pages|numbers|key)$/i;
 const GENERIC_CLIPBOARD_NAME = /^(?:image\.png|blob|file)$/i;
+
+function isDocumentMime(type: string): boolean {
+  if (!type) return false;
+  if (type === "application/pdf") return true;
+  if (type.includes("word") || type.includes("excel") || type.includes("spreadsheet")) return true;
+  if (type.includes("powerpoint") || type.includes("presentation")) return true;
+  return type.startsWith("text/") && type !== "text/html";
+}
+
+export function isDocumentFile(file: File, hintType?: string): boolean {
+  const type = mimeType(file, hintType);
+  if (isDocumentMime(type)) return true;
+  if (type.startsWith("image/") || type.startsWith("video/") || type.startsWith("audio/")) return false;
+  if (file.name && DOCUMENT_EXT.test(file.name)) return true;
+  return false;
+}
 
 function mimeType(file: File, hintType?: string): string {
   return file.type || hintType || "";
@@ -133,6 +151,7 @@ export async function classifyMediaFile(file: File, hintType?: string): Promise<
   const type = mimeType(file, hintType);
   if (type.startsWith("video/")) return "video";
   if (type.startsWith("image/")) return "image";
+  if (isDocumentFile(file, hintType)) return "other";
 
   const magic = await detectMediaByMagicBytes(file);
   if (magic) return magic;
@@ -141,9 +160,10 @@ export async function classifyMediaFile(file: File, hintType?: string): Promise<
   if (isImageFile(file, hintType)) return "image";
 
   // Large clipboard blobs without MIME are usually screen recordings / videos.
-  if (file.size > 80_000 && (!file.name || GENERIC_CLIPBOARD_NAME.test(file.name))) {
+  const ambiguousName = !file.name || GENERIC_CLIPBOARD_NAME.test(file.name);
+  if (file.size > 80_000 && ambiguousName) {
     if (await sniffVideoFile(file)) return "video";
-  } else if (await sniffVideoFile(file)) {
+  } else if (!ambiguousName && (await sniffVideoFile(file))) {
     return "video";
   }
   return "other";

@@ -324,7 +324,10 @@ export const api = {
     }>(`/messages${suffix}`);
   },
 
-  getUnreadChatCount: () => apiFetch<{ count: number }>("/messages/unread-count"),
+  getUnreadChatCount: (since?: string) => {
+    const q = since ? `?since=${encodeURIComponent(since)}` : "";
+    return apiFetch<{ count: number }>(`/messages/unread-count${q}`);
+  },
 
   sendMessage: (msg: Partial<ApiMessage>) =>
     apiFetch<ApiMessage>("/messages", { method: "POST", body: JSON.stringify(msg) }),
