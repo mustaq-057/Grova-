@@ -55,7 +55,7 @@ export const rateLimiters = {
   // Strict rate limit for auth endpoints
   auth: rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 5, // 5 requests per window
+    max: process.env.NODE_ENV === "production" ? 12 : 5,
     message: { error: 'Too many authentication attempts, please try again later' },
     standardHeaders: true,
     legacyHeaders: false,

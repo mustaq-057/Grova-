@@ -18,7 +18,7 @@ export function groupByDay(msgs: ApiMessage[]) {
     const dayKey = d.toDateString();
     const label =
       dayKey === now.toDateString()
-        ? d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false })
+        ? "Today"
         : dayKey === yesterday.toDateString()
           ? "Yesterday"
           : d.toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" });
@@ -32,11 +32,11 @@ export function groupByDay(msgs: ApiMessage[]) {
   return groups;
 }
 
-/** Show a centered time pill when gap from previous message is ≥ 5 minutes. */
+/** Show a centered time pill when gap from previous message is ≥ 1 hour. */
 export function shouldShowTimeGap(prev: ApiMessage | undefined, msg: ApiMessage): string | null {
   if (!prev) return null;
   const gap = new Date(msg.timestamp).getTime() - new Date(prev.timestamp).getTime();
-  if (gap < 5 * 60_000) return null;
+  if (gap < 60 * 60_000) return null;
   const d = new Date(msg.timestamp);
   if (isNaN(d.getTime())) return null;
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });

@@ -87,6 +87,18 @@ export async function markAllRead() {
   await api.markActivityReadAll();
 }
 
+/** Wipe notification list locally and on server. */
+export async function clearAllNotifications() {
+  setNotificationsCache([]);
+  clearUnreadChatBadge();
+  emitNotifyChanged();
+  try {
+    await api.clearActivityFeed();
+  } catch {
+    await api.markActivityReadAll().catch(() => {});
+  }
+}
+
 export function unreadCount(): number {
   return getNotifications().filter((n) => !n.read).length;
 }

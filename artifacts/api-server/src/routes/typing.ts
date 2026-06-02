@@ -15,8 +15,7 @@ router.post("/typing", rateLimiters.messages, authenticate, async (req, res) => 
       return;
     }
 
-    // Broadcast typing indicator to partner
-    broadcast("typing-indicator", { userId, typing });
+    broadcast("typing-indicator", { userId, typing }, partnerId);
 
     res.json({ success: true });
   } catch (err) {

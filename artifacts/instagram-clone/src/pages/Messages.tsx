@@ -78,7 +78,6 @@ import { showNotification } from "@/lib/notifications";
 import { isReadReceiptsEnabled, isShowPresenceEnabled, areNotificationsEnabled } from "@/lib/couple-sync";
 import { isChatBlocked, setChatBlocked, getCuteMode, setCuteMode } from "@/lib/client-memory";
 import { hydrateQuickReactions } from "@/lib/quick-reactions";
-import { UnsendConfirmModal } from "@/components/UnsendConfirmModal";
 import { scrollChatToBottom, scrollChatToBottomAfterPaint } from "@/lib/chat-scroll";
 import DoodleCanvas, { DOODLE_HEIGHT_STEP, DOODLE_MIN_HEIGHT } from "@/components/DoodleCanvas";
 import { ImageCropModal } from "@/components/ImageCropModal";
@@ -95,6 +94,20 @@ function finishToast(
   else if (result.type === "error") toast.error(result.message, { duration: 4000 });
 }
 
+function TypingDots() {
+  return (
+    <span className="inline-flex items-center gap-0.5 ml-1" aria-hidden>
+      {[0, 1, 2].map((i) => (
+        <span
+          key={i}
+          className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce"
+          style={{ animationDelay: `${i * 0.12}s` }}
+        />
+      ))}
+    </span>
+  );
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 type CallState = { status: "outgoing" | "incoming" | "active"; type: "audio" | "video"; incomingOffer?: RTCSessionDescriptionInit } | null;
 
@@ -106,8 +119,6 @@ export default function Messages() {
   const [showInfo, setShowInfo] = useState(false);
   const [showThemes, setShowThemes] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [showUnsendConfirm, setShowUnsendConfirm] = useState(false);
-  const [pendingUnsendId, setPendingUnsendId] = useState<string | null>(null);
   const [blocked, setBlocked] = useState(() => isChatBlocked());
   const [recording, setRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
@@ -256,10 +267,10 @@ export default function Messages() {
     refreshPresence();
     const hb = setInterval(() => {
       if (isShowPresenceEnabled()) api.heartbeat(user.id).catch(() => {});
-    }, 30_000);
+    }, 15_000);
     const poll = setInterval(() => {
       if (document.visibilityState === "visible") refreshPresence();
-    }, 30_000);
+    }, 15_000);
     return () => { clearInterval(hb); clearInterval(poll); };
   }, [user?.id, partnerId]);
 
@@ -1218,7 +1229,7 @@ export default function Messages() {
     // Set new timeout with 300ms debounce
     searchDebounceRef.current = setTimeout(() => {
       setSearchQuery(value);
-    }, 300);
+    }, 120);
   }, []);
 
   const handleInputActivity = useCallback((value: string) => {
@@ -1897,26 +1908,21 @@ export default function Messages() {
   }, [user, partnerId]);
 
   const handleUnsend = useCallback(async (id: string) => {
-    setPendingUnsendId(id);
-    setShowUnsendConfirm(true);
-  }, []);
-
-  const confirmUnsend = useCallback(async () => {
-    if (!pendingUnsendId) return;
+    setContextMenu(null);
     try {
-      const deleted = await api.deleteMessage(pendingUnsendId);
-      setMessages((prev) => prev.map((m) => (m.id === pendingUnsendId ? { ...m, ...deleted, deleted: true, text: undefined, audioData: undefined } : m)));
-      setShowUnsendConfirm(false);
-      setPendingUnsendId(null);
+      const deleted = await api.deleteMessage(id);
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === id ? { ...m, ...deleted, deleted: true, text: undefined, audioData: undefined } : m,
+        ),
+      );
     } catch (err) {
       window.alert(unsendErrorMessage(err));
-      if (err instanceof Error && /not found/i.test(err.message) && pendingUnsendId) {
-        setMessages((prev) => prev.filter((m) => m.id !== pendingUnsendId));
+      if (err instanceof Error && /not found/i.test(err.message)) {
+        setMessages((prev) => prev.filter((m) => m.id !== id));
       }
-      setShowUnsendConfirm(false);
-      setPendingUnsendId(null);
     }
-  }, [pendingUnsendId]);
+  }, []);
 
   const handleDeleteForMe = useCallback(
     async (id: string) => {
@@ -2066,8 +2072,15 @@ export default function Messages() {
         </div>
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-sm" data-testid="chat-partner-name">{pName}</p>
-          <p className={`text-xs ${isTyping ? "text-primary" : presence.online ? "text-green-400" : "text-muted-foreground"}`}>
-            {isTyping ? partnerTypingLine(partnerId, pName) : presence.label}
+          <p className={`text-xs flex items-center ${isTyping ? "text-primary" : presence.online ? "text-green-400" : "text-muted-foreground"}`}>
+            {isTyping && presence.online ? (
+              <>
+                <span>{partnerTypingLine(partnerId, pName)}</span>
+                <TypingDots />
+              </>
+            ) : (
+              presence.label
+            )}
           </p>
         </div>
         <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
@@ -2272,9 +2285,10 @@ export default function Messages() {
           <AvatarImage src={pAvatar} userId={partnerId} alt={`Profile picture of ${pName}`} className="w-14 h-14 md:w-24 md:h-24 rounded-full object-cover" />
           <p className="font-bold text-sm md:text-lg">{pName}</p>
           <span className="text-[10px] md:text-xs bg-secondary/60 px-3 py-1 rounded-full text-muted-foreground">Just the two of you ♥</span>
-          {isTyping && (
+          {isTyping && presence.online && (
             <div className="flex items-center gap-1 text-xs text-primary mt-1">
               <span>{partnerTypingLine(partnerId, pName)}</span>
+              <TypingDots />
             </div>
           )}
         </div>
@@ -2606,15 +2620,6 @@ export default function Messages() {
         />
       )}
 
-      {/* ── Unsend Confirmation Modal ── */}
-      <UnsendConfirmModal
-        show={showUnsendConfirm}
-        onConfirm={confirmUnsend}
-        onCancel={() => {
-          setShowUnsendConfirm(false);
-          setPendingUnsendId(null);
-        }}
-      />
     </div>
     </div>
   );

@@ -456,6 +456,9 @@ export const api = {
   markActivityReadAll: () =>
     apiFetch<{ success: boolean }>("/couple/activity/read-all", { method: "PUT" }),
 
+  clearActivityFeed: () =>
+    apiFetch<{ success: boolean }>("/couple/activity", { method: "DELETE" }),
+
   scheduleMessage: (data: {
     senderId: string;
     text?: string;

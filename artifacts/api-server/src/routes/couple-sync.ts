@@ -208,4 +208,14 @@ router.put("/couple/activity/read-all", rateLimiters.messages, authenticate, asy
   }
 });
 
+router.delete("/couple/activity", rateLimiters.messages, authenticate, async (_req, res) => {
+  try {
+    await db.execute("DELETE FROM activity_feed", []);
+    broadcast("activity-read-all", {});
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to clear notifications" });
+  }
+});
+
 export default router;

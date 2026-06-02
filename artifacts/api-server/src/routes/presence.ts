@@ -8,15 +8,22 @@ const lastSeen: Record<string, number> = {};
 
 const router = Router();
 
-router.post("/presence/heartbeat", rateLimiters.messages, authenticate, (req, res) => {
+router.post("/presence/heartbeat", rateLimiters.messages, authenticate, async (req, res) => {
   const authenticatedUserId = (req as { user?: { id: string } }).user?.id;
   if (!authenticatedUserId || (authenticatedUserId !== "me" && authenticatedUserId !== "wife")) {
     res.status(400).json({ error: "Invalid userId" });
     return;
   }
-  lastSeen[authenticatedUserId] = Date.now();
-  broadcast("presence", { userId: authenticatedUserId, lastSeen: lastSeen[authenticatedUserId] });
-  res.json({ userId: authenticatedUserId, lastSeen: lastSeen[authenticatedUserId] });
+  const now = Date.now();
+  lastSeen[authenticatedUserId] = now;
+  const partnerId = authenticatedUserId === "me" ? "wife" : "me";
+  try {
+    await db.execute("UPDATE devices SET last_seen = ? WHERE user_id = ?", [now, authenticatedUserId]);
+  } catch {
+    /* ignore */
+  }
+  broadcast("presence", { userId: authenticatedUserId, lastSeen: now }, partnerId);
+  res.json({ userId: authenticatedUserId, lastSeen: now });
 });
 
 router.get("/presence", rateLimiters.read, authenticate, async (req, res) => {

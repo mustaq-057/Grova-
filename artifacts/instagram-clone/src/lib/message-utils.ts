@@ -154,7 +154,7 @@ export function formatPresence(lastSeen: number | undefined): { label: string; o
   }
 
   if (mins < 60) {
-    const online = diff < 90_000;
+    const online = diff < 120_000;
     const label = mins === 1 ? "Active 1 min ago" : `Active ${mins} min ago`;
     return { label, online };
   }

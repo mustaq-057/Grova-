@@ -16,6 +16,20 @@ import { validators, validateBody } from "../lib/validation";
 import { persistAvatarIfNeeded, sanitizeAvatarForClient } from "../lib/avatar-url";
 
 const router = Router();
+
+router.use((req, res, next) => {
+  const ua = String(req.headers["user-agent"] || "").toLowerCase();
+  if (!ua || ua.length < 8) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+  if (/bot|crawler|spider|scrapy|headless|python-requests|curl\/|wget\/|semrush|ahrefs/i.test(ua)) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+  next();
+});
+
 const PRIMARY_SESSION_MS = 30 * 24 * 60 * 60 * 1000;
 const SESSION_MS = 30 * 24 * 60 * 60 * 1000;
 const PRIMARY_SESSION_RENEW_MS = 30 * 24 * 60 * 60 * 1000;

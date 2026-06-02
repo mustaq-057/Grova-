@@ -7,6 +7,7 @@ import {
   markAllReadLocal,
   setNotificationViewer,
   bumpUnreadChatBadge,
+  clearAllNotifications,
 } from "./notifications-feed";
 import { hydrateNotes } from "./notes";
 import { applyQuickReactions } from "./quick-reactions";
@@ -35,6 +36,7 @@ type AuthContextType = {
   refreshCouplePrefs: () => Promise<void>;
   updateChatTheme: (themeId: string) => Promise<void>;
   logout: () => void;
+  signOutEverywhere: () => void;
   lockProfileSession: () => void;
   refreshTrustedDevice: () => Promise<boolean>;
 };
@@ -121,8 +123,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [setUser]);
 
-  /** Logout: full sign-out — next visit starts at email + profile pick + code. */
+  /** Logout: end profile session — trusted device keeps email; next login is profile + code only. */
   const logout = useCallback(() => {
+    lockProfileSession();
+    setNotificationViewer(null);
+  }, [lockProfileSession]);
+
+  /** New browser / forgot trust — requires email + password again. */
+  const signOutEverywhere = useCallback(() => {
     clearEncryption();
     void api.revokeTrustedDevice().catch(() => {});
     void api.logout();
@@ -173,6 +181,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const init = async () => {
       setNotificationViewer(user.id, user.name);
+      await clearAllNotifications();
       await hydrateNotifications();
       await hydrateNotes();
       try {
@@ -279,6 +288,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         refreshCouplePrefs,
         updateChatTheme,
         logout,
+        signOutEverywhere,
         lockProfileSession,
         refreshTrustedDevice,
       }}
