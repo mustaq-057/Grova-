@@ -8,6 +8,7 @@ import { initEncryption } from "@/lib/crypto";
 import { getDefaultEmail, saveDefaultEmail } from "@/lib/session";
 import { AVATARS } from "@/lib/avatars";
 import { AvatarImage } from "@/components/AvatarImage";
+import { probeApiHealth } from "@/lib/server-health";
 
 type Step = "primary" | "pick" | "code";
 
@@ -28,6 +29,30 @@ export default memo(function Login() {
     { id: "me", name: "Mustaq", label: "That's me", avatar: AVATARS.me },
     { id: "wife", name: "Sara", label: "That's me", avatar: AVATARS.wife },
   ]);
+  const [serverOnline, setServerOnline] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const check = async () => {
+      const ok = await probeApiHealth();
+      if (!cancelled) {
+        setServerOnline(ok);
+        if (!ok) {
+          setError("Cannot reach the server. Run pnpm dev:grova and open http://localhost:5000");
+        } else {
+          setError((prev) =>
+            prev.includes("Cannot reach the server") || prev.includes("API running") ? "" : prev,
+          );
+        }
+      }
+    };
+    void check();
+    const interval = setInterval(() => void check(), 8000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, []);
 
   useEffect(() => {
     if (!authReady) return;
@@ -99,8 +124,8 @@ export default memo(function Login() {
       setUser(user as ApiUser);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "";
-      if (msg.includes("fetch") || msg.includes("Failed") || msg.includes("Network")) {
-        setError("Cannot reach the server. Run pnpm dev:grova and try again.");
+      if (msg.includes("fetch") || msg.includes("Failed") || msg.includes("Network") || msg.includes("API running")) {
+        setError("Cannot reach the server. Run pnpm dev:grova and open http://localhost:5000");
       } else if (msg.toLowerCase().includes("too many")) {
         setError("Too many wrong attempts. Wait 30 minutes or restart the server, then try again.");
       } else if (/Attempts remaining: (\d+)/i.test(msg)) {
@@ -130,6 +155,17 @@ export default memo(function Login() {
           <h1 className="font-serif italic text-5xl font-bold text-primary mb-2">Grova</h1>
           <p className="text-sm text-muted-foreground">Private chat for you two</p>
         </div>
+
+        {serverOnline === false && (
+          <div className="mb-4 rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            API offline. In the project folder run{" "}
+            <code className="rounded bg-muted px-1 text-xs">pnpm dev:grova</code>, then open{" "}
+            <a href="http://localhost:5000" className="underline font-medium">
+              http://localhost:5000
+            </a>
+            .
+          </div>
+        )}
 
         {step === "primary" ? (
           <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }}>

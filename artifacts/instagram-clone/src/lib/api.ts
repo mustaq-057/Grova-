@@ -2,9 +2,37 @@ import { getAuthHeaders, saveSession, clearSession, getRefreshToken, setDeviceId
 import type { CouplePrefs } from "./types";
 
 const BASE = "/api";
+const FETCH_TIMEOUT_MS = 45_000;
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+function mergeAbortSignal(userSignal: AbortSignal | null | undefined, timeoutMs: number): {
+  signal: AbortSignal;
+  cleanup: () => void;
+} {
+  const timeoutCtrl = new AbortController();
+  const timer = setTimeout(() => timeoutCtrl.abort(), timeoutMs);
+  if (!userSignal) {
+    return { signal: timeoutCtrl.signal, cleanup: () => clearTimeout(timer) };
+  }
+  if (userSignal.aborted) {
+    clearTimeout(timer);
+    return { signal: userSignal, cleanup: () => {} };
+  }
+  const merged = new AbortController();
+  const onAbort = () => merged.abort();
+  userSignal.addEventListener("abort", onAbort);
+  timeoutCtrl.signal.addEventListener("abort", onAbort);
+  return {
+    signal: merged.signal,
+    cleanup: () => {
+      clearTimeout(timer);
+      userSignal.removeEventListener("abort", onAbort);
+      timeoutCtrl.signal.removeEventListener("abort", onAbort);
+    },
+  };
 }
 
 let refreshInFlight: Promise<boolean> | null = null;
@@ -42,9 +70,11 @@ async function apiFetch<T = unknown>(path: string, options?: RequestInit, attemp
   const isRead = method === "GET" || method === "HEAD";
   const maxAttempts = isRead ? 4 : 2;
 
+  const { signal, cleanup } = mergeAbortSignal(options?.signal ?? undefined, FETCH_TIMEOUT_MS);
   try {
     const res = await fetch(`${BASE}${path}`, {
       ...options,
+      signal,
       credentials: "include",
       cache: "no-store",
       headers: {
@@ -81,12 +111,18 @@ async function apiFetch<T = unknown>(path: string, options?: RequestInit, attemp
   } catch (err) {
     const isNetwork =
       err instanceof TypeError ||
-      (err instanceof Error && /fetch|network|failed/i.test(err.message));
+      (err instanceof DOMException && err.name === "AbortError") ||
+      (err instanceof Error && /fetch|network|failed|abort/i.test(err.message));
     if (isNetwork && isRead && attempt < maxAttempts - 1) {
       await sleep(800 * (attempt + 1));
       return apiFetch<T>(path, options, attempt + 1);
     }
+    if (isNetwork) {
+      throw new Error("Failed to fetch — is the API running? Use pnpm dev:grova and open http://localhost:5000");
+    }
     throw err;
+  } finally {
+    cleanup();
   }
 }
 

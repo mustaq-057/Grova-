@@ -8,6 +8,7 @@
     "build:grova": "pnpm --filter @workspace/instagram-clone run build && pnpm --filter @workspace/api-server run build",
     "dev:web": "wait-on http://127.0.0.1:5001/api/healthz -t 60000 && pnpm --filter @workspace/instagram-clone run dev",
     "stop:grova": "npx --yes kill-port 5000 5001",
+    "dev": "pnpm run dev:grova",
     "dev:grova": "concurrently -k -n api,web -c blue,green \"pnpm --filter @workspace/api-server run dev\" \"pnpm run dev:web\"",
     "start:grova": "pnpm run build:grova && cross-env NODE_ENV=production PORT=5000 pnpm --filter @workspace/api-server run start",
     "db:health": "pnpm --filter @workspace/scripts run health:check",

@@ -231,6 +231,10 @@ const suspiciousAgentPattern =
   /(bot|spider|crawler|scrapy|curl|wget|python-requests|httpclient|go-http-client|postmanruntime)/i;
 
 export function blockSuspiciousBots(req: Request, res: Response, next: NextFunction): void {
+  if (process.env.NODE_ENV !== "production") {
+    next();
+    return;
+  }
   const userAgent = String(req.headers["user-agent"] || "");
   if (!userAgent || suspiciousAgentPattern.test(userAgent)) {
     res.status(403).json({ error: "Access denied" });
