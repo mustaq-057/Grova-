@@ -30,7 +30,6 @@ export default defineConfig({
           if (/\/node_modules\/react(-dom)?\//.test(id)) return undefined;
           if (id.includes("framer-motion")) return "framer-motion";
           if (id.includes("@radix-ui")) return "radix-ui";
-          if (id.includes("wouter")) return "wouter";
           if (id.includes("lucide-react")) return "lucide";
           return "vendor";
         },

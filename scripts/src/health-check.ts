@@ -9,6 +9,11 @@ async function checkDatabaseHealth() {
     const tables = [
       "profiles",
       "messages",
+      "sessions",
+      "devices",
+      "primary_access_tokens",
+      "couple_code",
+      "couple_prefs",
       "activity_feed",
       "message_reactions",
       "message_read_receipts",
@@ -39,6 +44,11 @@ async function checkDatabaseHealth() {
     const activities = await db.execute("SELECT COUNT(*) as total FROM activity_feed", []);
     const activitiesRow = activities.rows[0] as { total?: string | number } | undefined;
     console.log(`  ✅ Activities: ${activitiesRow?.total || 0}`);
+
+    const coupleCode = await db.execute("SELECT COUNT(*) as total FROM couple_code", []);
+    const coupleRow = coupleCode.rows[0] as { total?: string | number } | undefined;
+    const coupleOk = Number(coupleRow?.total || 0) > 0 || Boolean(process.env.DEFAULT_COUPLE_CODE?.trim());
+    console.log(`  ${coupleOk ? "✅" : "❌"} Couple code: ${coupleOk ? "configured" : "MISSING — set DEFAULT_COUPLE_CODE"}`);
 
     // 3. Check profile data consistency
     console.log("\n🔍 Profile Data:");

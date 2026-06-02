@@ -85,8 +85,8 @@ export default memo(function Login() {
       const msg = err instanceof Error ? err.message : "";
       if (msg.includes("Attempts remaining: 1")) {
         setError("Invalid email or password. One attempt left.");
-      } else if (msg.toLowerCase().includes("too many")) {
-        setError("Too many wrong attempts. Please wait and try again.");
+      } else if (msg.toLowerCase().includes("too many") || msg.includes("429")) {
+        setError("Too many wrong attempts. Login blocked for 30 minutes. Try again later.");
       } else {
         setError("Invalid email or password.");
       }
