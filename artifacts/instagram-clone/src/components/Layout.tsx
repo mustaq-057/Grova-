@@ -3,7 +3,13 @@ import { Link, useLocation } from "wouter";
 import { Home, MessageCircle, PlusSquare, Settings, BookOpen, Heart, Bell, Calendar as CalendarIcon, Sparkles, ListTodo, Star, Shield, Menu } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAuth } from "@/lib/auth";
-import { unreadCount, NOTIFY_CHANGED, getUnreadChatBadge, UNREAD_CHAT_CHANGED } from "@/lib/notifications-feed";
+import {
+  unreadCount,
+  NOTIFY_CHANGED,
+  getUnreadChatBadge,
+  UNREAD_CHAT_CHANGED,
+  syncChatBadgeFromServer,
+} from "@/lib/notifications-feed";
 import { AvatarImage } from "@/components/AvatarImage";
 import { FallingFlowersOverlay } from "@/components/FallingFlowersOverlay";
 import { APP_THEME_CHANGED, getStoredAppTheme, isSakuraFallTheme, type AppThemeId } from "@/lib/app-theme";
@@ -42,8 +48,22 @@ export function Layout({ children }: { children: React.ReactNode }) {
     const refresh = () => setChatBadge(getUnreadChatBadge());
     refresh();
     window.addEventListener(UNREAD_CHAT_CHANGED, refresh);
-    return () => window.removeEventListener(UNREAD_CHAT_CHANGED, refresh);
-  }, []);
+    const onPartnerMsg = () => {
+      if (location !== "/chat") refresh();
+    };
+    window.addEventListener("grova-partner-message", onPartnerMsg);
+    return () => {
+      window.removeEventListener(UNREAD_CHAT_CHANGED, refresh);
+      window.removeEventListener("grova-partner-message", onPartnerMsg);
+    };
+  }, [location]);
+
+  useEffect(() => {
+    if (!user || location === "/chat") return;
+    void syncChatBadgeFromServer();
+    const t = setInterval(() => void syncChatBadgeFromServer(), 20_000);
+    return () => clearInterval(t);
+  }, [user?.id, location]);
 
   const navItems: NavItem[] = [
     { icon: Home, label: "Home", href: "/" },
@@ -145,10 +165,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     className="absolute -top-1 left-1/2 -translate-x-1/2 w-6 h-1 bg-primary rounded-full shadow-lg shadow-primary/50"
                   />
                 )}
-                <div className={`p-2 sm:p-1.5 rounded-xl ${isActive ? "bg-primary/10" : "group-hover:bg-secondary/50"}`}>
+                <div className={`relative p-2 sm:p-1.5 rounded-xl ${isActive ? "bg-primary/10" : "group-hover:bg-secondary/50"}`}>
                   <Icon className={`w-5 h-5 sm:w-5 sm:h-5`} strokeWidth={isActive ? 2.5 : 1.5} />
                   {badge > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] bg-red-500 text-[8px] text-white rounded-full flex items-center justify-center font-bold">
+                    <span className="absolute -top-1 -right-1 z-20 min-w-[18px] h-[18px] px-1 bg-red-500 text-[10px] text-white rounded-full flex items-center justify-center font-bold ring-2 ring-background">
                       {badge > 9 ? "9+" : badge}
                     </span>
                   )}

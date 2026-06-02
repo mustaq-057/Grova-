@@ -14,6 +14,27 @@ export const UNREAD_CHAT_CHANGED = "grova-chat-unread-changed";
 type NotificationViewer = { id: string; name: string } | null;
 let viewer: NotificationViewer = null;
 
+function badgeStorageKey(userId: string) {
+  return `grova_chat_badge_${userId}`;
+}
+
+function persistBadgeCount(userId: string, count: number) {
+  try {
+    sessionStorage.setItem(badgeStorageKey(userId), String(Math.max(0, count)));
+  } catch {
+    /* ignore */
+  }
+}
+
+function readPersistedBadgeCount(userId: string): number {
+  try {
+    const n = parseInt(sessionStorage.getItem(badgeStorageKey(userId)) ?? "0", 10);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  } catch {
+    return 0;
+  }
+}
+
 function emitNotifyChanged() {
   window.dispatchEvent(new Event(NOTIFY_CHANGED));
 }
@@ -103,8 +124,24 @@ export function unreadCount(): number {
 }
 
 export function setUnreadChatBadge(count: number) {
-  writeUnreadChatBadge(Math.max(0, count));
+  const n = Math.max(0, count);
+  writeUnreadChatBadge(n);
+  if (viewer?.id) persistBadgeCount(viewer.id, n);
   window.dispatchEvent(new Event(UNREAD_CHAT_CHANGED));
+}
+
+/** Restore badge from server (and session) after login or when SSE may have missed an event. */
+export async function syncChatBadgeFromServer(): Promise<void> {
+  if (!viewer?.id) return;
+  try {
+    const { count } = await api.getUnreadChatCount();
+    const serverCount = Number.isFinite(count) ? Math.max(0, count) : 0;
+    const localCount = Math.max(readUnreadChatBadge(), readPersistedBadgeCount(viewer.id));
+    setUnreadChatBadge(Math.max(serverCount, localCount));
+  } catch {
+    const fallback = Math.max(readUnreadChatBadge(), readPersistedBadgeCount(viewer.id));
+    if (fallback > 0) setUnreadChatBadge(fallback);
+  }
 }
 
 export function bumpUnreadChatBadge(delta = 1) {

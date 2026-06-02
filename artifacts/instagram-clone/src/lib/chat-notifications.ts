@@ -16,6 +16,10 @@ function onChatRoute(): boolean {
   return typeof window !== "undefined" && window.location.pathname.includes("/chat");
 }
 
+function shouldBumpChatBadge(): boolean {
+  return !onChatRoute() || document.visibilityState === "hidden";
+}
+
 function showChatToast(title: string, body: string) {
   toast.message(title, {
     description: body,
@@ -33,6 +37,10 @@ function showChatToast(title: string, body: string) {
 export async function alertIncomingChatMessage(raw: ApiMessage, ctx: ChatNotifyContext): Promise<void> {
   if (raw.senderId !== ctx.partnerId) return;
 
+  if (shouldBumpChatBadge()) {
+    bumpUnreadChatBadge();
+  }
+
   let msg = raw;
   try {
     [msg] = await normalizeMessages([raw]);
@@ -40,15 +48,7 @@ export async function alertIncomingChatMessage(raw: ApiMessage, ctx: ChatNotifyC
     /* use raw for preview */
   }
 
-  const hidden = document.visibilityState === "hidden";
-  const onChat = onChatRoute();
-
-  if (!onChat || hidden) {
-    bumpUnreadChatBadge();
-  }
-
   const preview = messagePreview(msg) || "New message";
-
   showChatToast(ctx.partnerName, preview);
 
   if (!areNotificationsEnabled()) return;
@@ -60,15 +60,13 @@ export async function alertIncomingChatMessage(raw: ApiMessage, ctx: ChatNotifyC
         ? await requestNotificationPermission()
         : false;
 
-  if (granted && (!onChat || hidden)) {
+  if (granted && shouldBumpChatBadge()) {
     showNotification(ctx.partnerName, preview, ctx.partnerAvatar || undefined);
   }
 }
 
 export function alertIncomingChatLike(ctx: Pick<ChatNotifyContext, "partnerName" | "partnerAvatar">): void {
-  if (!onChatRoute() || document.visibilityState === "hidden") {
-    bumpUnreadChatBadge();
-  }
+  if (shouldBumpChatBadge()) bumpUnreadChatBadge();
   const body = "liked your message";
   showChatToast(ctx.partnerName, body);
   if (areNotificationsEnabled() && Notification.permission === "granted") {
@@ -80,9 +78,7 @@ export function alertIncomingChatReaction(
   emoji: string,
   ctx: Pick<ChatNotifyContext, "partnerName" | "partnerAvatar">,
 ): void {
-  if (!onChatRoute() || document.visibilityState === "hidden") {
-    bumpUnreadChatBadge();
-  }
+  if (shouldBumpChatBadge()) bumpUnreadChatBadge();
   const body = `reacted ${emoji} to your message`;
   showChatToast(ctx.partnerName, body);
   if (areNotificationsEnabled() && Notification.permission === "granted") {

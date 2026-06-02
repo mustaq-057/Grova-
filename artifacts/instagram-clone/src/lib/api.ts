@@ -324,6 +324,8 @@ export const api = {
     }>(`/messages${suffix}`);
   },
 
+  getUnreadChatCount: () => apiFetch<{ count: number }>("/messages/unread-count"),
+
   sendMessage: (msg: Partial<ApiMessage>) =>
     apiFetch<ApiMessage>("/messages", { method: "POST", body: JSON.stringify(msg) }),
 

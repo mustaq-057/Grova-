@@ -7,6 +7,7 @@ import {
   markAllReadLocal,
   setNotificationViewer,
   clearAllNotifications,
+  syncChatBadgeFromServer,
 } from "./notifications-feed";
 import {
   alertIncomingChatMessage,
@@ -197,6 +198,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         /* ignore */
       }
       await refreshProfiles();
+      await syncChatBadgeFromServer();
       void requestNotificationPermission();
     };
     init();
@@ -310,7 +312,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const poll = setInterval(() => {
       refreshProfiles();
       refreshCouplePrefs();
-    }, 60_000);
+      if (!window.location.pathname.includes("/chat")) {
+        void syncChatBadgeFromServer();
+      }
+    }, 30_000);
 
     return () => {
       mounted = false;

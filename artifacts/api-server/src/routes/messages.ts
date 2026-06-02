@@ -170,6 +170,37 @@ router.get("/messages", optionalAuth, async (req, res) => {
   }
 });
 
+router.get("/messages/unread-count", authenticate, async (req, res) => {
+  try {
+    const authenticatedUserId = (req as AuthenticatedRequest).user!.id;
+    const partnerId = authenticatedUserId === "me" ? "wife" : "me";
+    const chatClearedAt = await getChatClearedAtForUser(authenticatedUserId);
+
+    let sql = `
+      SELECT COUNT(*) AS count
+      FROM messages m
+      WHERE m.deleted = 0
+        AND m.sender_id = ?
+        AND NOT EXISTS (
+          SELECT 1 FROM message_read_receipts r
+          WHERE r.message_id = m.id AND r.user_id = ?
+        )
+    `;
+    const params: unknown[] = [partnerId, authenticatedUserId];
+    if (chatClearedAt) {
+      sql += " AND m.timestamp > ?";
+      params.push(chatClearedAt);
+    }
+
+    const result = await db.query(sql, params);
+    const count = Number((result.rows[0] as { count?: number })?.count ?? 0);
+    res.json({ count: Number.isFinite(count) ? count : 0 });
+  } catch (err) {
+    console.error("Failed to fetch unread chat count:", err);
+    res.status(500).json({ error: "Failed to fetch unread count" });
+  }
+});
+
 router.post("/messages", authenticate, validateBody({
   senderId: validators.nonEmptyString,
   type: validators.enum(["text", "audio", "heart", "sticker", "gif", "image", "video", "file", "location"]),
