@@ -1,199 +1,1408 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { Info, Heart, Smile, Mic, Send, X, Trash2, Play, Pause, Image, Ban, Phone, Video, Sticker, Gift, Palette, ImagePlus } from "lucide-react";
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from "react";
+import { Info, Heart, Mic, X, Trash2, Ban, Phone, Video, WifiOff, Wifi, Search, AlertCircle, Palette, MessageCircle, Shield } from "lucide-react";
 import { motion } from "framer-motion";
 import { api, type ApiMessage } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import EmojiPicker from "@/components/EmojiPicker";
-import StickerPicker from "@/components/StickerPicker";
-import GifPicker from "@/components/GifPicker";
 import CallScreen, { IncomingCallOverlay } from "@/components/CallScreen";
+import { MessageSkeleton } from "@/components/MessageSkeleton";
+import { MessageItem } from "@/components/MessageItem";
+import { ThemePicker } from "@/components/ThemePicker";
+import { MessageInput } from "@/components/MessageInput";
+import { InfoPanel } from "@/components/InfoPanel";
 import { Link } from "wouter";
-import { ME, WIFE } from "@/lib/mock-data";
+import type { GreetingTemplate } from "@/lib/greeting-messages";
+import { normalizeMessages, prepareOutgoingMessage, buildOptimisticMessage, buildSeenLabel, findLastSeenOutgoingId, messagePreview } from "@/lib/message-utils";
+import { callStartedText, callEndedText, isCallLogMessage } from "@/lib/call-chat-log";
+import { usePresenceLabel } from "@/hooks/usePresenceLabel";
+import { groupByDay, shouldShowTimeGap } from "@/lib/message-helpers";
+import { isEncryptionReady } from "@/lib/crypto";
+import { isOnline } from "@/lib/offline";
+import { requestNotificationPermission, subscribeToPush, sendSubscriptionToServer } from "@/lib/notifications";
 
-// ── Themes ────────────────────────────────────────────────────────────────────
-const THEMES = [
-  { id: "default",  name: "Espresso",  chatBg: "",                  myBg: "bg-amber-600",    myGrad: "from-amber-500 to-orange-600" },
-  { id: "midnight", name: "Midnight",  chatBg: "bg-[#08081a]",      myBg: "bg-indigo-700",   myGrad: "from-indigo-600 to-purple-700" },
-  { id: "rose",     name: "Rose",      chatBg: "bg-[#150a0e]",      myBg: "bg-rose-700",     myGrad: "from-rose-600 to-pink-700" },
-  { id: "forest",   name: "Forest",    chatBg: "bg-[#0a150a]",      myBg: "bg-emerald-700",  myGrad: "from-emerald-600 to-teal-700" },
-  { id: "ocean",    name: "Ocean",     chatBg: "bg-[#080f1e]",      myBg: "bg-sky-700",      myGrad: "from-sky-600 to-cyan-700" },
-  { id: "sakura",   name: "Sakura",    chatBg: "bg-[#150a12]",      myBg: "bg-pink-700",     myGrad: "from-pink-600 to-fuchsia-700" },
-];
-const THEME_SWATCHES: Record<string, string> = {
-  default: "bg-amber-600", midnight: "bg-indigo-700", rose: "bg-rose-700",
-  forest: "bg-emerald-700", ocean: "bg-sky-700", sakura: "bg-pink-700",
-};
+import { THEMES } from "@/lib/themes";
 
-// ── Audio message player ──────────────────────────────────────────────────────
-function AudioMessage({ audioData, isMe }: { audioData: string; isMe: boolean }) {
-  const [playing, setPlaying] = useState(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const bars = [3,5,8,6,9,7,5,8,6,4,7,5,3,6,8,5,7,4,6,3];
-  const toggle = () => {
-    if (!audioRef.current) {
-      audioRef.current = new Audio(audioData);
-      audioRef.current.onended = () => setPlaying(false);
-    }
-    if (playing) { audioRef.current.pause(); setPlaying(false); }
-    else { audioRef.current.play(); setPlaying(true); }
-  };
-  return (
-    <button onClick={toggle} className={`flex items-center gap-2 px-3 py-2.5 min-w-[150px] ${isMe ? "text-white/90" : "text-foreground"}`}>
-      <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${isMe ? "bg-white/20" : "bg-primary/20"}`}>
-        {playing ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
-      </div>
-      <div className="flex gap-px items-center h-5">
-        {bars.map((h, i) => (
-          <div key={i} className={`w-0.5 rounded-full ${isMe ? "bg-white/60" : "bg-foreground/40"}`} style={{ height: `${h}px` }} />
-        ))}
-      </div>
-      <span className="text-[11px] opacity-60 shrink-0">Voice</span>
-    </button>
-  );
+function notifyPartnerChatActivity(
+  msg: ApiMessage,
+  partnerDisplayName: string,
+  partnerAvatarUrl: string,
+) {
+  if (!areNotificationsEnabled()) return;
+  const isDua = msg.companionSticker === "🤲";
+  if (isDua) {
+    showNotification(partnerDisplayName, "shared a dua with you 🤲", partnerAvatarUrl);
+    addNotification({ type: "dua", fromName: partnerDisplayName, text: "shared a dua with you 🤲" });
+    return;
+  }
+  if (isCallLogMessage(msg.text)) {
+    const ended = Boolean(msg.text?.includes("ended"));
+    const text = ended ? "ended a call" : "started a call";
+    showNotification(partnerDisplayName, text, partnerAvatarUrl);
+    addNotification({ type: "call", fromName: partnerDisplayName, text });
+    return;
+  }
+  if (msg.type === "location") {
+    showNotification(partnerDisplayName, "shared their location", partnerAvatarUrl);
+    addNotification({ type: "location", fromName: partnerDisplayName, text: "shared their location" });
+    return;
+  }
+  let text = messagePreview(msg);
+  if (msg.type === "image") text = "sent a photo";
+  else if (msg.type === "file") text = "sent a file";
+  else if (msg.type === "audio") text = "sent a voice message";
+  else if (msg.type === "gif") text = "sent a GIF";
+  else if (msg.type === "sticker") text = "sent a sticker";
+  showNotification(partnerDisplayName, text, partnerAvatarUrl);
+  addNotification({ type: "message", fromName: partnerDisplayName, text });
 }
+
+function unsendErrorMessage(err: unknown): string {
+  if (!(err instanceof Error)) return "Could not unsend. Try again.";
+  const msg = err.message;
+  if (/not found/i.test(msg)) return "This message is no longer on the server. Pull to refresh the chat.";
+  if (/own messages|forbidden/i.test(msg)) return "You can only unsend messages you sent.";
+  if (/unauthorized|session/i.test(msg)) return "Your session expired. Log in again, then try unsend.";
+  if (/failed to delete/i.test(msg)) return "Server could not unsend right now. Try again in a moment.";
+  if (/fetch|network|failed/i.test(msg)) return "Could not reach the server. Check your connection and try again.";
+  return msg;
+}
+import { ChatInbox } from "@/components/ChatInbox";
+import { AppThemeModal } from "@/components/AppThemeModal";
+import { MessageContextMenu } from "@/components/MessageContextMenu";
+import { ReplyPreview } from "@/components/ReplyPreview";
+import { defaultAvatar } from "@/lib/avatars";
+import { AvatarImage } from "@/components/AvatarImage";
+import { saveMemoryFromMessage, removeMemory } from "@/lib/memories";
+import { getStoredAppTheme, type AppThemeId } from "@/lib/app-theme";
+import {
+  filterVisibleMessages,
+  hideMessageForUser,
+  hydrateHiddenMessages,
+  clearChatForUser,
+  applyHiddenMessageId,
+  getHiddenMessageIds,
+} from "@/lib/hidden-messages";
+import { mergeMessagesById } from "@/lib/chat-sync";
+import { downloadChatAsImage } from "@/lib/chat-download";
+import { uploadMediaToB2, readFileAsDataUrl } from "@/lib/media-upload";
+import { addNotification, unreadCount, NOTIFY_CHANGED, hydrateNotifications, setUnreadChatBadge } from "@/lib/notifications-feed";
+import { showNotification } from "@/lib/notifications";
+import { isReadReceiptsEnabled, isShowPresenceEnabled, areNotificationsEnabled } from "@/lib/couple-sync";
+import { isChatBlocked, setChatBlocked, getCuteMode, setCuteMode } from "@/lib/client-memory";
+import { hydrateQuickReactions } from "@/lib/quick-reactions";
+import { UnsendConfirmModal } from "@/components/UnsendConfirmModal";
+import { scrollChatToBottom, scrollChatToBottomAfterPaint } from "@/lib/chat-scroll";
+import DoodleCanvas, { DOODLE_HEIGHT_STEP, DOODLE_MIN_HEIGHT } from "@/components/DoodleCanvas";
+import { ImageCropModal } from "@/components/ImageCropModal";
+import { partnerTypingLine } from "@/lib/partner-words";
+import { toast } from "sonner";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-function isEmojiOnly(text?: string): boolean {
-  if (!text) return false;
-  const stripped = text.replace(/\s/g, "");
-  return stripped.length > 0 && stripped.length <= 6 && /^\p{Emoji}+$/u.test(stripped);
-}
-
-type OpenPicker = "emoji" | "sticker" | "gif" | null;
-type CallState = { status: "outgoing" | "incoming" | "active"; type: "audio" | "video"; offer?: RTCSessionDescriptionInit } | null;
+type CallState = { status: "outgoing" | "incoming" | "active"; type: "audio" | "video"; incomingOffer?: RTCSessionDescriptionInit } | null;
 
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function Messages() {
-  const { user } = useAuth();
+  const { user, partner, chatThemeId, updateChatTheme, refreshCouplePrefs } = useAuth();
   const [messages, setMessages] = useState<ApiMessage[]>([]);
   const [input, setInput] = useState("");
-  const [openPicker, setOpenPicker] = useState<OpenPicker>(null);
   const [showInfo, setShowInfo] = useState(false);
   const [showThemes, setShowThemes] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [blocked, setBlocked] = useState(false);
+  const [showUnsendConfirm, setShowUnsendConfirm] = useState(false);
+  const [pendingUnsendId, setPendingUnsendId] = useState<string | null>(null);
+  const [blocked, setBlocked] = useState(() => isChatBlocked());
   const [recording, setRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [themeId, setThemeId] = useState(() => localStorage.getItem("grova_chat_theme") || "default");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesStartRef = useRef<HTMLDivElement>(null);
   const [callState, setCallState] = useState<CallState>(null);
-  const [incomingCall, setIncomingCall] = useState<{ type: "audio" | "video"; offer: RTCSessionDescriptionInit } | null>(null);
-  const [callSignal, setCallSignal] = useState<{ type: "answer" | "ice"; data: unknown } | null>(null);
+  const [incomingCall, setIncomingCall] = useState<{
+    type: "audio" | "video";
+    offer?: RTCSessionDescriptionInit;
+  } | null>(null);
+  const [callSignal, setCallSignal] = useState<{ type: "answer" | "ice"; data: unknown; seq: number } | null>(null);
+  const callSignalSeq = useRef(0);
+  const callConnectedAtRef = useRef(0);
+  const callLoggedStartRef = useRef(false);
+  const activeCallTypeRef = useRef<"audio" | "video">("audio");
+  const callRoleRef = useRef<"outgoing" | "incoming">("outgoing");
+  const endCallRef = useRef<(opts?: { fromRemote?: boolean }) => void>(() => {});
   const [partnerName, setPartnerName] = useState("");
   const [partnerAvatar, setPartnerAvatar] = useState("");
+  const [partnerLastSeen, setPartnerLastSeen] = useState<number | undefined>();
+  const [online, setOnline] = useState(isOnline());
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchFilters, setSearchFilters] = useState({
+    messageType: "all" as "all" | "text" | "image" | "sticker" | "audio" | "gif",
+    sender: "all" as "all" | "me" | "partner",
+    hasReaction: false,
+    isPinned: false,
+  });
+  const [isTyping, setIsTyping] = useState(false);
+  const [appThemeId, setAppThemeId] = useState<AppThemeId>(() => getStoredAppTheme());
+  const [showAppThemes, setShowAppThemes] = useState(false);
+  const [replyTo, setReplyTo] = useState<ApiMessage | null>(null);
+  const [editingMessage, setEditingMessage] = useState<ApiMessage | null>(null);
+  const [editText, setEditText] = useState("");
+  const [sharingLocation, setSharingLocation] = useState(false);
+  const [imageToCrop, setImageToCrop] = useState<string | null>(null);
+  const [doodleOpen, setDoodleOpen] = useState(false);
+  const [doodleHeight, setDoodleHeight] = useState(0);
+  const [pendingImageType, setPendingImageType] = useState("image/jpeg");
+  const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [activeThread, setActiveThread] = useState<string | null>(null);
+  const [showThreadPanel, setShowThreadPanel] = useState(false);
+  const [hiddenTick, setHiddenTick] = useState(0);
+  const [contextMenu, setContextMenu] = useState<{ msg: ApiMessage; top: number; left: number } | null>(null);
+  const [cuteMode, setCuteModeState] = useState<string | null>(() => getCuteMode());
+  const [notifCount, setNotifCount] = useState(() => unreadCount());
+  const [unreadChat, setUnreadChat] = useState(0);
+  const [isNearBottom, setIsNearBottom] = useState(true);
+  const isNearBottomRef = useRef(true);
+  const [hasNewMessages, setHasNewMessages] = useState(false);
 
   const bottomRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sseRetryCountRef = useRef(0);
+  const sseRetryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingRequestsRef = useRef<Map<string, Promise<any>>>(new Map());
+  const previousMessagesLengthRef = useRef(0);
+  const isInitialLoadRef = useRef(true);
+  const hasMessagesRef = useRef(false);
+  const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const maxSseRetries = 10; // Maximum number of SSE reconnection attempts
 
-  const partnerId = user?.id === "me" ? "wife" : "me";
-  const staticPartner = user?.id === "me" ? WIFE : ME;
-  const theme = THEMES.find(t => t.id === themeId) ?? THEMES[0]!;
+  const partnerId = useMemo(() => user?.id === "me" ? "wife" : "me", [user?.id]);
+  const theme = THEMES.find(t => t.id === chatThemeId) ?? THEMES[0]!;
+  const presence = usePresenceLabel(partnerLastSeen);
 
-  // Init partner info from API
-  useEffect(() => {
-    api.getUsers().then(users => {
-      const p = users.find(u => u.id === partnerId);
-      if (p) { setPartnerName(p.name); setPartnerAvatar(p.avatar); }
-      else { setPartnerName(staticPartner.name); setPartnerAvatar(staticPartner.avatar); }
-    }).catch(() => {
-      setPartnerName(staticPartner.name);
-      setPartnerAvatar(staticPartner.avatar);
+  const scrollToBottomForMedia = useCallback(() => {
+    scrollChatToBottomAfterPaint(messagesContainerRef.current, bottomRef.current);
+  }, []);
+
+  const expandDoodleSpace = useCallback(() => {
+    setDoodleHeight((h) => h + DOODLE_HEIGHT_STEP);
+  }, []);
+
+  const openDoodlePanel = useCallback(() => {
+    setDoodleOpen(true);
+    setDoodleHeight((h) => (h > 0 ? h + DOODLE_HEIGHT_STEP : DOODLE_MIN_HEIGHT));
+    requestAnimationFrame(() => {
+      scrollChatToBottomAfterPaint(messagesContainerRef.current, bottomRef.current);
     });
-  }, [partnerId]);
+  }, []);
 
-  // SSE real-time connection
+  const closeDoodlePanel = useCallback(() => {
+    setDoodleOpen(false);
+  }, []);
+
+  // Define partner info early to avoid hoisting issues
+  const pAvatar = partner?.avatar || partnerAvatar || defaultAvatar(partnerId);
+  const pName = partner?.name || partnerName || (partnerId === "wife" ? "Sara" : "Mustaq");
+  const lastMsg = messages.filter((m) => !m.deleted).slice(-1)[0];
+  const lastPreview = lastMsg ? messagePreview(lastMsg) : undefined;
+
+  useEffect(() => {
+    const refresh = () => setNotifCount(unreadCount());
+    window.addEventListener(NOTIFY_CHANGED, refresh);
+    return () => window.removeEventListener(NOTIFY_CHANGED, refresh);
+  }, []);
+
+  useEffect(() => {
+    if (partner) {
+      setPartnerName(partner.name);
+      setPartnerAvatar(partner.avatar);
+    }
+  }, [partner?.name, partner?.avatar]);
+
+  useEffect(() => {
+    if (!user) return;
+    const refreshPresence = () => {
+      api.getPresence().then((map) => {
+        setPartnerLastSeen(map[partnerId]);
+      }).catch(() => {});
+    };
+    api.heartbeat(user.id).catch(() => {});
+    refreshPresence();
+    const hb = setInterval(() => {
+      if (isShowPresenceEnabled()) api.heartbeat(user.id).catch(() => {});
+    }, 30_000);
+    const poll = setInterval(refreshPresence, 15_000);
+    return () => { clearInterval(hb); clearInterval(poll); };
+  }, [user?.id, partnerId]);
+
+  // Load messages function (can be called from retry button)
+  const loadMessages = useCallback(async () => {
+    const requestId = 'load-messages';
+    
+    // Check if request is already pending
+    if (pendingRequestsRef.current.has(requestId)) {
+      return pendingRequestsRef.current.get(requestId);
+    }
+
+    setLoading(true);
+    setError(null);
+
+    const requestPromise = api.getMessages()
+      .then(async (data) => {
+        const messages = await normalizeMessages(data.messages || []);
+        isInitialLoadRef.current = true;
+        setMessages(messages);
+        const more = data.pagination?.hasMore ?? false;
+        setHasMore(messages.length > 0 && more);
+        return data;
+      })
+      .catch((err) => {
+        console.error("Failed to load messages:", err);
+        setError("Failed to load messages. Please check your connection.");
+        setMessages([]);
+      })
+      .finally(() => {
+        setLoading(false);
+        pendingRequestsRef.current.delete(requestId);
+      });
+    
+    pendingRequestsRef.current.set(requestId, requestPromise);
+    return requestPromise;
+  }, []);
+
+  // Load more messages when scrolling to top with pagination
+  const loadMoreMessages = useCallback(async () => {
+    if (loadingMore || !hasMore || messages.length === 0) return;
+
+    const offset = messages.length;
+
+    const container = messagesContainerRef.current;
+    // Store current scroll height before adding messages
+    const scrollHeightBefore = container?.scrollHeight ?? 0;
+    
+    setLoadingMore(true);
+    try {
+      const data = await api.getMessages({ offset });
+      const older = await normalizeMessages(data.messages || []);
+      if (older.length === 0) {
+        setHasMore(false);
+        return;
+      }
+      
+      // Use requestAnimationFrame to ensure DOM updates before calculating scroll
+      requestAnimationFrame(() => {
+        if (container) {
+          const scrollHeightAfter = container.scrollHeight;
+          const heightDifference = scrollHeightAfter - scrollHeightBefore;
+          // Maintain scroll position by adjusting for new content
+          container.scrollTop = container.scrollTop + heightDifference;
+        }
+      });
+      
+      setMessages((prev) => {
+        const existing = new Set(prev.map((m) => m.id));
+        const unique = older.filter((m) => !existing.has(m.id));
+        if (unique.length === 0) return prev;
+        return [...unique, ...prev];
+      });
+      const more = data.pagination?.hasMore ?? false;
+      setHasMore(more && older.length > 0);
+    } catch (err) {
+      console.error("Failed to load more messages:", err);
+      // Don't set error state for load more failures, just log it
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loadingMore, hasMore, messages.length]);
+
+  // Intersection Observer for loading more messages on scroll to top
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !loadingMore && hasMore && messages.length > 0) {
+          loadMoreMessages();
+        }
+      },
+      { rootMargin: '100px', threshold: 0.1 }
+    );
+
+    if (messagesStartRef.current) {
+      observer.observe(messagesStartRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, [loadingMore, hasMore, loadMoreMessages, messages.length]);
+
+  // SSE real-time connection with automatic reconnection
   useEffect(() => {
     if (!user) return;
 
-    // Initial message load
-    api.getMessages().then(msgs => { setMessages(msgs); setLoading(false); });
+    let mounted = true;
+    let es: EventSource | null = null;
+    let typingTimeout: ReturnType<typeof setTimeout> | null = null;
+    let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
 
-    const es = new EventSource(`/api/events?userId=${user.id}`);
+    // Load messages on mount
+    void hydrateHiddenMessages(user.id);
+    void hydrateQuickReactions();
+    loadMessages();
 
-    es.addEventListener("new-message", (e: MessageEvent) => {
-      const msg = JSON.parse(e.data) as ApiMessage;
-      setMessages(prev => prev.some(m => m.id === msg.id) ? prev : [...prev, msg]);
-    });
+    // SSE connection setup with reconnection logic
+    function connectSSE() {
+      if (!mounted || !user) return;
 
-    es.addEventListener("message-liked", (e: MessageEvent) => {
-      const msg = JSON.parse(e.data) as ApiMessage;
-      setMessages(prev => prev.map(m => m.id === msg.id ? msg : m));
-    });
+      es = new EventSource(`/api/sse?userId=${user.id}`);
 
-    es.addEventListener("messages-cleared", () => setMessages([]));
+      es.addEventListener("connected", () => {
+        sseRetryCountRef.current = 0;
+        setError(null);
+      });
 
-    es.addEventListener("call-offer", (e: MessageEvent) => {
-      const d = JSON.parse(e.data);
-      if (d.from !== user.id) {
-        setIncomingCall({ type: d.callType, offer: d.sdp });
+      const handleNewMessage = async (e: MessageEvent) => {
+        if (!mounted) return;
+        try {
+          const raw = JSON.parse(e.data) as ApiMessage;
+          const [msg] = await normalizeMessages([raw]);
+          if (msg.senderId === partnerId) {
+            notifyPartnerChatActivity(msg, pName, pAvatar);
+          }
+          setMessages(prev => {
+            // Use Set for O(1) lookup instead of O(n) array.some
+            const existingIds = new Set(prev.map(m => m.id));
+            return existingIds.has(msg.id) ? prev : [...prev, msg];
+          });
+          
+          if (msg.senderId === partnerId && !isNearBottomRef.current) {
+            setHasNewMessages(true);
+          } else {
+            scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
+          }
+        } catch (err) {
+          console.error("Failed to handle new message:", err);
+        }
+      };
+
+      const handleMessageLiked = async (e: MessageEvent) => {
+        if (!mounted) return;
+        try {
+          const raw = JSON.parse(e.data) as ApiMessage;
+          const likedBy = (raw as ApiMessage & { likedBy?: string }).likedBy;
+          const [msg] = await normalizeMessages([raw]);
+          if (
+            msg.senderId === user?.id &&
+            msg.liked &&
+            likedBy === partnerId &&
+            areNotificationsEnabled()
+          ) {
+            addNotification({ type: "like", fromName: pName, text: "liked your message" });
+            showNotification(pName, "liked your message", pAvatar);
+          }
+          setMessages((prev) => {
+            const found = prev.find(m => m.id === msg.id);
+            if (!found) return prev;
+            return prev.map((m) => (m.id === msg.id ? msg : m));
+          });
+        } catch (err) {
+          console.error("Failed to handle message liked:", err);
+        }
+      };
+
+      /** Unsend only — global delete for both partners. Not used for "delete for me". */
+      const handleMessageDeleted = (e: MessageEvent) => {
+        if (!mounted) return;
+        try {
+          const msg = JSON.parse(e.data) as ApiMessage;
+          setMessages(prev => {
+            const found = prev.find(m => m.id === msg.id);
+            if (!found) return prev;
+            return prev.map(m => m.id === msg.id ? {
+              ...m,
+              ...msg,
+              deleted: true,
+              text: undefined,
+              audioData: undefined,
+              gifUrl: undefined,
+              imageData: undefined,
+              imageUrl: undefined,
+              fileData: undefined,
+            } : m);
+          });
+        } catch (err) {
+          console.error("Failed to handle message deleted:", err);
+        }
+      };
+
+      const handleMessageHidden = (e: MessageEvent) => {
+        if (!mounted || !user) return;
+        try {
+          const d = JSON.parse(e.data) as { userId: string; messageId: string };
+          if (d.userId !== user.id) return;
+          applyHiddenMessageId(user.id, d.messageId);
+          setHiddenTick((t) => t + 1);
+        } catch (err) {
+          console.error("Failed to handle message hidden:", err);
+        }
+      };
+
+      const handleMessageEdited = async (e: MessageEvent) => {
+        if (!mounted) return;
+        try {
+          const raw = JSON.parse(e.data) as ApiMessage;
+          const [msg] = await normalizeMessages([raw]);
+          setMessages((prev) => {
+            const found = prev.find(m => m.id === msg.id);
+            if (!found) return prev;
+            return prev.map((m) => (m.id === msg.id ? { ...m, text: msg.text } : m));
+          });
+        } catch (err) {
+          console.error("Failed to handle message edited:", err);
+        }
+      };
+
+      const handleMessageReaction = (e: MessageEvent) => {
+        if (!mounted || !user) return;
+        try {
+          const d = JSON.parse(e.data) as {
+            messageId: string;
+            reactions: { emoji: string; userId: string }[];
+            byUserId?: string;
+          };
+          const myReaction = d.reactions.find((r) => r.userId === user.id)?.emoji;
+          const partnerReaction = d.reactions.find((r) => r.userId === partnerId)?.emoji;
+          setMessages((prev) => {
+            const found = prev.find(m => m.id === d.messageId);
+            if (!found) return prev;
+            return prev.map((m) => {
+              if (m.id !== d.messageId) return m;
+              const displayReaction =
+                m.senderId === user.id
+                  ? (partnerReaction ?? myReaction)
+                  : (myReaction ?? partnerReaction);
+              if (
+                partnerReaction &&
+                m.senderId === user.id &&
+                d.byUserId === partnerId &&
+                areNotificationsEnabled()
+              ) {
+                addNotification({
+                  type: "like",
+                  fromName: pName,
+                  text: `reacted ${partnerReaction} to your message`,
+                });
+              }
+              return { ...m, reaction: displayReaction };
+            });
+          });
+        } catch (err) {
+          console.error("Failed to handle message reaction:", err);
+        }
+      };
+
+      const handlePresence = (e: MessageEvent) => {
+        if (!mounted) return;
+        try {
+          const d = JSON.parse(e.data) as { userId: string; lastSeen: number };
+          if (d.userId === partnerId) setPartnerLastSeen(d.lastSeen);
+        } catch (err) {
+          console.error("Failed to handle presence:", err);
+        }
+      };
+
+      const handleMessagesCleared = () => { if (mounted) setMessages([]); };
+
+      const pushCallSignal = (type: "answer" | "ice", data: unknown) => {
+        callSignalSeq.current += 1;
+        setCallSignal({ type, data, seq: callSignalSeq.current });
+      };
+
+      const handleCallOffer = (e: MessageEvent) => {
+        if (!mounted || !user) return;
+        try {
+          const d = JSON.parse(e.data) as {
+            from: string;
+            callType: "audio" | "video";
+            sdp?: RTCSessionDescriptionInit;
+          };
+          if (d.from !== partnerId || !d.sdp) return;
+          setIncomingCall({ type: d.callType, offer: d.sdp });
+          if (Notification.permission === "granted") {
+            new Notification(`${partnerName} is calling`, {
+              body: d.callType === "video" ? "Video call" : "Audio call",
+              icon: pAvatar,
+            });
+          }
+        } catch (err) {
+          console.error("Failed to handle call offer:", err);
+        }
+      };
+
+      const handleCallRing = (e: MessageEvent) => {
+        if (!mounted || !user) return;
+        try {
+          const d = JSON.parse(e.data) as { from: string; callType: "audio" | "video" };
+          if (d.from !== partnerId) return;
+          setIncomingCall((prev) => prev ?? { type: d.callType });
+        } catch (err) {
+          console.error("Failed to handle call ring:", err);
+        }
+      };
+
+      const handleCallAnswer = (e: MessageEvent) => {
+        if (!mounted || !user) return;
+        try {
+          const d = JSON.parse(e.data) as { from: string; sdp: RTCSessionDescriptionInit };
+          if (d.from !== partnerId || !d.sdp) return;
+          pushCallSignal("answer", d.sdp);
+        } catch (err) {
+          console.error("Failed to handle call answer:", err);
+        }
+      };
+
+      const handleCallIce = (e: MessageEvent) => {
+        if (!mounted || !user) return;
+        try {
+          const d = JSON.parse(e.data) as { from: string; candidate: RTCIceCandidateInit };
+          if (d.from !== partnerId || !d.candidate) return;
+          pushCallSignal("ice", d.candidate);
+        } catch (err) {
+          console.error("Failed to handle call ICE:", err);
+        }
+      };
+
+      const handleCallEnd = () => {
+        if (mounted) endCallRef.current({ fromRemote: true });
+      };
+      const handleCallReject = () => {
+        if (mounted) endCallRef.current({ fromRemote: true });
+      };
+
+      const handleProfileUpdated = (e: MessageEvent) => {
+        if (!mounted) return;
+        try {
+          const d = JSON.parse(e.data);
+          if (d.userId === partnerId) { setPartnerName(d.name); setPartnerAvatar(d.avatar); }
+        } catch (err) {
+          console.error("Failed to handle profile updated:", err);
+        }
+      };
+
+      const handleTypingIndicator = (e: MessageEvent) => {
+        if (!mounted) return;
+        try {
+          const d = JSON.parse(e.data);
+          if (d.userId === partnerId) {
+            setIsTyping(d.typing);
+            if (d.typing) {
+              if (typingTimeout) clearTimeout(typingTimeout);
+              typingTimeout = setTimeout(() => setIsTyping(false), 3000);
+            }
+          }
+        } catch (err) {
+          console.error("Failed to handle typing indicator:", err);
+        }
+      };
+
+      const handleMessageRead = (e: MessageEvent) => {
+        if (!mounted || !user) return;
+        try {
+          const d = JSON.parse(e.data) as { messageId: string; userId: string; readAt: string };
+          setMessages(prev => {
+            const readMsg = prev.find((m) => m.id === d.messageId);
+            if (!readMsg) return prev;
+            const readTs = new Date(readMsg.timestamp).getTime();
+            return prev.map((m) => {
+              if (d.userId === partnerId && m.senderId === user.id && !m.deleted) {
+                const ts = new Date(m.timestamp).getTime();
+                if (m.id === d.messageId || (readTs > 0 && ts <= readTs)) {
+                  return { ...m, seenByPartner: true, readAt: m.readAt ?? d.readAt };
+                }
+              }
+              if (d.userId === user.id && m.senderId === partnerId && m.id === d.messageId) {
+                return { ...m, read: true, readAt: d.readAt };
+              }
+              return m;
+            });
+          });
+        } catch (err) {
+          console.error("Failed to handle message read:", err);
+        }
+      };
+
+      const handleDuaAdded = () => { hydrateNotifications(); };
+      const handleDuaDeleted = () => { api.getDuas().catch(() => {}); };
+      const handlePrefsUpdated = () => { refreshCouplePrefs(); };
+
+      es.addEventListener("new-message", handleNewMessage);
+      es.addEventListener("message-liked", handleMessageLiked);
+      es.addEventListener("message-deleted", handleMessageDeleted);
+      es.addEventListener("message-hidden", handleMessageHidden);
+      es.addEventListener("message-edited", handleMessageEdited);
+      es.addEventListener("message-reaction", handleMessageReaction);
+      es.addEventListener("presence", handlePresence);
+      es.addEventListener("messages-cleared", handleMessagesCleared);
+      es.addEventListener("call-offer", handleCallOffer);
+      es.addEventListener("call-ring", handleCallRing);
+      es.addEventListener("call-answer", handleCallAnswer);
+      es.addEventListener("call-ice", handleCallIce);
+      es.addEventListener("call-end", handleCallEnd);
+      es.addEventListener("call-reject", handleCallReject);
+      es.addEventListener("profile-updated", handleProfileUpdated);
+      es.addEventListener("typing-indicator", handleTypingIndicator);
+      es.addEventListener("message-read", handleMessageRead);
+      es.addEventListener("dua-added", handleDuaAdded);
+      es.addEventListener("dua-deleted", handleDuaDeleted);
+      es.addEventListener("prefs-updated", handlePrefsUpdated);
+
+      // SSE error handler with exponential backoff reconnection
+      es.onerror = () => {
+        console.warn("SSE connection error, will retry...");
+        if (es) {
+          es.close();
+          es = null;
+        }
+
+        if (!mounted) return;
+
+        // Check if we've exceeded max retries
+        const retryCount = sseRetryCountRef.current;
+        if (retryCount >= maxSseRetries) {
+          console.error("SSE max retries exceeded, stopping reconnection");
+          setError("Connection failed. Please refresh the page to try again.");
+          return;
+        }
+
+        // Exponential backoff: 1s, 2s, 4s, 8s, max 30s
+        const delay = Math.min(1000 * Math.pow(2, retryCount), 30000);
+        sseRetryCountRef.current = retryCount + 1;
+
+        console.log(`SSE reconnecting in ${delay}ms (attempt ${retryCount + 1})`);
+        reconnectTimeout = setTimeout(() => {
+          if (mounted) connectSSE();
+        }, delay);
+      };
+    }
+
+    connectSSE();
+
+    return () => {
+      mounted = false;
+      if (typingTimeout) clearTimeout(typingTimeout);
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+      if (sseRetryTimeoutRef.current) clearTimeout(sseRetryTimeoutRef.current);
+      if (es) {
+        es.onerror = null;
+        es.close();
+        es = null;
       }
-    });
+    };
+  }, [user, partnerId, loadMessages, refreshCouplePrefs]);
 
-    es.addEventListener("call-answer", (e: MessageEvent) => {
-      const d = JSON.parse(e.data);
-      if (d.from !== user.id) setCallSignal({ type: "answer", data: d.sdp });
-    });
+  // Keep chat in sync across tabs/devices (SSE can miss events while backgrounded)
+  useEffect(() => {
+    if (!user) return;
 
-    es.addEventListener("call-ice", (e: MessageEvent) => {
-      const d = JSON.parse(e.data);
-      if (d.from !== user.id) setCallSignal({ type: "ice", data: d.candidate });
-    });
+    const syncFromServer = () => {
+      void api.getMessages().then(async (data) => {
+        const fresh = await normalizeMessages(data.messages ?? []);
+        setMessages((prev) => mergeMessagesById(prev, fresh));
+        setHasMore(fresh.length > 0 && (data.pagination?.hasMore ?? false));
+      }).catch(() => {});
+    };
 
-    es.addEventListener("call-end", () => { setCallState(null); setIncomingCall(null); });
-    es.addEventListener("call-reject", () => setCallState(null));
+    const onVisible = () => {
+      if (document.visibilityState === "visible") syncFromServer();
+    };
 
-    es.addEventListener("profile-updated", (e: MessageEvent) => {
-      const d = JSON.parse(e.data);
-      if (d.userId === partnerId) { setPartnerName(d.name); setPartnerAvatar(d.avatar); }
-    });
+    document.addEventListener("visibilitychange", onVisible);
+    const interval = setInterval(syncFromServer, 120_000);
 
-    return () => es.close();
-  }, [user, partnerId]);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      clearInterval(interval);
+    };
+  }, [user]);
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
+  // Jump to latest on first paint (no animated scroll through history)
+  useLayoutEffect(() => {
+    if (loading || messages.length === 0) return;
+    if (!isInitialLoadRef.current) return;
+    scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
+    isInitialLoadRef.current = false;
+    previousMessagesLengthRef.current = messages.length;
+    setHasNewMessages(false);
+  }, [loading, messages]);
 
-  const setTheme = (id: string) => {
-    setThemeId(id);
-    localStorage.setItem("grova_chat_theme", id);
+  // New messages: scroll if you sent it, you're already at bottom, or it's media you sent
+  useEffect(() => {
+    if (isInitialLoadRef.current) return;
+    const prevLen = previousMessagesLengthRef.current;
+    if (messages.length <= prevLen) {
+      previousMessagesLengthRef.current = messages.length;
+      return;
+    }
+    const last = messages[messages.length - 1];
+    const isOwn = last?.senderId === user?.id;
+    const isMedia = last?.type === "gif" || last?.type === "image";
+
+    if (isOwn || isNearBottom || (isOwn && isMedia)) {
+      if (isMedia) {
+        scrollChatToBottomAfterPaint(messagesContainerRef.current, bottomRef.current);
+      } else {
+        scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
+      }
+      setHasNewMessages(false);
+    } else if (last?.senderId === partnerId) {
+      setHasNewMessages(true);
+    }
+    previousMessagesLengthRef.current = messages.length;
+  }, [messages, isNearBottom, user?.id, partnerId]);
+
+  // Scroll position detection - track if user is near bottom (debounced for performance)
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const handleScroll = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      
+      debounceTimer = setTimeout(() => {
+        // Check if user is within 100px of the bottom
+        const { scrollHeight, scrollTop, clientHeight } = container;
+        const isNear = scrollHeight - (scrollTop + clientHeight) < 100;
+        isNearBottomRef.current = isNear;
+        setIsNearBottom(isNear);
+        
+        // Clear "new messages" indicator when user scrolls to bottom
+        if (isNear) {
+          setHasNewMessages(false);
+        }
+      }, 50);
+    };
+
+    container.addEventListener('scroll', handleScroll);
+    return () => {
+      container.removeEventListener('scroll', handleScroll);
+      if (debounceTimer) clearTimeout(debounceTimer);
+    };
+  }, []);
+
+  // Online/offline detection (UI only — messages always come from Neon via API)
+  useEffect(() => {
+    const handleOnline = () => setOnline(true);
+    const handleOffline = () => setOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Mark partner messages as read when viewed (debounced batch — avoids N API calls)
+  useEffect(() => {
+    if (!user || !isReadReceiptsEnabled()) return;
+    const unreadIds = messages
+      .filter((m) => m.senderId === partnerId && !m.read && !m.deleted)
+      .map((m) => m.id);
+    if (unreadIds.length === 0) return;
+
+    const timer = setTimeout(() => {
+      const readAt = new Date().toISOString();
+      api.markMessagesReadBatch(unreadIds, user.id).catch(() => {});
+      setMessages((prev) => {
+        const unreadSet = new Set(unreadIds);
+        return prev.map((m) =>
+          unreadSet.has(m.id) ? { ...m, read: true, readAt: m.readAt ?? readAt } : m,
+        );
+      });
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [messages, user, partnerId]);
+
+  useEffect(() => {
+    if (!user) return;
+    const n = messages.filter(m => m.senderId === partnerId && !m.deleted && !m.read).length;
+    setUnreadChatBadge(n);
+    setUnreadChat(n);
+  }, [messages, user, partnerId]);
+
+  // Request notification permission on mount
+  useEffect(() => {
+    if (!user) return;
+
+    let mounted = true;
+
+    const setupNotifications = async () => {
+      try {
+        const granted = await requestNotificationPermission();
+        if (granted && mounted) {
+          const subscription = await subscribeToPush();
+          if (subscription) {
+            sendSubscriptionToServer(subscription, user.id);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to setup notifications:", err);
+      }
+    };
+
+
+
+    setupNotifications();
+
+    return () => {
+      mounted = false;
+    };
+  }, [user]);
+
+  const setTheme = useCallback((id: string) => {
+    updateChatTheme(id);
     setShowThemes(false);
+  }, [updateChatTheme]);
+
+  const fetchAllMessagesForExport = useCallback(async () => {
+    const collected: ApiMessage[] = [];
+    let offset = 0;
+    let hasMore = true;
+    while (hasMore) {
+      const data = await api.getMessages({ offset });
+      const batch = await normalizeMessages(data.messages || []);
+      if (batch.length === 0) break;
+      collected.push(...batch);
+      hasMore = Boolean(data.pagination?.hasMore);
+      offset += batch.length;
+    }
+    const byId = new Map(collected.map((m) => [m.id, m]));
+    return [...byId.values()];
+  }, []);
+
+  const downloadChatImages = useCallback(async () => {
+    if (!user) return;
+    try {
+      const toastId = "chat-export";
+      toast.loading("Loading full chat history…", { id: toastId });
+      const all = await fetchAllMessagesForExport();
+      const visible = filterVisibleMessages(user.id, all);
+      if (visible.length === 0) {
+        toast.error("No messages to export", { id: toastId });
+        return;
+      }
+      toast.loading(`Exporting ${visible.length} messages…`, { id: toastId });
+      const pages = await downloadChatAsImage(visible, user.id, user.name, pName, (cur, total) => {
+        toast.loading(`Downloading part ${cur} of ${total}…`, { id: toastId });
+      });
+      toast.success(
+        pages > 1 ? `Saved ${pages} images (${visible.length} messages).` : `Chat saved (${visible.length} messages).`,
+        { id: toastId },
+      );
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not export chat.");
+    }
+  }, [user, pName, fetchAllMessagesForExport]);
+
+  const canEditMessage = useCallback((msg: ApiMessage) => {
+    if (msg.senderId !== user?.id || !msg.text) return false;
+    return Date.now() - new Date(msg.timestamp).getTime() < 60 * 60 * 1000;
+  }, [user?.id]);
+
+  const exportData = async () => {
+    if (!user) return;
+    try {
+      const response = await fetch(`/api/export/${user.id}`);
+      const data = await response.json();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `grova-export-${user.id}-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Failed to export data:", err);
+    }
   };
+
+  // Drop legacy local chat cache — all messages live in Neon only
+  useEffect(() => {
+    try {
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   // Send helpers
   const sendMsg = useCallback(async (partial: Partial<ApiMessage>) => {
     if (!user) return;
+
+    if (!online) {
+      setError("You're offline. Connect to the internet to send messages.");
+      return;
+    }
+
+    let tempId: string | null = null;
     try {
-      await api.sendMessage({ senderId: user.id, ...partial });
-      // Message arrives via SSE — no need to set state here
-    } catch { /* ignore */ }
-  }, [user]);
+      const outgoing = await prepareOutgoingMessage({ senderId: user.id, ...partial });
+      tempId = crypto.randomUUID();
+      const optimistic = buildOptimisticMessage({ senderId: user.id, ...partial }, tempId);
 
-  const sendText = () => {
-    const text = input.trim();
+      setMessages((prev) => [...prev, optimistic]);
+      scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
+
+      const saved = await api.sendMessage(outgoing);
+      const [display] = await normalizeMessages([saved]);
+      setMessages((prev) => {
+        const found = prev.find(m => m.id === tempId);
+        if (!found) return prev;
+        return prev.map((m) => (m.id === tempId ? display : m));
+      });
+      scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
+    } catch (err) {
+      console.error("Failed to send message:", err);
+      if (tempId) {
+        setMessages((prev) => prev.filter((m) => m.id !== tempId));
+      }
+      setError("Message did not send. Check your connection and try again.");
+    }
+  }, [user, online]);
+
+  const toggleCuteMode = useCallback((mode: string | null) => {
+    setCuteMode(mode);
+    setCuteModeState(mode);
+  }, []);
+
+  const sendText = useCallback(() => {
+    let text = input.trim();
     if (!text) return;
+    if (replyTo?.text) {
+      const snippet = replyTo.text.slice(0, 80);
+      text = `↩ ${snippet}${replyTo.text.length > 80 ? "…" : ""}\n${text}`;
+    }
     setInput("");
-    sendMsg({ text, type: "text" });
-  };
+    setReplyTo(null);
+    const modeStickers: Record<string, string> = {
+      frog: "🐸",
+      cat: "🐱",
+      panda: "🐼",
+    };
+    sendMsg({
+      text,
+      type: "text",
+      ...(cuteMode
+        ? { variant: "cute" as const, companionSticker: modeStickers[cuteMode] || "🐸" }
+        : { variant: "default" as const }),
+    });
+  }, [input, sendMsg, cuteMode, replyTo]);
 
-  const sendHeart = () => sendMsg({ text: "♥", type: "heart" });
+  // Debounced search handler
+  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    
+    // Clear previous timeout
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current);
+    }
+    
+    // Set new timeout with 300ms debounce
+    searchDebounceRef.current = setTimeout(() => {
+      setSearchQuery(value);
+    }, 300);
+  }, []);
 
-  const sendSticker = (s: string) => sendMsg({ text: s, type: "sticker" });
-  const sendGif = (url: string) => sendMsg({ gifUrl: url, type: "gif" });
+  // Handle typing indicator with debouncing
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setInput(e.target.value);
 
-  const sendImage = (dataUrl: string) => sendMsg({ imageData: dataUrl, type: "image" });
+    if (user && e.target.value.length > 0) {
+      // Clear previous timeout
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onloadend = () => sendImage(reader.result as string);
-    reader.readAsDataURL(file);
-    e.target.value = "";
-  };
+      // Debounce typing indicator - only send after 500ms of typing
+      typingTimeoutRef.current = setTimeout(() => {
+        fetch('/api/typing', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: user.id, partnerId, typing: true })
+        }).catch(() => {});
+
+        // Set timeout to send stopped typing after 2 seconds
+        setTimeout(() => {
+          fetch('/api/typing', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: user.id, partnerId, typing: false })
+          }).catch(() => {});
+        }, 2000);
+      }, 500);
+    }
+  }, [user, partnerId]);
+
+  const sendGreeting = useCallback((g: GreetingTemplate) => {
+    sendMsg({
+      text: g.text,
+      type: "text",
+      variant: "cute",
+      companionSticker: g.companionSticker,
+    });
+  }, [sendMsg]);
+
+  const handleEdit = useCallback((msg: ApiMessage) => {
+    setEditingMessage(msg);
+    setEditText(msg.text || "");
+    setReplyTo(null);
+  }, []);
+
+  const handleSaveEdit = useCallback(async () => {
+    if (!editingMessage || !editText.trim() || !user) return;
+    
+    try {
+      await api.editMessage(editingMessage.id, editText.trim(), user.id);
+      setMessages((prev) => {
+        const found = prev.find(m => m.id === editingMessage.id);
+        if (!found) return prev;
+        return prev.map((m) => (m.id === editingMessage.id ? { ...m, text: editText.trim() } : m));
+      });
+      setEditingMessage(null);
+      setEditText("");
+    } catch (err) {
+      console.error("Failed to edit message:", err);
+    }
+  }, [editingMessage, editText, user]);
+
+  const handleCancelEdit = useCallback(() => {
+    setEditingMessage(null);
+    setEditText("");
+  }, []);
+
+  const handleShareLocation = useCallback(() => {
+    if (!navigator.geolocation) {
+      toast.error("Geolocation is not supported in this browser");
+      return;
+    }
+    if (!window.isSecureContext) {
+      toast.error("Location only works on HTTPS or localhost. Open the app via http://localhost:5000");
+      return;
+    }
+
+    setSharingLocation(true);
+
+    const sendFromPosition = async (position: GeolocationPosition) => {
+      const location = {
+        lat: position.coords.latitude,
+        lng: position.coords.longitude,
+      };
+      setCurrentLocation(location);
+      try {
+        await sendMsg({
+          type: "location",
+          location,
+          text: "📍 Shared location",
+        });
+      } finally {
+        setSharingLocation(false);
+      }
+    };
+
+    const geoErrorMessage = (error: GeolocationPositionError) =>
+      error.code === 1
+        ? "Location permission denied. Allow location for this site in browser settings."
+        : error.code === 2
+          ? "Location unavailable. Turn on Windows location, or try again on Wi‑Fi."
+          : error.code === 3
+            ? "Location request timed out. Try again."
+            : "Could not get your location.";
+
+    // Desktop-friendly first (Wi‑Fi / IP). High-accuracy GPS often fails on PC (code 2).
+    const tryGetPosition = (
+      options: PositionOptions,
+      onFail?: (err: GeolocationPositionError) => void,
+    ) => {
+      navigator.geolocation.getCurrentPosition(
+        (position) => void sendFromPosition(position),
+        onFail ?? ((error) => {
+          toast.error(geoErrorMessage(error));
+          setSharingLocation(false);
+        }),
+        options,
+      );
+    };
+
+    tryGetPosition(
+      { enableHighAccuracy: false, timeout: 15000, maximumAge: 120_000 },
+      (firstError) => {
+        if (firstError.code === 1) {
+          toast.error(geoErrorMessage(firstError));
+          setSharingLocation(false);
+          return;
+        }
+        // Retry once with a fresh low-accuracy read (no GPS requirement)
+        tryGetPosition(
+          { enableHighAccuracy: false, timeout: 25_000, maximumAge: 0 },
+          (secondError) => {
+            toast.error(geoErrorMessage(secondError));
+            setSharingLocation(false);
+          },
+        );
+      },
+    );
+  }, [sendMsg]);
+
+  const handleStartThread = useCallback((message: ApiMessage) => {
+    const threadId = message.threadId || message.id;
+    setActiveThread(threadId);
+    setShowThreadPanel(true);
+  }, []);
+
+  const handleReplyToThread = useCallback((threadId: string) => {
+    setActiveThread(threadId);
+    setShowThreadPanel(true);
+  }, []);
+
+  const handleCloseThread = useCallback(() => {
+    setActiveThread(null);
+    setShowThreadPanel(false);
+  }, []);
+
+  const getThreadMessages = useCallback((threadId: string) => {
+    return messages.filter(msg => msg.threadId === threadId || msg.id === threadId);
+  }, [messages]);
+
+  const exportChatHistory = useCallback(() => {
+    if (!user || messages.length === 0) return;
+    
+    const exportData = {
+      exportedAt: new Date().toISOString(),
+      userId: user.id,
+      partnerId,
+      partnerName: pName,
+      messageCount: messages.length,
+      messages: messages.map(msg => ({
+        id: msg.id,
+        senderId: msg.senderId,
+        text: msg.text,
+        type: msg.type,
+        timestamp: msg.timestamp,
+        liked: msg.liked,
+        deleted: msg.deleted,
+        variant: msg.variant,
+        companionSticker: msg.companionSticker,
+        reaction: msg.reaction,
+        pinned: msg.pinned,
+      }))
+    };
+    
+    const dataStr = JSON.stringify(exportData, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `chat-export-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, [user, partnerId, pName, messages]);
+
+  const deleteMessage = useCallback(async (id: string) => {
+    try {
+      const deleted = await api.deleteMessage(id);
+      setMessages((prev) => {
+        const found = prev.find(m => m.id === id);
+        if (!found) return prev;
+        return prev.map((m) =>
+          m.id === id ? { ...m, ...deleted, deleted: true, text: undefined, audioData: undefined } : m,
+        );
+      });
+    } catch (err) {
+      const message = unsendErrorMessage(err);
+      if (err instanceof Error && /not found/i.test(err.message)) {
+        setMessages((prev) => prev.filter((m) => m.id !== id));
+      }
+      window.alert(message);
+    }
+  }, []);
+
+  const sendHeart = useCallback(() => sendMsg({ text: "♥", type: "heart" }), [sendMsg]);
+
+  const sendSticker = useCallback(
+    (s: string) => {
+      if (s.startsWith("http")) sendMsg({ gifUrl: s, type: "gif" });
+      else sendMsg({ text: s, type: "sticker" });
+    },
+    [sendMsg],
+  );
+  const sendGif = useCallback((url: string) => sendMsg({ gifUrl: url, type: "gif" }), [sendMsg]);
+
+  const sendImage = useCallback((dataUrl: string) => sendMsg({ imageData: dataUrl, type: "image" }), [sendMsg]);
+
+  const convertToWebP = useCallback((file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const canvas = document.createElement('canvas');
+      
+      img.onload = () => {
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error('Failed to get canvas context'));
+          return;
+        }
+        ctx.drawImage(img, 0, 0);
+        const webpDataUrl = canvas.toDataURL('image/webp', 0.8);
+        resolve(webpDataUrl);
+      };
+      
+      img.onerror = () => reject(new Error('Failed to load image'));
+      
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsDataURL(file);
+    });
+  }, []);
+
+  const uploadAndSendFile = useCallback(
+    async (file: File) => {
+      if (!user) return;
+
+      const tempId = crypto.randomUUID();
+      const optimistic = buildOptimisticMessage(
+        {
+          senderId: user.id,
+          type: "file",
+          text: `${file.name} · Uploading…`,
+          fileType: file.type,
+          fileSize: file.size,
+        },
+        tempId,
+      );
+      setMessages((prev) => [...prev, optimistic]);
+      scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
+
+      try {
+        const dataUrl = await readFileAsDataUrl(file);
+        const url = await uploadMediaToB2(dataUrl, file.type || undefined);
+        const outgoing = await prepareOutgoingMessage({
+          senderId: user.id,
+          type: "file",
+          text: file.name,
+          fileData: url,
+          fileType: file.type,
+          fileSize: file.size,
+        });
+        const saved = await api.sendMessage(outgoing);
+        const [display] = await normalizeMessages([saved]);
+        setMessages((prev) => prev.map((m) => (m.id === tempId ? display : m)));
+        scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
+      } catch (uploadError) {
+        console.error("File upload failed:", uploadError);
+        setMessages((prev) => prev.filter((m) => m.id !== tempId));
+        alert(
+          uploadError instanceof Error
+            ? uploadError.message
+            : "File upload failed. Check your connection and storage settings.",
+        );
+      }
+    },
+    [user],
+  );
+
+  const handlePickedFile = useCallback(
+    async (file: File) => {
+      const MAX_FILE_SIZE = 25 * 1024 * 1024;
+      if (file.size > MAX_FILE_SIZE) {
+        alert("File too large. Maximum size is 25MB.");
+        return;
+      }
+
+      try {
+        if (file.type.startsWith("image/")) {
+          const dataUrl = await readFileAsDataUrl(file);
+          setPendingImageType(file.type);
+          setImageToCrop(dataUrl);
+        } else {
+          await uploadAndSendFile(file);
+        }
+      } catch (error) {
+        console.error("Failed to process file:", error);
+        alert("Failed to process file.");
+      }
+    },
+    [uploadAndSendFile],
+  );
+
+  const handleFileChange = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      await handlePickedFile(file);
+      e.target.value = "";
+    },
+    [handlePickedFile],
+  );
+
+  useEffect(() => {
+    if (!user || blocked) return;
+
+    const onDocumentPaste = (e: ClipboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target?.closest("input, textarea, [contenteditable='true']")) return;
+
+      const cd = e.clipboardData;
+      if (!cd) return;
+
+      const files: File[] = [];
+      for (const item of cd.items) {
+        if (item.kind === "file") {
+          const f = item.getAsFile();
+          if (f) files.push(f);
+        }
+      }
+      if (files.length === 0 && cd.files.length > 0) {
+        files.push(...Array.from(cd.files));
+      }
+      if (files.length === 0) return;
+
+      e.preventDefault();
+      for (const file of files) {
+        void handlePickedFile(file);
+      }
+    };
+
+    document.addEventListener("paste", onDocumentPaste);
+    return () => document.removeEventListener("paste", onDocumentPaste);
+  }, [user, blocked, handlePickedFile]);
+
+  const handleCroppedImage = useCallback(async (croppedDataUrl: string) => {
+    setImageToCrop(null);
+    try {
+      const url = await uploadMediaToB2(croppedDataUrl, pendingImageType);
+      sendMsg({ type: "image", imageUrl: url });
+    } catch (uploadError) {
+      console.error("Failed to upload image:", uploadError);
+      alert(uploadError instanceof Error ? uploadError.message : "Image upload failed.");
+    }
+  }, [pendingImageType, sendMsg]);
 
   // Voice recording
   const startRecording = async () => {
@@ -208,7 +1417,17 @@ export default function Messages() {
         const blob = new Blob(chunksRef.current, { type: mimeType || "audio/webm" });
         stream.getTracks().forEach(t => t.stop());
         const reader = new FileReader();
-        reader.onloadend = () => sendMsg({ type: "audio", audioData: reader.result as string });
+        reader.onloadend = async () => {
+          const dataUrl = reader.result as string;
+          if (!dataUrl) return;
+          try {
+            const url = await uploadMediaToB2(dataUrl, mimeType || "audio/webm");
+            sendMsg({ type: "audio", audioData: url });
+          } catch (err) {
+            console.error("Voice upload failed:", err);
+            alert(err instanceof Error ? err.message : "Voice upload failed — check cloud storage in .env");
+          }
+        };
         reader.readAsDataURL(blob);
       };
       mediaRecorderRef.current = recorder;
@@ -216,7 +1435,22 @@ export default function Messages() {
       setRecording(true);
       setRecordingTime(0);
       timerRef.current = setInterval(() => setRecordingTime(t => t + 1), 1000);
-    } catch { alert("Microphone permission denied."); }
+    } catch (err) {
+      console.error("Microphone error:", err);
+      if (err instanceof Error) {
+        if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
+          alert("Microphone permission denied. Please allow microphone access in your browser settings.");
+        } else if (err.name === "NotFoundError") {
+          alert("No microphone found. Please connect a microphone and try again.");
+        } else if (err.name === "NotReadableError") {
+          alert("Microphone is being used by another application. Please close other apps using the microphone.");
+        } else {
+          alert("Failed to access microphone. Please check your browser settings and try again.");
+        }
+      } else {
+        alert("Failed to access microphone. Please check your browser settings and try again.");
+      }
+    }
   };
 
   const stopRecording = () => {
@@ -240,323 +1474,722 @@ export default function Messages() {
   };
 
   // Call actions
-  const startCall = (type: "audio" | "video") => {
+  const startCall = useCallback((type: "audio" | "video") => {
+    if (!user) return;
+    activeCallTypeRef.current = type;
+    callRoleRef.current = "outgoing";
+    callLoggedStartRef.current = false;
+    callConnectedAtRef.current = 0;
+    setCallSignal(null);
     setCallState({ status: "outgoing", type });
     setIncomingCall(null);
-    setOpenPicker(null);
-  };
-  const acceptCall = () => {
-    if (!incomingCall) return;
-    setCallState({ status: "incoming", type: incomingCall.type, offer: incomingCall.offer });
-    setIncomingCall(null);
-  };
-  const rejectCall = () => {
-    if (user) api.sendCallSignal({ type: "reject", senderId: user.id });
-    setIncomingCall(null);
-  };
-  const endCall = () => { setCallState(null); setCallSignal(null); };
+  }, [user]);
 
-  // Delete chat
-  const handleDeleteChat = async () => {
-    await api.deleteMessages();
+  const acceptCall = useCallback(() => {
+    if (!incomingCall?.offer) return;
+    activeCallTypeRef.current = incomingCall.type;
+    callRoleRef.current = "incoming";
+    callLoggedStartRef.current = false;
+    callConnectedAtRef.current = 0;
+    setCallSignal(null);
+    setCallState({ status: "incoming", type: incomingCall.type, incomingOffer: incomingCall.offer });
+    setIncomingCall(null);
+  }, [incomingCall]);
+
+  const rejectCall = useCallback(() => {
+    if (user) {
+      api.sendCallSignal({ type: "reject", senderId: user.id }).catch(() => {});
+    }
+    setIncomingCall(null);
+  }, [user]);
+
+  const onCallConnected = useCallback(() => {
+    if (callLoggedStartRef.current) return;
+    callLoggedStartRef.current = true;
+    callConnectedAtRef.current = Date.now();
+    if (callRoleRef.current === "outgoing") {
+      void sendMsg({ type: "text", text: callStartedText(activeCallTypeRef.current) });
+    }
+  }, [sendMsg]);
+
+  const endCall = useCallback((opts?: { fromRemote?: boolean }) => {
+    const type = activeCallTypeRef.current;
+    const startedAt = callConnectedAtRef.current;
+    const hadSession = callLoggedStartRef.current;
+    callLoggedStartRef.current = false;
+    callConnectedAtRef.current = 0;
+    setCallState(null);
+    setCallSignal(null);
+    setIncomingCall(null);
+    if (hadSession && !opts?.fromRemote) {
+      const durationSec = startedAt ? Math.max(0, Math.floor((Date.now() - startedAt) / 1000)) : 0;
+      void sendMsg({ type: "text", text: callEndedText(type, durationSec) });
+    }
+  }, [sendMsg]);
+
+  useEffect(() => {
+    endCallRef.current = endCall;
+  }, [endCall]);
+
+  const handleDeleteChat = useCallback(async () => {
+    if (!user) return;
     setShowDeleteConfirm(false);
     setShowInfo(false);
-  };
+    setMessages([]);
+    setHasMore(false);
+    setLoadingMore(false);
+    setHasNewMessages(false);
+    setError(null);
+    setHiddenTick((t) => t + 1);
+    try {
+      await clearChatForUser(user.id);
+    } catch (err) {
+      console.error("Failed to clear chat:", err);
+      window.alert("Could not clear chat on the server. Try again.");
+      void loadMessages();
+    }
+  }, [user, loadMessages]);
 
-  const toggleLike = async (id: string) => {
+  const toggleLike = useCallback(async (id: string) => {
     try { await api.likeMessage(id); } catch { /**/ }
-  };
+  }, []);
 
-  const togglePicker = (p: OpenPicker) => setOpenPicker(prev => prev === p ? null : p);
-
-  // Render helpers
-  const fmtTime = (ts: string) => {
-    const d = new Date(ts);
-    const now = new Date();
-    const yesterday = new Date(now); yesterday.setDate(yesterday.getDate() - 1);
-    const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    if (d.toDateString() === now.toDateString()) return time;
-    if (d.toDateString() === yesterday.toDateString()) return `Yesterday ${time}`;
-    return `${d.toLocaleDateString([], { month: "short", day: "numeric" })} ${time}`;
-  };
-
-  const groupByDay = (msgs: ApiMessage[]) => {
-    const groups: { label: string; msgs: ApiMessage[] }[] = [];
-    msgs.forEach(msg => {
-      const d = new Date(msg.timestamp);
-      const now = new Date();
-      const yesterday = new Date(now); yesterday.setDate(yesterday.getDate() - 1);
-      const label = d.toDateString() === now.toDateString() ? "Today"
-        : d.toDateString() === yesterday.toDateString() ? "Yesterday"
-        : d.toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" });
-      const last = groups[groups.length - 1];
-      if (last?.label === label) last.msgs.push(msg);
-      else groups.push({ label, msgs: [msg] });
+  const handleReact = useCallback(async (id: string, emoji: string) => {
+    if (!user) return;
+    let previousReaction: string | undefined;
+    setMessages((prev) => {
+      const msg = prev.find((m) => m.id === id);
+      if (!msg) return prev;
+      previousReaction = msg?.reaction;
+      return prev.map((m) =>
+        m.id === id ? { ...m, reaction: m.reaction === emoji ? undefined : emoji } : m,
+      );
     });
-    return groups;
-  };
+    try {
+      const { reactions } = await api.reactMessage(id, user.id, emoji);
+      setMessages((prev) => {
+        const found = prev.find(m => m.id === id);
+        if (!found) return prev;
+        return prev.map((m) => {
+          if (m.id !== id) return m;
+          const myReaction = reactions.find((r) => r.userId === user.id)?.emoji;
+          const partnerReaction = reactions.find((r) => r.userId === partnerId)?.emoji;
+          const displayReaction =
+            m.senderId === user.id
+              ? (partnerReaction ?? myReaction)
+              : (myReaction ?? partnerReaction);
+          return { ...m, reaction: displayReaction };
+        });
+      });
+    } catch (err) {
+      setMessages((prev) => {
+        const found = prev.find(m => m.id === id);
+        if (!found) return prev;
+        return prev.map((m) => (m.id === id ? { ...m, reaction: previousReaction } : m));
+      });
+      console.error("Failed to react to message:", err);
+    }
+  }, [user, partnerId]);
 
-  const pAvatar = partnerAvatar || staticPartner.avatar;
-  const pName = partnerName || staticPartner.name;
+  const handleUnsend = useCallback(async (id: string) => {
+    setPendingUnsendId(id);
+    setShowUnsendConfirm(true);
+  }, []);
+
+  const confirmUnsend = useCallback(async () => {
+    if (!pendingUnsendId) return;
+    try {
+      const deleted = await api.deleteMessage(pendingUnsendId);
+      setMessages((prev) => prev.map((m) => (m.id === pendingUnsendId ? { ...m, ...deleted, deleted: true, text: undefined, audioData: undefined } : m)));
+      setShowUnsendConfirm(false);
+      setPendingUnsendId(null);
+    } catch (err) {
+      window.alert(unsendErrorMessage(err));
+      if (err instanceof Error && /not found/i.test(err.message) && pendingUnsendId) {
+        setMessages((prev) => prev.filter((m) => m.id !== pendingUnsendId));
+      }
+      setShowUnsendConfirm(false);
+      setPendingUnsendId(null);
+    }
+  }, [pendingUnsendId]);
+
+  const handleDeleteForMe = useCallback(
+    async (id: string) => {
+      if (!user) return;
+      applyHiddenMessageId(user.id, id);
+      setHiddenTick((t) => t + 1);
+      try {
+        await hideMessageForUser(user.id, id);
+      } catch {
+        const set = getHiddenMessageIds(user.id);
+        set.delete(id);
+        setHiddenTick((t) => t + 1);
+        window.alert("Could not hide message — check your connection.");
+      }
+    },
+    [user],
+  );
+
+  const handleEditMessage = useCallback(
+    async (msg: ApiMessage) => {
+      if (!user || !msg.text) return;
+      const next = window.prompt("Edit message", msg.text);
+      if (next == null || next.trim() === msg.text) return;
+      try {
+        await api.editMessage(msg.id, next.trim(), user.id);
+        setMessages((prev) =>
+          prev.map((m) => (m.id === msg.id ? { ...m, text: next.trim() } : m)),
+        );
+      } catch (err) {
+        console.error("Edit failed:", err);
+        window.alert("Could not edit — only within 1 hour of sending.");
+      }
+    },
+    [user],
+  );
+
+  const handlePin = useCallback(async (id: string) => {
+    if (!user) return;
+    const msg = messages.find((m) => m.id === id);
+    if (!msg) return;
+    const nextPinned = !msg.pinned;
+    setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, pinned: nextPinned } : m)));
+    try {
+      if (nextPinned) {
+        await saveMemoryFromMessage(user.id, msg);
+      } else {
+        await removeMemory(user.id, id);
+      }
+    } catch {
+      setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, pinned: !nextPinned } : m)));
+      window.alert("Could not update pin — check your connection.");
+    }
+  }, [messages, user]);
+
+  // Filter messages based on search query (memoized for performance)
+  const visibleMessages = useMemo(() => {
+    if (!user) return messages;
+    return filterVisibleMessages(user.id, messages);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages, user, hiddenTick]);
+
+  const filteredMessages = useMemo(() => {
+    let filtered = visibleMessages;
+    
+    // Apply search query
+    if (searchQuery) {
+      filtered = filtered.filter((msg) =>
+        msg.text?.toLowerCase().includes(searchQuery.toLowerCase()),
+      );
+    }
+    
+    // Apply message type filter
+    if (searchFilters.messageType !== "all") {
+      filtered = filtered.filter((msg) => msg.type === searchFilters.messageType);
+    }
+    
+    // Apply sender filter
+    if (searchFilters.sender !== "all") {
+      filtered = filtered.filter((msg) => {
+        if (searchFilters.sender === "me") return msg.senderId === user?.id;
+        if (searchFilters.sender === "partner") return msg.senderId !== user?.id;
+        return true;
+      });
+    }
+    
+    // Apply reaction filter
+    if (searchFilters.hasReaction) {
+      filtered = filtered.filter((msg) => msg.reaction);
+    }
+    
+    // Apply pinned filter
+    if (searchFilters.isPinned) {
+      filtered = filtered.filter((msg) => msg.pinned);
+    }
+    
+    return filtered;
+  }, [visibleMessages, searchQuery, searchFilters, user?.id]);
+
+  // Memoize pinned messages to avoid filtering on every render
+  const pinnedMessages = useMemo(() => {
+    return visibleMessages.filter((m) => m.pinned);
+  }, [visibleMessages]);
+
+  // Memoize grouped messages to avoid regrouping on every render
+  const groupedMessages = useMemo(() => {
+    return groupByDay(filteredMessages);
+  }, [filteredMessages]);
+
+  const lastSeenOutgoingId = useMemo(
+    () => findLastSeenOutgoingId(filteredMessages, user?.id),
+    [filteredMessages, user?.id],
+  );
 
   if (blocked) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4 text-center px-6">
         <Ban className="w-12 h-12 text-destructive/50" />
         <p className="font-semibold">You've blocked {pName}</p>
-        <button onClick={() => setBlocked(false)} className="px-4 py-2 bg-secondary rounded-lg text-sm font-semibold">Unblock</button>
+        <button onClick={() => { setBlocked(false); setChatBlocked(false); }} className="px-4 py-2 bg-secondary rounded-lg text-sm font-semibold">Unblock</button>
       </div>
     );
   }
 
   return (
-    <div className={`flex flex-col h-full relative overflow-hidden ${theme.chatBg}`}>
+    <div className="flex h-full min-h-0 w-full">
+      {user && (
+        <ChatInbox
+          userName={user.name}
+          partnerId={partnerId}
+          partnerName={pName}
+          partnerAvatar={pAvatar}
+          partnerLastSeen={partnerLastSeen}
+          lastPreview={lastPreview}
+          active
+        />
+      )}
+    <div className="chat-panel flex-1 min-w-0 h-full min-h-0 relative bg-black">
 
+      <div className="chat-panel-top shrink-0 z-20 flex flex-col">
       {/* ── Header ── */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-border shrink-0 bg-background/80 backdrop-blur sticky top-0 z-10">
+      <div className="chat-panel-header flex items-center gap-1.5 sm:gap-3 px-2 sm:px-4 py-1.5 sm:py-2.5 border-b shrink-0 text-white">
         <div className="relative shrink-0">
-          <div className="story-ring"><div className="bg-background rounded-full p-[2px]">
-            <img src={pAvatar} alt={pName} className="w-9 h-9 rounded-full object-cover" />
-          </div></div>
-          <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-background" />
+          <AvatarImage src={pAvatar} userId={partnerId} alt={pName} className="w-9 h-9 rounded-full object-cover" />
+          {presence.online && (
+            <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-background" />
+          )}
         </div>
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-sm" data-testid="chat-partner-name">{pName}</p>
-          <p className="text-xs text-green-400">Active now</p>
+          <p className={`text-xs ${isTyping ? "text-primary" : presence.online ? "text-green-400" : "text-muted-foreground"}`}>
+            {isTyping ? partnerTypingLine(partnerId, pName) : presence.label}
+          </p>
         </div>
-        <div className="flex items-center gap-1">
-          {/* Theme picker */}
+        <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
+          {isEncryptionReady() && (
+            <span className="hidden sm:flex items-center gap-1 text-[10px] text-green-400 bg-green-500/10 px-2 py-0.5 rounded-full border border-green-500/20 mr-1">
+              <Shield className="w-3 h-3" /> Encrypted
+            </span>
+          )}
+          <div className="hidden sm:flex items-center gap-1 px-2 py-1 rounded-full bg-secondary/60">
+            {online ? (
+              <Wifi className="w-3 h-3 text-green-400" />
+            ) : (
+              <WifiOff className="w-3 h-3 text-destructive" />
+            )}
+            <span className="text-xs text-muted-foreground">{presence.label}</span>
+          </div>
+          <button 
+            onClick={() => setShowSearch(s => !s)} 
+            className={`p-1.5 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 active:scale-95 ${
+              showSearch ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+            }`} 
+            data-testid="button-search"
+            aria-label="Search messages"
+          >
+            <Search className="w-4 h-4" strokeWidth={1.5} />
+          </button>
           <div className="relative">
-            <button onClick={() => { setShowThemes(s => !s); setShowInfo(false); }} className="p-1.5 text-muted-foreground hover:text-foreground transition-colors" data-testid="button-themes">
+            <button 
+              onClick={() => { setShowThemes(s => !s); setShowInfo(false); }} 
+              className={`p-1.5 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 active:scale-95 ${showThemes ? "bg-primary/20 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-secondary"}`} 
+              data-testid="button-themes"
+              aria-label="Change theme"
+            >
               <Palette className="w-4 h-4" strokeWidth={1.5} />
             </button>
-            {showThemes && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setShowThemes(false)} />
-                <div className="absolute top-full right-0 mt-2 bg-card border border-border rounded-2xl p-3 z-50 shadow-xl flex gap-2 flex-wrap w-44" data-testid="theme-picker">
-                  {THEMES.map(t => (
-                    <button key={t.id} onClick={() => setTheme(t.id)} title={t.name}
-                      className={`w-7 h-7 rounded-full ${THEME_SWATCHES[t.id]} hover:scale-110 transition-transform ${themeId === t.id ? "ring-2 ring-white ring-offset-2 ring-offset-card" : ""}`}
-                    />
-                  ))}
-                </div>
-              </>
-            )}
           </div>
-          <button onClick={() => startCall("audio")} className="p-1.5 text-muted-foreground hover:text-green-400 transition-colors" data-testid="button-voice-call">
+          <button 
+            onClick={() => startCall("audio")} 
+            className="hidden sm:inline-flex p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 active:scale-95" 
+            data-testid="button-voice-call"
+            aria-label="Start audio call"
+          >
             <Phone className="w-4 h-4" strokeWidth={1.5} />
           </button>
-          <button onClick={() => startCall("video")} className="p-1.5 text-muted-foreground hover:text-blue-400 transition-colors" data-testid="button-video-call">
+          <button 
+            onClick={() => startCall("video")} 
+            className="hidden sm:inline-flex p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 active:scale-95" 
+            data-testid="button-video-call"
+            aria-label="Start video call"
+          >
             <Video className="w-4 h-4" strokeWidth={1.5} />
           </button>
-          <button onClick={() => { setShowInfo(s => !s); setShowThemes(false); }}
-            className={`p-1.5 transition-colors ${showInfo ? "text-primary" : "text-muted-foreground hover:text-foreground"}`} data-testid="button-info">
+          <button 
+            onClick={() => { setShowInfo(s => !s); setShowThemes(false); }}
+            className={`p-1.5 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 active:scale-95 ${showInfo ? "text-primary" : "text-muted-foreground hover:text-foreground hover:bg-secondary"}`} 
+            data-testid="button-info"
+            aria-label="Show chat info"
+          >
             <Info className="w-4 h-4" strokeWidth={1.5} />
           </button>
         </div>
       </div>
+      </div>
 
       {/* ── Messages ── */}
-      <div className="flex-1 overflow-y-auto px-3 py-4 flex flex-col gap-1 scrollbar-hide" data-testid="messages-list">
+      <div
+        className="chat-panel-messages overflow-y-auto px-2 sm:px-3 py-2 md:py-3 md:px-4 flex flex-col gap-1 scrollbar-hide"
+        data-testid="messages-list"
+        ref={messagesContainerRef}
+        style={{ scrollBehavior: 'auto' }}
+      >
+        {/* New messages indicator */}
+        {hasNewMessages && !isNearBottom && (
+          <div className="flex justify-center mb-2 sticky top-0 z-10">
+            <button
+              onClick={() => {
+                scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
+                setHasNewMessages(false);
+              }}
+              className="px-3 py-1 bg-primary text-primary-foreground text-xs font-semibold rounded-full hover:bg-primary/90 transition-colors shadow-sm"
+            >
+              ↓ New messages
+            </button>
+          </div>
+        )}
+
+        {/* Load more indicator at top */}
+        <div ref={messagesStartRef} className="h-2" />
+        
+        {/* Pinned messages section */}
+        {pinnedMessages.length > 0 && (
+          <div className="mb-4 px-2">
+            <p className="text-[10px] text-muted-foreground/60 uppercase tracking-wider mb-2 font-semibold px-2">Pinned</p>
+            {pinnedMessages.map(msg => {
+              const isMe = msg.senderId === user?.id;
+              return (
+                <MessageItem
+                  key={msg.id}
+                  msg={msg}
+                  isMe={isMe}
+                  partnerName={pName}
+                  partnerAvatar={pAvatar}
+                  theme={theme}
+                  onDelete={deleteMessage}
+                  onLike={toggleLike}
+                  onReact={handleReact}
+                  onUnsend={handleUnsend}
+                  onPin={handlePin}
+                  onReply={setReplyTo}
+                  onEdit={handleEdit}
+                  onOpenMenu={(m, rect) => setContextMenu({ msg: m, top: rect.bottom + 4, left: rect.left })}
+                  seenLabel={buildSeenLabel(msg, isMe, lastSeenOutgoingId)}
+                  onStartThread={handleStartThread}
+                  onReplyToThread={handleReplyToThread}
+                  onMediaLoad={scrollToBottomForMedia}
+                />
+              );
+            })}
+          </div>
+        )}
+        {loadingMore && messages.length > 0 && (
+          <div className="flex justify-center py-2">
+            <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          </div>
+        )}
+        
+        {/* Search bar */}
+        {showSearch && (
+          <div className="mb-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="Search messages..."
+                value={searchQuery}
+                onChange={handleSearchChange}
+                className="w-full pl-10 pr-10 py-2 bg-secondary/50 rounded-full text-sm outline-none placeholder:text-muted-foreground"
+                data-testid="search-input"
+              />
+              {searchQuery && (
+                <button onClick={() => setSearchQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" title="Clear search">
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+            {searchQuery && (
+              <>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Found {filteredMessages.length} message{filteredMessages.length !== 1 ? 's' : ''}
+                </p>
+                {/* Filter Controls */}
+                <div className="flex flex-wrap gap-2 mt-3">
+                  <select
+                    value={searchFilters.messageType}
+                    onChange={(e) => setSearchFilters(prev => ({ ...prev, messageType: e.target.value as any }))}
+                    className="px-3 py-1.5 bg-background border border-border rounded-full text-xs"
+                    title="Filter by message type"
+                  >
+                    <option value="all">All Types</option>
+                    <option value="text">Text</option>
+                    <option value="image">Images</option>
+                    <option value="sticker">Stickers</option>
+                    <option value="audio">Audio</option>
+                    <option value="gif">GIFs</option>
+                  </select>
+                  <select
+                    value={searchFilters.sender}
+                    onChange={(e) => setSearchFilters(prev => ({ ...prev, sender: e.target.value as any }))}
+                    className="px-3 py-1.5 bg-background border border-border rounded-full text-xs"
+                    title="Filter by sender"
+                  >
+                    <option value="all">All Senders</option>
+                    <option value="me">From Me</option>
+                    <option value="partner">From {pName}</option>
+                  </select>
+                  <button
+                    onClick={() => setSearchFilters(prev => ({ ...prev, hasReaction: !prev.hasReaction }))}
+                    className={`px-3 py-1.5 border rounded-full text-xs ${searchFilters.hasReaction ? 'bg-primary text-primary-foreground border-primary' : 'bg-background border-border'}`}
+                  >
+                    With Reactions
+                  </button>
+                  <button
+                    onClick={() => setSearchFilters(prev => ({ ...prev, isPinned: !prev.isPinned }))}
+                    className={`px-3 py-1.5 border rounded-full text-xs ${searchFilters.isPinned ? 'bg-primary text-primary-foreground border-primary' : 'bg-background border-border'}`}
+                  >
+                    Pinned Only
+                  </button>
+                  <button
+                    onClick={() => setSearchFilters({ messageType: "all", sender: "all", hasReaction: false, isPinned: false })}
+                    className="px-3 py-1.5 bg-secondary text-foreground rounded-full text-xs hover:bg-secondary/80"
+                  >
+                    Reset Filters
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
         {/* Profile header */}
-        <div className="flex flex-col items-center gap-2 py-8 mb-2">
-          <div className="story-ring"><div className="bg-background rounded-full p-[3px]">
-            <img src={pAvatar} alt="" className="w-24 h-24 rounded-full object-cover" />
-          </div></div>
-          <p className="font-bold text-lg">{pName}</p>
-          <span className="text-xs bg-secondary/60 backdrop-blur px-3 py-1 rounded-full text-muted-foreground">Just the two of you ♥</span>
+        <div className="flex flex-col items-center gap-2 py-3 md:py-8 mb-1 md:mb-2 shrink-0">
+          <AvatarImage src={pAvatar} userId={partnerId} alt={`Profile picture of ${pName}`} className="w-14 h-14 md:w-24 md:h-24 rounded-full object-cover" />
+          <p className="font-bold text-sm md:text-lg">{pName}</p>
+          <span className="text-[10px] md:text-xs bg-secondary/60 px-3 py-1 rounded-full text-muted-foreground">Just the two of you ♥</span>
+          {isTyping && (
+            <div className="flex items-center gap-1 text-xs text-primary mt-1">
+              <span>{partnerTypingLine(partnerId, pName)}</span>
+            </div>
+          )}
         </div>
 
-        {loading && <div className="flex justify-center py-4"><div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div>}
+        {loading && messages.length === 0 && (
+          <div className="space-y-2">
+            <MessageSkeleton />
+            <MessageSkeleton />
+            <MessageSkeleton />
+          </div>
+        )}
 
-        {!loading && messages.length === 0 && (
+        {!loading && error && (
+          <div
+            className="flex flex-col items-center gap-3 py-8 text-center px-4 bg-destructive/5 border border-destructive/30 rounded-2xl mx-2"
+          >
+            <div className="w-12 h-12 rounded-full bg-destructive/15 flex items-center justify-center">
+              <AlertCircle className="w-6 h-6 text-destructive" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-foreground mb-1">Failed to load messages</p>
+              <p className="text-xs text-destructive/80">{error}</p>
+            </div>
+            <button 
+              onClick={() => { setError(null); loadMessages(); }} 
+              className="px-4 py-2 bg-destructive text-destructive-foreground rounded-lg text-sm font-semibold hover:bg-destructive/90 transition-colors active:scale-95"
+            >
+              Try Again
+            </button>
+          </div>
+        )}
+
+        {!loading && !error && messages.length === 0 && (
           <div className="flex flex-col items-center gap-2 py-8 text-center">
             <span className="text-4xl">💬</span>
             <p className="text-sm text-muted-foreground">Say hi to {pName}!</p>
           </div>
         )}
 
-        {groupByDay(messages).map(group => (
-          <div key={group.label}>
-            <p className="text-center text-[11px] text-muted-foreground/50 my-4 font-medium">{group.label}</p>
-            {group.msgs.map((msg, i) => {
+        {groupedMessages.map((group, groupIndex) => (
+          <div key={`${group.dayKey}-${groupIndex}`}>
+            <p className="text-center text-[11px] text-muted-foreground/70 my-4 font-medium">{group.label}</p>
+            {group.msgs
+              .filter((msg: ApiMessage) => !msg.pinned)
+              .map((msg, i, arr) => {
               const isMe = msg.senderId === user?.id;
-              const prevMsg = group.msgs[i - 1];
-              const sameSender = prevMsg?.senderId === msg.senderId;
-              const emojiOnly = (msg.type === "text" || msg.type === "heart") && isEmojiOnly(msg.text);
-              const isSticker = msg.type === "sticker";
-              const isGif = msg.type === "gif";
-              const isImage = msg.type === "image";
-
+              const prevMsg = arr[i - 1];
+              const timeGap = shouldShowTimeGap(prevMsg, msg);
               return (
-                <div key={msg.id} className={`flex items-end gap-2 group mb-0.5 ${isMe ? "flex-row-reverse" : "flex-row"}`} data-testid={`message-${msg.id}`}>
-                  {!isMe && !sameSender ? (
-                    <img src={pAvatar} alt="" className="w-6 h-6 rounded-full object-cover shrink-0 mb-1" />
-                  ) : !isMe ? <div className="w-6 shrink-0" /> : null}
-
-                  <div className="relative max-w-[72%]">
-                    <motion.div
-                      initial={{ opacity: 0, y: 4, scale: 0.96 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      transition={{ duration: 0.12 }}
-                      className={
-                        emojiOnly || isSticker ? "text-5xl px-1" :
-                        isGif || isImage ? "overflow-hidden rounded-2xl" :
-                        msg.type === "audio" ? `rounded-2xl overflow-hidden ${isMe ? `bg-gradient-to-br ${theme.myGrad}` : "bg-secondary/80"} ${isMe ? "rounded-br-[5px]" : "rounded-bl-[5px]"}` :
-                        `px-4 py-2.5 rounded-[20px] text-sm leading-snug
-                         ${isMe ? `bg-gradient-to-br ${theme.myGrad} text-white rounded-br-[5px]` : "bg-secondary/80 backdrop-blur text-foreground rounded-bl-[5px]"}`
-                      }
-                    >
-                      {msg.type === "audio" && msg.audioData ? (
-                        <AudioMessage audioData={msg.audioData} isMe={isMe} />
-                      ) : isGif && msg.gifUrl ? (
-                        <img src={msg.gifUrl} alt="GIF" className="max-w-[200px] max-h-[200px] object-cover" loading="lazy" />
-                      ) : isImage && msg.imageData ? (
-                        <img src={msg.imageData} alt="" className="max-w-[220px] max-h-[220px] object-cover" />
-                      ) : (
-                        msg.text
-                      )}
-                    </motion.div>
-
-                    {/* Timestamp */}
-                    <p className={`text-[10px] text-muted-foreground/40 mt-0.5 ${isMe ? "text-right" : "text-left"}`}>
-                      {fmtTime(msg.timestamp)}
-                    </p>
-
-                    {/* Like */}
-                    <button onClick={() => toggleLike(msg.id)}
-                      className={`absolute -bottom-1.5 ${isMe ? "-left-1" : "-right-1"} transition-all ${msg.liked ? "opacity-100 scale-100" : "opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100"}`}
-                      data-testid={`button-like-${msg.id}`}
-                    >
-                      <Heart className={`w-4 h-4 drop-shadow ${msg.liked ? "fill-red-500 text-red-500" : "text-muted-foreground/60"}`} />
-                    </button>
-                  </div>
+                <div key={msg.id}>
+                  {timeGap && (
+                    <p className="text-center text-[10px] text-muted-foreground/60 my-3 font-medium">{timeGap}</p>
+                  )}
+                  <MessageItem
+                    msg={msg}
+                    isMe={isMe}
+                    partnerName={pName}
+                    partnerAvatar={pAvatar}
+                    theme={theme}
+                    onDelete={deleteMessage}
+                    onLike={toggleLike}
+                    onReact={handleReact}
+                    onUnsend={handleUnsend}
+                    onPin={handlePin}
+                    onReply={setReplyTo}
+                    onOpenMenu={(m, rect) => setContextMenu({ msg: m, top: rect.bottom + 4, left: rect.left })}
+                    prevMsg={prevMsg}
+                    seenLabel={buildSeenLabel(msg, isMe, lastSeenOutgoingId)}
+                    onStartThread={handleStartThread}
+                    onReplyToThread={handleReplyToThread}
+                    onMediaLoad={scrollToBottomForMedia}
+                  />
                 </div>
               );
             })}
           </div>
         ))}
 
-        <div ref={bottomRef} className="h-2" />
+        <div ref={bottomRef} className="h-4 shrink-0" aria-hidden />
       </div>
+
+      <div className="chat-panel-bottom shrink-0">
+      {/* ── Edit Message Bar ── */}
+      {editingMessage && (
+        <div className="px-3 sm:px-4 py-2 bg-secondary/30 border-t border-border/50 flex items-center gap-2">
+          <input
+            type="text"
+            value={editText}
+            onChange={(e) => setEditText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleSaveEdit();
+              } else if (e.key === "Escape") {
+                handleCancelEdit();
+              }
+            }}
+            placeholder="Edit message..."
+            className="flex-1 px-4 py-2 bg-background border border-border rounded-full text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+            autoFocus
+          />
+          <button
+            onClick={handleSaveEdit}
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-full text-sm font-medium hover:bg-primary/90 transition-colors"
+          >
+            Save
+          </button>
+          <button
+            onClick={handleCancelEdit}
+            className="px-4 py-2 bg-secondary text-foreground rounded-full text-sm font-medium hover:bg-secondary/80 transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+
+      {doodleOpen && (
+        <DoodleCanvas
+          canvasHeight={doodleHeight}
+          onExpandCanvas={expandDoodleSpace}
+          onClose={closeDoodlePanel}
+          onSend={async (imageData) => {
+            closeDoodlePanel();
+            try {
+              const url = await uploadMediaToB2(imageData, "image/jpeg");
+              sendMsg({ type: "image", imageUrl: url, text: "✏️ Doodle" });
+            } catch (err) {
+              alert(err instanceof Error ? err.message : "Doodle upload failed — check CLOUDINARY_URL in .env");
+            }
+          }}
+        />
+      )}
 
       {/* ── Input Bar ── */}
-      <div className="px-3 py-3 border-t border-border shrink-0 bg-background/80 backdrop-blur">
-        <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
-
-        {recording ? (
-          <div className="flex items-center gap-3">
-            <button onClick={cancelRecording} className="text-muted-foreground hover:text-destructive transition-colors"><X className="w-5 h-5" /></button>
-            <div className="flex-1 flex items-center gap-2 bg-destructive/10 rounded-full px-4 py-2.5">
-              <motion.div animate={{ scale: [1,1.3,1] }} transition={{ repeat: Infinity, duration: 1 }} className="w-2 h-2 bg-destructive rounded-full shrink-0" />
-              <span className="text-sm text-destructive font-medium">Recording {recordingTime}s</span>
-            </div>
-            <button onPointerUp={stopRecording} className="w-10 h-10 bg-primary rounded-full flex items-center justify-center text-primary-foreground shrink-0" data-testid="button-stop-record">
-              <Send className="w-4 h-4" />
-            </button>
-          </div>
-        ) : (
-          <div className="flex items-center gap-2 relative">
-            {/* Pickers row */}
-            <div className="flex items-center gap-1 shrink-0">
-              <div className="relative">
-                <button onClick={() => togglePicker("emoji")} className={`transition-colors ${openPicker === "emoji" ? "text-primary" : "text-muted-foreground hover:text-foreground"}`} data-testid="button-emoji">
-                  <Smile className="w-5 h-5" strokeWidth={1.5} />
-                </button>
-                {openPicker === "emoji" && <EmojiPicker onSelect={e => { setInput(i => i + e); setOpenPicker(null); inputRef.current?.focus(); }} onClose={() => setOpenPicker(null)} />}
-              </div>
-              <div className="relative">
-                <button onClick={() => togglePicker("sticker")} className={`transition-colors ${openPicker === "sticker" ? "text-primary" : "text-muted-foreground hover:text-foreground"}`} data-testid="button-sticker">
-                  <Sticker className="w-5 h-5" strokeWidth={1.5} />
-                </button>
-                {openPicker === "sticker" && <StickerPicker onSelect={sendSticker} onClose={() => setOpenPicker(null)} />}
-              </div>
-              <div className="relative">
-                <button onClick={() => togglePicker("gif")} className={`transition-colors ${openPicker === "gif" ? "text-primary" : "text-muted-foreground hover:text-foreground"}`} data-testid="button-gif">
-                  <Gift className="w-5 h-5" strokeWidth={1.5} />
-                </button>
-                {openPicker === "gif" && <GifPicker onSelect={sendGif} onClose={() => setOpenPicker(null)} />}
-              </div>
-            </div>
-
-            {/* Input */}
-            <div className="flex-1 flex items-center bg-secondary/70 rounded-full px-4 py-2.5">
-              <input ref={inputRef} type="text" placeholder={`Message ${pName}...`} value={input}
-                onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Enter" && sendText()}
-                className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground" data-testid="input-message" />
-            </div>
-
-            {/* Right buttons */}
-            {input.trim() ? (
-              <motion.button whileTap={{ scale: 0.9 }} onClick={sendText} className="w-9 h-9 bg-primary rounded-full flex items-center justify-center shrink-0" data-testid="button-send">
-                <Send className="w-4 h-4 text-primary-foreground" />
-              </motion.button>
-            ) : (
-              <div className="flex items-center gap-1.5 shrink-0">
-                <button onClick={() => fileInputRef.current?.click()} className="text-muted-foreground hover:text-foreground transition-colors" data-testid="button-image">
-                  <ImagePlus className="w-5 h-5" strokeWidth={1.5} />
-                </button>
-                <button onPointerDown={startRecording} onPointerUp={stopRecording} onPointerLeave={stopRecording}
-                  className="text-muted-foreground hover:text-primary transition-colors active:text-primary" data-testid="button-mic">
-                  <Mic className="w-5 h-5" strokeWidth={1.5} />
-                </button>
-                <motion.button whileTap={{ scale: 1.3 }} onClick={sendHeart} className="text-muted-foreground hover:text-red-500 transition-colors" data-testid="button-heart">
-                  <Heart className="w-5 h-5" strokeWidth={1.5} />
-                </motion.button>
-              </div>
-            )}
-          </div>
-        )}
+      <MessageInput
+        input={input}
+        setInput={setInput}
+        onSend={sendText}
+        cuteMode={cuteMode}
+        onToggleCuteMode={toggleCuteMode}
+        onShareLocation={handleShareLocation}
+        sharingLocation={sharingLocation}
+        replyPreview={
+          replyTo && user ? (
+            <ReplyPreview
+              replyTo={replyTo}
+              myId={user.id}
+              partnerName={pName}
+              onCancel={() => setReplyTo(null)}
+            />
+          ) : undefined
+        }
+        onEmojiSelect={(emoji) => setInput(i => i + emoji)}
+        onStickerSelect={sendSticker}
+        onGifSelect={sendGif}
+        onGreetingSelect={sendGreeting}
+        onImageSelect={(file) => {
+          void handlePickedFile(file);
+        }}
+        onDoodleOpen={openDoodlePanel}
+        doodleActive={doodleOpen}
+        onStartRecording={startRecording}
+        onStopRecording={stopRecording}
+        recording={recording}
+        recordingTime={recordingTime}
+        disabled={!online || blocked || editingMessage !== null}
+      />
       </div>
 
+      <AppThemeModal
+        show={showAppThemes}
+        onClose={() => setShowAppThemes(false)}
+        current={appThemeId}
+        onSelect={(themeId) => {
+          setAppThemeId(themeId);
+          api.updateCouplePrefs({ appTheme: themeId }).then(refreshCouplePrefs).catch(console.error);
+        }}
+      />
+      <ThemePicker
+        show={showThemes}
+        onClose={() => setShowThemes(false)}
+        currentThemeId={chatThemeId}
+        onThemeChange={setTheme}
+      />
+
       {/* ── Info Panel ── */}
-      {showInfo && (
-        <>
-          <div className="absolute inset-0 bg-black/30 z-20" onClick={() => setShowInfo(false)} />
-          <motion.div initial={{ x: "100%" }} animate={{ x: 0 }} transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            className="absolute top-0 right-0 bottom-0 w-72 bg-background border-l border-border z-30 flex flex-col overflow-y-auto scrollbar-hide" data-testid="info-panel">
-            <div className="flex items-center justify-between px-4 py-4 border-b border-border shrink-0">
-              <p className="font-semibold text-sm">Details</p>
-              <button onClick={() => setShowInfo(false)} className="text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
-            </div>
-            <div className="flex flex-col items-center gap-2 py-6 border-b border-border px-4">
-              <div className="story-ring"><div className="bg-background rounded-full p-[3px]">
-                <img src={pAvatar} alt="" className="w-20 h-20 rounded-full object-cover" />
-              </div></div>
-              <p className="font-bold">{pName}</p>
-            </div>
-            <div className="py-2">
-              <Link href="/memories" onClick={() => setShowInfo(false)}>
-                <div className="flex items-center gap-3 px-4 py-3.5 hover:bg-secondary/40 transition-colors cursor-pointer">
-                  <div className="w-9 h-9 bg-secondary rounded-xl flex items-center justify-center"><Image className="w-4 h-4 text-muted-foreground" strokeWidth={1.5} /></div>
-                  <div><p className="text-sm font-medium">View Memories</p><p className="text-xs text-muted-foreground">Your shared photos</p></div>
-                </div>
-              </Link>
-              <div onClick={() => setBlocked(true)} className="flex items-center gap-3 px-4 py-3.5 hover:bg-secondary/40 transition-colors cursor-pointer">
-                <div className="w-9 h-9 bg-destructive/10 rounded-xl flex items-center justify-center"><Ban className="w-4 h-4 text-destructive" strokeWidth={1.5} /></div>
-                <div><p className="text-sm font-medium text-destructive">Block {pName}</p><p className="text-xs text-muted-foreground">Hide messages temporarily</p></div>
-              </div>
-              <div onClick={() => setShowDeleteConfirm(true)} className="flex items-center gap-3 px-4 py-3.5 hover:bg-secondary/40 transition-colors cursor-pointer">
-                <div className="w-9 h-9 bg-destructive/10 rounded-xl flex items-center justify-center"><Trash2 className="w-4 h-4 text-destructive" strokeWidth={1.5} /></div>
-                <div><p className="text-sm font-medium text-destructive">Delete Chat</p><p className="text-xs text-muted-foreground">Remove all messages</p></div>
-              </div>
-            </div>
-          </motion.div>
-        </>
-      )}
+      <InfoPanel
+        show={showInfo}
+        onClose={() => setShowInfo(false)}
+        partnerName={pName}
+        partnerAvatar={pAvatar}
+        partnerLastSeen={partnerLastSeen}
+        online={online}
+        blocked={blocked}
+        onToggleBlock={() => {
+          setBlocked((prev) => {
+            const next = !prev;
+            setChatBlocked(next);
+            return next;
+          });
+        }}
+        onClearChat={() => setShowDeleteConfirm(true)}
+        onExportChat={exportChatHistory}
+        onAudioCall={() => startCall("audio")}
+        onVideoCall={() => startCall("video")}
+      />
 
       {/* ── Delete confirm ── */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-6">
-          <motion.div initial={{ scale: 0.92, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-card border border-border rounded-2xl p-6 w-full max-w-xs" data-testid="delete-confirm">
+          <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-xs" data-testid="delete-confirm">
             <Trash2 className="w-8 h-8 text-destructive mx-auto mb-3" />
-            <h3 className="font-bold text-center mb-1">Delete all messages?</h3>
-            <p className="text-sm text-muted-foreground text-center mb-5">This cannot be undone.</p>
+            <h3 className="font-bold text-center mb-1">Clear chat for you?</h3>
+            <p className="text-sm text-muted-foreground text-center mb-5">
+              Messages disappear on your account only. {pName} will still see the full chat.
+            </p>
             <div className="flex gap-2">
               <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 py-2.5 bg-secondary rounded-xl text-sm font-semibold" data-testid="button-cancel-delete">Cancel</button>
               <button onClick={handleDeleteChat} className="flex-1 py-2.5 bg-destructive text-white rounded-xl text-sm font-semibold" data-testid="button-confirm-delete">Delete</button>
             </div>
-          </motion.div>
+          </div>
         </div>
       )}
 
@@ -566,6 +2199,7 @@ export default function Messages() {
           callerName={pName}
           callerAvatar={pAvatar}
           callType={incomingCall.type}
+          canAccept={Boolean(incomingCall.offer)}
           onAccept={acceptCall}
           onReject={rejectCall}
         />
@@ -580,10 +2214,62 @@ export default function Messages() {
           partnerAvatar={pAvatar}
           myId={user!.id}
           onSendSignal={(data) => api.sendCallSignal(data)}
+          onConnected={onCallConnected}
           onEnd={endCall}
           incomingSignal={callSignal ?? undefined}
         />
       )}
+
+      {contextMenu && user && (
+        <MessageContextMenu
+          msg={contextMenu.msg}
+          position={{ top: contextMenu.top, left: contextMenu.left }}
+          mode={contextMenu.msg.type === "audio" ? "audio" : "full"}
+          isMe={contextMenu.msg.senderId === user.id}
+          canEdit={canEditMessage(contextMenu.msg)}
+          onClose={() => setContextMenu(null)}
+          onReply={() => setReplyTo(contextMenu.msg)}
+          onCopy={() => {
+            if (contextMenu.msg.text) navigator.clipboard.writeText(contextMenu.msg.text);
+          }}
+          onPin={() => handlePin(contextMenu.msg.id)}
+          onDeleteForMe={() => handleDeleteForMe(contextMenu.msg.id)}
+          onUnsend={
+            contextMenu.msg.senderId === user.id ? () => handleUnsend(contextMenu.msg.id) : undefined
+          }
+          onRemoveReaction={
+            contextMenu.msg.reaction
+              ? () => handleReact(contextMenu.msg.id, contextMenu.msg.reaction!)
+              : undefined
+          }
+          onEdit={
+            canEditMessage(contextMenu.msg)
+              ? () => handleEditMessage(contextMenu.msg)
+              : undefined
+          }
+          onDownloadChat={contextMenu.msg.type !== "audio" ? downloadChatImages : undefined}
+        />
+      )}
+
+      {imageToCrop && (
+        <ImageCropModal
+          imageSrc={imageToCrop}
+          title="Crop before sending"
+          onCancel={() => setImageToCrop(null)}
+          onApply={handleCroppedImage}
+        />
+      )}
+
+      {/* ── Unsend Confirmation Modal ── */}
+      <UnsendConfirmModal
+        show={showUnsendConfirm}
+        onConfirm={confirmUnsend}
+        onCancel={() => {
+          setShowUnsendConfirm(false);
+          setPendingUnsendId(null);
+        }}
+      />
+    </div>
     </div>
   );
 }
