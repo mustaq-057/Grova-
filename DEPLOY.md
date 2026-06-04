@@ -35,10 +35,10 @@ Do **not** upload `.env` to GitHub.
 2. You should see the **Grova login page** (not a page of code)
 3. Log in with the email/password from `PRIMARY_AUTH_*` in your `.env`
 
-## 4. If build fails with `vite: command not found` or `node_modules missing`
+## 4. If build fails (`build:grova` exited with 1, or `vite: command not found`)
 
 1. Vercel → **Settings** → **General** → **Root Directory** → leave **empty** (monorepo root)
-2. **Settings** → **Build & Development** → **Install Command** → leave **empty** (use `vercel.json`)
+2. **Settings** → **Build & Development** → set **Build Command** and **Install Command** to **empty** (not `pnpm -w run build:grova` — the repo uses `vercel.json` → `node scripts/vercel-build.mjs`)
 3. **Redeploy** after pushing the latest `main` from GitHub
 
 ## 5. If you see JavaScript instead of the app
