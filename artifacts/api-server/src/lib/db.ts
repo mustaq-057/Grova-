@@ -188,6 +188,13 @@ export async function initDb() {
       )
     `);
     await db.execute(`CREATE INDEX IF NOT EXISTS idx_primary_access_expires_at ON primary_access_tokens(expires_at)`);
+    for (const col of ["client_id TEXT", "origin TEXT"]) {
+      try {
+        await db.execute(`ALTER TABLE primary_access_tokens ADD COLUMN ${col}`);
+      } catch {
+        /* column may already exist */
+      }
+    }
 
     await db.execute(`
       CREATE TABLE IF NOT EXISTS messages (

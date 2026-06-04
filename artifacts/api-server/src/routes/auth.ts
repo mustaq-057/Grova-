@@ -140,17 +140,52 @@ function requestUserAgent(req: { headers: Record<string, unknown> }): string {
   return String(req.headers["user-agent"] || "Unknown");
 }
 
+function requestClientId(req: { headers: Record<string, unknown> }): string {
+  return String(req.headers["x-client-id"] || "").trim();
+}
+
+function requestClientOrigin(req: { headers: Record<string, unknown> }): string {
+  const fromHeader = String(req.headers["x-client-origin"] || "").trim();
+  if (fromHeader) return fromHeader;
+  const origin = req.headers.origin;
+  return typeof origin === "string" ? origin.trim() : "";
+}
+
 async function validateAndRenewPrimaryToken(
   req: { headers: Record<string, unknown> },
   primaryToken: string,
 ): Promise<boolean> {
   const tokenHash = sha256(primaryToken);
   const now = Date.now();
+  const clientId = requestClientId(req);
+  const origin = requestClientOrigin(req);
+  const userAgent = requestUserAgent(req);
+
   const result = await db.execute(
-    "SELECT token_hash FROM primary_access_tokens WHERE token_hash = $1 AND expires_at > $2 AND user_agent = $3",
-    [tokenHash, now, requestUserAgent(req)],
+    "SELECT token_hash, client_id, origin, user_agent FROM primary_access_tokens WHERE token_hash = $1 AND expires_at > $2",
+    [tokenHash, now],
   );
   if (result.rows.length === 0) return false;
+
+  const row = result.rows[0] as {
+    client_id?: string | null;
+    origin?: string | null;
+    user_agent?: string;
+  };
+
+  const storedClientId = String(row.client_id ?? "").trim();
+  const storedOrigin = String(row.origin ?? "").trim();
+  const storedUa = String(row.user_agent ?? "");
+
+  // Legacy rows (before client_id): fall back to user-agent match only.
+  if (storedClientId) {
+    if (!clientId || clientId !== storedClientId) return false;
+  } else if (storedUa !== userAgent) {
+    return false;
+  }
+
+  if (storedOrigin && origin && storedOrigin !== origin) return false;
+
   await db.execute("UPDATE primary_access_tokens SET expires_at = $1 WHERE token_hash = $2", [
     now + PRIMARY_SESSION_RENEW_MS,
     tokenHash,
@@ -475,7 +510,12 @@ router.post("/auth/primary-login", rateLimiters.auth, validateBody({
   email: validators.nonEmptyString,
   password: validators.nonEmptyString,
 }), async (req, res) => {
-  const { email, password } = req.body as { email: string; password: string };
+  const { email, password, clientId, origin } = req.body as {
+    email: string;
+    password: string;
+    clientId?: string;
+    origin?: string;
+  };
   try {
     await clearExpiredPrimaryTokens();
     const attemptKey = primaryAttemptKey(req as unknown as { headers: Record<string, unknown>; socket: { remoteAddress?: string | null } }, email);
@@ -514,9 +554,11 @@ router.post("/auth/primary-login", rateLimiters.auth, validateBody({
     const tokenHash = sha256(primaryToken);
     const now = Date.now();
     const userAgent = String(req.headers["user-agent"] || "Unknown");
+    const trustedClientId = String(clientId || requestClientId(req)).trim();
+    const trustedOrigin = String(origin || requestClientOrigin(req)).trim();
     await db.execute(
-      "INSERT INTO primary_access_tokens (token_hash, email, user_agent, created_at, expires_at) VALUES ($1, $2, $3, $4, $5)",
-      [tokenHash, email.toLowerCase(), userAgent, now, now + PRIMARY_SESSION_MS],
+      "INSERT INTO primary_access_tokens (token_hash, email, user_agent, client_id, origin, created_at, expires_at) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+      [tokenHash, email.toLowerCase(), userAgent, trustedClientId, trustedOrigin, now, now + PRIMARY_SESSION_MS],
     );
     setAuthCookies(res as unknown as { cookie: (name: string, value: string, opts: Record<string, unknown>) => void }, {
       primaryToken,
@@ -562,7 +604,7 @@ router.get("/auth/primary-session", async (req, res) => {
       res.status(401).json({ error: "Primary session expired" });
       return;
     }
-    res.json({ ok: true });
+    res.json({ ok: true, expiresInDays: 30, sessionMs: PRIMARY_SESSION_MS });
   } catch {
     res.status(500).json({ error: "Failed to validate primary session" });
   }

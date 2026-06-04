@@ -33,7 +33,7 @@ export async function uploadMediaBinary(file: File | Blob, contentType: string):
       method: "POST",
       credentials: "include",
       headers: binaryUploadHeaders(mime),
-      body: await file.arrayBuffer(),
+      body: file,
       signal: controller.signal,
     });
   } finally {

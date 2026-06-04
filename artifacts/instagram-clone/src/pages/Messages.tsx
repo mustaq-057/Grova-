@@ -1549,7 +1549,7 @@ export default function Messages() {
       filePickInFlightRef.current = true;
       const unlockTimer = window.setTimeout(() => {
         filePickInFlightRef.current = false;
-      }, 180_000);
+      }, 90_000);
       const normalized = normalizePastedFile(file, clipboardItemType);
       const toastId = `media-pick-${Date.now()}`;
       const quickDoc = isDocumentFile(normalized, clipboardItemType);
@@ -1635,9 +1635,10 @@ export default function Messages() {
           toast.loading("Sending video…", { id: toastId });
 
           try {
-            const durationPromise = getVideoDurationSafe(normalized);
             const uploadPromise = uploadMediaFile(normalized, mime);
-            const [duration, url] = await Promise.all([durationPromise, uploadPromise]);
+            const durationPromise = getVideoDurationSafe(normalized);
+            const url = await uploadPromise;
+            const duration = await durationPromise;
 
             if (duration > 60) {
               pendingOutgoingRef.current.delete(tempId);
@@ -1705,26 +1706,29 @@ export default function Messages() {
     const onDocumentPaste = (e: ClipboardEvent) => {
       if (recording || filePickInFlightRef.current) return;
       const cd = e.clipboardData;
-      let picked = extractClipboardFiles(cd).filter(({ file }) => file.size > 0);
+      const picked = extractClipboardFiles(cd).filter(({ file }) => file.size > 0);
+      const plainText = cd?.getData("text/plain")?.trim() ?? "";
 
       const runPaste = (files: { file: File; itemType?: string }[]) => {
         if (files.length === 0 || filePickInFlightRef.current) return;
+        e.preventDefault();
+        e.stopImmediatePropagation();
         const { file, itemType } = files[0]!;
         void handlePickedFile(file, itemType);
       };
 
       if (picked.length > 0) {
-        e.preventDefault();
-        e.stopImmediatePropagation();
         runPaste(picked);
         return;
       }
 
-      e.preventDefault();
-      e.stopImmediatePropagation();
+      // Screen recordings / Windows paste often need async clipboard read — don't block plain text paste.
+      if (plainText.length > 0) return;
+
       void readClipboardFilesAsync().then((asyncPicked) => {
-        picked = asyncPicked.filter(({ file }) => file.size > 0);
-        runPaste(picked);
+        const media = asyncPicked.filter(({ file }) => file.size > 0);
+        if (media.length === 0) return;
+        runPaste(media);
       });
     };
 
@@ -1821,12 +1825,12 @@ export default function Messages() {
         void (async () => {
           try {
             const voiceMime = (mimeType || "audio/webm").split(";")[0]?.trim() || "audio/webm";
-            const url = await uploadMediaFile(blob, voiceMime);
-            const outgoing = await prepareOutgoingMessage({
-              senderId,
-              type: "audio",
-              audioData: url,
-            });
+            const voiceFile = new File([blob], `voice-${Date.now()}.webm`, { type: voiceMime });
+            const [url, outgoing] = await Promise.all([
+              uploadMediaFile(voiceFile, voiceMime),
+              prepareOutgoingMessage({ senderId, type: "audio", audioData: "" }),
+            ]);
+            outgoing.audioData = url;
             const saved = await api.sendMessage(outgoing);
             const [display] = await normalizeMessages([saved]);
             pendingOutgoingRef.current.delete(tempId);

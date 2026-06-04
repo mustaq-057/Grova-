@@ -1,14 +1,22 @@
 import { memo, useState } from "react";
 import { createPortal } from "react-dom";
-import { getThemeBackgroundUrl, type AppThemeId } from "@/lib/app-theme";
+import {
+  getThemeBackgroundUrl,
+  getThemeBackgroundOpacity,
+  themeUsesPhotoScrim,
+  type AppThemeId,
+} from "@/lib/app-theme";
 
 type Props = { themeId: AppThemeId };
 
-/** Full-screen themed photo behind app chrome (subtle, readable UI on top). */
+/** Full-screen themed photo behind app chrome. */
 export const ThemeBackgroundOverlay = memo(function ThemeBackgroundOverlay({ themeId }: Props) {
   const url = getThemeBackgroundUrl(themeId);
   const [hidden, setHidden] = useState(false);
   if (!url || hidden) return null;
+
+  const opacity = getThemeBackgroundOpacity(themeId);
+  const scrim = themeUsesPhotoScrim(themeId);
 
   return createPortal(
     <div
@@ -18,18 +26,22 @@ export const ThemeBackgroundOverlay = memo(function ThemeBackgroundOverlay({ the
         backgroundImage: `url(${url})`,
         backgroundSize: "cover",
         backgroundPosition: "center",
-        opacity: 0.28,
-        filter: "saturate(1.08)",
+        opacity,
+        filter: themeId === "book-bouquet" ? "none" : "saturate(1.06)",
       }}
     >
       <img src={url} alt="" className="hidden" onError={() => setHidden(true)} />
-      <div
-        className="absolute inset-0"
-        style={{
-          background:
-            "linear-gradient(180deg, hsl(var(--background) / 0.55) 0%, hsl(var(--background) / 0.88) 55%, hsl(var(--background) / 0.95) 100%)",
-        }}
-      />
+      {scrim ? (
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              themeId === "sara-lavender"
+                ? "linear-gradient(180deg, hsl(var(--background) / 0.12) 0%, hsl(var(--background) / 0.35) 100%)"
+                : "linear-gradient(180deg, hsl(var(--background) / 0.55) 0%, hsl(var(--background) / 0.88) 55%, hsl(var(--background) / 0.95) 100%)",
+          }}
+        />
+      ) : null}
     </div>,
     document.body,
   );

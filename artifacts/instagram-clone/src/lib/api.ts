@@ -1,4 +1,4 @@
-import { getAuthHeaders, saveSession, clearSession, getRefreshToken, setDeviceId } from "./session";
+import { getAuthHeaders, saveSession, clearSession, getRefreshToken, setDeviceId, getOrCreateClientId } from "./session";
 import type { CouplePrefs } from "./types";
 
 const BASE = "/api";
@@ -296,13 +296,23 @@ export const api = {
   primaryLogin: async (email: string, password: string): Promise<void> => {
     await apiFetch("/auth/primary-login", {
       method: "POST",
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({
+        email,
+        password,
+        clientId: getOrCreateClientId(),
+        origin: typeof window !== "undefined" ? window.location.origin : "",
+      }),
     });
   },
 
   validatePrimarySession: async (): Promise<boolean> => {
     try {
-      await apiFetch<{ ok: boolean }>("/auth/primary-session");
+      await apiFetch<{ ok: boolean }>("/auth/primary-session", {
+        headers: {
+          "X-Client-Id": getOrCreateClientId(),
+          "X-Client-Origin": typeof window !== "undefined" ? window.location.origin : "",
+        },
+      });
       return true;
     } catch {
       return false;

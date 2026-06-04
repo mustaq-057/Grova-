@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
 import type { ApiUser, ApiMessage } from "./api";
 import { clearEncryption, loadEncryptionKey } from "./crypto";
-import { api } from "./api";
+import { api, tryRefreshSession } from "./api";
 import {
   hydrateNotifications,
   markAllReadLocal,
@@ -168,7 +168,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const trusted = await api.validatePrimarySession();
       if (cancelled) return;
       setTrustedDevice(trusted);
-      clearSession();
+
+      if (trusted) {
+        try {
+          const restored = await api.restoreSession();
+          const e2eReady = await loadEncryptionKey();
+          if (!cancelled && restored.user && e2eReady) {
+            setUser(restored.user);
+          }
+        } catch {
+          try {
+            const refreshed = await tryRefreshSession();
+            if (refreshed) {
+              const restored = await api.restoreSession();
+              const e2eReady = await loadEncryptionKey();
+              if (!cancelled && restored.user && e2eReady) setUser(restored.user);
+            }
+          } catch {
+            /* profile code required */
+          }
+        }
+      } else {
+        clearSession();
+      }
+
       if (!cancelled) setAuthReady(true);
     })();
 

@@ -75,3 +75,17 @@ export function saveDefaultEmail(email: string) {
 export function getDefaultEmail(): string {
   return storage()?.getItem(DEFAULT_EMAIL_KEY) ?? "";
 }
+
+const CLIENT_ID_KEY = "grova_client_id";
+
+/** Stable per-browser id — primary trust requires matching client + origin. */
+export function getOrCreateClientId(): string {
+  const s = storage();
+  if (!s) return crypto.randomUUID();
+  let id = s.getItem(CLIENT_ID_KEY);
+  if (!id) {
+    id = crypto.randomUUID();
+    s.setItem(CLIENT_ID_KEY, id);
+  }
+  return id;
+}

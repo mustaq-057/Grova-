@@ -138,45 +138,45 @@ export const APP_THEMES: {
   {
     id: "sara-lavender",
     name: "Sara",
-    description: "Stargazer lilies · Sara falls ♡",
+    description: "Sara falls · lavender photo ♡",
     swatch: "bg-gradient-to-br from-pink-300 via-fuchsia-200 to-violet-300",
     dark: {
-      "--app-background": "270 28% 9%",
-      "--app-foreground": "270 20% 94%",
-      "--app-primary": "270 65% 72%",
-      "--app-card": "270 24% 12%",
-      "--app-secondary": "270 20% 16%",
-      "--app-border": "270 18% 20%",
+      "--app-background": "270 20% 8% / 0.72",
+      "--app-foreground": "0 0% 98%",
+      "--app-primary": "330 75% 78%",
+      "--app-card": "270 18% 10% / 0.82",
+      "--app-secondary": "270 15% 14% / 0.78",
+      "--app-border": "270 12% 22% / 0.55",
     },
     light: {
-      "--app-background": "270 45% 97%",
-      "--app-foreground": "270 30% 18%",
-      "--app-primary": "270 55% 58%",
-      "--app-card": "270 40% 99%",
-      "--app-secondary": "270 35% 94%",
-      "--app-border": "270 25% 88%",
+      "--app-background": "270 30% 96% / 0.75",
+      "--app-foreground": "270 25% 16%",
+      "--app-primary": "330 65% 52%",
+      "--app-card": "0 0% 100% / 0.88",
+      "--app-secondary": "270 25% 94% / 0.85",
+      "--app-border": "270 20% 88% / 0.6",
     },
   },
   {
     id: "book-bouquet",
     name: "Book Bouquet",
-    description: "Bookstagram blooms · soft pink ♡",
+    description: "Book photo only · soft blooms ♡",
     swatch: "bg-gradient-to-br from-rose-200 via-pink-100 to-amber-100",
     dark: {
-      "--app-background": "350 22% 9%",
-      "--app-foreground": "350 25% 94%",
-      "--app-primary": "350 55% 72%",
-      "--app-card": "350 20% 12%",
-      "--app-secondary": "350 18% 16%",
-      "--app-border": "350 15% 20%",
+      "--app-background": "0 0% 0% / 0",
+      "--app-foreground": "30 15% 96%",
+      "--app-primary": "25 40% 75%",
+      "--app-card": "30 10% 8% / 0.55",
+      "--app-secondary": "30 8% 12% / 0.45",
+      "--app-border": "30 10% 40% / 0.35",
     },
     light: {
-      "--app-background": "30 35% 97%",
-      "--app-foreground": "350 28% 20%",
-      "--app-primary": "350 50% 58%",
-      "--app-card": "30 40% 99%",
-      "--app-secondary": "350 35% 94%",
-      "--app-border": "350 25% 88%",
+      "--app-background": "0 0% 100% / 0",
+      "--app-foreground": "25 30% 18%",
+      "--app-primary": "25 45% 42%",
+      "--app-card": "0 0% 100% / 0.72",
+      "--app-secondary": "30 20% 96% / 0.65",
+      "--app-border": "30 15% 80% / 0.45",
     },
   },
   {
@@ -286,6 +286,19 @@ export function getThemeBackgroundUrl(themeId?: AppThemeId): string | null {
 
 export function themeUsesPhotoBackground(themeId?: AppThemeId): boolean {
   return getThemeBackgroundUrl(themeId) != null;
+}
+
+/** Photo layer opacity (book bouquet 75%, Sara stronger). */
+export function getThemeBackgroundOpacity(themeId?: AppThemeId): number {
+  const id = themeId ?? getStoredAppTheme();
+  if (id === "book-bouquet") return 0.75;
+  if (id === "sara-lavender") return 0.58;
+  return 0.28;
+}
+
+export function themeUsesPhotoScrim(themeId?: AppThemeId): boolean {
+  const id = themeId ?? getStoredAppTheme();
+  return id !== "book-bouquet" && id !== "sara-lavender";
 }
 
 export function applyAppTheme(themeId: AppThemeId) {
