@@ -1,6 +1,5 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "rootDirectory": ".",
   "installCommand": "corepack enable && corepack prepare pnpm@9.15.9 --activate && pnpm -w install --frozen-lockfile",
   "buildCommand": "pnpm -w run build:grova",
   "outputDirectory": "dist",
