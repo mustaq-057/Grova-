@@ -1,4 +1,7 @@
 import "./lib/load-env";
+
+process.env.VERCEL ??= "1";
+
 import app from "./app";
 import { initDb } from "./lib/db";
 import { authenticateEncryption } from "./lib/encryption";

@@ -48,10 +48,14 @@ Thumbs.db
 .cache/
 .local/
 
-# Environment variables
+# Environment variables (never commit secrets — use Vercel/Railway dashboard in production)
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
+.envrc
+*.pem
+credentials.json
+secrets.json
 
 # Local databases
 *.db

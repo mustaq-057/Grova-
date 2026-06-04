@@ -5,6 +5,7 @@ import { Link } from "wouter";
 import { toast } from "sonner";
 import { api, type ApiPost, type ApiPostComment } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { openLiveChannel } from "@/lib/sse-client";
 import { askPartner, partnerHimHer, partnerIsFemale } from "@/lib/partner-words";
 import { AvatarImage } from "@/components/AvatarImage";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -32,10 +33,24 @@ export function PostFeed() {
   }, []);
 
   useEffect(() => {
+    if (!user) return;
     loadPosts();
-    const es = user ? new EventSource(`/api/sse?userId=${user.id}`) : null;
-    es?.addEventListener("post-added", () => loadPosts());
-    es?.addEventListener("post-liked", (e) => {
+    let es: EventSource | null = null;
+    let pollStop: (() => void) | null = null;
+
+    void openLiveChannel(user.id, loadPosts).then((channel) => {
+      if (!channel) return;
+      if (channel.mode === "poll") {
+        pollStop = channel.stop;
+        return;
+      }
+      es = channel.eventSource;
+      wirePostEvents(es);
+    });
+
+    function wirePostEvents(source: EventSource) {
+    source.addEventListener("post-added", () => loadPosts());
+    source.addEventListener("post-liked", (e) => {
       try {
         const updated = JSON.parse((e as MessageEvent).data) as ApiPost;
         setPosts((prev) => prev.map((p) => (p.id === updated.id ? { ...p, ...updated } : p)));
@@ -43,7 +58,7 @@ export function PostFeed() {
         loadPosts();
       }
     });
-    es?.addEventListener("post-reacted", (e) => {
+    source.addEventListener("post-reacted", (e) => {
       try {
         const updated = JSON.parse((e as MessageEvent).data) as ApiPost;
         setPosts((prev) => prev.map((p) => (p.id === updated.id ? { ...p, ...updated } : p)));
@@ -51,7 +66,7 @@ export function PostFeed() {
         loadPosts();
       }
     });
-    es?.addEventListener("post-deleted", (e) => {
+    source.addEventListener("post-deleted", (e) => {
       try {
         const { id } = JSON.parse((e as MessageEvent).data) as { id: string };
         setPosts((prev) => prev.filter((p) => p.id !== id));
@@ -59,7 +74,7 @@ export function PostFeed() {
         loadPosts();
       }
     });
-    es?.addEventListener("post-commented", (e) => {
+    source.addEventListener("post-commented", (e) => {
       try {
         const c = JSON.parse((e as MessageEvent).data) as ApiPostComment;
         setComments((prev) => ({
@@ -71,9 +86,12 @@ export function PostFeed() {
         loadPosts();
       }
     });
+    }
+
     const poll = setInterval(loadPosts, 60_000);
     return () => {
       es?.close();
+      pollStop?.();
       clearInterval(poll);
     };
   }, [user?.id, loadPosts]);

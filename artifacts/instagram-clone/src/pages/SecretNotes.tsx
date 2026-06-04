@@ -10,6 +10,7 @@ import { formatSecretNotePlain } from "@/lib/secret-note-payload";
 import { partnerPossessiveNote } from "@/lib/partner-words";
 import { SecretNoteReader } from "@/components/SecretNoteReader";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { openLiveChannel } from "@/lib/sse-client";
 
 export default function SecretNotes() {
   const { user } = useAuth();
@@ -54,8 +55,21 @@ export default function SecretNotes() {
 
   useEffect(() => {
     if (!user) return;
-    const es = new EventSource(`/api/sse?userId=${user.id}`);
-    es.addEventListener("secret-note-added", (e) => {
+    let es: EventSource | null = null;
+    let pollStop: (() => void) | null = null;
+
+    void openLiveChannel(user.id, () => void loadNotes()).then((channel) => {
+      if (!channel) return;
+      if (channel.mode === "poll") {
+        pollStop = channel.stop;
+        return;
+      }
+      es = channel.eventSource;
+      wireEvents(es);
+    });
+
+    function wireEvents(source: EventSource) {
+    source.addEventListener("secret-note-added", (e) => {
       try {
         const note = JSON.parse((e as MessageEvent).data) as ApiSecretNote;
         setNotes((prev) => (prev.some((n) => n.id === note.id) ? prev : [note, ...prev]));
@@ -63,7 +77,7 @@ export default function SecretNotes() {
         void loadNotes();
       }
     });
-    es.addEventListener("secret-note-deleted", (e) => {
+    source.addEventListener("secret-note-deleted", (e) => {
       try {
         const { id } = JSON.parse((e as MessageEvent).data) as { id: string };
         setNotes((prev) => prev.filter((n) => n.id !== id));
@@ -72,7 +86,12 @@ export default function SecretNotes() {
         void loadNotes();
       }
     });
-    return () => es.close();
+    }
+
+    return () => {
+      es?.close();
+      pollStop?.();
+    };
   }, [user, loadNotes, reader?.id]);
 
   const stopDictation = useCallback(() => {

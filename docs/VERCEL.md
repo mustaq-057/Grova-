@@ -1,46 +1,69 @@
-# Deploy Grova on Vercel
+# Deploy Grova on Vercel (frontend + API)
 
-## One project (UI + API)
+One Vercel project serves:
 
-`vercel.json` builds the React app and exposes the Express API as a serverless function at `/api/*`.
+- **Static UI** → `artifacts/instagram-clone/dist`
+- **API** → serverless Express at `/api/*` via `api/[[...path]].mjs`
 
-1. Import [https://github.com/mustaq-057/Grova-](https://github.com/mustaq-057/Grova-) on Vercel.
-2. Root directory: repo root (default).
-3. Add **all** environment variables from `.env.example` (see below).
-4. Deploy. Open your `*.vercel.app` URL — the UI calls `/api` on the same host.
+## 1. Import repo
 
-### Required env (Project → Settings → Environment Variables)
+[https://github.com/mustaq-057/Grova-](https://github.com/mustaq-057/Grova-)
+
+Root directory: **repo root** (default). Vercel reads `vercel.json` automatically.
+
+## 2. Environment variables (Vercel dashboard)
+
+**Never commit `.env`** — it stays on your machine only (`.gitignore`). Paste the same values into Vercel → Settings → Environment Variables.
+
+Required:
 
 | Variable | Notes |
 |----------|--------|
 | `DATABASE_URL` | Neon **pooled** Postgres URL |
-| `ENCRYPTION_KEY` | 64 hex chars |
-| `ENCRYPTION_PASSWORD` | Server encryption unlock |
+| `ENCRYPTION_KEY` | 64 hex characters |
+| `ENCRYPTION_PASSWORD` | Unlocks server encryption |
 | `DEFAULT_COUPLE_CODE` | First-time seed |
-| `PRIMARY_AUTH_EMAILS` | Comma-separated |
+| `PRIMARY_AUTH_EMAILS` | Comma-separated emails |
 | `PRIMARY_AUTH_PASSWORD_1` | Login password |
-| `ALLOWED_ORIGINS` | Your Vercel URL + custom domain |
-| `CLOUDINARY_URL` or B2 keys | Media uploads |
-| `VITE_GIPHY_API_KEY` | GIF picker (build-time) |
+| `ALLOWED_ORIGINS` | `https://your-app.vercel.app` (+ custom domain) |
+| `CLOUDINARY_URL` or `B2_*` | Media uploads |
+| `VITE_GIPHY_API_KEY` | Build-time — enable GIF picker |
 
-Optional: `B2_*`, `VAPID_*`, `TURN_*`
+Optional: `VAPID_*`, `TURN_*`, `STUN_*`
 
-### Limits on Vercel
+## 3. Local vs production
 
-- **SSE / live sync**: connections may drop after ~60s; the app falls back to polling where needed.
-- **Scheduled messages worker**: not running on serverless — use a VPS cron or Railway for that if you rely on it.
-- **WebRTC calls**: still need TURN env vars; calls are peer-to-peer.
+| | Local (`pnpm dev:grova`) | Vercel |
+|--|--------------------------|--------|
+| Config | `.env` in repo root | Dashboard env vars |
+| API | Port 5001 | `/api` same domain |
+| Live updates | SSE | **Polling** (12s) — serverless-safe |
+| Scheduled messages | Worker runs | Worker **off** — use VPS/Railway if needed |
 
-For full-time SSE + workers, run `pnpm start:grova` on Railway/Render/Fly instead.
+Your local `.env` is **not** uploaded (`.gitignore` + `.vercelignore`).
 
-## Local production smoke test
+## 4. After deploy
+
+1. Open `https://your-project.vercel.app`
+2. Log in with `PRIMARY_AUTH_*` credentials
+3. Set couple code in Settings
+
+If login fails: check `ALLOWED_ORIGINS` includes your exact Vercel URL (no trailing slash).
+
+## 5. Build command (automatic)
 
 ```bash
-pnpm install
-pnpm run build:grova
-VERCEL=1 NODE_ENV=production node artifacts/api-server/dist/vercel-entry.mjs
+pnpm install && pnpm run build:grova
 ```
 
-## Frontend-only (API elsewhere)
+Builds Vite + bundles API into `artifacts/api-server/dist/` for the serverless handler.
 
-If the API runs on Railway/Render, set Vercel env `API_URL=https://your-api-host` and use a rewrite/proxy — or point the built app’s API base URL to that host in your deployment docs.
+## 6. Heavier production (optional)
+
+For 24/7 SSE, scheduled messages, and WebRTC TURN on one box:
+
+```bash
+pnpm start:grova
+```
+
+Host on Railway, Render, Fly.io, or a VPS with HTTPS.

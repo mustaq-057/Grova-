@@ -20,6 +20,9 @@
     "typecheck:grova": "pnpm --filter @workspace/instagram-clone run typecheck && pnpm --filter @workspace/api-server run typecheck"
   },
   "private": true,
+  "engines": {
+    "node": ">=20"
+  },
   "devDependencies": {
     "concurrently": "^9.2.1",
     "cross-env": "^7.0.3",

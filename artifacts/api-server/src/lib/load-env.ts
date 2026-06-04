@@ -8,6 +8,9 @@ const apiServerRoot = path.resolve(
 );
 const repoRoot = path.resolve(apiServerRoot, "../..");
 
-config({ path: path.join(repoRoot, ".env") });
+/** Local dev: load repo-root .env. Vercel/production inject env via dashboard — no file needed. */
+if (!process.env.VERCEL) {
+  config({ path: path.join(repoRoot, ".env") });
+}
 
 export { apiServerRoot, repoRoot };

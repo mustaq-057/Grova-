@@ -1,0 +1,11 @@
+.env
+.env.*
+!.env.example
+*.db
+*.db-shm
+*.db-wal
+test-connections.mjs
+verify-connections.mjs
+.agents
+.cursor
+terminals

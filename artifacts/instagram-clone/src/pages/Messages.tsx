@@ -49,6 +49,7 @@ import {
 } from "@/lib/hidden-messages";
 import { mergeMessagesById } from "@/lib/chat-sync";
 import { downloadChatAsImage, downloadChatAsText } from "@/lib/chat-download";
+import { openLiveChannel } from "@/lib/sse-client";
 import { uploadMediaToB2, uploadMediaFile } from "@/lib/media-upload";
 import {
   classifyMediaFile,
@@ -388,11 +389,27 @@ export default function Messages() {
     void hydrateQuickReactions();
     loadMessages();
 
-    // SSE connection setup with reconnection logic
-    function connectSSE() {
+    const pollSyncMessages = () => {
+      if (!mounted) return;
+      void api.getMessages().then(async (data) => {
+        const fresh = await normalizeMessages(data.messages ?? []);
+        setMessages((prev) => mergeMessagesById(prev, fresh));
+        setHasMore(fresh.length > 0 && (data.pagination?.hasMore ?? false));
+      }).catch(() => {});
+    };
+
+    // SSE (local) or polling (Vercel serverless)
+    async function connectSSE() {
       if (!mounted || !user) return;
 
-      es = new EventSource(`/api/sse?userId=${user.id}`, { withCredentials: true });
+      const channel = await openLiveChannel(user.id, pollSyncMessages);
+      if (!mounted) {
+        if (channel?.mode === "poll") channel.stop();
+        return;
+      }
+      if (!channel || channel.mode === "poll") return;
+
+      es = channel.eventSource;
 
       es.addEventListener("connected", () => {
         sseRetryCountRef.current = 0;
@@ -734,7 +751,7 @@ export default function Messages() {
       };
     }
 
-    connectSSE();
+    void connectSSE();
 
     return () => {
       mounted = false;
@@ -768,7 +785,7 @@ export default function Messages() {
     document.addEventListener("visibilitychange", onVisible);
     const interval = setInterval(() => {
       if (document.visibilityState === "visible") syncFromServer();
-    }, 180_000);
+    }, import.meta.env.PROD ? 45_000 : 180_000);
 
     return () => {
       document.removeEventListener("visibilitychange", onVisible);
