@@ -141,20 +141,20 @@ export const APP_THEMES: {
     description: "Sara falls · lavender photo ♡",
     swatch: "bg-gradient-to-br from-pink-300 via-fuchsia-200 to-violet-300",
     dark: {
-      "--app-background": "270 20% 8% / 0.72",
+      "--app-background": "270 22% 9%",
       "--app-foreground": "0 0% 98%",
       "--app-primary": "330 75% 78%",
-      "--app-card": "270 18% 10% / 0.82",
-      "--app-secondary": "270 15% 14% / 0.78",
-      "--app-border": "270 12% 22% / 0.55",
+      "--app-card": "270 20% 13%",
+      "--app-secondary": "270 18% 16%",
+      "--app-border": "270 14% 22%",
     },
     light: {
-      "--app-background": "270 30% 96% / 0.75",
+      "--app-background": "270 35% 97%",
       "--app-foreground": "270 25% 16%",
       "--app-primary": "330 65% 52%",
-      "--app-card": "0 0% 100% / 0.88",
-      "--app-secondary": "270 25% 94% / 0.85",
-      "--app-border": "270 20% 88% / 0.6",
+      "--app-card": "0 0% 100%",
+      "--app-secondary": "270 28% 94%",
+      "--app-border": "270 22% 88%",
     },
   },
   {
@@ -163,20 +163,20 @@ export const APP_THEMES: {
     description: "Book photo only · soft blooms ♡",
     swatch: "bg-gradient-to-br from-rose-200 via-pink-100 to-amber-100",
     dark: {
-      "--app-background": "0 0% 0% / 0",
+      "--app-background": "25 14% 10%",
       "--app-foreground": "30 15% 96%",
       "--app-primary": "25 40% 75%",
-      "--app-card": "30 10% 8% / 0.55",
-      "--app-secondary": "30 8% 12% / 0.45",
-      "--app-border": "30 10% 40% / 0.35",
+      "--app-card": "25 12% 14%",
+      "--app-secondary": "25 10% 17%",
+      "--app-border": "25 10% 24%",
     },
     light: {
-      "--app-background": "0 0% 100% / 0",
+      "--app-background": "35 40% 97%",
       "--app-foreground": "25 30% 18%",
       "--app-primary": "25 45% 42%",
-      "--app-card": "0 0% 100% / 0.72",
-      "--app-secondary": "30 20% 96% / 0.65",
-      "--app-border": "30 15% 80% / 0.45",
+      "--app-card": "0 0% 100%",
+      "--app-secondary": "30 28% 95%",
+      "--app-border": "30 18% 86%",
     },
   },
   {
@@ -288,17 +288,33 @@ export function themeUsesPhotoBackground(themeId?: AppThemeId): boolean {
   return getThemeBackgroundUrl(themeId) != null;
 }
 
-/** Photo layer opacity (book bouquet 75%, Sara stronger). */
+/** Photo layer strength — kept low so nav/cards stay readable. */
 export function getThemeBackgroundOpacity(themeId?: AppThemeId): number {
   const id = themeId ?? getStoredAppTheme();
-  if (id === "book-bouquet") return 0.75;
-  if (id === "sara-lavender") return 0.58;
+  if (id === "book-bouquet") return 0.28;
+  if (id === "sara-lavender") return 0.32;
   return 0.28;
 }
 
 export function themeUsesPhotoScrim(themeId?: AppThemeId): boolean {
-  const id = themeId ?? getStoredAppTheme();
-  return id !== "book-bouquet" && id !== "sara-lavender";
+  return themeUsesPhotoBackground(themeId);
+}
+
+/** Readable gradient over the photo (avoids invalid hsl(var(--background) / …) scrims). */
+export function getPhotoScrimGradient(themeId: AppThemeId, dark: boolean): string {
+  if (themeId === "book-bouquet") {
+    return dark
+      ? "linear-gradient(180deg, rgba(18,14,12,0.72) 0%, rgba(18,14,12,0.88) 55%, rgba(18,14,12,0.94) 100%)"
+      : "linear-gradient(180deg, rgba(255,252,248,0.72) 0%, rgba(255,252,248,0.88) 55%, rgba(255,252,248,0.94) 100%)";
+  }
+  if (themeId === "sara-lavender") {
+    return dark
+      ? "linear-gradient(180deg, rgba(28,14,32,0.68) 0%, rgba(28,14,32,0.84) 55%, rgba(28,14,32,0.92) 100%)"
+      : "linear-gradient(180deg, rgba(255,246,252,0.7) 0%, rgba(255,246,252,0.86) 55%, rgba(255,246,252,0.93) 100%)";
+  }
+  return dark
+    ? "linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.88) 100%)"
+    : "linear-gradient(180deg, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.88) 100%)";
 }
 
 export function applyAppTheme(themeId: AppThemeId) {
@@ -308,6 +324,11 @@ export function applyAppTheme(themeId: AppThemeId) {
   const root = document.documentElement;
   for (const [key, value] of Object.entries(vars)) {
     root.style.setProperty(key, value);
+  }
+  if (themeUsesPhotoBackground(currentAppTheme)) {
+    root.dataset.photoTheme = "true";
+  } else {
+    delete root.dataset.photoTheme;
   }
   syncAppChromeFromTheme();
   window.dispatchEvent(new Event(APP_THEME_CHANGED));

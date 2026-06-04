@@ -102,13 +102,17 @@ export function Layout({ children }: { children: React.ReactNode }) {
     { icon: Settings, label: "Settings", href: "/settings" },
   ];
 
+  const photoChrome = showThemeBg ? "bg-background/92 backdrop-blur-md" : "bg-background/50";
+
   return (
     <div className="flex h-[100dvh] app-chrome bg-background text-foreground overflow-hidden relative">
       {showThemeBg && <ThemeBackgroundOverlay themeId={appTheme} />}
       {showSakura && <FallingFlowersOverlay />}
       {showSaraLavender && <FallingNamesOverlay />}
       {/* Desktop Sidebar */}
-      <nav className="hidden md:flex flex-col w-[72px] lg:w-[244px] border-r border-border h-full px-3 py-6 justify-between shrink-0 bg-background/50 app-chrome relative z-10">
+      <nav
+        className={`hidden md:flex flex-col w-[72px] lg:w-[244px] border-r border-border h-full px-3 py-6 justify-between shrink-0 app-chrome relative z-10 ${photoChrome}`}
+      >
         <div className="flex flex-col gap-6 h-full min-h-0">
           <Link href="/" className="px-3 pt-2 pb-2 group">
             <span className="font-serif text-2xl tracking-tighter hidden lg:block italic font-bold text-primary inline-block">Grova</span>
@@ -164,7 +168,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
           {children}
         </main>
       ) : (
-        <main className="flex-1 overflow-hidden relative z-10">
+        <main
+          className={`flex-1 overflow-hidden relative z-10 ${showThemeBg ? "bg-background/88 backdrop-blur-sm" : ""}`}
+        >
           <div className="h-full overflow-y-auto pb-20 sm:pb-16 md:pb-0 scrollbar-thin scrollbar-thumb-primary/40 scrollbar-track-transparent">
             {children}
           </div>
@@ -173,7 +179,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Mobile Bottom Bar - Responsive with Menu Toggle */}
       <nav
-        className="md:hidden fixed bottom-0 left-0 right-0 h-16 sm:h-14 app-chrome bg-background/95 border-t border-border/50 flex items-center justify-around px-1 z-50 backdrop-blur-md safe-area-bottom"
+        className={`md:hidden fixed bottom-0 left-0 right-0 h-16 sm:h-14 app-chrome border-t border-border/50 flex items-center justify-around px-1 z-50 safe-area-bottom ${showThemeBg ? "bg-background/95 backdrop-blur-lg" : "bg-background/95 backdrop-blur-md"}`}
       >
         {navItems.filter((i) => !["Dua", "Memories", "Calendar", "Check-in", "Tasks", "Milestones", "Secret Notes"].includes(i.label)).map((item) => {
           const Icon = item.icon;

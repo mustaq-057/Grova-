@@ -343,6 +343,12 @@
   --border: var(--app-border);
 }
 
+/* Photo themes (Sara, Book Bouquet) — keep panels readable over background image */
+html[data-photo-theme="true"] .app-chrome .bg-card,
+html[data-photo-theme="true"] .app-chrome [class*="bg-card"] {
+  background-color: hsl(var(--card));
+}
+
 /* Glass morphism effects */
 .glass-input {
   background: rgba(255, 255, 255, 0.05);

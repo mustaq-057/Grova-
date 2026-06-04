@@ -1,18 +1,35 @@
-import { memo, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import {
-  getThemeBackgroundUrl,
+  APP_THEME_CHANGED,
+  getPhotoScrimGradient,
+  getStoredDarkMode,
   getThemeBackgroundOpacity,
+  getThemeBackgroundUrl,
   themeUsesPhotoScrim,
   type AppThemeId,
 } from "@/lib/app-theme";
 
 type Props = { themeId: AppThemeId };
 
-/** Full-screen themed photo behind app chrome. */
+/** Full-screen themed photo behind app chrome — soft, never hides UI. */
 export const ThemeBackgroundOverlay = memo(function ThemeBackgroundOverlay({ themeId }: Props) {
   const url = getThemeBackgroundUrl(themeId);
   const [hidden, setHidden] = useState(false);
+  const [dark, setDark] = useState(() => getStoredDarkMode());
+
+  useEffect(() => {
+    const sync = () => setDark(getStoredDarkMode());
+    sync();
+    window.addEventListener(APP_THEME_CHANGED, sync);
+    const obs = new MutationObserver(sync);
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    return () => {
+      window.removeEventListener(APP_THEME_CHANGED, sync);
+      obs.disconnect();
+    };
+  }, []);
+
   if (!url || hidden) return null;
 
   const opacity = getThemeBackgroundOpacity(themeId);
@@ -27,19 +44,14 @@ export const ThemeBackgroundOverlay = memo(function ThemeBackgroundOverlay({ the
         backgroundSize: "cover",
         backgroundPosition: "center",
         opacity,
-        filter: themeId === "book-bouquet" ? "none" : "saturate(1.06)",
+        filter: themeId === "book-bouquet" ? "brightness(0.92) saturate(0.95)" : "brightness(0.9) saturate(1.05)",
       }}
     >
       <img src={url} alt="" className="hidden" onError={() => setHidden(true)} />
       {scrim ? (
         <div
           className="absolute inset-0"
-          style={{
-            background:
-              themeId === "sara-lavender"
-                ? "linear-gradient(180deg, hsl(var(--background) / 0.12) 0%, hsl(var(--background) / 0.35) 100%)"
-                : "linear-gradient(180deg, hsl(var(--background) / 0.55) 0%, hsl(var(--background) / 0.88) 55%, hsl(var(--background) / 0.95) 100%)",
-          }}
+          style={{ background: getPhotoScrimGradient(themeId, dark) }}
         />
       ) : null}
     </div>,
