@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "installCommand": "pnpm install",
-  "buildCommand": "pnpm -w run build:grova",
+  "buildCommand": "pnpm run build:grova",
   "outputDirectory": "dist",
   "framework": null,
   "functions": {

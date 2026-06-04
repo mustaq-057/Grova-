@@ -2,7 +2,7 @@
 
 One Vercel project serves:
 
-- **Static UI** → `artifacts/instagram-clone/dist`
+- **Static UI** → repo-root `dist/` (copied from `artifacts/instagram-clone/dist` during build)
 - **API** → serverless Express at `/api/*` via `api/[[...path]].mjs`
 
 ## 1. Import repo
