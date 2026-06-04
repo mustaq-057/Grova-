@@ -48,6 +48,10 @@ Do **not** upload `.env` to GitHub.
 3. Clear **Build Command** (leave blank)
 4. **Redeploy**
 
-## 6. If login fails
+## 6. If login always says "Invalid email or password" but env vars are set
+
+Older deploys routed only `/api/healthz` correctly; `/api/auth/*` returned 404. Ensure `api/index.mjs` + `vercel.json` rewrite `/api/(.*)` → `/api` are deployed, then **Redeploy**.
+
+## 7. If login fails
 
 Add or fix `ALLOWED_ORIGINS` = your exact Vercel URL (no `/` at the end), then **Redeploy**.

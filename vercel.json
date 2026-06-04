@@ -5,13 +5,13 @@
   "outputDirectory": "dist",
   "framework": null,
   "functions": {
-    "api/**/*.mjs": {
+    "api/index.mjs": {
       "maxDuration": 60,
-      "memory": 1024,
       "includeFiles": "artifacts/api-server/dist/**"
     }
   },
   "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],
   "headers": [
