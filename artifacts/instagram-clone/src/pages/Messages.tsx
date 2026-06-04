@@ -1647,14 +1647,6 @@ export default function Messages() {
           const previewUrl = URL.createObjectURL(normalized);
           const tempId = crypto.randomUUID();
           pendingOutgoingRef.current.add(tempId);
-          let videoToastDone = false;
-          const endVideoToast = (
-            result: { type: "success"; message: string } | { type: "error"; message: string },
-          ) => {
-            if (videoToastDone) return;
-            videoToastDone = true;
-            finishToast(toastId, result);
-          };
 
           const optimistic = buildOptimisticMessage(
             {
@@ -1675,7 +1667,7 @@ export default function Messages() {
           );
           setMessages((prev) => [...prev, optimistic]);
           scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
-          toast.loading("Sending video…", { id: toastId });
+          toast.dismiss(toastId);
 
           try {
             const duration = await getVideoDurationSafe(normalized);
@@ -1683,7 +1675,7 @@ export default function Messages() {
               pendingOutgoingRef.current.delete(tempId);
               setMessages((prev) => prev.filter((m) => m.id !== tempId));
               URL.revokeObjectURL(previewUrl);
-              endVideoToast({ type: "error", message: "Video must be 1 minute or less." });
+              toast.error("Video must be 1 minute or less.", { duration: 4000 });
               return;
             }
 
@@ -1705,20 +1697,14 @@ export default function Messages() {
             pendingOutgoingRef.current.delete(tempId);
             setMessages((prev) => replaceOutgoingVideoMessage(prev, tempId, display, user.id));
             scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
-            endVideoToast({ type: "success", message: "Video sent" });
           } catch (videoErr) {
             pendingOutgoingRef.current.delete(tempId);
             setMessages((prev) => prev.filter((m) => m.id !== tempId));
             URL.revokeObjectURL(previewUrl);
-            endVideoToast({
-              type: "error",
-              message:
-                videoErr instanceof Error ? videoErr.message : "Failed to send video.",
-            });
-          } finally {
-            if (!videoToastDone) {
-              toast.dismiss(toastId);
-            }
+            toast.error(
+              videoErr instanceof Error ? videoErr.message : "Failed to send video.",
+              { duration: 4000 },
+            );
           }
         } else {
           toast.loading("Uploading file…", { id: toastId });
