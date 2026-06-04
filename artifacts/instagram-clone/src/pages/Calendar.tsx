@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useDelayedSpinner } from "@/hooks/useDelayedSpinner";
 import { Plus, Trash2, Calendar as CalendarIcon, Clock, Heart, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { motion } from "framer-motion";
 import { api, type ApiEvent } from "@/lib/api";
@@ -8,7 +9,8 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 export default function Calendar() {
   const { user } = useAuth();
   const [events, setEvents] = useState<ApiEvent[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [fetching, setFetching] = useState(true);
+  const showLoading = useDelayedSpinner(fetching);
   const [showAdd, setShowAdd] = useState(false);
   const [editingEvent, setEditingEvent] = useState<ApiEvent | null>(null);
   const [title, setTitle] = useState("");
@@ -32,7 +34,7 @@ export default function Calendar() {
     } catch (err) {
       console.error("Failed to load events:", err);
     } finally {
-      setLoading(false);
+      setFetching(false);
     }
   };
 
@@ -349,7 +351,7 @@ export default function Calendar() {
             <Clock className="w-4 h-4 text-primary" />
             Upcoming Events
           </h3>
-          {loading ? (
+          {showLoading ? (
             <div className="space-y-3">
               {[1, 2, 3].map((i) => (
                 <div key={i} className="h-16 bg-secondary/50 rounded-2xl animate-pulse" />

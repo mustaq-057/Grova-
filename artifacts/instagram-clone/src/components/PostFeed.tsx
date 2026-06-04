@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useDelayedSpinner } from "@/hooks/useDelayedSpinner";
 import { Heart, MessageCircle, Send, MapPin, Trash2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { Link } from "wouter";
@@ -14,7 +15,8 @@ export function PostFeed() {
   const { user, partner } = useAuth();
   const partnerId = user?.id === "me" ? "wife" : "me";
   const [posts, setPosts] = useState<ApiPost[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [fetching, setFetching] = useState(true);
+  const showLoading = useDelayedSpinner(fetching);
   const [commentPostId, setCommentPostId] = useState<string | null>(null);
   const [commentText, setCommentText] = useState("");
   const [comments, setComments] = useState<Record<string, ApiPostComment[]>>({});
@@ -22,7 +24,7 @@ export function PostFeed() {
   const [deleting, setDeleting] = useState(false);
 
   const loadPosts = useCallback(async () => {
-    const safety = window.setTimeout(() => setLoading(false), 8_000);
+    const safety = window.setTimeout(() => setFetching(false), 8_000);
     try {
       const list = await Promise.race([
         api.getPosts(),
@@ -35,7 +37,7 @@ export function PostFeed() {
       console.error("Failed to load posts:", err);
     } finally {
       window.clearTimeout(safety);
-      setLoading(false);
+      setFetching(false);
     }
   }, []);
 
@@ -186,7 +188,7 @@ export function PostFeed() {
     }
   };
 
-  if (loading) {
+  if (showLoading) {
     return (
       <div className="px-4 py-8 text-center text-sm text-muted-foreground">
         Loading posts…

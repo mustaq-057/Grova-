@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useDelayedSpinner } from "@/hooks/useDelayedSpinner";
 import { Plus, Trash2, Check, CheckCircle2, Circle, ListTodo, X } from "lucide-react";
 import { motion } from "framer-motion";
 import { api, type ApiTask } from "@/lib/api";
@@ -8,7 +9,8 @@ export default function Tasks() {
   const { user, partner } = useAuth();
   const otherLabel = partner?.name?.split(" ")[0] ?? "Them";
   const [tasks, setTasks] = useState<ApiTask[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [fetching, setFetching] = useState(true);
+  const showLoading = useDelayedSpinner(fetching);
   const [showAdd, setShowAdd] = useState(false);
   const [title, setTitle] = useState("");
   const [assignedTo, setAssignedTo] = useState<"me" | "wife" | "both">("both");
@@ -26,7 +28,7 @@ export default function Tasks() {
     } catch (err) {
       console.error("Failed to load tasks:", err);
     } finally {
-      setLoading(false);
+      setFetching(false);
     }
   };
 
@@ -177,7 +179,7 @@ export default function Tasks() {
 
       {/* Tasks List */}
       <div className="p-4">
-        {loading ? (
+        {showLoading ? (
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (
               <div key={i} className="h-16 bg-secondary/50 rounded-2xl animate-pulse" />

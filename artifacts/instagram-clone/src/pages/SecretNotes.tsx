@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useDelayedSpinner } from "@/hooks/useDelayedSpinner";
 import { Plus, Trash2, Lock, X, Shield, Mic } from "lucide-react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
@@ -14,7 +15,8 @@ import { openLiveChannel } from "@/lib/sse-client";
 export default function SecretNotes() {
   const { user } = useAuth();
   const [notes, setNotes] = useState<ApiSecretNote[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [fetching, setFetching] = useState(true);
+  const showLoading = useDelayedSpinner(fetching);
   const [showAdd, setShowAdd] = useState(false);
   const [content, setContent] = useState("");
   const [password, setPassword] = useState("");
@@ -42,7 +44,7 @@ export default function SecretNotes() {
       console.error("Failed to load secret notes:", err);
       setError("Could not load secret notes.");
     } finally {
-      setLoading(false);
+      setFetching(false);
     }
   }, []);
 
@@ -330,7 +332,7 @@ export default function SecretNotes() {
       </AnimatePresence>
 
       <div className="p-4">
-        {loading ? (
+        {showLoading ? (
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (
               <div key={i} className="h-20 bg-secondary/50 rounded-2xl animate-pulse" />

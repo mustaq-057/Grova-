@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useDelayedSpinner } from "@/hooks/useDelayedSpinner";
 import { Plus, Trash2, BookOpen, X, ChevronDown, ChevronUp, Send } from "lucide-react";
 import { motion } from "framer-motion";
 import { Link } from "wouter";
@@ -10,7 +11,8 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 export default function Dua() {
   const { user, partner } = useAuth();
   const [duas, setDuas] = useState<ApiDua[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [fetching, setFetching] = useState(true);
+  const showLoading = useDelayedSpinner(fetching);
   const [showAdd, setShowAdd] = useState(false);
   const [arabic, setArabic] = useState("");
   const [translation, setTranslation] = useState("");
@@ -32,7 +34,7 @@ export default function Dua() {
   }, []);
 
   useEffect(() => {
-    loadDuas().finally(() => setLoading(false));
+    loadDuas().finally(() => setFetching(false));
     const interval = setInterval(loadDuas, 45_000);
     return () => clearInterval(interval);
   }, [loadDuas]);
@@ -177,7 +179,7 @@ export default function Dua() {
         </motion.div>
       )}
 
-      {loading ? (
+      {showLoading ? (
         <div className="flex flex-col gap-3 p-4">
           {[1, 2, 3].map((i) => (
             <div key={i} className="h-32 bg-secondary/50 rounded-2xl animate-pulse" />
@@ -279,7 +281,7 @@ export default function Dua() {
         </div>
       )}
 
-      {!loading && duas.length === 0 && (
+      {!fetching && duas.length === 0 && (
         <div className="flex flex-col items-center gap-3 py-16 text-center px-4">
           <BookOpen className="w-12 h-12 text-muted-foreground/20" />
           <p className="text-muted-foreground text-sm">No duas yet</p>

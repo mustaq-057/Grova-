@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useDelayedSpinner } from "@/hooks/useDelayedSpinner";
 import { createPortal } from "react-dom";
 import { Search, X, Loader2, Sticker } from "lucide-react";
 import { motion } from "framer-motion";
@@ -23,6 +24,7 @@ export default function StickerPicker({ onSelect, onSelectGif, onClose }: Props)
   const [items, setItems] = useState<GiphyMedia[]>([]);
   const offsetRef = useRef(0);
   const [loading, setLoading] = useState(false);
+  const showStickerSpinner = useDelayedSpinner(loading && items.length === 0);
   const [hasMore, setHasMore] = useState(true);
   const loadingRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -127,7 +129,7 @@ export default function StickerPicker({ onSelect, onSelectGif, onClose }: Props)
                 Add a GIPHY API key in .env to enable sticker search
               </p>
             </div>
-          ) : loading && items.length === 0 ? (
+          ) : showStickerSpinner ? (
             <div className="flex justify-center py-10">
               <Loader2 className="w-6 h-6 animate-spin text-primary" />
             </div>

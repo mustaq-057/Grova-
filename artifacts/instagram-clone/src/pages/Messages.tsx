@@ -43,10 +43,12 @@ import {
   filterVisibleMessages,
   hideMessageForUser,
   hydrateHiddenMessages,
+  getChatClearedAt,
   clearChatForUser,
   applyHiddenMessageId,
   getHiddenMessageIds,
 } from "@/lib/hidden-messages";
+import { useDelayedSpinner } from "@/hooks/useDelayedSpinner";
 import { mergeMessagesById } from "@/lib/chat-sync";
 import { mergeMessagesIfChanged, messagesListSignature } from "@/lib/message-list-perf";
 import { downloadChatAsImage, downloadChatAsText } from "@/lib/chat-download";
@@ -141,6 +143,7 @@ export default function Messages() {
   const [recording, setRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [loading, setLoading] = useState(false);
+  const showChatSpinner = useDelayedSpinner(loading);
   const [error, setError] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
@@ -299,6 +302,29 @@ export default function Messages() {
     return () => { clearInterval(hb); clearInterval(poll); };
   }, [user?.id, partnerId]);
 
+  const applyMessageBatch = useCallback((raw: ApiMessage[]) => {
+    if (raw.length === 0) return;
+    const preview = previewMessagesForDisplay(raw);
+    setLoading(false);
+    setMessages((prev) => {
+      const pending = prev.filter((m) => pendingOutgoingRef.current.has(m.id));
+      const next = mergeMessagesById(preview, pending);
+      messagesSigRef.current = messagesListSignature(next);
+      return next;
+    });
+    void normalizeMessages(raw).then((fromServer) => {
+      isInitialLoadRef.current = true;
+      startTransition(() => {
+        setMessages((prev) => {
+          const pending = prev.filter((m) => pendingOutgoingRef.current.has(m.id));
+          const next = mergeMessagesById(fromServer, pending);
+          messagesSigRef.current = messagesListSignature(next);
+          return next;
+        });
+      });
+    });
+  }, []);
+
   // Load messages function (can be called from retry button)
   const loadMessages = useCallback(async () => {
     const requestId = "load-messages";
@@ -313,42 +339,33 @@ export default function Messages() {
 
     const safetyTimer = window.setTimeout(() => {
       setLoading(false);
-    }, 12_000);
+    }, 8_000);
 
     const fetchMessages = () =>
       Promise.race([
         api.getMessages({ limit: 50 }),
         new Promise<never>((_, reject) => {
-          window.setTimeout(() => reject(new Error("Request timed out")), 20_000);
+          window.setTimeout(() => reject(new Error("Request timed out")), 15_000);
         }),
       ]);
 
+    const uid = user?.id;
+    if (uid) {
+      void hydrateHiddenMessages(uid).then(() => setHiddenTick((t) => t + 1));
+    }
+
     const requestPromise = fetchMessages()
-      .then(async (data) => {
+      .then((data) => {
         const raw = data.messages || [];
         if (raw.length > 0) {
-          setLoading(false);
-          const preview = previewMessagesForDisplay(raw);
-          setMessages((prev) => {
-            const pending = prev.filter((m) => pendingOutgoingRef.current.has(m.id));
-            const next = mergeMessagesById(preview, pending);
-            messagesSigRef.current = messagesListSignature(next);
-            return next;
-          });
+          applyMessageBatch(raw);
+          const more = data.pagination?.hasMore ?? false;
+          setHasMore(more);
+        } else {
+          setMessages([]);
+          messagesSigRef.current = "0";
+          setHasMore(false);
         }
-        const fromServer = await normalizeMessages(raw);
-        isInitialLoadRef.current = true;
-        startTransition(() => {
-          setMessages((prev) => {
-            const pending = prev.filter((m) => pendingOutgoingRef.current.has(m.id));
-            const next = mergeMessagesById(fromServer, pending);
-            messagesSigRef.current = messagesListSignature(next);
-            return next;
-          });
-        });
-        const mergedCount = fromServer.length;
-        const more = data.pagination?.hasMore ?? false;
-        setHasMore(mergedCount > 0 && more);
         return data;
       })
       .catch((err) => {
@@ -368,7 +385,7 @@ export default function Messages() {
 
     pendingRequestsRef.current.set(requestId, requestPromise);
     return requestPromise;
-  }, []);
+  }, [user?.id, applyMessageBatch]);
 
   // Load more messages when scrolling to top with pagination
   const loadMoreMessages = useCallback(async () => {
@@ -450,28 +467,34 @@ export default function Messages() {
     const pollSyncMessages = () => {
       if (!mounted) return;
       void api.getMessages().then(async (data) => {
-        const fresh = await normalizeMessages(data.messages ?? []);
-        startTransition(() => {
-          setMessages((prev) => {
-            const cleaned = prev.filter((m) => {
-              if (!pendingOutgoingRef.current.has(m.id)) return true;
-              if (m.type !== "video" || !m.fileData?.startsWith("blob:")) return true;
-              const serverHasSame = fresh.some(
-                (f) =>
-                  f.senderId === m.senderId &&
-                  f.type === "video" &&
-                  Math.abs(new Date(f.timestamp).getTime() - new Date(m.timestamp).getTime()) < 120_000,
-              );
-              if (serverHasSame) pendingOutgoingRef.current.delete(m.id);
-              return !serverHasSame;
+        const raw = data.messages ?? [];
+        const preview = previewMessagesForDisplay(raw);
+        const mergePreview = (fresh: ApiMessage[]) => {
+          startTransition(() => {
+            setMessages((prev) => {
+              const cleaned = prev.filter((m) => {
+                if (!pendingOutgoingRef.current.has(m.id)) return true;
+                if (m.type !== "video" || !m.fileData?.startsWith("blob:")) return true;
+                const serverHasSame = fresh.some(
+                  (f) =>
+                    f.senderId === m.senderId &&
+                    f.type === "video" &&
+                    Math.abs(new Date(f.timestamp).getTime() - new Date(m.timestamp).getTime()) < 120_000,
+                );
+                if (serverHasSame) pendingOutgoingRef.current.delete(m.id);
+                return !serverHasSame;
+              });
+              const next = mergeMessagesIfChanged(cleaned, fresh, mergeMessagesById);
+              if (!next) return prev;
+              messagesSigRef.current = messagesListSignature(next);
+              return next;
             });
-            const next = mergeMessagesIfChanged(cleaned, fresh, mergeMessagesById);
-            if (!next) return prev;
-            messagesSigRef.current = messagesListSignature(next);
-            return next;
+            setHasMore(fresh.length > 0 && (data.pagination?.hasMore ?? false));
           });
-          setHasMore(fresh.length > 0 && (data.pagination?.hasMore ?? false));
-        });
+        };
+        if (raw.length > 0) mergePreview(preview);
+        const fresh = await normalizeMessages(raw);
+        mergePreview(fresh);
       }).catch(() => {});
     };
 
@@ -2501,7 +2524,7 @@ export default function Messages() {
           )}
         </div>
 
-        {loading && messages.length === 0 && (
+        {showChatSpinner && messages.length === 0 && (
           <div className="space-y-2">
             <MessageSkeleton />
             <MessageSkeleton />
@@ -2529,10 +2552,19 @@ export default function Messages() {
           </div>
         )}
 
-        {!loading && !error && messages.length === 0 && (
-          <div className="flex flex-col items-center gap-2 py-8 text-center">
+        {!loading && !error && visibleMessages.length === 0 && (
+          <div className="flex flex-col items-center gap-2 py-8 text-center px-4">
             <span className="text-4xl">💬</span>
-            <p className="text-sm text-muted-foreground">Say hi to {pName}!</p>
+            {user && getChatClearedAt(user.id) ? (
+              <>
+                <p className="text-sm font-medium text-foreground">Chat cleared on your side</p>
+                <p className="text-xs text-muted-foreground">
+                  Older messages are hidden for you. {pName} may still see the full history — send a new message anytime.
+                </p>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">Say hi to {pName}!</p>
+            )}
           </div>
         )}
 

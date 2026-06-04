@@ -58,6 +58,9 @@ export async function decryptMessage(msg: ApiMessage): Promise<ApiMessage> {
 }
 
 export async function decryptMessages(msgs: ApiMessage[]): Promise<ApiMessage[]> {
+  if (msgs.length <= 50) {
+    return Promise.all(msgs.map(decryptMessage));
+  }
   const CHUNK = 40;
   const out: ApiMessage[] = [];
   for (let i = 0; i < msgs.length; i += CHUNK) {
