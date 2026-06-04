@@ -56,6 +56,20 @@ export function extractClipboardFiles(cd: DataTransfer | null | undefined): { fi
     .filter((item) => item.kind === "file")
     .map((item) => item.type || undefined);
 
+  // Some browsers expose a single video only on items (not files).
+  for (const item of cd.items) {
+    if (item.kind !== "file") continue;
+    const type = item.type || "";
+    if (!type.startsWith("video/") && type !== "application/octet-stream") continue;
+    const f = item.getAsFile();
+    if (!f || f.size <= 0) continue;
+    const key = fileKey(f);
+    if (seenKeys.has(key)) continue;
+    seenKeys.add(key);
+    out.push({ file: f, itemType: type || undefined });
+  }
+  if (out.length > 0) return out;
+
   // Windows / Chrome often expose pasted videos only via clipboardData.files.
   for (const f of cd.files) {
     if (!f || f.size <= 0) continue;
@@ -78,6 +92,34 @@ export function extractClipboardFiles(cd: DataTransfer | null | undefined): { fi
   }
 
   return out;
+}
+
+/** Async clipboard read when paste event has no files (common for screen recordings on Windows). */
+export async function readClipboardFilesAsync(): Promise<{ file: File; itemType?: string }[]> {
+  if (!navigator.clipboard?.read) return [];
+  try {
+    const items = await navigator.clipboard.read();
+    const out: { file: File; itemType?: string }[] = [];
+    const seen = new Set<string>();
+    for (const item of items) {
+      for (const type of item.types) {
+        if (!type.startsWith("video/") && !type.startsWith("image/") && type !== "application/octet-stream") {
+          continue;
+        }
+        const blob = await item.getType(type);
+        if (!blob || blob.size <= 0) continue;
+        const ext = type.startsWith("video/") ? "mp4" : "png";
+        const file = new File([blob], `clipboard-${Date.now()}.${ext}`, { type: blob.type || type });
+        const key = `${file.name}|${file.size}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push({ file, itemType: type });
+      }
+    }
+    return out;
+  } catch {
+    return [];
+  }
 }
 
 export function isVideoFile(file: File, hintType?: string): boolean {
@@ -177,7 +219,7 @@ export async function classifyMediaFile(file: File, hintType?: string): Promise<
 
   // Pasted screen recordings often lack MIME/filename — prefer fast magic bytes, then short sniff.
   const ambiguousName = !file.name || GENERIC_CLIPBOARD_NAME.test(file.name);
-  if (ambiguousName && file.size > 512 * 1024 && !isDocumentFile(file, hintType)) {
+  if (ambiguousName && file.size > 200 * 1024 && !isDocumentFile(file, hintType)) {
     return "video";
   }
   if (ambiguousName || file.size > 32_000) {

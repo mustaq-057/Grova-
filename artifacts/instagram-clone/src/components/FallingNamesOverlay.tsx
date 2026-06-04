@@ -1,8 +1,8 @@
 import { memo, useMemo } from "react";
 import { createPortal } from "react-dom";
 
-const NAMES = ["Sara", "Lily", "Sara", "Lily", "♡ Sara", "♡ Lily"];
-const LAVENDER = ["#e8d5ff", "#d4b5ff", "#c9a0ff", "#b794f6", "#ddd6fe", "#ede9fe", "#f3e8ff"];
+const NAMES = ["Sara", "Sara", "♡ Sara", "sara", "SARA", "♡ sara"];
+const SARA_COLORS = ["#ffb7c9", "#ff85a8", "#fd79a8", "#e84393", "#f8a5c2", "#ffc8d8", "#ffe4ec"];
 
 type Flake = {
   id: number;
@@ -30,7 +30,8 @@ export const FallingNamesOverlay = memo(function FallingNamesOverlay() {
       drift: (Math.random() - 0.5) * 80,
       sway: 20 + Math.random() * 40,
       spin: (Math.random() - 0.5) * 180,
-      color: LAVENDER[i % LAVENDER.length]!,
+      color: SARA_COLORS[i % SARA_COLORS.length]!,
+      fontFamily: '"Segoe Script", "Brush Script MT", "Snell Roundhand", cursive',
       depth: 0.5 + Math.random() * 0.5,
     }));
   }, []);
@@ -41,7 +42,7 @@ export const FallingNamesOverlay = memo(function FallingNamesOverlay() {
       aria-hidden
       style={{
         background:
-          "radial-gradient(ellipse 120% 80% at 50% 0%, rgba(196, 181, 253, 0.35) 0%, transparent 55%), linear-gradient(180deg, rgba(237, 233, 254, 0.12) 0%, transparent 40%)",
+          "radial-gradient(ellipse 120% 80% at 50% 0%, rgba(255, 133, 168, 0.28) 0%, transparent 55%), linear-gradient(180deg, rgba(255, 228, 236, 0.15) 0%, transparent 40%)",
       }}
     >
       <style>{`
@@ -64,7 +65,7 @@ export const FallingNamesOverlay = memo(function FallingNamesOverlay() {
             fontSize: `${f.size}px`,
             color: f.color,
             opacity: 0.55 * f.depth,
-            textShadow: "0 1px 8px rgba(139, 92, 246, 0.35), 0 0 20px rgba(216, 180, 254, 0.25)",
+            textShadow: "0 1px 10px rgba(232, 67, 147, 0.4), 0 0 18px rgba(255, 183, 201, 0.35)",
             animation: `nameFall ${f.duration}s linear ${f.delay}s infinite, nameSway ${3 + f.duration * 0.15}s ease-in-out ${f.delay}s infinite alternate`,
             // @ts-expect-error css vars
             "--drift": `${f.drift}px`,

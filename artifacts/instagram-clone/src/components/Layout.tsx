@@ -15,7 +15,18 @@ import {
 import { AvatarImage } from "@/components/AvatarImage";
 import { FallingFlowersOverlay } from "@/components/FallingFlowersOverlay";
 import { FallingNamesOverlay } from "@/components/FallingNamesOverlay";
-import { APP_THEME_CHANGED, getStoredAppTheme, isSakuraFallTheme, isSaraLavenderTheme, type AppThemeId } from "@/lib/app-theme";
+import { FallingLiliesOverlay } from "@/components/FallingLiliesOverlay";
+import { FallingBouquetFlowersOverlay } from "@/components/FallingBouquetFlowersOverlay";
+import { ThemeBackgroundOverlay } from "@/components/ThemeBackgroundOverlay";
+import {
+  APP_THEME_CHANGED,
+  getStoredAppTheme,
+  isSakuraFallTheme,
+  isSaraLavenderTheme,
+  isBookBouquetTheme,
+  themeUsesPhotoBackground,
+  type AppThemeId,
+} from "@/lib/app-theme";
 import { MobileMenuGrid } from "./MobileMenuGrid";
 
 type NavItem = {
@@ -35,6 +46,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const isChat = location === "/chat";
   const showSakura = isSakuraFallTheme(appTheme);
   const showSaraLavender = isSaraLavenderTheme(appTheme);
+  const showBookBouquet = isBookBouquetTheme(appTheme);
+  const showThemeBg = themeUsesPhotoBackground(appTheme);
 
   useEffect(() => {
     const onTheme = () => setAppTheme(getStoredAppTheme());
@@ -95,8 +108,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-[100dvh] app-chrome bg-background text-foreground overflow-hidden relative">
+      {showThemeBg && <ThemeBackgroundOverlay themeId={appTheme} />}
       {showSakura && <FallingFlowersOverlay />}
-      {showSaraLavender && <FallingNamesOverlay />}
+      {showSaraLavender && (
+        <>
+          <FallingLiliesOverlay />
+          <FallingNamesOverlay />
+        </>
+      )}
+      {showBookBouquet && <FallingBouquetFlowersOverlay />}
       {/* Desktop Sidebar */}
       <nav className="hidden md:flex flex-col w-[72px] lg:w-[244px] border-r border-border h-full px-3 py-6 justify-between shrink-0 bg-background/50 app-chrome relative z-10">
         <div className="flex flex-col gap-6 h-full min-h-0">

@@ -1,6 +1,19 @@
 /** App-wide color themes — nav, settings, profile chrome only (not chat bubbles). */
 
-export type AppThemeId = "grova" | "rose-love" | "ocean" | "midnight" | "golden" | "sakura-fall" | "sara-lavender";
+export type AppThemeId =
+  | "grova"
+  | "rose-love"
+  | "ocean"
+  | "midnight"
+  | "golden"
+  | "sakura-fall"
+  | "sara-lavender"
+  | "book-bouquet";
+
+const THEME_BACKGROUNDS: Partial<Record<AppThemeId, string>> = {
+  "sara-lavender": "/themes/sara-lilies.jpg",
+  "book-bouquet": "/themes/book-bouquet.jpg",
+};
 
 export const APP_THEME_CHANGED = "grova-app-theme-changed";
 
@@ -124,9 +137,9 @@ export const APP_THEMES: {
   },
   {
     id: "sara-lavender",
-    name: "Sara & Lily",
-    description: "Lavender sky · names fall ♡",
-    swatch: "bg-gradient-to-br from-violet-300 via-purple-200 to-lavender-300",
+    name: "Sara",
+    description: "Stargazer lilies · Sara falls ♡",
+    swatch: "bg-gradient-to-br from-pink-300 via-fuchsia-200 to-violet-300",
     dark: {
       "--app-background": "270 28% 9%",
       "--app-foreground": "270 20% 94%",
@@ -142,6 +155,28 @@ export const APP_THEMES: {
       "--app-card": "270 40% 99%",
       "--app-secondary": "270 35% 94%",
       "--app-border": "270 25% 88%",
+    },
+  },
+  {
+    id: "book-bouquet",
+    name: "Book Bouquet",
+    description: "Bookstagram blooms · soft pink ♡",
+    swatch: "bg-gradient-to-br from-rose-200 via-pink-100 to-amber-100",
+    dark: {
+      "--app-background": "350 22% 9%",
+      "--app-foreground": "350 25% 94%",
+      "--app-primary": "350 55% 72%",
+      "--app-card": "350 20% 12%",
+      "--app-secondary": "350 18% 16%",
+      "--app-border": "350 15% 20%",
+    },
+    light: {
+      "--app-background": "30 35% 97%",
+      "--app-foreground": "350 28% 20%",
+      "--app-primary": "350 50% 58%",
+      "--app-card": "30 40% 99%",
+      "--app-secondary": "350 35% 94%",
+      "--app-border": "350 25% 88%",
     },
   },
   {
@@ -238,6 +273,19 @@ export function isSakuraFallTheme(themeId?: AppThemeId): boolean {
 
 export function isSaraLavenderTheme(themeId?: AppThemeId): boolean {
   return (themeId ?? getStoredAppTheme()) === "sara-lavender";
+}
+
+export function isBookBouquetTheme(themeId?: AppThemeId): boolean {
+  return (themeId ?? getStoredAppTheme()) === "book-bouquet";
+}
+
+export function getThemeBackgroundUrl(themeId?: AppThemeId): string | null {
+  const id = themeId ?? getStoredAppTheme();
+  return THEME_BACKGROUNDS[id] ?? null;
+}
+
+export function themeUsesPhotoBackground(themeId?: AppThemeId): boolean {
+  return getThemeBackgroundUrl(themeId) != null;
 }
 
 export function applyAppTheme(themeId: AppThemeId) {

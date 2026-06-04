@@ -55,6 +55,7 @@ import {
   classifyMediaFile,
   detectMediaByMagicBytes,
   extractClipboardFiles,
+  readClipboardFilesAsync,
   getVideoDurationSafe,
   guessVideoMime,
   isDocumentFile,
@@ -1528,6 +1529,9 @@ export default function Messages() {
     async (file: File, clipboardItemType?: string) => {
       if (!user || filePickInFlightRef.current) return;
       filePickInFlightRef.current = true;
+      const unlockTimer = window.setTimeout(() => {
+        filePickInFlightRef.current = false;
+      }, 180_000);
       const normalized = normalizePastedFile(file, clipboardItemType);
       const toastId = `media-pick-${Date.now()}`;
       const quickDoc = isDocumentFile(normalized, clipboardItemType);
@@ -1660,6 +1664,7 @@ export default function Messages() {
           message: error instanceof Error ? error.message : "Failed to send video. Try a shorter clip or check your connection.",
         });
       } finally {
+        window.clearTimeout(unlockTimer);
         filePickInFlightRef.current = false;
       }
     },
@@ -1680,15 +1685,29 @@ export default function Messages() {
     if (!user || blocked) return;
 
     const onDocumentPaste = (e: ClipboardEvent) => {
-      if (recording) return;
+      if (recording || filePickInFlightRef.current) return;
       const cd = e.clipboardData;
-      const picked = extractClipboardFiles(cd).filter(({ file }) => file.size > 0);
-      if (picked.length === 0) return;
+      let picked = extractClipboardFiles(cd).filter(({ file }) => file.size > 0);
+
+      const runPaste = (files: { file: File; itemType?: string }[]) => {
+        if (files.length === 0 || filePickInFlightRef.current) return;
+        const { file, itemType } = files[0]!;
+        void handlePickedFile(file, itemType);
+      };
+
+      if (picked.length > 0) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        runPaste(picked);
+        return;
+      }
 
       e.preventDefault();
       e.stopImmediatePropagation();
-      const { file, itemType } = picked[0];
-      void handlePickedFile(file, itemType);
+      void readClipboardFilesAsync().then((asyncPicked) => {
+        picked = asyncPicked.filter(({ file }) => file.size > 0);
+        runPaste(picked);
+      });
     };
 
     document.addEventListener("paste", onDocumentPaste, true);

@@ -116,7 +116,7 @@ export default function SecretNotes() {
     dictationRef.current = session;
     void session.promise
       .then((final) => {
-        if (final) setContent(prefix ? `${prefix} ${final}`.trim() : final);
+        if (final.text) setContent(prefix ? `${prefix} ${final.text}`.trim() : final.text);
       })
       .catch(() => toast.error("Could not transcribe audio."))
       .finally(() => {

@@ -114,9 +114,10 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
   const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const MAX_FILE_SIZE = 25 * 1024 * 1024;
-    if (file.size > MAX_FILE_SIZE) {
-      alert("File too large. Maximum size is 25MB.");
+    const isVideo = file.type.startsWith("video/") || /\.(mp4|webm|mov|m4v|mkv|3gp)$/i.test(file.name);
+    const maxBytes = isVideo ? 60 * 1024 * 1024 : 25 * 1024 * 1024;
+    if (file.size > maxBytes) {
+      alert(isVideo ? "Video too large (max 60MB)." : "File too large (max 25MB).");
       e.target.value = "";
       return;
     }

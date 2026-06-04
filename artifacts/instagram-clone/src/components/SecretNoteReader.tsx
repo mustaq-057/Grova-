@@ -2,9 +2,15 @@ import { memo, useState } from "react";
 import { X, Lock, Mic } from "lucide-react";
 import { motion } from "framer-motion";
 import { AudioMessage } from "@/components/AudioMessage";
-import { isTranscriptionSupported, transcribeFromMicrophone } from "@/lib/voice-transcribe";
+import { isTranscriptionSupported, transcribeFromMicrophone, type TranscriptSegment } from "@/lib/voice-transcribe";
 import { parseSecretNotePlain, type SecretNotePayload } from "@/lib/secret-note-payload";
 import { toast } from "sonner";
+
+function formatSegTime(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
 
 type Props = {
   title: string;
@@ -15,6 +21,7 @@ type Props = {
 export const SecretNoteReader = memo(function SecretNoteReader({ title, body, onClose }: Props) {
   const payload: SecretNotePayload = parseSecretNotePlain(body);
   const [appendText, setAppendText] = useState("");
+  const [appendSegments, setAppendSegments] = useState<TranscriptSegment[]>([]);
   const [dictating, setDictating] = useState(false);
 
   const startAppendDictation = () => {
@@ -23,8 +30,15 @@ export const SecretNoteReader = memo(function SecretNoteReader({ title, body, on
       return;
     }
     setDictating(true);
-    const session = transcribeFromMicrophone(setAppendText);
+    const session = transcribeFromMicrophone((text, segs) => {
+      setAppendText(text);
+      setAppendSegments(segs);
+    });
     void session.promise
+      .then((r) => {
+        setAppendText(r.text);
+        setAppendSegments(r.segments);
+      })
       .catch(() => toast.error("Could not transcribe."))
       .finally(() => setDictating(false));
   };
@@ -78,7 +92,16 @@ export const SecretNoteReader = memo(function SecretNoteReader({ title, body, on
             <Mic className="w-4 h-4" />
             {dictating ? "Listening…" : "Transcribe audio"}
           </button>
-          {appendText ? (
+          {appendSegments.length > 0 ? (
+            <div className="text-sm space-y-1.5 bg-secondary/50 rounded-xl p-3">
+              {appendSegments.map((seg, i) => (
+                <p key={`${seg.start}-${i}`} className="leading-relaxed break-words">
+                  <span className="text-primary font-medium tabular-nums mr-2">{formatSegTime(seg.start)}</span>
+                  {seg.text}
+                </p>
+              ))}
+            </div>
+          ) : appendText ? (
             <p className="text-sm leading-relaxed whitespace-pre-wrap break-words bg-secondary/50 rounded-xl p-3">
               {appendText}
             </p>

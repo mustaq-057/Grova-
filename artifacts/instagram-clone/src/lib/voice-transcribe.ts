@@ -1,5 +1,16 @@
 /** Live mic dictation + normalized playback for file-based transcription (best-effort). */
 
+export type TranscriptSegment = {
+  start: number;
+  end: number;
+  text: string;
+};
+
+export type TranscriptionResult = {
+  text: string;
+  segments: TranscriptSegment[];
+};
+
 type SpeechRecognitionLike = {
   lang: string;
   continuous: boolean;
@@ -25,18 +36,20 @@ function getSpeechRecognition(): SpeechRecognitionLike {
 
 /** Speak into the mic — accurate transcription for secret notes / compose fields. */
 export function transcribeFromMicrophone(
-  onPartial: (text: string) => void,
+  onPartial: (text: string, segments: TranscriptSegment[]) => void,
   lang = "en-US",
-): { stop: () => void; promise: Promise<string> } {
+): { stop: () => void; promise: Promise<TranscriptionResult> } {
   const recognition = getSpeechRecognition();
   recognition.lang = lang;
   recognition.continuous = true;
   recognition.interimResults = true;
 
   let finalText = "";
-  let resolvePromise!: (value: string) => void;
+  const segments: TranscriptSegment[] = [];
+  const startedAt = Date.now();
+  let resolvePromise!: (value: TranscriptionResult) => void;
   let rejectPromise!: (reason: unknown) => void;
-  const promise = new Promise<string>((resolve, reject) => {
+  const promise = new Promise<TranscriptionResult>((resolve, reject) => {
     resolvePromise = resolve;
     rejectPromise = reject;
   });
@@ -45,10 +58,15 @@ export function transcribeFromMicrophone(
     let interim = "";
     for (let i = event.resultIndex; i < event.results.length; i++) {
       const chunk = event.results[i][0]?.transcript ?? "";
-      if (event.results[i].isFinal) finalText += chunk;
-      else interim += chunk;
+      if (event.results[i].isFinal) {
+        const start = (Date.now() - startedAt) / 1000;
+        finalText += chunk;
+        const end = (Date.now() - startedAt) / 1000;
+        const text = chunk.trim();
+        if (text) segments.push({ start, end: Math.max(end, start + 0.3), text });
+      } else interim += chunk;
     }
-    onPartial((finalText + interim).trim());
+    onPartial((finalText + interim).trim(), [...segments]);
   };
 
   recognition.onerror = (event) => {
@@ -56,7 +74,7 @@ export function transcribeFromMicrophone(
   };
 
   recognition.onend = () => {
-    resolvePromise(finalText.trim());
+    resolvePromise({ text: finalText.trim(), segments });
   };
 
   recognition.start();
@@ -152,9 +170,9 @@ function audioBufferToWav(buffer: AudioBuffer): Blob {
 /** Best-effort: play normalized audio while listening via mic (browser limitation). */
 export async function transcribeFromAudioUrl(
   audioUrl: string,
-  onPartial: (text: string) => void,
+  onPartial: (text: string, segments: TranscriptSegment[]) => void,
   lang = "en-US",
-): Promise<string> {
+): Promise<TranscriptionResult> {
   if (!isTranscriptionSupported()) {
     throw new Error("Speech recognition not supported");
   }
@@ -166,26 +184,38 @@ export async function transcribeFromAudioUrl(
   recognition.interimResults = true;
 
   let finalText = "";
+  const segments: TranscriptSegment[] = [];
   let finished = false;
 
-  return new Promise((resolve, reject) => {
+  return new Promise<TranscriptionResult>((resolve, reject) => {
+    const audio = new Audio(normalizedUrl);
+    audio.volume = 1;
+    audio.setAttribute("playsinline", "true");
+
     recognition.onresult = (event) => {
       let interim = "";
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const chunk = event.results[i][0]?.transcript ?? "";
-        if (event.results[i].isFinal) finalText += chunk;
-        else interim += chunk;
+        if (event.results[i].isFinal) {
+          const t = audio.currentTime;
+          const text = chunk.trim();
+          if (text) {
+            const last = segments[segments.length - 1];
+            segments.push({
+              start: last ? last.end : Math.max(0, t - 0.5),
+              end: t,
+              text,
+            });
+          }
+          finalText += chunk;
+        } else interim += chunk;
       }
-      onPartial((finalText + interim).trim());
+      onPartial((finalText + interim).trim(), [...segments]);
     };
 
     recognition.onerror = (event) => {
       if (event.error !== "aborted") reject(new Error(event.error));
     };
-
-    const audio = new Audio(normalizedUrl);
-    audio.volume = 1;
-    audio.setAttribute("playsinline", "true");
 
     let timeout = 0;
 
@@ -194,7 +224,7 @@ export async function transcribeFromAudioUrl(
       finished = true;
       window.clearTimeout(timeout);
       URL.revokeObjectURL(normalizedUrl);
-      resolve(finalText.trim());
+      resolve({ text: finalText.trim(), segments });
     };
 
     const fail = (err: unknown) => {

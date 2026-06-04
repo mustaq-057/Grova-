@@ -1,6 +1,7 @@
 import { getAuthHeaders } from "./session";
 
-const BINARY_UPLOAD_MIN_BYTES = 200 * 1024;
+/** Always prefer raw binary upload (no base64 bloat). */
+const BINARY_UPLOAD_MIN_BYTES = 0;
 
 function normalizeUploadMime(mime: string): string {
   return mime.split(";")[0]?.trim().toLowerCase() || "application/octet-stream";
