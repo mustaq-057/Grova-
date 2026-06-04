@@ -4,8 +4,9 @@
   "license": "MIT",
   "scripts": {
     "preinstall": "echo bypass",
+    "prebuild:grova": "pnpm install --frozen-lockfile",
     "build": "pnpm run typecheck && pnpm -r --if-present run build",
-    "build:grova": "pnpm --filter @workspace/instagram-clone run build && pnpm --filter @workspace/api-server run build && node scripts/sync-vercel-dist.mjs",
+    "build:grova": "pnpm install --frozen-lockfile && pnpm --filter @workspace/instagram-clone run build && pnpm --filter @workspace/api-server run build && node scripts/sync-vercel-dist.mjs",
     "vercel-build": "node scripts/vercel-build.mjs",
     "dev:web": "wait-on http://127.0.0.1:5001/api/healthz -t 120000 -i 1000 && pnpm --filter @workspace/instagram-clone run dev",
     "stop:grova": "npx --yes kill-port 5000 5001",
