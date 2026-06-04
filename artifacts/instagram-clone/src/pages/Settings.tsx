@@ -12,6 +12,7 @@ import {
   isShowPresenceEnabled,
   areNotificationsEnabled,
   applyCouplePrefs,
+  applyCouplePrefsWithReconcile,
   PREFS_CHANGED,
 } from "@/lib/couple-sync";
 import { getCouplePrefsCache } from "@/lib/client-memory";
@@ -84,9 +85,11 @@ export default memo(function Settings() {
     if (cached) applyPrefsToForm(cached);
     void api
       .getCouplePrefs()
-      .then((prefs) => {
-        applyCouplePrefs(prefs);
-        applyPrefsToForm(prefs);
+      .then(async (prefs) => {
+        const resolved = await applyCouplePrefsWithReconcile(prefs, (patch) =>
+          api.updateCouplePrefs(patch),
+        );
+        applyPrefsToForm(resolved);
       })
       .catch(() => {
         toast.error("Could not refresh settings from server.");

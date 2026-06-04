@@ -73,3 +73,40 @@ export function isShowPresenceEnabled(): boolean {
 export function areNotificationsEnabled(): boolean {
   return getCouplePrefsCache()?.notifications ?? notifications;
 }
+
+function couplePrefsEqual(a: CouplePrefs, b: CouplePrefs): boolean {
+  return (
+    (a.chatTheme || "default") === (b.chatTheme || "default") &&
+    (a.appTheme || "grova") === (b.appTheme || "grova") &&
+    a.readReceipts === b.readReceipts &&
+    a.showPresence === b.showPresence &&
+    (a.notifications ?? true) === (b.notifications ?? true)
+  );
+}
+
+/** Apply server prefs; if disk cache differs, keep disk and push to Neon (fixes refresh wiping toggles). */
+export async function applyCouplePrefsWithReconcile(
+  server: CouplePrefs,
+  sync: (patch: Partial<CouplePrefs>) => Promise<CouplePrefs>,
+): Promise<CouplePrefs> {
+  const local = loadPersistedCouplePrefs();
+  if (!local || couplePrefsEqual(local, server)) {
+    applyCouplePrefs(server);
+    return server;
+  }
+  applyCouplePrefs(local);
+  try {
+    const synced = await sync({
+      chatTheme: local.chatTheme,
+      appTheme: local.appTheme,
+      readReceipts: local.readReceipts,
+      showPresence: local.showPresence,
+      notifications: local.notifications,
+      quickEmojis: local.quickEmojis,
+    });
+    applyCouplePrefs(synced);
+    return synced;
+  } catch {
+    return local;
+  }
+}

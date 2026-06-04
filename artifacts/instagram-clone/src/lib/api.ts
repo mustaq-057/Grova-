@@ -491,8 +491,14 @@ export const api = {
 
   getCouplePrefs: () => apiFetch<CouplePrefs>("/couple/prefs"),
 
-  updateCouplePrefs: (data: Partial<Pick<CouplePrefs, "chatTheme" | "appTheme" | "readReceipts" | "showPresence" | "quickEmojis">>) =>
-    apiFetch<CouplePrefs>("/couple/prefs", { method: "PUT", body: JSON.stringify(data) }),
+  updateCouplePrefs: (
+    data: Partial<
+      Pick<
+        CouplePrefs,
+        "chatTheme" | "appTheme" | "readReceipts" | "showPresence" | "notifications" | "quickEmojis"
+      >
+    >,
+  ) => apiFetch<CouplePrefs>("/couple/prefs", { method: "PUT", body: JSON.stringify(data) }),
 
   getCoupleNotes: () => apiFetch<{ me: string; wife: string }>("/couple/notes"),
 

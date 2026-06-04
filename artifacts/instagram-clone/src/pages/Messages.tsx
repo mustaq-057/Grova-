@@ -11,7 +11,7 @@ import { MessageInput } from "@/components/MessageInput";
 import { InfoPanel } from "@/components/InfoPanel";
 import { Link } from "wouter";
 import type { GreetingTemplate } from "@/lib/greeting-messages";
-import { normalizeMessages, prepareOutgoingMessage, buildOptimisticMessage, buildSeenLabel, findLastSeenOutgoingId, messagePreview } from "@/lib/message-utils";
+import { normalizeMessages, previewMessagesForDisplay, prepareOutgoingMessage, buildOptimisticMessage, buildSeenLabel, findLastSeenOutgoingId, messagePreview } from "@/lib/message-utils";
 import { callStartedText, callEndedText, isCallLogMessage } from "@/lib/call-chat-log";
 import { usePresenceLabel } from "@/hooks/usePresenceLabel";
 import { groupByDay, shouldShowTimeGap } from "@/lib/message-helpers";
@@ -328,6 +328,13 @@ export default function Messages() {
         const raw = data.messages || [];
         if (raw.length > 0) {
           setLoading(false);
+          const preview = previewMessagesForDisplay(raw);
+          setMessages((prev) => {
+            const pending = prev.filter((m) => pendingOutgoingRef.current.has(m.id));
+            const next = mergeMessagesById(preview, pending);
+            messagesSigRef.current = messagesListSignature(next);
+            return next;
+          });
         }
         const fromServer = await normalizeMessages(raw);
         isInitialLoadRef.current = true;

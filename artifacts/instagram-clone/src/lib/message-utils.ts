@@ -73,6 +73,15 @@ export async function decryptMessages(msgs: ApiMessage[]): Promise<ApiMessage[]>
   return out;
 }
 
+/** Fast first paint while full decrypt runs in the background. */
+export function previewMessagesForDisplay(msgs: ApiMessage[]): ApiMessage[] {
+  return msgs.map((m) => {
+    if (!isE2ECiphertext(m.text)) return scrubUndecryptedServerText(m);
+    if (!isEncryptionReady()) return scrubLockedE2E(m);
+    return { ...m, text: "…" };
+  });
+}
+
 export async function normalizeMessages(msgs: ApiMessage[]): Promise<ApiMessage[]> {
   if (msgs.length === 0) return [];
   const needsDecrypt = msgs.some((m) => isE2ECiphertext(m.text));

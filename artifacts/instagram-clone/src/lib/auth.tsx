@@ -21,7 +21,9 @@ import { hydrateNotes } from "./notes";
 import { applyQuickReactions } from "./quick-reactions";
 import {
   applyCouplePrefs,
+  applyCouplePrefsWithReconcile,
   applyChatTheme,
+  hydrateCouplePrefsFromDisk,
   type CouplePrefs,
   PARTNER_CHANGED,
 } from "./couple-sync";
@@ -89,7 +91,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshCouplePrefs = useCallback(async () => {
     const prefs = await api.getCouplePrefs();
-    applyPrefs(prefs);
+    const resolved = await applyCouplePrefsWithReconcile(prefs, (patch) => api.updateCouplePrefs(patch));
+    applyPrefs(resolved);
   }, [applyPrefs]);
 
   const updateChatTheme = useCallback(
@@ -232,11 +235,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await clearAllNotifications();
       await hydrateNotifications();
       await hydrateNotes();
+      hydrateCouplePrefsFromDisk();
       try {
         const prefs = await api.getCouplePrefs();
-        if (mounted) applyPrefs(prefs);
+        if (mounted) {
+          const resolved = await applyCouplePrefsWithReconcile(prefs, (patch) =>
+            api.updateCouplePrefs(patch),
+          );
+          if (mounted) applyPrefs(resolved);
+        }
       } catch {
-        /* ignore */
+        /* keep disk prefs from bootstrap */
       }
       await refreshProfiles();
       await syncChatBadgeFromServer();
