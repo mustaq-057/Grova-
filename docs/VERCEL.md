@@ -56,7 +56,9 @@ If login fails: check `ALLOWED_ORIGINS` includes your exact Vercel URL (no trail
 pnpm install && pnpm run build:grova
 ```
 
-Builds Vite + bundles API into `artifacts/api-server/dist/` for the serverless handler.
+Builds Vite + bundles API into `artifacts/api-server/dist/` for the serverless handler, then copies the UI to repo-root `dist/` (Vercel output directory).
+
+**Project settings:** Root Directory = repo root (default). If the dashboard sets **Output Directory**, use `dist` or leave it empty so `vercel.json` applies.
 
 ## 6. Heavier production (optional)
 

@@ -5,7 +5,7 @@
   "scripts": {
     "preinstall": "echo bypass",
     "build": "pnpm run typecheck && pnpm -r --if-present run build",
-    "build:grova": "pnpm --filter @workspace/instagram-clone run build && pnpm --filter @workspace/api-server run build",
+    "build:grova": "pnpm --filter @workspace/instagram-clone run build && pnpm --filter @workspace/api-server run build && node scripts/sync-vercel-dist.mjs",
     "dev:web": "wait-on http://127.0.0.1:5001/api/healthz -t 120000 -i 1000 && pnpm --filter @workspace/instagram-clone run dev",
     "stop:grova": "npx --yes kill-port 5000 5001",
     "dev": "pnpm run dev:grova",

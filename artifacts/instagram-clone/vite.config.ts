@@ -1,14 +1,29 @@
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 
 const apiTarget = process.env.API_URL ?? "http://localhost:5001";
 
+/** shadcn copies include Next.js "use client"; strip it so Vite/Rollup sourcemaps stay valid. */
+function stripUseClient(): Plugin {
+  return {
+    name: "strip-use-client",
+    enforce: "pre",
+    transform(code, id) {
+      if (!/\.(tsx|jsx)$/.test(id)) return;
+      if (!/^['"]use client['"];?\s*\r?\n/.test(code)) return;
+      return {
+        code: code.replace(/^['"]use client['"];?\s*\r?\n/, ""),
+        map: null,
+      };
+    },
+  };
+}
 
 export default defineConfig({
   base: "/",
-  plugins: [react(), tailwindcss()],
+  plugins: [stripUseClient(), react(), tailwindcss()],
   publicDir: "public",
   resolve: {
     alias: {
@@ -22,6 +37,7 @@ export default defineConfig({
   build: {
     outDir: "dist",
     emptyOutDir: true,
+    sourcemap: false,
     rollupOptions: {
       output: {
         manualChunks: (id) => {
