@@ -1,4 +1,4 @@
-import { useState, memo } from "react";
+import { useState, memo, useEffect } from "react";
 import { ChevronRight, User, Lock, Bell, Moon, Sun, LogOut, Heart, Shield, Smartphone, Eye, EyeOff, Check, Edit3, X } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -12,7 +12,10 @@ import {
   isShowPresenceEnabled,
   areNotificationsEnabled,
   applyCouplePrefs,
+  PREFS_CHANGED,
 } from "@/lib/couple-sync";
+import { getCouplePrefsCache } from "@/lib/client-memory";
+import type { CouplePrefs } from "@/lib/types";
 import { hydrateNotifications } from "@/lib/notifications-feed";
 import { Link } from "wouter";
 import { applyColorMode, applyAppTheme, getStoredAppTheme, getStoredDarkMode, type AppThemeId } from "@/lib/app-theme";
@@ -65,17 +68,62 @@ export default memo(function Settings() {
   const [readReceipts, setReadReceipts] = useState(() => isReadReceiptsEnabled());
   const [showPresence, setShowPresence] = useState(() => isShowPresenceEnabled());
 
+  const applyPrefsToForm = (prefs: CouplePrefs) => {
+    setReadReceipts(prefs.readReceipts);
+    setShowPresence(prefs.showPresence);
+    setNotifications(prefs.notifications ?? true);
+    if (prefs.appTheme) {
+      setAppTheme(prefs.appTheme as AppThemeId);
+      applyAppTheme(prefs.appTheme as AppThemeId);
+    }
+  };
+
+  useEffect(() => {
+    if (!user) return;
+    const cached = getCouplePrefsCache();
+    if (cached) applyPrefsToForm(cached);
+    void api
+      .getCouplePrefs()
+      .then((prefs) => {
+        applyCouplePrefs(prefs);
+        applyPrefsToForm(prefs);
+      })
+      .catch(() => {
+        toast.error("Could not refresh settings from server.");
+      });
+    const onPrefs = (e: Event) => {
+      applyPrefsToForm((e as CustomEvent<CouplePrefs>).detail);
+    };
+    window.addEventListener(PREFS_CHANGED, onPrefs);
+    return () => window.removeEventListener(PREFS_CHANGED, onPrefs);
+  }, [user?.id]);
+
   const syncPref = async (patch: {
     readReceipts?: boolean;
     showPresence?: boolean;
     notifications?: boolean;
     appTheme?: AppThemeId;
   }) => {
+    const optimistic: CouplePrefs = {
+      chatTheme: getCouplePrefsCache()?.chatTheme ?? "default",
+      appTheme: patch.appTheme ?? appTheme,
+      readReceipts: patch.readReceipts ?? readReceipts,
+      showPresence: patch.showPresence ?? showPresence,
+      notifications: patch.notifications ?? notifications,
+      noteMe: getCouplePrefsCache()?.noteMe ?? "",
+      noteWife: getCouplePrefsCache()?.noteWife ?? "",
+      quickEmojis: getCouplePrefsCache()?.quickEmojis ?? [],
+    };
+    applyCouplePrefs(optimistic);
+    applyPrefsToForm(optimistic);
     try {
       const prefs = await api.updateCouplePrefs(patch);
       applyCouplePrefs(prefs);
+      applyPrefsToForm(prefs);
     } catch (err) {
       console.error("Failed to sync preference:", err);
+      toast.error("Could not save setting. Try again.");
+      void api.getCouplePrefs().then(applyCouplePrefs).catch(() => {});
     }
   };
 

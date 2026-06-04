@@ -22,12 +22,19 @@ export function PostFeed() {
   const [deleting, setDeleting] = useState(false);
 
   const loadPosts = useCallback(async () => {
+    const safety = window.setTimeout(() => setLoading(false), 8_000);
     try {
-      const list = await api.getPosts();
+      const list = await Promise.race([
+        api.getPosts(),
+        new Promise<never>((_, reject) => {
+          window.setTimeout(() => reject(new Error("timeout")), 15_000);
+        }),
+      ]);
       setPosts(list);
     } catch (err) {
       console.error("Failed to load posts:", err);
     } finally {
+      window.clearTimeout(safety);
       setLoading(false);
     }
   }, []);

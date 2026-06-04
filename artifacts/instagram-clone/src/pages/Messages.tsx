@@ -301,19 +301,35 @@ export default function Messages() {
 
   // Load messages function (can be called from retry button)
   const loadMessages = useCallback(async () => {
-    const requestId = 'load-messages';
-    
-    // Check if request is already pending
+    const requestId = "load-messages";
+
     if (pendingRequestsRef.current.has(requestId)) {
       return pendingRequestsRef.current.get(requestId);
     }
 
-    setLoading(true);
+    const hadMessages = messagesSigRef.current !== "0";
+    if (!hadMessages) setLoading(true);
     setError(null);
 
-    const requestPromise = api.getMessages()
+    const safetyTimer = window.setTimeout(() => {
+      setLoading(false);
+    }, 12_000);
+
+    const fetchMessages = () =>
+      Promise.race([
+        api.getMessages(),
+        new Promise<never>((_, reject) => {
+          window.setTimeout(() => reject(new Error("Request timed out")), 20_000);
+        }),
+      ]);
+
+    const requestPromise = fetchMessages()
       .then(async (data) => {
-        const fromServer = await normalizeMessages(data.messages || []);
+        const raw = data.messages || [];
+        if (raw.length > 0) {
+          setLoading(false);
+        }
+        const fromServer = await normalizeMessages(raw);
         isInitialLoadRef.current = true;
         setMessages((prev) => {
           const pending = prev.filter((m) => pendingOutgoingRef.current.has(m.id));
@@ -328,14 +344,19 @@ export default function Messages() {
       })
       .catch((err) => {
         console.error("Failed to load messages:", err);
-        setError("Failed to load messages. Please check your connection.");
-        setMessages([]);
+        const msg =
+          err instanceof Error && /timed out/i.test(err.message)
+            ? "Loading messages timed out. Tap Try Again."
+            : "Failed to load messages. Please check your connection.";
+        setError(msg);
+        if (!hadMessages) setMessages([]);
       })
       .finally(() => {
+        window.clearTimeout(safetyTimer);
         setLoading(false);
         pendingRequestsRef.current.delete(requestId);
       });
-    
+
     pendingRequestsRef.current.set(requestId, requestPromise);
     return requestPromise;
   }, []);

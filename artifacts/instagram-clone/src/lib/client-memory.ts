@@ -83,6 +83,7 @@ export function purgeLegacyLocalStorage(): void {
     "grova_app_theme",
     "grova_dark_mode",
     "grova_theme",
+    /* keep grova_couple_prefs_v1 + grova_dark_mode_v1 — current settings cache */
     "grova_device_id",
     "grova_e2e_keys_",
   ];

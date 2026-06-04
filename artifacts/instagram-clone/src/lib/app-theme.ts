@@ -1,5 +1,7 @@
 /** App-wide color themes — nav, settings, profile chrome only (not chat bubbles). */
 
+import { loadPersistedDarkMode, persistDarkMode } from "./couple-prefs-persist";
+
 export type AppThemeId =
   | "grova"
   | "rose-love"
@@ -217,6 +219,7 @@ export function getStoredDarkMode(): boolean {
 export function applyColorMode(dark: boolean) {
   darkMode = dark;
   document.documentElement.classList.toggle("dark", dark);
+  persistDarkMode(dark);
   syncAppChromeFromTheme();
 }
 

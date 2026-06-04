@@ -1,11 +1,11 @@
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./index.css";
-import { initAppearance } from "@/lib/app-theme";
+import { bootstrapAppearance } from "@/lib/couple-sync";
 import { purgeLegacyLocalStorage } from "@/lib/client-memory";
 
 purgeLegacyLocalStorage();
-initAppearance();
+bootstrapAppearance();
 
 // Dev: remove stale service workers (cached JS can break React hooks)
 if (import.meta.env.DEV && "serviceWorker" in navigator) {

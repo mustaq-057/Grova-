@@ -1,5 +1,12 @@
 import { getCouplePrefsCache, setCouplePrefsCache } from "./client-memory";
-import { applyAppTheme, type AppThemeId } from "./app-theme";
+
+export { getCouplePrefsCache } from "./client-memory";
+import { applyAppTheme, applyColorMode, type AppThemeId } from "./app-theme";
+import {
+  loadPersistedCouplePrefs,
+  loadPersistedDarkMode,
+  persistCouplePrefs,
+} from "./couple-prefs-persist";
 import type { CouplePrefs } from "./types";
 
 export const CHAT_THEME_CHANGED = "grova-chat-theme-changed";
@@ -24,6 +31,7 @@ export function applyChatTheme(themeId: string) {
 
 export function applyCouplePrefs(prefs: CouplePrefs) {
   setCouplePrefsCache(prefs);
+  persistCouplePrefs(prefs);
   applyChatTheme(prefs.chatTheme || "default");
   if (prefs.appTheme) {
     applyAppTheme(prefs.appTheme as AppThemeId);
@@ -32,6 +40,26 @@ export function applyCouplePrefs(prefs: CouplePrefs) {
   showPresence = prefs.showPresence;
   notifications = prefs.notifications ?? true;
   window.dispatchEvent(new CustomEvent(PREFS_CHANGED, { detail: prefs }));
+}
+
+/** Restore theme + toggles from localStorage on cold start (before Neon). */
+export function bootstrapAppearance(): void {
+  const prefs = loadPersistedCouplePrefs();
+  const dark = loadPersistedDarkMode() ?? true;
+  applyColorMode(dark);
+  if (prefs) {
+    applyCouplePrefs(prefs);
+    return;
+  }
+  applyAppTheme("grova");
+}
+
+/** Restore toggles from disk before Neon responds (survives refresh). */
+export function hydrateCouplePrefsFromDisk(): CouplePrefs | null {
+  const prefs = loadPersistedCouplePrefs();
+  if (!prefs) return null;
+  applyCouplePrefs(prefs);
+  return prefs;
 }
 
 export function isReadReceiptsEnabled(): boolean {

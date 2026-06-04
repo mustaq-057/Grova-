@@ -58,7 +58,19 @@ export async function decryptMessage(msg: ApiMessage): Promise<ApiMessage> {
 }
 
 export async function decryptMessages(msgs: ApiMessage[]): Promise<ApiMessage[]> {
-  return Promise.all(msgs.map(decryptMessage));
+  const CHUNK = 20;
+  const out: ApiMessage[] = [];
+  for (let i = 0; i < msgs.length; i += CHUNK) {
+    const slice = msgs.slice(i, i + CHUNK);
+    const decrypted = await Promise.all(slice.map(decryptMessage));
+    out.push(...decrypted);
+    if (i + CHUNK < msgs.length) {
+      await new Promise<void>((r) => {
+        requestAnimationFrame(() => r());
+      });
+    }
+  }
+  return out;
 }
 
 export async function normalizeMessages(msgs: ApiMessage[]): Promise<ApiMessage[]> {
