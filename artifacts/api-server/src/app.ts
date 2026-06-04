@@ -46,12 +46,22 @@ setupCompression(app);
 // Setup security headers
 setupSecurity(app);
 
-// Configure CORS with specific origin (not open)
-const allowedOrigins = process.env.ALLOWED_ORIGINS 
-  ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim())
-  : ['http://localhost:5000', 'http://127.0.0.1:5000'];
+const isDev = process.env.NODE_ENV !== "production";
 
-const isDev = process.env.NODE_ENV !== 'production';
+function buildAllowedOrigins(): string[] {
+  const fromEnv = (process.env.ALLOWED_ORIGINS || "")
+    .split(",")
+    .map((o) => o.trim())
+    .filter(Boolean);
+  const vercelHosts = [process.env.VERCEL_URL, process.env.VERCEL_BRANCH_URL]
+    .filter(Boolean)
+    .map((h) => `https://${h}`);
+  const devDefaults = ["http://localhost:5000", "http://127.0.0.1:5000"];
+  const merged = [...new Set([...fromEnv, ...vercelHosts, ...(isDev ? devDefaults : [])])];
+  return merged.length > 0 ? merged : devDefaults;
+}
+
+const allowedOrigins = buildAllowedOrigins();
 
 app.use(cors({
   origin: (origin, callback) => {
@@ -74,7 +84,14 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token', 'X-Primary-Token'],
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "X-CSRF-Token",
+    "X-Primary-Token",
+    "X-Client-Id",
+    "X-Client-Origin",
+  ],
 }));
 
 app.use(cookieParser());

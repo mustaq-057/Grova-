@@ -82,7 +82,7 @@ export class ProfileService {
     const result = await db.execute("SELECT * FROM profiles WHERE id = $1", [userId]);
     const profile = result.rows[0] as unknown as RawProfileRow;
 
-    const publicAvatar = await persistAvatarIfNeeded(userId, profile.avatar);
+    const publicAvatar = sanitizeAvatarForClient(userId, profile.avatar);
     broadcast("profile-updated", {
       userId,
       id: profile.id,

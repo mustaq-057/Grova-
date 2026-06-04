@@ -135,6 +135,8 @@ export default memo(function Login() {
         );
       } else if (msg.toLowerCase().includes("invalid code")) {
         setError("Wrong code. Check spelling and try again.");
+      } else if (msg.toLowerCase().includes("primary authentication")) {
+        setError("Email sign-in expired. Go back and sign in with your email again.");
       } else {
         setError("Login failed. Please try again.");
       }

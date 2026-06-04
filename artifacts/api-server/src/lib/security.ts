@@ -221,8 +221,11 @@ export function validateEnv(): void {
 
   if (process.env.NODE_ENV === "production") {
     const allowedOrigins = (process.env.ALLOWED_ORIGINS || "").trim();
-    if (!allowedOrigins) {
-      throw new Error("ALLOWED_ORIGINS is required in production");
+    const vercelHost = (process.env.VERCEL_URL || "").trim();
+    if (!allowedOrigins && !vercelHost) {
+      throw new Error(
+        "ALLOWED_ORIGINS is required in production (or deploy on Vercel where VERCEL_URL is set automatically)",
+      );
     }
   }
 }

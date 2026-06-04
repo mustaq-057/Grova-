@@ -1,6 +1,7 @@
 import { memo, useState, useEffect, useMemo } from "react";
 import { defaultAvatar } from "@/lib/avatars";
 import { avatarSrc } from "@/lib/avatar-display";
+import { isStockAvatar } from "@/lib/avatar-utils";
 
 type Props = {
   src?: string;
@@ -9,30 +10,45 @@ type Props = {
   className?: string;
 };
 
-function resolveAvatarUrl(src: string | undefined, userId: string, failed: boolean): string {
-  const fallback = defaultAvatar(userId);
-  if (failed) return fallback;
+function resolveAvatarUrl(src: string | undefined, userId: string, failed: boolean, retry: number): string {
+  const stock = defaultAvatar(userId);
   const raw = src?.trim();
-  if (!raw) return fallback;
+  if (!raw) return stock;
+
   if (raw.startsWith("data:image/")) return raw;
-  if (raw.startsWith("http://") || raw.startsWith("https://")) {
-    return avatarSrc(raw, userId) || fallback;
+
+  if (raw.startsWith("http://") || raw.startsWith("https://") || raw.startsWith("/")) {
+    const absolute = raw.startsWith("/") ? `${window.location.origin}${raw}` : raw;
+    if (failed) {
+      // Never swap a failed custom upload for the stock Unsplash photo.
+      if (!isStockAvatar(absolute, userId)) {
+        if (retry < 1) {
+          const sep = absolute.includes("?") ? "&" : "?";
+          return `${absolute}${sep}retry=${retry + 1}`;
+        }
+        return absolute;
+      }
+      return stock;
+    }
+    return avatarSrc(absolute, userId) || stock;
   }
-  if (raw.startsWith("/")) {
-    const absolute = `${window.location.origin}${raw}`;
-    return avatarSrc(absolute, userId) || fallback;
-  }
-  return fallback;
+
+  return stock;
 }
 
 export const AvatarImage = memo(function AvatarImage({ src, userId, alt, className }: Props) {
   const [failed, setFailed] = useState(false);
+  const [retry, setRetry] = useState(0);
 
   useEffect(() => {
     setFailed(false);
+    setRetry(0);
   }, [src, userId]);
 
-  const displaySrc = useMemo(() => resolveAvatarUrl(src, userId, failed), [src, userId, failed]);
+  const displaySrc = useMemo(
+    () => resolveAvatarUrl(src, userId, failed, retry),
+    [src, userId, failed, retry],
+  );
 
   return (
     <img
@@ -42,7 +58,12 @@ export const AvatarImage = memo(function AvatarImage({ src, userId, alt, classNa
       loading="lazy"
       decoding="async"
       referrerPolicy="no-referrer"
-      onError={() => setFailed(true)}
+      onError={() => {
+        if (!failed) {
+          setFailed(true);
+          setRetry((r) => r + 1);
+        }
+      }}
     />
   );
 });

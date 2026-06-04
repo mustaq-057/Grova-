@@ -8,11 +8,8 @@ function normalizeUploadMime(mime: string): string {
 }
 
 function binaryUploadHeaders(contentType: string): Record<string, string> {
-  const headers: Record<string, string> = { "Content-Type": contentType };
   const auth = getAuthHeaders();
-  if (auth.Authorization) headers.Authorization = auth.Authorization;
-  if (auth["X-CSRF-Token"]) headers["X-CSRF-Token"] = auth["X-CSRF-Token"];
-  return headers;
+  return { "Content-Type": contentType, ...auth };
 }
 
 function guessContentType(dataUrl: string): string {

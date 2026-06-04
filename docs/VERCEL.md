@@ -25,7 +25,7 @@ Required:
 | `DEFAULT_COUPLE_CODE` | First-time seed |
 | `PRIMARY_AUTH_EMAILS` | Comma-separated emails |
 | `PRIMARY_AUTH_PASSWORD_1` | Login password |
-| `ALLOWED_ORIGINS` | `https://your-app.vercel.app` (+ custom domain) |
+| `ALLOWED_ORIGINS` | `https://your-app.vercel.app` (+ custom domain). Optional on Vercel — `VERCEL_URL` is added automatically |
 | `CLOUDINARY_URL` or `B2_*` | Media uploads |
 | `VITE_GIPHY_API_KEY` | Build-time — enable GIF picker |
 

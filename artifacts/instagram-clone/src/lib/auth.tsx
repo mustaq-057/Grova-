@@ -29,6 +29,8 @@ import { applyAppTheme, type AppThemeId } from "./app-theme";
 import { clearClientMemory, purgeLegacyLocalStorage } from "./client-memory";
 import { clearSession } from "./session";
 import { bumpAvatarVersion } from "./avatar-display";
+import { pickAvatarUrl } from "./avatar-utils";
+import { openLiveChannel } from "./sse-client";
 
 /** After this idle time, profile session ends — user picks profile + enters code again. */
 export const PROFILE_INACTIVITY_MS = 60 * 60 * 1000;
@@ -107,13 +109,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const me = users.find((u) => u.id === current.id);
     const p = users.find((u) => u.id !== current.id);
     if (me) {
-      if (me.avatar !== userRef.current?.avatar) bumpAvatarVersion(me.id);
-      setUser(me);
+      const cur = userRef.current;
+      const avatar = pickAvatarUrl(me.avatar, cur?.avatar, me.id);
+      if (avatar !== cur?.avatar) bumpAvatarVersion(me.id);
+      setUser({ ...me, avatar });
     }
     if (p) {
-      if (p.avatar !== partnerRef.current?.avatar) bumpAvatarVersion(p.id);
-      setPartner(p);
-      window.dispatchEvent(new CustomEvent(PARTNER_CHANGED, { detail: p }));
+      const cur = partnerRef.current;
+      const avatar = pickAvatarUrl(p.avatar, cur?.avatar, p.id);
+      if (avatar !== cur?.avatar) bumpAvatarVersion(p.id);
+      const merged = { ...p, avatar };
+      setPartner(merged);
+      window.dispatchEvent(new CustomEvent(PARTNER_CHANGED, { detail: merged }));
     }
   }, [setUser]);
 
@@ -209,6 +216,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     let mounted = true;
     let es: EventSource | null = null;
+    let stopLive: (() => void) | null = null;
+
+    const onLivePoll = () => {
+      void refreshProfiles();
+      void refreshCouplePrefs();
+      void hydrateNotifications();
+      if (!window.location.pathname.includes("/chat")) {
+        void syncChatBadgeFromServer();
+      }
+    };
 
     const init = async () => {
       setNotificationViewer(user.id, user.name);
@@ -227,29 +244,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
     init();
 
-    es = new EventSource(`/api/sse?userId=${user.id}`, { withCredentials: true });
-
-    es.addEventListener("profile-updated", (e) => {
+    const wireSse = (source: EventSource) => {
+    source.addEventListener("profile-updated", (e) => {
       try {
         const d = JSON.parse((e as MessageEvent).data) as ApiUser & { userId: string };
         const id = d.userId || d.id;
-        if (d.avatar) bumpAvatarVersion(id);
         if (id === userRef.current?.id) {
+          const cur = userRef.current!;
+          const avatar =
+            d.avatar != null ? pickAvatarUrl(d.avatar, cur.avatar, id) : cur.avatar;
+          if (d.avatar != null && avatar !== cur.avatar) bumpAvatarVersion(id);
           setUser({
-            ...userRef.current!,
+            ...cur,
             ...(d.name != null && d.name !== "" ? { name: d.name } : {}),
             ...(d.bio != null ? { bio: d.bio } : {}),
-            ...(d.avatar != null ? { avatar: d.avatar } : {}),
+            ...(d.avatar != null ? { avatar } : {}),
             ...(d.username != null && d.username !== "" ? { username: d.username } : {}),
           });
           if (d.name) setNotificationViewer(id, d.name);
         } else {
+          const prev = partnerRef.current;
+          const avatar = pickAvatarUrl(
+            d.avatar ?? prev?.avatar,
+            prev?.avatar,
+            id,
+          );
+          if (d.avatar != null && avatar !== prev?.avatar) bumpAvatarVersion(id);
           const p: ApiUser = {
             id: id as "me" | "wife",
-            username: d.username ?? partnerRef.current?.username ?? (id === "wife" ? "sara" : "mustaq"),
-            name: d.name ?? partnerRef.current?.name ?? (id === "wife" ? "Sara" : "Mustaq"),
-            bio: d.bio ?? partnerRef.current?.bio ?? "",
-            avatar: d.avatar ?? partnerRef.current?.avatar ?? "",
+            username: d.username ?? prev?.username ?? (id === "wife" ? "sara" : "mustaq"),
+            name: d.name ?? prev?.name ?? (id === "wife" ? "Sara" : "Mustaq"),
+            bio: d.bio ?? prev?.bio ?? "",
+            avatar,
           };
           setPartner(p);
           window.dispatchEvent(new CustomEvent(PARTNER_CHANGED, { detail: p }));
@@ -259,7 +285,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    es.addEventListener("prefs-updated", (e) => {
+    source.addEventListener("prefs-updated", (e) => {
       try {
         applyPrefs(JSON.parse((e as MessageEvent).data) as CouplePrefs);
       } catch {
@@ -267,7 +293,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    es.addEventListener("note-updated", () => {
+    source.addEventListener("note-updated", () => {
       hydrateNotes();
     });
 
@@ -284,7 +310,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       };
     };
 
-    es.addEventListener("new-message", (e) => {
+    source.addEventListener("new-message", (e) => {
       void (async () => {
         try {
           const msg = JSON.parse((e as MessageEvent).data) as ApiMessage;
@@ -299,7 +325,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       })();
     });
 
-    es.addEventListener("message-reaction", (e) => {
+    source.addEventListener("message-reaction", (e) => {
       try {
         const d = JSON.parse((e as MessageEvent).data) as {
           reactions: { emoji: string; userId: string }[];
@@ -314,7 +340,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    es.addEventListener("message-liked", (e) => {
+    source.addEventListener("message-liked", (e) => {
       try {
         const msg = JSON.parse((e as MessageEvent).data) as ApiMessage & { likedBy?: string };
         const ctx = chatNotifyCtx();
@@ -325,27 +351,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    es.addEventListener("activity-added", () => {
+    source.addEventListener("activity-added", () => {
       if (userRef.current) setNotificationViewer(userRef.current.id, userRef.current.name);
       hydrateNotifications();
     });
 
-    es.addEventListener("activity-read-all", () => {
+    source.addEventListener("activity-read-all", () => {
       markAllReadLocal();
     });
+    };
 
-    const poll = setInterval(() => {
-      refreshProfiles();
-      refreshCouplePrefs();
-      if (!window.location.pathname.includes("/chat")) {
-        void syncChatBadgeFromServer();
+    void openLiveChannel(user.id, onLivePoll).then((channel) => {
+      if (!mounted) {
+        if (channel?.mode === "poll") channel.stop();
+        else channel?.mode === "sse" && channel.eventSource.close();
+        return;
       }
-    }, 30_000);
+      if (!channel) return;
+      if (channel.mode === "poll") {
+        stopLive = channel.stop;
+        return;
+      }
+      es = channel.eventSource;
+      wireSse(es);
+    });
 
     return () => {
       mounted = false;
       es?.close();
-      clearInterval(poll);
+      stopLive?.();
     };
   }, [user?.id, authReady, refreshProfiles, refreshCouplePrefs, applyPrefs, setUser]);
 

@@ -29,8 +29,8 @@ export default defineConfig({
           // Never split React — duplicate copies break hooks (useState is null).
           if (/\/node_modules\/react(-dom)?\//.test(id)) return undefined;
           if (id.includes("framer-motion")) return "framer-motion";
-          if (id.includes("@radix-ui")) return "radix-ui";
           if (id.includes("lucide-react")) return "lucide";
+          // @radix-ui stays in vendor — separate chunk caused circular vendor <-> radix-ui
           return "vendor";
         },
       },

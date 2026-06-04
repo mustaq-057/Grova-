@@ -55,6 +55,10 @@ export function getAccessToken(): string | null {
 
 export function getAuthHeaders(): Record<string, string> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
+  headers["X-Client-Id"] = getOrCreateClientId();
+  if (typeof window !== "undefined") {
+    headers["X-Client-Origin"] = window.location.origin;
+  }
   const s = storage();
   if (!s) return headers;
   const token = s.getItem(TOKEN_KEY);

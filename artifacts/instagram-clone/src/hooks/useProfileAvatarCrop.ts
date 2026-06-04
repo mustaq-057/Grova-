@@ -8,7 +8,7 @@ import { readFileAsDataUrl, uploadMediaToB2 } from "@/lib/media-upload";
 const MAX_AVATAR_BYTES = 12 * 1024 * 1024;
 
 export function useProfileAvatarCrop() {
-  const { user, setUser, refreshProfiles } = useAuth();
+  const { user, setUser } = useAuth();
   const [avatarToCrop, setAvatarToCrop] = useState<string | null>(null);
   const [pendingContentType, setPendingContentType] = useState("image/jpeg");
   const [uploading, setUploading] = useState(false);
@@ -53,7 +53,6 @@ export function useProfileAvatarCrop() {
         const updated = await api.updateProfile(user.id, { avatar: cloudUrl });
         bumpAvatarVersion(user.id);
         setUser({ ...user, avatar: updated.avatar });
-        await refreshProfiles();
         toast.success("Profile photo updated");
       } catch (err) {
         console.error("Failed to update avatar:", err);
@@ -62,7 +61,7 @@ export function useProfileAvatarCrop() {
         setUploading(false);
       }
     },
-    [user, pendingContentType, setUser, refreshProfiles],
+    [user, pendingContentType, setUser],
   );
 
   return {
