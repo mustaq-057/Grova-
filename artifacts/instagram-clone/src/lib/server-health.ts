@@ -1,6 +1,7 @@
 /** Quick check that the API is reachable (via Vite proxy in dev or same origin in prod). */
-export async function probeApiHealth(timeoutMs = 4000): Promise<boolean> {
-  for (let attempt = 0; attempt < 2; attempt++) {
+export async function probeApiHealth(timeoutMs = 12_000): Promise<boolean> {
+  const attempts = 4;
+  for (let attempt = 0; attempt < attempts; attempt++) {
     try {
       const ctrl = new AbortController();
       const timer = setTimeout(() => ctrl.abort(), timeoutMs);
@@ -13,9 +14,11 @@ export async function probeApiHealth(timeoutMs = 4000): Promise<boolean> {
       clearTimeout(timer);
       if (res.ok) return true;
     } catch {
-      /* retry once */
+      /* retry */
     }
-    if (attempt === 0) await new Promise((r) => setTimeout(r, 400));
+    if (attempt < attempts - 1) {
+      await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
+    }
   }
   return false;
 }

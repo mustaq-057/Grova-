@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useDelayedSpinner } from "@/hooks/useDelayedSpinner";
+import { useFeatureLoading } from "@/hooks/useFeatureLoading";
 import { Plus, Trash2, Lock, X, Shield, Mic } from "lucide-react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
@@ -15,8 +15,7 @@ import { openLiveChannel } from "@/lib/sse-client";
 export default function SecretNotes() {
   const { user } = useAuth();
   const [notes, setNotes] = useState<ApiSecretNote[]>([]);
-  const [fetching, setFetching] = useState(true);
-  const showLoading = useDelayedSpinner(fetching);
+  const { showLoading, finishLoading } = useFeatureLoading(notes.length === 0);
   const [showAdd, setShowAdd] = useState(false);
   const [content, setContent] = useState("");
   const [password, setPassword] = useState("");
@@ -44,9 +43,9 @@ export default function SecretNotes() {
       console.error("Failed to load secret notes:", err);
       setError("Could not load secret notes.");
     } finally {
-      setFetching(false);
+      finishLoading();
     }
-  }, []);
+  }, [finishLoading]);
 
   useEffect(() => {
     void loadNotes();

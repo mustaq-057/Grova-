@@ -45,15 +45,27 @@ export default memo(function Home() {
       setLoadingPartner(false);
       return;
     }
+    let cancelled = false;
+    const safety = window.setTimeout(() => {
+      if (!cancelled) setLoadingPartner(false);
+    }, 10_000);
     setLoadingPartner(true);
     api.getUsers().then((users) => {
+      if (cancelled) return;
       const p = users.find((u) => u.id === partnerId);
       if (p) setPartner(p);
       setLoadingPartner(false);
     }).catch((error) => {
+      if (cancelled) return;
       console.error('Failed to fetch partner data:', error);
       setLoadingPartner(false);
+    }).finally(() => {
+      window.clearTimeout(safety);
     });
+    return () => {
+      cancelled = true;
+      window.clearTimeout(safety);
+    };
   }, [authPartner, partnerId, partner]);
 
   useEffect(() => {

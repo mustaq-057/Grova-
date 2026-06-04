@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { useDelayedSpinner } from "@/hooks/useDelayedSpinner";
+import { useFeatureLoading } from "@/hooks/useFeatureLoading";
 import { Plus, Trash2, BookOpen, X, ChevronDown, ChevronUp, Send } from "lucide-react";
 import { motion } from "framer-motion";
 import { Link } from "wouter";
@@ -11,8 +11,7 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 export default function Dua() {
   const { user, partner } = useAuth();
   const [duas, setDuas] = useState<ApiDua[]>([]);
-  const [fetching, setFetching] = useState(true);
-  const showLoading = useDelayedSpinner(fetching);
+  const { showLoading, finishLoading, fetching } = useFeatureLoading(duas.length === 0);
   const [showAdd, setShowAdd] = useState(false);
   const [arabic, setArabic] = useState("");
   const [translation, setTranslation] = useState("");
@@ -34,10 +33,10 @@ export default function Dua() {
   }, []);
 
   useEffect(() => {
-    loadDuas().finally(() => setFetching(false));
+    loadDuas().finally(finishLoading);
     const interval = setInterval(loadDuas, 45_000);
     return () => clearInterval(interval);
-  }, [loadDuas]);
+  }, [loadDuas, finishLoading]);
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();

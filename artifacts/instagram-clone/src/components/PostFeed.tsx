@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useDelayedSpinner } from "@/hooks/useDelayedSpinner";
+import { useFeatureLoading } from "@/hooks/useFeatureLoading";
 import { Heart, MessageCircle, Send, MapPin, Trash2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { Link } from "wouter";
@@ -15,8 +15,7 @@ export function PostFeed() {
   const { user, partner } = useAuth();
   const partnerId = user?.id === "me" ? "wife" : "me";
   const [posts, setPosts] = useState<ApiPost[]>([]);
-  const [fetching, setFetching] = useState(true);
-  const showLoading = useDelayedSpinner(fetching);
+  const { showLoading, finishLoading } = useFeatureLoading(posts.length === 0);
   const [commentPostId, setCommentPostId] = useState<string | null>(null);
   const [commentText, setCommentText] = useState("");
   const [comments, setComments] = useState<Record<string, ApiPostComment[]>>({});
@@ -24,25 +23,26 @@ export function PostFeed() {
   const [deleting, setDeleting] = useState(false);
 
   const loadPosts = useCallback(async () => {
-    const safety = window.setTimeout(() => setFetching(false), 8_000);
     try {
       const list = await Promise.race([
         api.getPosts(),
         new Promise<never>((_, reject) => {
-          window.setTimeout(() => reject(new Error("timeout")), 15_000);
+          window.setTimeout(() => reject(new Error("timeout")), 12_000);
         }),
       ]);
       setPosts(list);
     } catch (err) {
       console.error("Failed to load posts:", err);
     } finally {
-      window.clearTimeout(safety);
-      setFetching(false);
+      finishLoading();
     }
-  }, []);
+  }, [finishLoading]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      finishLoading();
+      return;
+    }
     loadPosts();
     let es: EventSource | null = null;
     let pollStop: (() => void) | null = null;
@@ -103,7 +103,7 @@ export function PostFeed() {
       pollStop?.();
       clearInterval(poll);
     };
-  }, [user?.id, loadPosts]);
+  }, [user?.id, loadPosts, finishLoading]);
 
   const toggleLike = async (postId: string) => {
     const snapshot = posts.find((p) => p.id === postId);

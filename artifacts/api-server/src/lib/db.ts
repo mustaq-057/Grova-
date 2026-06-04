@@ -95,12 +95,13 @@ export function isDbReady(): boolean {
 }
 
 async function verifyPostgresConnection(retries = 5): Promise<void> {
+  if (!pgPool) {
+    throw new Error("PostgreSQL pool not initialized");
+  }
   let lastErr: unknown;
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      const testPool = await createPostgresPool(databaseUrl);
-      await testPool.query("SELECT 1");
-      await testPool.end();
+      await pgPool.query("SELECT 1");
       console.log("[neon] PostgreSQL connected successfully");
       return;
     } catch (err) {

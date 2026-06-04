@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useDelayedSpinner } from "@/hooks/useDelayedSpinner";
+import { useFeatureLoading } from "@/hooks/useFeatureLoading";
 import { Heart, MessageCircle, ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
 import { api, type ApiCheckin } from "@/lib/api";
@@ -32,8 +32,7 @@ export default function DailyCheckin() {
   const { user, partner } = useAuth();
   const otherLabel = partner?.name?.split(" ")[0] ?? "Them";
   const [checkins, setCheckins] = useState<ApiCheckin[]>([]);
-  const [fetching, setFetching] = useState(true);
-  const showLoading = useDelayedSpinner(fetching);
+  const { showLoading, finishLoading } = useFeatureLoading(checkins.length === 0);
   const [showAdd, setShowAdd] = useState(false);
   const [answer, setAnswer] = useState("");
   const [question, setQuestion] = useState("");
@@ -53,7 +52,7 @@ export default function DailyCheckin() {
     } catch (err) {
       console.error("Failed to load checkins:", err);
     } finally {
-      setFetching(false);
+      finishLoading();
     }
   };
 

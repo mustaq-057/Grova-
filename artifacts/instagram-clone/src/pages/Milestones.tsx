@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useDelayedSpinner } from "@/hooks/useDelayedSpinner";
+import { useFeatureLoading } from "@/hooks/useFeatureLoading";
 import { Plus, Trash2, Heart, Calendar, Star, X, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
 import { api, type ApiMilestone } from "@/lib/api";
@@ -17,8 +17,7 @@ const milestoneTypes = [
 export default function Milestones() {
   const { user } = useAuth();
   const [milestones, setMilestones] = useState<ApiMilestone[]>([]);
-  const [fetching, setFetching] = useState(true);
-  const showLoading = useDelayedSpinner(fetching);
+  const { showLoading, finishLoading } = useFeatureLoading(milestones.length === 0);
   const [showAdd, setShowAdd] = useState(false);
   const [title, setTitle] = useState("");
   const [date, setDate] = useState("");
@@ -39,7 +38,7 @@ export default function Milestones() {
     } catch (err) {
       console.error("Failed to load milestones:", err);
     } finally {
-      setFetching(false);
+      finishLoading();
     }
   };
 

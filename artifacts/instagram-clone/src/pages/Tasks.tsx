@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
-import { useDelayedSpinner } from "@/hooks/useDelayedSpinner";
-import { Plus, Trash2, Check, CheckCircle2, Circle, ListTodo, X } from "lucide-react";
+import { useFeatureLoading } from "@/hooks/useFeatureLoading";
+import { Plus, Trash2, CheckCircle2, Circle, ListTodo, X } from "lucide-react";
 import { motion } from "framer-motion";
+import { toast } from "sonner";
 import { api, type ApiTask } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 
@@ -9,8 +10,7 @@ export default function Tasks() {
   const { user, partner } = useAuth();
   const otherLabel = partner?.name?.split(" ")[0] ?? "Them";
   const [tasks, setTasks] = useState<ApiTask[]>([]);
-  const [fetching, setFetching] = useState(true);
-  const showLoading = useDelayedSpinner(fetching);
+  const { showLoading, finishLoading } = useFeatureLoading(tasks.length === 0);
   const [showAdd, setShowAdd] = useState(false);
   const [title, setTitle] = useState("");
   const [assignedTo, setAssignedTo] = useState<"me" | "wife" | "both">("both");
@@ -28,7 +28,7 @@ export default function Tasks() {
     } catch (err) {
       console.error("Failed to load tasks:", err);
     } finally {
-      setFetching(false);
+      finishLoading();
     }
   };
 
@@ -63,11 +63,14 @@ export default function Tasks() {
   };
 
   const handleDelete = async (id: string) => {
+    const snapshot = tasks;
+    setTasks((prev) => prev.filter((t) => t.id !== id));
     try {
       await api.deleteTask(id);
-      setTasks((prev) => prev.filter((t) => t.id !== id));
     } catch (err) {
       console.error("Failed to delete task:", err);
+      setTasks(snapshot);
+      toast.error("Could not delete task.");
     }
   };
 
