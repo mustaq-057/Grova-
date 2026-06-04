@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import EmojiPicker from "@/components/EmojiPicker";
 import StickerPicker from "@/components/StickerPicker";
 import GreetingPicker from "@/components/GreetingPicker";
-import { extractClipboardFiles } from "@/lib/media-file";
+import { extractClipboardFiles, readClipboardFilesAsync } from "@/lib/media-file";
 
 interface MessageInputProps {
   /** Called with trimmed text when user sends (input state stays inside this component for perf). */
@@ -88,12 +88,26 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
   const handlePaste = useCallback(
     (e: React.ClipboardEvent<HTMLInputElement>) => {
       if (recording || disabled) return;
-      const picked = extractClipboardFiles(e.clipboardData).filter(({ file }) => file.size > 0);
-      if (picked.length === 0) return;
-      e.preventDefault();
-      e.stopPropagation();
-      const { file, itemType } = picked[0];
-      onImageSelect(file, itemType);
+
+      const runPicked = (picked: { file: File; itemType?: string }[]) => {
+        if (picked.length === 0) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const { file, itemType } = picked[0]!;
+        onImageSelect(file, itemType);
+      };
+
+      const sync = extractClipboardFiles(e.clipboardData).filter(({ file }) => file.size > 0);
+      if (sync.length > 0) {
+        runPicked(sync);
+        return;
+      }
+
+      void readClipboardFilesAsync().then((asyncPicked) => {
+        const media = asyncPicked.filter(({ file }) => file.size > 0);
+        if (media.length === 0) return;
+        runPicked(media);
+      });
     },
     [recording, disabled, onImageSelect],
   );

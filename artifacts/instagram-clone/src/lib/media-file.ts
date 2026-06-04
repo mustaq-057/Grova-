@@ -77,7 +77,9 @@ export function extractClipboardFiles(cd: DataTransfer | null | undefined): { fi
     if (seenKeys.has(key)) continue;
     seenKeys.add(key);
     const matched = [...cd.items].find((item) => item.kind === "file" && item.getAsFile() === f);
-    out.push({ file: f, itemType: matched?.type || f.type || itemTypes[0] || undefined });
+    let itemType = matched?.type || f.type || itemTypes[0] || undefined;
+    if (!itemType && f.size > 200 * 1024) itemType = "application/octet-stream";
+    out.push({ file: f, itemType });
   }
   if (out.length > 0) return out;
 

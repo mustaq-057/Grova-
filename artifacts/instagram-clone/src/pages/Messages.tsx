@@ -89,6 +89,29 @@ function finishToast(
   else if (result.type === "error") toast.error(result.message, { duration: 4000 });
 }
 
+/** Swap temp upload row for server row without duplicate blob + cloud videos. */
+function replaceOutgoingVideoMessage(
+  prev: ApiMessage[],
+  tempId: string,
+  display: ApiMessage,
+  senderId: string,
+): ApiMessage[] {
+  const displayTime = new Date(display.timestamp).getTime();
+  const filtered = prev.filter((m) => {
+    if (m.id === tempId || m.id === display.id) return false;
+    if (
+      m.senderId === senderId &&
+      m.type === "video" &&
+      m.fileData?.startsWith("blob:") &&
+      Math.abs(new Date(m.timestamp).getTime() - displayTime) < 120_000
+    ) {
+      return false;
+    }
+    return true;
+  });
+  return [...filtered, display];
+}
+
 function TypingDots() {
   return (
     <span className="inline-flex items-center gap-0.5 ml-1" aria-hidden>
@@ -400,7 +423,19 @@ export default function Messages() {
         const fresh = await normalizeMessages(data.messages ?? []);
         startTransition(() => {
           setMessages((prev) => {
-            const next = mergeMessagesIfChanged(prev, fresh, mergeMessagesById);
+            const cleaned = prev.filter((m) => {
+              if (!pendingOutgoingRef.current.has(m.id)) return true;
+              if (m.type !== "video" || !m.fileData?.startsWith("blob:")) return true;
+              const serverHasSame = fresh.some(
+                (f) =>
+                  f.senderId === m.senderId &&
+                  f.type === "video" &&
+                  Math.abs(new Date(f.timestamp).getTime() - new Date(m.timestamp).getTime()) < 120_000,
+              );
+              if (serverHasSame) pendingOutgoingRef.current.delete(m.id);
+              return !serverHasSame;
+            });
+            const next = mergeMessagesIfChanged(cleaned, fresh, mergeMessagesById);
             if (!next) return prev;
             messagesSigRef.current = messagesListSignature(next);
             return next;
@@ -1612,6 +1647,14 @@ export default function Messages() {
           const previewUrl = URL.createObjectURL(normalized);
           const tempId = crypto.randomUUID();
           pendingOutgoingRef.current.add(tempId);
+          let videoToastDone = false;
+          const endVideoToast = (
+            result: { type: "success"; message: string } | { type: "error"; message: string },
+          ) => {
+            if (videoToastDone) return;
+            videoToastDone = true;
+            finishToast(toastId, result);
+          };
 
           const optimistic = buildOptimisticMessage(
             {
@@ -1635,18 +1678,16 @@ export default function Messages() {
           toast.loading("Sending video…", { id: toastId });
 
           try {
-            const uploadPromise = uploadMediaFile(normalized, mime);
-            const durationPromise = getVideoDurationSafe(normalized);
-            const url = await uploadPromise;
-            const duration = await durationPromise;
-
+            const duration = await getVideoDurationSafe(normalized);
             if (duration > 60) {
               pendingOutgoingRef.current.delete(tempId);
               setMessages((prev) => prev.filter((m) => m.id !== tempId));
               URL.revokeObjectURL(previewUrl);
-              finishToast(toastId, { type: "error", message: "Video must be 1 minute or less." });
+              endVideoToast({ type: "error", message: "Video must be 1 minute or less." });
               return;
             }
+
+            const url = await uploadMediaFile(normalized, mime);
 
             const sticker = mediaModeSticker(mediaViewMode);
             const outgoing = await prepareOutgoingMessage({
@@ -1662,14 +1703,22 @@ export default function Messages() {
             const [display] = await normalizeMessages([saved]);
             URL.revokeObjectURL(previewUrl);
             pendingOutgoingRef.current.delete(tempId);
-            setMessages((prev) => prev.map((m) => (m.id === tempId ? display : m)));
+            setMessages((prev) => replaceOutgoingVideoMessage(prev, tempId, display, user.id));
             scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
-            finishToast(toastId, { type: "success", message: "Video sent" });
+            endVideoToast({ type: "success", message: "Video sent" });
           } catch (videoErr) {
             pendingOutgoingRef.current.delete(tempId);
             setMessages((prev) => prev.filter((m) => m.id !== tempId));
             URL.revokeObjectURL(previewUrl);
-            throw videoErr;
+            endVideoToast({
+              type: "error",
+              message:
+                videoErr instanceof Error ? videoErr.message : "Failed to send video.",
+            });
+          } finally {
+            if (!videoToastDone) {
+              toast.dismiss(toastId);
+            }
           }
         } else {
           toast.loading("Uploading file…", { id: toastId });
@@ -1722,14 +1771,14 @@ export default function Messages() {
         return;
       }
 
-      // Screen recordings / Windows paste often need async clipboard read — don't block plain text paste.
-      if (plainText.length > 0) return;
-
+      // Screen recordings / Windows paste often need async clipboard read (even when text is also on clipboard).
       void readClipboardFilesAsync().then((asyncPicked) => {
         const media = asyncPicked.filter(({ file }) => file.size > 0);
         if (media.length === 0) return;
         runPaste(media);
       });
+
+      if (plainText.length > 0) return;
     };
 
     document.addEventListener("paste", onDocumentPaste, true);
