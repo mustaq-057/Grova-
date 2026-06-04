@@ -68,7 +68,7 @@ export async function tryRefreshSession(): Promise<boolean> {
 async function apiFetch<T = unknown>(path: string, options?: RequestInit, attempt = 0): Promise<T> {
   const method = options?.method ?? "GET";
   const isRead = method === "GET" || method === "HEAD";
-  const maxAttempts = isRead ? 4 : 2;
+  const maxAttempts = isRead ? 2 : 2;
 
   const { signal, cleanup } = mergeAbortSignal(options?.signal ?? undefined, FETCH_TIMEOUT_MS);
   try {
@@ -93,7 +93,7 @@ async function apiFetch<T = unknown>(path: string, options?: RequestInit, attemp
     if (!res.ok) {
       const retryable = res.status >= 502 && res.status <= 504;
       if (retryable && isRead && attempt < maxAttempts - 1) {
-        await sleep(600 * (attempt + 1));
+        await sleep(300 * (attempt + 1));
         return apiFetch<T>(path, options, attempt + 1);
       }
       const err = await res.json().catch(() => ({ error: "Request failed" })) as {
@@ -114,7 +114,7 @@ async function apiFetch<T = unknown>(path: string, options?: RequestInit, attemp
       (err instanceof DOMException && err.name === "AbortError") ||
       (err instanceof Error && /fetch|network|failed|abort/i.test(err.message));
     if (isNetwork && isRead && attempt < maxAttempts - 1) {
-      await sleep(800 * (attempt + 1));
+      await sleep(400 * (attempt + 1));
       return apiFetch<T>(path, options, attempt + 1);
     }
     if (isNetwork) {

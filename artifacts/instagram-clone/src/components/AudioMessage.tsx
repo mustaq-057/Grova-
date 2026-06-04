@@ -16,7 +16,15 @@ function formatAudioTime(seconds: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-export function AudioMessage({ audioData, isMe }: { audioData: string; isMe: boolean }) {
+export function AudioMessage({
+  audioData,
+  isMe,
+  hideTranscribe = false,
+}: {
+  audioData: string;
+  isMe: boolean;
+  hideTranscribe?: boolean;
+}) {
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
@@ -195,20 +203,22 @@ export function AudioMessage({ audioData, isMe }: { audioData: string; isMe: boo
         </span>
       </div>
 
-      <button
-        type="button"
-        onClick={() => void transcribeAudio()}
-        disabled={transcribing}
-        className={`flex items-center gap-2 px-3 py-1.5 text-xs rounded-lg w-fit transition-all ${
-          transcribing ? "opacity-50 cursor-not-allowed" : "hover:bg-black/5 active:scale-[0.98]"
-        } ${isMe ? "text-white/75" : "text-foreground/65"}`}
-        aria-label="Transcribe voice message"
-      >
-        <Mic className="w-3.5 h-3.5" />
-        {transcribing ? "Transcribing…" : "Transcribe"}
-      </button>
+      {!hideTranscribe ? (
+        <button
+          type="button"
+          onClick={() => void transcribeAudio()}
+          disabled={transcribing}
+          className={`flex items-center gap-2 px-3 py-1.5 text-xs rounded-lg w-fit transition-all ${
+            transcribing ? "opacity-50 cursor-not-allowed" : "hover:bg-black/5 active:scale-[0.98]"
+          } ${isMe ? "text-white/75" : "text-foreground/65"}`}
+          aria-label="Transcribe voice message"
+        >
+          <Mic className="w-3.5 h-3.5" />
+          {transcribing ? "Transcribing…" : "Transcribe"}
+        </button>
+      ) : null}
 
-      {segments.length > 0 ? (
+      {!hideTranscribe && segments.length > 0 ? (
         <div
           className={`text-xs rounded-lg max-w-full space-y-1 px-2 py-2 ${isMe ? "bg-white/10 text-white/90" : "bg-black/5"}`}
         >
@@ -228,7 +238,7 @@ export function AudioMessage({ audioData, isMe }: { audioData: string; isMe: boo
             </button>
           ))}
         </div>
-      ) : transcript ? (
+      ) : !hideTranscribe && transcript ? (
         <p className={`text-xs px-3 py-2 rounded-lg max-w-full break-words ${isMe ? "bg-white/10 text-white/90" : "bg-black/5"}`}>
           {transcript}
         </p>

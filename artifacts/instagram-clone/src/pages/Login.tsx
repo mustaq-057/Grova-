@@ -9,10 +9,33 @@ import { getDefaultEmail, saveDefaultEmail } from "@/lib/session";
 import { AVATARS } from "@/lib/avatars";
 import { AvatarImage } from "@/components/AvatarImage";
 import { probeApiHealth } from "@/lib/server-health";
+import { readLoginProfiles, writeLoginProfiles, type LoginProfileRow } from "@/lib/profile-cache";
 
 type Step = "primary" | "pick" | "code";
 
 type PickUser = { id: "me" | "wife"; name: string; label: string; avatar: string };
+
+function defaultPickUsers(): PickUser[] {
+  const cached = readLoginProfiles();
+  if (cached?.length) {
+    return cached.map((p) => ({ ...p, label: "That's me" }));
+  }
+  return [
+    { id: "me", name: "Mustaq", label: "That's me", avatar: AVATARS.me },
+    { id: "wife", name: "Sara", label: "That's me", avatar: AVATARS.wife },
+  ];
+}
+
+function mergeLoginProfiles(prev: PickUser[], profiles: LoginProfileRow[]): PickUser[] {
+  const next = prev.map((u) => {
+    const p = profiles.find((x) => x.id === u.id);
+    return p ? { ...u, name: p.name, avatar: p.avatar } : u;
+  });
+  writeLoginProfiles(
+    next.map((u) => ({ id: u.id, name: u.name, avatar: u.avatar })),
+  );
+  return next;
+}
 
 export default memo(function Login() {
   const { setUser, refreshTrustedDevice, trustedDevice, authReady } = useAuth();
@@ -25,10 +48,7 @@ export default memo(function Login() {
   const [showCode, setShowCode] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [users, setUsers] = useState<PickUser[]>([
-    { id: "me", name: "Mustaq", label: "That's me", avatar: AVATARS.me },
-    { id: "wife", name: "Sara", label: "That's me", avatar: AVATARS.wife },
-  ]);
+  const [users, setUsers] = useState<PickUser[]>(defaultPickUsers);
   const [serverOnline, setServerOnline] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -63,12 +83,7 @@ export default memo(function Login() {
     api
       .getLoginProfiles()
       .then((profiles) => {
-        setUsers((prev) =>
-          prev.map((u) => {
-            const p = profiles.find((x) => x.id === u.id);
-            return p ? { ...u, name: p.name, avatar: p.avatar } : u;
-          }),
-        );
+        setUsers((prev) => mergeLoginProfiles(prev, profiles as LoginProfileRow[]));
       })
       .catch(() => {});
   }, [authReady, trustedDevice]);
@@ -83,12 +98,7 @@ export default memo(function Login() {
       saveDefaultEmail(email.trim());
       await refreshTrustedDevice();
       api.getLoginProfiles().then((profiles) => {
-        setUsers((prev) =>
-          prev.map((u) => {
-            const p = profiles.find((x) => x.id === u.id);
-            return p ? { ...u, name: p.name, avatar: p.avatar } : u;
-          }),
-        );
+        setUsers((prev) => mergeLoginProfiles(prev, profiles as LoginProfileRow[]));
       }).catch(() => {});
       setStep("pick");
       setSelectedId(null);

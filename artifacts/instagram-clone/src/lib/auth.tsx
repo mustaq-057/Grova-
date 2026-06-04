@@ -6,7 +6,6 @@ import {
   hydrateNotifications,
   markAllReadLocal,
   setNotificationViewer,
-  clearAllNotifications,
   syncChatBadgeFromServer,
   notifyPartnerChatIncoming,
 } from "./notifications-feed";
@@ -28,11 +27,17 @@ import {
   PARTNER_CHANGED,
 } from "./couple-sync";
 import { applyAppTheme, type AppThemeId } from "./app-theme";
-import { clearClientMemory, purgeLegacyLocalStorage } from "./client-memory";
+import { clearClientMemory } from "./client-memory";
 import { clearSession } from "./session";
 import { bumpAvatarVersion } from "./avatar-display";
 import { pickAvatarUrl } from "./avatar-utils";
 import { openLiveChannel } from "./sse-client";
+import {
+  clearSessionSnapshot,
+  readSessionSnapshot,
+  writeSessionSnapshot,
+} from "./profile-cache";
+import { hasSession } from "./session";
 
 /** After this idle time, profile session ends — user picks profile + enters code again. */
 export const PROFILE_INACTIVITY_MS = 60 * 60 * 1000;
@@ -55,9 +60,27 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType>(null!);
 
+function applyRestoredSession(
+  restored: { user: ApiUser; partner: ApiUser | null },
+  setUserState: (u: ApiUser) => void,
+  setPartnerState: (p: ApiUser | null) => void,
+) {
+  const avatar = pickAvatarUrl(restored.user.avatar, undefined, restored.user.id);
+  const user = { ...restored.user, avatar };
+  setUserState(user);
+  if (restored.partner) {
+    const pAvatar = pickAvatarUrl(restored.partner.avatar, undefined, restored.partner.id);
+    const partner = { ...restored.partner, avatar: pAvatar };
+    setPartnerState(partner);
+    writeSessionSnapshot(user, partner);
+  } else {
+    writeSessionSnapshot(user, null);
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUserState] = useState<ApiUser | null>(null);
-  const [partner, setPartner] = useState<ApiUser | null>(null);
+  const [user, setUserState] = useState<ApiUser | null>(() => readSessionSnapshot()?.user ?? null);
+  const [partner, setPartner] = useState<ApiUser | null>(() => readSessionSnapshot()?.partner ?? null);
   const [chatThemeId, setChatThemeId] = useState("default");
   const [authReady, setAuthReady] = useState(false);
   const [trustedDevice, setTrustedDevice] = useState(false);
@@ -77,6 +100,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!u) {
       setPartner(null);
       setNotificationViewer(null);
+      clearSessionSnapshot();
     } else {
       setNotificationViewer(u.id, u.name);
     }
@@ -132,6 +156,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     clearEncryption();
     void api.logout();
     clearSession();
+    clearSessionSnapshot();
     setUser(null);
     try {
       sessionStorage.removeItem("grova_e2e_key");
@@ -154,6 +179,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     void api.logout();
     clearSession();
     clearClientMemory();
+    clearSessionSnapshot();
     setTrustedDevice(false);
     setNotificationViewer(null);
     setUser(null);
@@ -167,39 +193,67 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
-    purgeLegacyLocalStorage();
     try {
       localStorage.removeItem("grova_primary_token");
     } catch {
       /* ignore */
     }
 
+    const snapshot = readSessionSnapshot();
+    const profileSession = hasSession();
+    if (snapshot?.user && profileSession) {
+      setNotificationViewer(snapshot.user.id, snapshot.user.name);
+      setAuthReady(true);
+    }
+
+    const restoreProfileSession = async (): Promise<boolean> => {
+      try {
+        const [restored, e2eReady] = await Promise.all([
+          api.restoreSession(),
+          loadEncryptionKey(),
+        ]);
+        if (!cancelled && restored.user && e2eReady) {
+          applyRestoredSession(restored, setUserState, setPartner);
+          setNotificationViewer(restored.user.id, restored.user.name);
+          return true;
+        }
+        return false;
+      } catch {
+        try {
+          const refreshed = await tryRefreshSession();
+          if (!refreshed) return false;
+          const [restored, e2eReady] = await Promise.all([
+            api.restoreSession(),
+            loadEncryptionKey(),
+          ]);
+          if (!cancelled && restored.user && e2eReady) {
+            applyRestoredSession(restored, setUserState, setPartner);
+            setNotificationViewer(restored.user.id, restored.user.name);
+            return true;
+          }
+        } catch {
+          /* profile code required */
+        }
+        return false;
+      }
+    };
+
     (async () => {
-      const trusted = await api.validatePrimarySession();
+      const trustedP = api.validatePrimarySession();
+      const restoreP = profileSession ? restoreProfileSession() : Promise.resolve(false);
+      const [trusted, restoredOk] = await Promise.all([trustedP, restoreP]);
       if (cancelled) return;
       setTrustedDevice(trusted);
 
-      if (trusted) {
-        try {
-          const restored = await api.restoreSession();
-          const e2eReady = await loadEncryptionKey();
-          if (!cancelled && restored.user && e2eReady) {
-            setUser(restored.user);
-          }
-        } catch {
-          try {
-            const refreshed = await tryRefreshSession();
-            if (refreshed) {
-              const restored = await api.restoreSession();
-              const e2eReady = await loadEncryptionKey();
-              if (!cancelled && restored.user && e2eReady) setUser(restored.user);
-            }
-          } catch {
-            /* profile code required */
-          }
-        }
-      } else {
+      if (!trusted) {
         clearSession();
+        clearSessionSnapshot();
+        setUserState(null);
+        setPartner(null);
+      } else if (profileSession && !restoredOk) {
+        clearSessionSnapshot();
+        setUserState(null);
+        setPartner(null);
       }
 
       if (!cancelled) setAuthReady(true);
@@ -209,6 +263,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (user) writeSessionSnapshot(user, partner);
+  }, [user, partner]);
 
   useEffect(() => {
     if (user) loadEncryptionKey();
@@ -222,34 +280,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let stopLive: (() => void) | null = null;
 
     const onLivePoll = () => {
-      void refreshProfiles();
-      void refreshCouplePrefs();
       void hydrateNotifications();
       if (!window.location.pathname.includes("/chat")) {
         void syncChatBadgeFromServer();
       }
     };
 
-    const init = async () => {
+    const init = () => {
       setNotificationViewer(user.id, user.name);
-      await clearAllNotifications();
-      await hydrateNotifications();
-      await hydrateNotes();
       hydrateCouplePrefsFromDisk();
-      try {
-        const prefs = await api.getCouplePrefs();
-        if (mounted) {
-          const resolved = await applyCouplePrefsWithReconcile(prefs, (patch) =>
-            api.updateCouplePrefs(patch),
-          );
-          if (mounted) applyPrefs(resolved);
-        }
-      } catch {
-        /* keep disk prefs from bootstrap */
-      }
-      await refreshProfiles();
-      await syncChatBadgeFromServer();
       void requestNotificationPermission();
+
+      const runBackgroundSync = () => {
+        if (!mounted) return;
+        void hydrateNotifications();
+        void hydrateNotes();
+        if (!partnerRef.current) void refreshProfiles();
+        if (!window.location.pathname.includes("/chat")) void syncChatBadgeFromServer();
+        void api
+          .getCouplePrefs()
+          .then((prefs) => {
+            if (!mounted) return;
+            applyPrefs(prefs);
+            const reconcile = () => {
+              void applyCouplePrefsWithReconcile(prefs, (patch) => api.updateCouplePrefs(patch))
+                .then((resolved) => {
+                  if (mounted) applyPrefs(resolved);
+                })
+                .catch(() => {});
+            };
+            if (typeof requestIdleCallback === "function") {
+              requestIdleCallback(reconcile, { timeout: 5000 });
+            } else {
+              window.setTimeout(reconcile, 2000);
+            }
+          })
+          .catch(() => {});
+      };
+
+      if (typeof requestIdleCallback === "function") {
+        requestIdleCallback(runBackgroundSync, { timeout: 2500 });
+      } else {
+        window.setTimeout(runBackgroundSync, 0);
+      }
     };
     init();
 
@@ -370,6 +443,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
     };
 
+    const connectLive = () => {
     void openLiveChannel(user.id, onLivePoll).then((channel) => {
       if (!mounted) {
         if (channel?.mode === "poll") channel.stop();
@@ -384,6 +458,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       es = channel.eventSource;
       wireSse(es);
     });
+    };
+
+    if (typeof requestIdleCallback === "function") {
+      requestIdleCallback(connectLive, { timeout: 3000 });
+    } else {
+      window.setTimeout(connectLive, 500);
+    }
 
     return () => {
       mounted = false;

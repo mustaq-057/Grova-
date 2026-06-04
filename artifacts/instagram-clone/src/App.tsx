@@ -8,9 +8,8 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthProvider, useAuth, PROFILE_INACTIVITY_MS } from "@/lib/auth";
 import Login from "@/pages/Login";
 import Home from "@/pages/Home";
-import { lazy, Suspense, useEffect, useRef, type ReactNode } from "react";
-
-const Messages = lazy(() => import("@/pages/Messages"));
+import { useEffect, useRef, type ReactNode } from "react";
+import Messages from "@/pages/Messages";
 import Create from "@/pages/Create";
 import Profile from "@/pages/Profile";
 import Settings from "@/pages/Settings";
@@ -85,18 +84,7 @@ function ProtectedRouter() {
         </Route>
         <Route path="/chat">
           <PageWrapper>
-            <Suspense
-              fallback={
-                <div
-                  className="flex min-h-[100dvh] items-center justify-center"
-                  style={{ background: "#141210", color: "#e8e0d5" }}
-                >
-                  Loading chat…
-                </div>
-              }
-            >
-              <Messages />
-            </Suspense>
+            <Messages />
           </PageWrapper>
         </Route>
         <Route path="/create">

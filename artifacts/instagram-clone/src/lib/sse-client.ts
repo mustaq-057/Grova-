@@ -17,8 +17,8 @@ export async function openLiveChannel(
       const body = (await probe.json()) as { mode?: string; pollIntervalMs?: number };
       if (body.mode === "poll") {
         const intervalMs = body.pollIntervalMs ?? 12_000;
-        onPoll();
         const id = window.setInterval(onPoll, intervalMs);
+        window.setTimeout(onPoll, 1500);
         return {
           mode: "poll",
           intervalMs,
@@ -34,8 +34,8 @@ export async function openLiveChannel(
     const eventSource = new EventSource(url, { withCredentials: true });
     return { mode: "sse", eventSource };
   } catch {
-    onPoll();
     const id = window.setInterval(onPoll, 12_000);
+    window.setTimeout(onPoll, 1500);
     return { mode: "poll", intervalMs: 12_000, stop: () => window.clearInterval(id) };
   }
 }

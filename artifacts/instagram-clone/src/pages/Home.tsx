@@ -14,7 +14,7 @@ export default memo(function Home() {
   const [partner, setPartner] = useState<ApiUser | null>(authPartner);
   const [moroccoTime, setMoroccoTime] = useState("");
   const [indiaTime, setIndiaTime] = useState("");
-  const [loadingPartner, setLoadingPartner] = useState(true);
+  const [loadingPartner, setLoadingPartner] = useState(() => !authPartner);
 
   const partnerId = user?.id === "me" ? "wife" : "me";
 
@@ -35,7 +35,15 @@ export default memo(function Home() {
   }, []);
 
   useEffect(() => {
-    if (partner) return;
+    if (authPartner) {
+      setPartner(authPartner);
+      setLoadingPartner(false);
+      return;
+    }
+    if (partner) {
+      setLoadingPartner(false);
+      return;
+    }
     setLoadingPartner(true);
     api.getUsers().then((users) => {
       const p = users.find((u) => u.id === partnerId);
@@ -45,14 +53,16 @@ export default memo(function Home() {
       console.error('Failed to fetch partner data:', error);
       setLoadingPartner(false);
     });
-    
+  }, [authPartner, partnerId, partner]);
+
+  useEffect(() => {
     api.getPresence().then((presence) => {
       const partnerOnline = presence[partnerId];
       setPartnerOnline(partnerOnline !== undefined && Date.now() - partnerOnline < 30000);
     }).catch((error) => {
       console.error('Failed to fetch presence data:', error);
     });
-  }, [partnerId, partner]);
+  }, [partnerId]);
 
   const [partnerOnline, setPartnerOnline] = useState(false);
 

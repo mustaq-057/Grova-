@@ -59,6 +59,19 @@ export function clearClientMemory(): void {
   cuteMode = null;
 }
 
+const LEGACY_PURGED_KEY = "grova_legacy_storage_purged_v1";
+
+/** Run the full localStorage scan once per browser — not on every app open. */
+export function purgeLegacyLocalStorageOnce(): void {
+  try {
+    if (sessionStorage.getItem(LEGACY_PURGED_KEY) === "1") return;
+    sessionStorage.setItem(LEGACY_PURGED_KEY, "1");
+  } catch {
+    /* still purge */
+  }
+  purgeLegacyLocalStorage();
+}
+
 /** Remove legacy localStorage keys from older builds. */
 export function purgeLegacyLocalStorage(): void {
   const legacyPrefixes = [

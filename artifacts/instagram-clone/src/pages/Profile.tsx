@@ -7,7 +7,7 @@ import { useAuth } from "@/lib/auth";
 import { api } from "@/lib/api";
 import { ImageCropModal } from "@/components/ImageCropModal";
 import { useProfileAvatarCrop } from "@/hooks/useProfileAvatarCrop";
-import { unreadCount, NOTIFY_CHANGED, hydrateNotifications } from "@/lib/notifications-feed";
+import { unreadCount, NOTIFY_CHANGED } from "@/lib/notifications-feed";
 import { AvatarImage } from "@/components/AvatarImage";
 import { getPosts, clearLegacyLocalMedia, type StoredPost } from "@/lib/local-posts";
 
@@ -59,8 +59,7 @@ export default memo(function Profile() {
         bio: pendingBio.trim(),
       });
       setUser({ ...user, name: updated.name, bio: updated.bio, avatar: updated.avatar, username: updated.username });
-      await refreshProfiles();
-      await hydrateNotifications();
+      void refreshProfiles();
       setEditing(false);
       toast.success("Profile saved");
     } catch (error) {

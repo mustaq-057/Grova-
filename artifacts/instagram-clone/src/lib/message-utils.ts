@@ -58,7 +58,7 @@ export async function decryptMessage(msg: ApiMessage): Promise<ApiMessage> {
 }
 
 export async function decryptMessages(msgs: ApiMessage[]): Promise<ApiMessage[]> {
-  const CHUNK = 20;
+  const CHUNK = 40;
   const out: ApiMessage[] = [];
   for (let i = 0; i < msgs.length; i += CHUNK) {
     const slice = msgs.slice(i, i + CHUNK);

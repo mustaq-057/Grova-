@@ -158,8 +158,8 @@ export default function Messages() {
   const activeCallTypeRef = useRef<"audio" | "video">("audio");
   const callRoleRef = useRef<"outgoing" | "incoming">("outgoing");
   const endCallRef = useRef<(opts?: { fromRemote?: boolean }) => void>(() => {});
-  const [partnerName, setPartnerName] = useState("");
-  const [partnerAvatar, setPartnerAvatar] = useState("");
+  const [partnerName, setPartnerName] = useState(() => partner?.name ?? "");
+  const [partnerAvatar, setPartnerAvatar] = useState(() => partner?.avatar ?? "");
   const [partnerLastSeen, setPartnerLastSeen] = useState<number | undefined>();
   const [online, setOnline] = useState(isOnline());
 
@@ -317,7 +317,7 @@ export default function Messages() {
 
     const fetchMessages = () =>
       Promise.race([
-        api.getMessages(),
+        api.getMessages({ limit: 50 }),
         new Promise<never>((_, reject) => {
           window.setTimeout(() => reject(new Error("Request timed out")), 20_000);
         }),
@@ -338,11 +338,13 @@ export default function Messages() {
         }
         const fromServer = await normalizeMessages(raw);
         isInitialLoadRef.current = true;
-        setMessages((prev) => {
-          const pending = prev.filter((m) => pendingOutgoingRef.current.has(m.id));
-          const next = mergeMessagesById(fromServer, pending);
-          messagesSigRef.current = messagesListSignature(next);
-          return next;
+        startTransition(() => {
+          setMessages((prev) => {
+            const pending = prev.filter((m) => pendingOutgoingRef.current.has(m.id));
+            const next = mergeMessagesById(fromServer, pending);
+            messagesSigRef.current = messagesListSignature(next);
+            return next;
+          });
         });
         const mergedCount = fromServer.length;
         const more = data.pagination?.hasMore ?? false;

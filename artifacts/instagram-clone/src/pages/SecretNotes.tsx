@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Plus, Trash2, Lock, X, Shield, Mic } from "lucide-react";
 import { toast } from "sonner";
-import { isTranscriptionSupported, transcribeFromMicrophone } from "@/lib/voice-transcribe";
 import { motion, AnimatePresence } from "framer-motion";
 import { api, type ApiSecretNote } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -28,10 +27,8 @@ export default function SecretNotes() {
   const [reader, setReader] = useState<{ id: string; title: string; body: string } | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [dictating, setDictating] = useState(false);
   const [voiceNoteUrl, setVoiceNoteUrl] = useState<string | null>(null);
   const [recordingNote, setRecordingNote] = useState(false);
-  const dictationRef = useRef<{ stop: () => void } | null>(null);
   const noteRecorderRef = useRef<MediaRecorder | null>(null);
   const noteChunksRef = useRef<Blob[]>([]);
   const noteStreamRef = useRef<MediaStream | null>(null);
@@ -93,37 +90,6 @@ export default function SecretNotes() {
       pollStop?.();
     };
   }, [user, loadNotes, reader?.id]);
-
-  const stopDictation = useCallback(() => {
-    dictationRef.current?.stop();
-    dictationRef.current = null;
-    setDictating(false);
-  }, []);
-
-  useEffect(() => () => stopDictation(), [stopDictation]);
-
-  const startDictation = () => {
-    if (!isTranscriptionSupported()) {
-      toast.error("Voice typing needs Chrome or Edge.");
-      return;
-    }
-    stopDictation();
-    setDictating(true);
-    const prefix = content.trim();
-    const session = transcribeFromMicrophone((partial) => {
-      setContent(prefix ? `${prefix} ${partial}`.trim() : partial);
-    });
-    dictationRef.current = session;
-    void session.promise
-      .then((final) => {
-        if (final.text) setContent(prefix ? `${prefix} ${final.text}`.trim() : final.text);
-      })
-      .catch(() => toast.error("Could not transcribe audio."))
-      .finally(() => {
-        dictationRef.current = null;
-        setDictating(false);
-      });
-  };
 
   const stopNoteRecording = useCallback(() => {
     const rec = noteRecorderRef.current;
@@ -315,7 +281,7 @@ export default function SecretNotes() {
               <textarea
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
-                placeholder="Write your private message or tap the mic to speak…"
+                placeholder="Write your private message…"
                 rows={5}
                 className="w-full bg-secondary border border-border rounded-xl px-4 py-3 text-sm outline-none focus:border-primary transition-colors resize-none"
                 data-testid="input-secret-note-content"
@@ -338,18 +304,6 @@ export default function SecretNotes() {
                   <audio src={voiceNoteUrl} controls className="w-full" playsInline />
                 </div>
               ) : null}
-              <button
-                type="button"
-                onClick={dictating ? stopDictation : startDictation}
-                className={`flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-sm font-medium border transition-colors ${
-                  dictating
-                    ? "bg-destructive/10 border-destructive/30 text-destructive"
-                    : "bg-secondary border-border hover:border-primary/40"
-                }`}
-              >
-                <Mic className="w-4 h-4" />
-                {dictating ? "Stop transcribing" : "Type from voice (live)"}
-              </button>
               <input
                 type="password"
                 value={password}

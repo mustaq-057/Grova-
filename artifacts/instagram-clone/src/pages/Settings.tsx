@@ -17,7 +17,6 @@ import {
 } from "@/lib/couple-sync";
 import { getCouplePrefsCache } from "@/lib/client-memory";
 import type { CouplePrefs } from "@/lib/types";
-import { hydrateNotifications } from "@/lib/notifications-feed";
 import { Link } from "wouter";
 import { applyColorMode, applyAppTheme, getStoredAppTheme, getStoredDarkMode, type AppThemeId } from "@/lib/app-theme";
 import { AppThemeModal } from "@/components/AppThemeModal";
@@ -163,8 +162,7 @@ export default memo(function Settings() {
     try {
       const updated = await api.updateProfile(user.id, { name: trimmedName, bio: pendingBio.trim() });
       setUser({ ...user, name: updated.name, bio: updated.bio, avatar: updated.avatar, username: updated.username });
-      await refreshProfiles();
-      await hydrateNotifications();
+      void refreshProfiles();
       setEditingProfile(false);
       toast.success("Profile saved");
     } catch (error) {
