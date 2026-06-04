@@ -7,7 +7,7 @@ Your code: **https://github.com/mustaq-057/Grova-**
 1. Go to [vercel.com](https://vercel.com) → **Add New → Project**
 2. Import **Grova-** from GitHub
 3. **Root Directory** must be **`.`** (repo root — leave blank). Do **not** set it to `artifacts/instagram-clone` or the build will fail with `vite: command not found`.
-4. On the setup screen, leave **Build Command** and **Output Directory** **empty** (the repo’s `vercel.json` handles everything)
+4. **Build Command** can stay as `pnpm -w run build:grova` (locked is OK — that script installs deps and builds everything). **Output Directory**: `dist` or empty.
 5. Click **Environment Variables** and paste everything from your local `.env` file (see list below)
 6. Click **Deploy**
 
@@ -38,7 +38,7 @@ Do **not** upload `.env` to GitHub.
 ## 4. If build fails (`build:grova` exited with 1, or `vite: command not found`)
 
 1. Vercel → **Settings** → **General** → **Root Directory** → leave **empty** (monorepo root)
-2. **Settings** → **Build & Development** → set **Build Command** and **Install Command** to **empty** (not `pnpm -w run build:grova` — the repo uses `vercel.json` → `node scripts/vercel-build.mjs`)
+2. **Build Command** may stay **`pnpm -w run build:grova`** — latest `main` runs `node scripts/build-grova.mjs` under that script name.
 3. **Redeploy** after pushing the latest `main` from GitHub
 
 ## 5. If you see JavaScript instead of the app
