@@ -35,26 +35,49 @@ router.get("/presence", rateLimiters.read, authenticate, async (req, res) => {
     }
 
     const partnerId = authenticatedUserId === "me" ? "wife" : "me";
-    const result = await db.execute(
-      `
-      SELECT user_id, MAX(last_seen) AS last_seen
-      FROM devices
-      WHERE user_id = ? OR user_id = ?
-      GROUP BY user_id
-      `,
-      [authenticatedUserId, partnerId],
-    );
+    const lastSeenMap: Record<string, number> = { ...lastSeen };
+    const typing: Record<string, boolean> = {};
+    const now = Date.now();
 
-    const response: Record<string, number> = { ...lastSeen };
-    for (const row of result.rows as { user_id?: string; last_seen?: string | number | null }[]) {
+    let result;
+    try {
+      result = await db.execute(
+        `
+        SELECT user_id, MAX(last_seen) AS last_seen, MAX(typing_until) AS typing_until
+        FROM devices
+        WHERE user_id = ? OR user_id = ?
+        GROUP BY user_id
+        `,
+        [authenticatedUserId, partnerId],
+      );
+    } catch {
+      result = await db.execute(
+        `
+        SELECT user_id, MAX(last_seen) AS last_seen
+        FROM devices
+        WHERE user_id = ? OR user_id = ?
+        GROUP BY user_id
+        `,
+        [authenticatedUserId, partnerId],
+      );
+    }
+
+    for (const row of result.rows as {
+      user_id?: string;
+      last_seen?: string | number | null;
+      typing_until?: string | number | null;
+    }[]) {
       const id = row.user_id ? String(row.user_id) : "";
       if (!id) continue;
       const persisted = Number(row.last_seen ?? 0);
-      if (!Number.isFinite(persisted) || persisted <= 0) continue;
-      response[id] = Math.max(response[id] ?? 0, persisted);
+      if (Number.isFinite(persisted) && persisted > 0) {
+        lastSeenMap[id] = Math.max(lastSeenMap[id] ?? 0, persisted);
+      }
+      const typingUntil = Number(row.typing_until ?? 0);
+      typing[id] = Number.isFinite(typingUntil) && typingUntil > now;
     }
 
-    res.json(response);
+    res.json({ lastSeen: lastSeenMap, typing });
   } catch (err) {
     console.error("Failed to fetch presence:", err);
     res.status(500).json({ error: "Failed to fetch presence" });

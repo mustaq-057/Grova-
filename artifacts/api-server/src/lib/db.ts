@@ -178,6 +178,11 @@ export async function initDb() {
     await db.execute(`CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)`);
     await db.execute(`CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at)`);
     await db.execute(`CREATE INDEX IF NOT EXISTS idx_devices_user_id ON devices(user_id)`);
+    try {
+      await db.execute("ALTER TABLE devices ADD COLUMN typing_until BIGINT NOT NULL DEFAULT 0");
+    } catch {
+      /* column may already exist */
+    }
     await db.execute(`
       CREATE TABLE IF NOT EXISTS primary_access_tokens (
         token_hash TEXT PRIMARY KEY,

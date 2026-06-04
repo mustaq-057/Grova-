@@ -264,6 +264,12 @@ export type ScheduledMessage = {
   createdAt: string;
 };
 
+export type PresenceResponse = {
+  lastSeen: Record<string, number>;
+  typing: Record<string, boolean>;
+};
+
+/** @deprecated Use PresenceResponse — kept for callers that expect a flat map */
 export type PresenceMap = Record<string, number>;
 
 type LoginResponse = {
@@ -433,7 +439,7 @@ export const api = {
   heartbeat: (userId: string) =>
     apiFetch<{ success: boolean }>("/presence/heartbeat", { method: "POST", body: JSON.stringify({ userId }) }),
 
-  getPresence: () => apiFetch<PresenceMap>("/presence"),
+  getPresence: () => apiFetch<PresenceResponse>("/presence"),
 
   getDuas: () => apiFetch<ApiDua[]>("/duas"),
 

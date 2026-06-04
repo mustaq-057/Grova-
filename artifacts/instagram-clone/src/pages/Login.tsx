@@ -53,21 +53,29 @@ export default memo(function Login() {
 
   useEffect(() => {
     let cancelled = false;
+    let failStreak = 0;
+    const offlineMsg = import.meta.env.PROD
+      ? "Cannot reach Grova right now. Check your connection and try again."
+      : "Cannot reach the server. Run pnpm dev:grova and open http://localhost:5000";
     const check = async () => {
       const ok = await probeApiHealth();
-      if (!cancelled) {
-        setServerOnline(ok);
-        if (!ok) {
-          setError("Cannot reach the server. Run pnpm dev:grova and open http://localhost:5000");
-        } else {
-          setError((prev) =>
-            prev.includes("Cannot reach the server") || prev.includes("API running") ? "" : prev,
-          );
+      if (cancelled) return;
+      if (ok) {
+        failStreak = 0;
+        setServerOnline(true);
+        setError((prev) =>
+          prev.includes("Cannot reach") ? "" : prev,
+        );
+      } else {
+        failStreak += 1;
+        if (failStreak >= 2) {
+          setServerOnline(false);
+          setError(offlineMsg);
         }
       }
     };
     void check();
-    const interval = setInterval(() => void check(), 8000);
+    const interval = setInterval(() => void check(), 20_000);
     return () => {
       cancelled = true;
       clearInterval(interval);
@@ -170,12 +178,18 @@ export default memo(function Login() {
 
         {serverOnline === false && (
           <div className="mb-4 rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-            API offline. In the project folder run{" "}
-            <code className="rounded bg-muted px-1 text-xs">pnpm dev:grova</code>, then open{" "}
-            <a href="http://localhost:5000" className="underline font-medium">
-              http://localhost:5000
-            </a>
-            .
+            {import.meta.env.PROD ? (
+              <>Cannot reach the Grova server. Check your internet connection and try again in a moment.</>
+            ) : (
+              <>
+                API offline. In the project folder run{" "}
+                <code className="rounded bg-muted px-1 text-xs">pnpm dev:grova</code>, then open{" "}
+                <a href="http://localhost:5000" className="underline font-medium">
+                  http://localhost:5000
+                </a>
+                .
+              </>
+            )}
           </div>
         )}
 

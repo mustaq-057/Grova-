@@ -4,7 +4,6 @@ import { motion } from "framer-motion";
 import { api, type ApiMessage } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import CallScreen, { IncomingCallOverlay } from "@/components/CallScreen";
-import { MessageSkeleton } from "@/components/MessageSkeleton";
 import { MessageItem } from "@/components/MessageItem";
 import { ThemePicker } from "@/components/ThemePicker";
 import { MessageInput } from "@/components/MessageInput";
@@ -48,7 +47,7 @@ import {
   applyHiddenMessageId,
   getHiddenMessageIds,
 } from "@/lib/hidden-messages";
-import { useDelayedSpinner } from "@/hooks/useDelayedSpinner";
+import { parsePresenceResponse, isPartnerActiveInChat } from "@/lib/presence-api";
 import { mergeMessagesById } from "@/lib/chat-sync";
 import { mergeMessagesIfChanged, messagesListSignature } from "@/lib/message-list-perf";
 import { downloadChatAsImage, downloadChatAsText } from "@/lib/chat-download";
@@ -142,8 +141,6 @@ export default function Messages() {
   const [blocked, setBlocked] = useState(() => isChatBlocked());
   const [recording, setRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const showChatSpinner = useDelayedSpinner(loading);
   const [error, setError] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
@@ -238,6 +235,8 @@ export default function Messages() {
   const partnerId = useMemo(() => user?.id === "me" ? "wife" : "me", [user?.id]);
   const theme = THEMES.find(t => t.id === chatThemeId) ?? THEMES[0]!;
   const presence = usePresenceLabel(partnerLastSeen);
+  const partnerActive = isPartnerActiveInChat(partnerLastSeen);
+  const showPartnerTyping = isTyping && partnerActive;
 
   const scrollToBottomForMedia = useCallback(() => {
     scrollChatToBottomAfterPaint(messagesContainerRef.current, bottomRef.current);
@@ -287,25 +286,26 @@ export default function Messages() {
   useEffect(() => {
     if (!user) return;
     const refreshPresence = () => {
-      api.getPresence().then((map) => {
-        setPartnerLastSeen(map[partnerId]);
+      api.getPresence().then((raw) => {
+        const { lastSeen, typing } = parsePresenceResponse(raw);
+        if (lastSeen[partnerId] != null) setPartnerLastSeen(lastSeen[partnerId]);
+        setIsTyping(Boolean(typing[partnerId]));
       }).catch(() => {});
     };
     api.heartbeat(user.id).catch(() => {});
     refreshPresence();
     const hb = setInterval(() => {
       if (isShowPresenceEnabled()) api.heartbeat(user.id).catch(() => {});
-    }, 15_000);
+    }, 10_000);
     const poll = setInterval(() => {
       if (document.visibilityState === "visible") refreshPresence();
-    }, 15_000);
+    }, 10_000);
     return () => { clearInterval(hb); clearInterval(poll); };
   }, [user?.id, partnerId]);
 
   const applyMessageBatch = useCallback((raw: ApiMessage[]) => {
     if (raw.length === 0) return;
     const preview = previewMessagesForDisplay(raw);
-    setLoading(false);
     setMessages((prev) => {
       const pending = prev.filter((m) => pendingOutgoingRef.current.has(m.id));
       const next = mergeMessagesById(preview, pending);
@@ -334,27 +334,14 @@ export default function Messages() {
     }
 
     const hadMessages = messagesSigRef.current !== "0";
-    if (!hadMessages) setLoading(true);
     setError(null);
-
-    const safetyTimer = window.setTimeout(() => {
-      setLoading(false);
-    }, 8_000);
-
-    const fetchMessages = () =>
-      Promise.race([
-        api.getMessages({ limit: 50 }),
-        new Promise<never>((_, reject) => {
-          window.setTimeout(() => reject(new Error("Request timed out")), 15_000);
-        }),
-      ]);
 
     const uid = user?.id;
     if (uid) {
       void hydrateHiddenMessages(uid).then(() => setHiddenTick((t) => t + 1));
     }
 
-    const requestPromise = fetchMessages()
+    const requestPromise = api.getMessages({ limit: 50 })
       .then((data) => {
         const raw = data.messages || [];
         if (raw.length > 0) {
@@ -370,16 +357,16 @@ export default function Messages() {
       })
       .catch((err) => {
         console.error("Failed to load messages:", err);
-        const msg =
-          err instanceof Error && /timed out/i.test(err.message)
-            ? "Loading messages timed out. Tap Try Again."
-            : "Failed to load messages. Please check your connection.";
-        setError(msg);
-        if (!hadMessages) setMessages([]);
+        if (!hadMessages && messagesSigRef.current === "0") {
+          const msg =
+            err instanceof Error && /timed out/i.test(err.message)
+              ? "Loading messages timed out. Tap Try Again."
+              : "Failed to load messages. Please check your connection.";
+          setError(msg);
+          setMessages([]);
+        }
       })
       .finally(() => {
-        window.clearTimeout(safetyTimer);
-        setLoading(false);
         pendingRequestsRef.current.delete(requestId);
       });
 
@@ -458,9 +445,23 @@ export default function Messages() {
     let es: EventSource | null = null;
     let typingTimeout: ReturnType<typeof setTimeout> | null = null;
     let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+    let livePollStop: (() => void) | null = null;
+    let presencePollId: number | null = null;
 
-    // Load messages on mount
-    void hydrateHiddenMessages(user.id);
+    const syncPresenceFromServer = () => {
+      if (!mounted) return;
+      void api.getPresence().then((raw) => {
+        const { lastSeen, typing } = parsePresenceResponse(raw);
+        if (lastSeen[partnerId] != null) setPartnerLastSeen(lastSeen[partnerId]);
+        const partnerTyping = Boolean(typing[partnerId]);
+        setIsTyping(partnerTyping);
+        if (partnerTyping) {
+          if (typingTimeout) clearTimeout(typingTimeout);
+          typingTimeout = setTimeout(() => setIsTyping(false), 4000);
+        }
+      }).catch(() => {});
+    };
+
     void hydrateQuickReactions();
     loadMessages();
 
@@ -507,13 +508,19 @@ export default function Messages() {
         if (channel?.mode === "poll") channel.stop();
         return;
       }
-      if (!channel || channel.mode === "poll") return;
+      if (!channel) return;
+
+      if (channel.mode === "poll") {
+        livePollStop = channel.stop;
+        presencePollId = window.setInterval(syncPresenceFromServer, 2500);
+        void syncPresenceFromServer();
+        return;
+      }
 
       es = channel.eventSource;
 
       es.addEventListener("connected", () => {
         sseRetryCountRef.current = 0;
-        setError(null);
       });
 
       const handleNewMessage = async (e: MessageEvent) => {
@@ -836,7 +843,6 @@ export default function Messages() {
         const retryCount = sseRetryCountRef.current;
         if (retryCount >= maxSseRetries) {
           console.error("SSE max retries exceeded, stopping reconnection");
-          setError("Connection failed. Please refresh the page to try again.");
           return;
         }
 
@@ -857,6 +863,8 @@ export default function Messages() {
       mounted = false;
       if (typingTimeout) clearTimeout(typingTimeout);
       if (reconnectTimeout) clearTimeout(reconnectTimeout);
+      if (presencePollId) window.clearInterval(presencePollId);
+      if (livePollStop) livePollStop();
       if (sseRetryTimeoutRef.current) clearTimeout(sseRetryTimeoutRef.current);
       if (es) {
         es.onerror = null;
@@ -895,13 +903,13 @@ export default function Messages() {
 
   // Jump to latest on first paint (no animated scroll through history)
   useLayoutEffect(() => {
-    if (loading || messages.length === 0) return;
+    if (messages.length === 0) return;
     if (!isInitialLoadRef.current) return;
     scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
     isInitialLoadRef.current = false;
     previousMessagesLengthRef.current = messages.length;
     setHasNewMessages(false);
-  }, [loading, messages]);
+  }, [messages]);
 
   // New messages: scroll if you sent it, you're already at bottom, or it's media you sent
   useEffect(() => {
@@ -2299,9 +2307,9 @@ export default function Messages() {
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-sm" data-testid="chat-partner-name">{pName}</p>
           <p className={`text-xs flex items-center ${isTyping ? "text-primary" : presence.online ? "text-green-400" : "text-muted-foreground"}`}>
-            {isTyping && presence.online ? (
+            {showPartnerTyping ? (
               <>
-                <span>{partnerTypingLine(partnerId, pName)}</span>
+                <span>{partnerTypingLine(partnerId)}</span>
                 <TypingDots />
               </>
             ) : (
@@ -2516,23 +2524,15 @@ export default function Messages() {
           <AvatarImage src={pAvatar} userId={partnerId} alt={`Profile picture of ${pName}`} className="w-14 h-14 md:w-24 md:h-24 rounded-full object-cover" />
           <p className="font-bold text-sm md:text-lg">{pName}</p>
           <span className="text-[10px] md:text-xs bg-secondary/60 px-3 py-1 rounded-full text-muted-foreground">Just the two of you ♥</span>
-          {isTyping && presence.online && (
+          {showPartnerTyping && (
             <div className="flex items-center gap-1 text-xs text-primary mt-1">
-              <span>{partnerTypingLine(partnerId, pName)}</span>
+              <span>{partnerTypingLine(partnerId)}</span>
               <TypingDots />
             </div>
           )}
         </div>
 
-        {showChatSpinner && messages.length === 0 && (
-          <div className="space-y-2">
-            <MessageSkeleton />
-            <MessageSkeleton />
-            <MessageSkeleton />
-          </div>
-        )}
-
-        {!loading && error && (
+        {error && messages.length === 0 && visibleMessages.length === 0 && (
           <div
             className="flex flex-col items-center gap-3 py-8 text-center px-4 bg-destructive/5 border border-destructive/30 rounded-2xl mx-2"
           >
@@ -2552,7 +2552,7 @@ export default function Messages() {
           </div>
         )}
 
-        {!loading && !error && visibleMessages.length === 0 && (
+        {!error && visibleMessages.length === 0 && messages.length === 0 && (
           <div className="flex flex-col items-center gap-2 py-8 text-center px-4">
             <span className="text-4xl">💬</span>
             {user && getChatClearedAt(user.id) ? (

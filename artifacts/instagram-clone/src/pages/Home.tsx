@@ -8,6 +8,7 @@ import { isEncryptionReady } from "@/lib/crypto";
 import { AvatarImage } from "@/components/AvatarImage";
 import { PostFeed } from "@/components/PostFeed";
 import { PARTNER_CHANGED } from "@/lib/couple-sync";
+import { parsePresenceResponse } from "@/lib/presence-api";
 
 export default memo(function Home() {
   const { user, partner: authPartner } = useAuth();
@@ -56,8 +57,9 @@ export default memo(function Home() {
   }, [authPartner, partnerId, partner]);
 
   useEffect(() => {
-    api.getPresence().then((presence) => {
-      const partnerOnline = presence[partnerId];
+    api.getPresence().then((raw) => {
+      const { lastSeen } = parsePresenceResponse(raw);
+      const partnerOnline = lastSeen[partnerId];
       setPartnerOnline(partnerOnline !== undefined && Date.now() - partnerOnline < 30000);
     }).catch((error) => {
       console.error('Failed to fetch presence data:', error);

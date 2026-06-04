@@ -15,8 +15,8 @@ export function partnerHeShe(partnerId: string): "he" | "she" {
   return partnerIsFemale(partnerId) ? "she" : "he";
 }
 
-export function partnerTypingLine(partnerId: string, name: string): string {
-  return `${name} is typing…`;
+export function partnerTypingLine(partnerId: string, _name?: string): string {
+  return partnerId === "wife" ? "Sara is typing…" : "Mustaq is typing…";
 }
 
 /** e.g. "Ask her" / "Ask him" */
