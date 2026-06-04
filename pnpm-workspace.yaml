@@ -33,6 +33,11 @@ minimumReleaseAgeExclude:
   # this setting guards against does not apply to our own packages.
   - '@replit/*'
   - stripe-replit-sync
+  # Build toolchain (CI/Vercel must install these even when published <24h ago)
+  - vite
+  - esbuild
+  - '@vitejs/*'
+  - '@esbuild/*'
 
 packages:
   - artifacts/*
@@ -77,4 +82,4 @@ overrides:
 
 allowBuilds:
   better-sqlite3: false
-  esbuild: false
+  esbuild: true
