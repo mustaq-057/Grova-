@@ -8,15 +8,13 @@ import GreetingPicker from "@/components/GreetingPicker";
 import { extractClipboardFiles } from "@/lib/media-file";
 
 interface MessageInputProps {
-  input: string;
-  setInput: (value: string) => void;
+  /** Called with trimmed text when user sends (input state stays inside this component for perf). */
+  onSendMessage: (text: string) => void;
   onInputActivity?: (value: string) => void;
-  onSend: () => void;
   cuteMode?: string | null;
   onToggleCuteMode?: (mode: string | null) => void;
   onShareLocation?: () => void;
   sharingLocation?: boolean;
-  onEmojiSelect: (emoji: string) => void;
   onStickerSelect: (sticker: string) => void;
   onGifSelect: (gif: string) => void;
   onGreetingSelect: (greeting: unknown) => void;
@@ -37,15 +35,12 @@ interface MessageInputProps {
 type OpenPicker = "emoji" | "sticker" | "greeting" | null;
 
 export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>(function MessageInput({
-  input,
-  setInput,
+  onSendMessage,
   onInputActivity,
-  onSend,
   cuteMode = null,
   onToggleCuteMode,
   onShareLocation,
   sharingLocation = false,
-  onEmojiSelect,
   onStickerSelect,
   onGifSelect,
   onGreetingSelect,
@@ -62,6 +57,7 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
   disabled,
   replyPreview,
 }, ref) {
+  const [input, setInput] = useState("");
   const [openPicker, setOpenPicker] = useState<OpenPicker>(null);
   const [showCuteMenu, setShowCuteMenu] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -75,12 +71,19 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
     }
   }, [openPicker]);
 
+  const submitMessage = useCallback(() => {
+    const text = input.trim();
+    if (!text || disabled || recording) return;
+    setInput("");
+    onSendMessage(text);
+  }, [input, disabled, recording, onSendMessage]);
+
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      onSend();
+      submitMessage();
     }
-  }, [onSend]);
+  }, [submitMessage]);
 
   const handlePaste = useCallback(
     (e: React.ClipboardEvent<HTMLInputElement>) => {
@@ -164,9 +167,9 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
   }, []);
 
   const handleEmojiSelect = useCallback((emoji: string) => {
-    onEmojiSelect(emoji);
+    setInput((i) => i + emoji);
     setOpenPicker(null);
-  }, [onEmojiSelect]);
+  }, []);
 
   const handleStickerSelect = useCallback((sticker: string) => {
     onStickerSelect(sticker);
@@ -210,7 +213,7 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
   ) : input.trim() ? (
     <button
       type="button"
-      onClick={onSend}
+      onClick={submitMessage}
       className={`p-2.5 rounded-full transition-all shrink-0 ${
         disabled ? "opacity-50 cursor-not-allowed bg-primary/60" : "bg-primary text-primary-foreground hover:bg-primary/90"
       }`}

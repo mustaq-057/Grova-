@@ -1,4 +1,4 @@
-import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, startTransition } from "react";
 import { Info, Heart, Mic, X, Trash2, Ban, Phone, Video, WifiOff, Wifi, Search, AlertCircle, Palette, MessageCircle, Shield } from "lucide-react";
 import { motion } from "framer-motion";
 import { api, type ApiMessage } from "@/lib/api";
@@ -48,6 +48,7 @@ import {
   getHiddenMessageIds,
 } from "@/lib/hidden-messages";
 import { mergeMessagesById } from "@/lib/chat-sync";
+import { mergeMessagesIfChanged, messagesListSignature } from "@/lib/message-list-perf";
 import { downloadChatAsImage, downloadChatAsText } from "@/lib/chat-download";
 import { openLiveChannel } from "@/lib/sse-client";
 import { uploadMediaToB2, uploadMediaFile } from "@/lib/media-upload";
@@ -109,7 +110,7 @@ type CallState = { status: "outgoing" | "incoming" | "active"; type: "audio" | "
 export default function Messages() {
   const { user, partner, chatThemeId, updateChatTheme, refreshCouplePrefs } = useAuth();
   const [messages, setMessages] = useState<ApiMessage[]>([]);
-  const [input, setInput] = useState("");
+  const messagesSigRef = useRef("");
   const [showInfo, setShowInfo] = useState(false);
   const [showThemes, setShowThemes] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -189,6 +190,7 @@ export default function Messages() {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastTypingPingRef = useRef(0);
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sseRetryCountRef = useRef(0);
   const sseRetryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -292,7 +294,9 @@ export default function Messages() {
         isInitialLoadRef.current = true;
         setMessages((prev) => {
           const pending = prev.filter((m) => pendingOutgoingRef.current.has(m.id));
-          return mergeMessagesById(fromServer, pending);
+          const next = mergeMessagesById(fromServer, pending);
+          messagesSigRef.current = messagesListSignature(next);
+          return next;
         });
         const mergedCount = fromServer.length;
         const more = data.pagination?.hasMore ?? false;
@@ -394,8 +398,15 @@ export default function Messages() {
       if (!mounted) return;
       void api.getMessages().then(async (data) => {
         const fresh = await normalizeMessages(data.messages ?? []);
-        setMessages((prev) => mergeMessagesById(prev, fresh));
-        setHasMore(fresh.length > 0 && (data.pagination?.hasMore ?? false));
+        startTransition(() => {
+          setMessages((prev) => {
+            const next = mergeMessagesIfChanged(prev, fresh, mergeMessagesById);
+            if (!next) return prev;
+            messagesSigRef.current = messagesListSignature(next);
+            return next;
+          });
+          setHasMore(fresh.length > 0 && (data.pagination?.hasMore ?? false));
+        });
       }).catch(() => {});
     };
 
@@ -1065,14 +1076,18 @@ export default function Messages() {
 
     let tempId: string | null = null;
     try {
-      const outgoing = await prepareOutgoingMessage({ senderId: user.id, ...partial });
       tempId = crypto.randomUUID();
       pendingOutgoingRef.current.add(tempId);
       const optimistic = buildOptimisticMessage({ senderId: user.id, ...partial }, tempId);
 
-      setMessages((prev) => [...prev, optimistic]);
+      setMessages((prev) => {
+        const next = [...prev, optimistic];
+        messagesSigRef.current = messagesListSignature(next);
+        return next;
+      });
       scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
 
+      const outgoing = await prepareOutgoingMessage({ senderId: user.id, ...partial });
       const saved = await api.sendMessage(outgoing);
       const [display] = await normalizeMessages([saved]);
       pendingOutgoingRef.current.delete(tempId);
@@ -1211,14 +1226,13 @@ export default function Messages() {
     setCuteModeState(mode);
   }, []);
 
-  const sendText = useCallback(() => {
-    let text = input.trim();
+  const sendText = useCallback((rawText: string) => {
+    let text = rawText.trim();
     if (!text) return;
     if (replyTo?.text) {
       const snippet = replyTo.text.slice(0, 80);
       text = `↩ ${snippet}${replyTo.text.length > 80 ? "…" : ""}\n${text}`;
     }
-    setInput("");
     setReplyTo(null);
     const modeStickers: Record<string, string> = {
       frog: "🐸",
@@ -1232,7 +1246,7 @@ export default function Messages() {
         ? { variant: "cute" as const, companionSticker: modeStickers[cuteMode] || "🐸" }
         : { variant: "default" as const }),
     });
-  }, [input, sendMsg, cuteMode, replyTo]);
+  }, [sendMsg, cuteMode, replyTo]);
 
   // Debounced search handler
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1256,10 +1270,14 @@ export default function Messages() {
       void api.sendTyping(user.id, partnerId, false);
       return;
     }
-    void api.sendTyping(user.id, partnerId, true);
+    const now = Date.now();
+    if (now - lastTypingPingRef.current > 900) {
+      lastTypingPingRef.current = now;
+      void api.sendTyping(user.id, partnerId, true);
+    }
     typingTimeoutRef.current = setTimeout(() => {
       void api.sendTyping(user.id, partnerId, false);
-    }, 1500);
+    }, 2000);
   }, [user, partnerId]);
 
   const sendGreeting = useCallback((g: GreetingTemplate) => {
@@ -2459,7 +2477,7 @@ export default function Messages() {
               const prevMsg = arr[i - 1];
               const timeGap = shouldShowTimeGap(prevMsg, msg);
               return (
-                <div key={msg.id}>
+                <div key={msg.id} className="chat-message-row">
                   {timeGap && (
                     <p className="text-center text-[10px] text-muted-foreground/60 my-3 font-medium">{timeGap}</p>
                   )}
@@ -2547,10 +2565,8 @@ export default function Messages() {
       {/* ── Input Bar ── */}
       <MessageInput
         ref={messageInputRef}
-        input={input}
-        setInput={setInput}
         onInputActivity={handleInputActivity}
-        onSend={sendText}
+        onSendMessage={sendText}
         cuteMode={cuteMode}
         onToggleCuteMode={toggleCuteMode}
         onShareLocation={handleShareLocation}
@@ -2565,7 +2581,6 @@ export default function Messages() {
             />
           ) : undefined
         }
-        onEmojiSelect={(emoji) => setInput(i => i + emoji)}
         onStickerSelect={sendSticker}
         onGifSelect={sendGif}
         onGreetingSelect={sendGreeting}

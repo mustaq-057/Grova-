@@ -47,7 +47,6 @@ export function AudioMessage({ audioData, isMe }: { audioData: string; isMe: boo
         if (!duration && Number.isFinite(audio.duration)) setDuration(audio.duration);
       }
     };
-    void generateWaveform(audio);
     return audio;
   };
 
@@ -68,6 +67,7 @@ export function AudioMessage({ audioData, isMe }: { audioData: string; isMe: boo
       audio.pause();
       setPlaying(false);
     } else {
+      if (waveform.length === 0) void generateWaveform(audio);
       audio.play().catch((err) => console.error("Audio playback failed:", err));
       setPlaying(true);
     }
