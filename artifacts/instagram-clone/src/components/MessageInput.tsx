@@ -1,10 +1,11 @@
-import { memo, useRef, useState, useEffect, useCallback } from "react";
+import { memo, useRef, useState, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
 import { createPortal } from "react-dom";
 import { Smile, Mic, Send, Sticker, Paperclip, X, MessageCircle, MapPin, PenTool, Zap } from "lucide-react";
 import { motion } from "framer-motion";
 import EmojiPicker from "@/components/EmojiPicker";
 import StickerPicker from "@/components/StickerPicker";
 import GreetingPicker from "@/components/GreetingPicker";
+import { extractClipboardFiles } from "@/lib/media-file";
 
 interface MessageInputProps {
   input: string;
@@ -35,7 +36,7 @@ interface MessageInputProps {
 
 type OpenPicker = "emoji" | "sticker" | "greeting" | null;
 
-export const MessageInput = memo(function MessageInput({
+export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>(function MessageInput({
   input,
   setInput,
   onInputActivity,
@@ -60,11 +61,13 @@ export const MessageInput = memo(function MessageInput({
   recordingTime,
   disabled,
   replyPreview,
-}: MessageInputProps) {
+}, ref) {
   const [openPicker, setOpenPicker] = useState<OpenPicker>(null);
   const [showCuteMenu, setShowCuteMenu] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useImperativeHandle(ref, () => inputRef.current as HTMLInputElement);
 
   useEffect(() => {
     if (inputRef.current && !openPicker) {
@@ -78,6 +81,19 @@ export const MessageInput = memo(function MessageInput({
       onSend();
     }
   }, [onSend]);
+
+  const handlePaste = useCallback(
+    (e: React.ClipboardEvent<HTMLInputElement>) => {
+      if (recording || disabled) return;
+      const picked = extractClipboardFiles(e.clipboardData).filter(({ file }) => file.size > 0);
+      if (picked.length === 0) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const { file, itemType } = picked[0];
+      onImageSelect(file, itemType);
+    },
+    [recording, disabled, onImageSelect],
+  );
 
   const formatTime = useCallback((seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -218,9 +234,15 @@ export const MessageInput = memo(function MessageInput({
     <input
       ref={inputRef}
       type="text"
+      inputMode="text"
+      enterKeyHint="send"
+      autoComplete="off"
+      autoCorrect="on"
       value={input}
       onChange={handleInputChange}
       onKeyDown={handleKeyDown}
+      onPaste={handlePaste}
+      onClick={() => inputRef.current?.focus()}
       placeholder="Message..."
       className={`w-full min-w-0 px-4 py-2.5 bg-secondary/50 border border-border/50 rounded-full text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/50 transition-all ${
         disabled || recording ? "opacity-60 cursor-not-allowed" : ""
@@ -446,4 +468,4 @@ export const MessageInput = memo(function MessageInput({
         )}
     </div>
   );
-});
+}));

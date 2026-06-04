@@ -1,5 +1,5 @@
 import type { ApiMessage } from "./api";
-import { messagePreview } from "./message-utils";
+import { messagePreview, scrubUndecryptedServerText } from "./message-utils";
 
 const W = 480;
 const PAD = 20;
@@ -7,8 +7,8 @@ const BUBBLE_MAX = 320;
 const LINE_H = 18;
 const GAP = 12;
 const HEADER_H = 72;
-const MAX_PAGE_HEIGHT = 1400;
-const MAX_MESSAGES_PER_PAGE = 24;
+const MAX_PAGE_HEIGHT = 12000;
+const MAX_MESSAGES_PER_PAGE = 120;
 const IMAGE_BLOCK_H = 180;
 const GIF_BLOCK_H = 180;
 const META_H = 14;
@@ -32,14 +32,48 @@ function wrapLines(ctx: CanvasRenderingContext2D, text: string, maxWidth: number
 }
 
 function exportBody(msg: ApiMessage): string {
-  if (msg.type === "text" && msg.text?.trim()) {
-    if (/^(?:\d+:)?[0-9a-f]{16,}:[0-9a-f]{16,}:[0-9a-f]+$/i.test(msg.text)) {
-      return "🔒 Encrypted message";
-    }
-    if (msg.text.startsWith("e2e:")) return "🔒 Encrypted message";
-    return msg.text.trim();
+  const cleaned = scrubUndecryptedServerText(msg);
+  if (cleaned.type === "text" && cleaned.text?.trim()) {
+    if (cleaned.text.startsWith("🔒")) return cleaned.text;
+    return cleaned.text.trim();
   }
-  return messagePreview(msg);
+  return messagePreview(cleaned);
+}
+
+function formatExportLine(msg: ApiMessage, isMe: boolean, myName: string, partnerName: string): string {
+  const who = isMe ? myName : partnerName;
+  const time = formatMsgTime(msg.timestamp);
+  const body = exportBody(msg);
+  return `[${time}] ${who}: ${body}`;
+}
+
+/** Readable plain-text export (preferred). */
+export function downloadChatAsText(
+  messages: ApiMessage[],
+  myId: string,
+  myName: string,
+  partnerName: string,
+): void {
+  const sorted = [...messages]
+    .filter((m) => !m.deleted && m.variant !== "cute")
+    .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+  const lines = [
+    `Grova chat export — ${myName} & ${partnerName}`,
+    `Exported ${new Date().toLocaleString()}`,
+    "",
+    ...sorted.map((m) => formatExportLine(m, m.senderId === myId, myName, partnerName)),
+  ];
+
+  const blob = new Blob([lines.join("\n")], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `grova-chat-${new Date().toISOString().slice(0, 10)}.txt`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 function formatMsgTime(iso: string): string {

@@ -1,6 +1,10 @@
-import { memo } from "react";
-import { X, Lock } from "lucide-react";
+import { memo, useState } from "react";
+import { X, Lock, Mic } from "lucide-react";
 import { motion } from "framer-motion";
+import { AudioMessage } from "@/components/AudioMessage";
+import { isTranscriptionSupported, transcribeFromMicrophone } from "@/lib/voice-transcribe";
+import { parseSecretNotePlain, type SecretNotePayload } from "@/lib/secret-note-payload";
+import { toast } from "sonner";
 
 type Props = {
   title: string;
@@ -9,6 +13,22 @@ type Props = {
 };
 
 export const SecretNoteReader = memo(function SecretNoteReader({ title, body, onClose }: Props) {
+  const payload: SecretNotePayload = parseSecretNotePlain(body);
+  const [appendText, setAppendText] = useState("");
+  const [dictating, setDictating] = useState(false);
+
+  const startAppendDictation = () => {
+    if (!isTranscriptionSupported()) {
+      toast.error("Voice typing needs Chrome or Edge.");
+      return;
+    }
+    setDictating(true);
+    const session = transcribeFromMicrophone(setAppendText);
+    void session.promise
+      .catch(() => toast.error("Could not transcribe."))
+      .finally(() => setDictating(false));
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -33,10 +53,37 @@ export const SecretNoteReader = memo(function SecretNoteReader({ title, body, on
           <X className="w-5 h-5" />
         </button>
       </header>
-      <div className="flex-1 overflow-y-auto px-4 py-6 md:px-8 md:py-10">
-        <p className="text-base md:text-lg leading-relaxed whitespace-pre-wrap break-words text-foreground max-w-2xl mx-auto">
-          {body}
-        </p>
+      <div className="flex-1 overflow-y-auto px-4 py-6 md:px-8 md:py-10 space-y-6">
+        {payload.audio ? (
+          <div className="max-w-2xl mx-auto rounded-2xl border border-border bg-card/50 p-4">
+            <p className="text-xs text-muted-foreground mb-3 font-medium">Saved voice note</p>
+            <AudioMessage audioData={payload.audio} isMe={false} />
+          </div>
+        ) : null}
+        {payload.text?.trim() ? (
+          <p className="text-base md:text-lg leading-relaxed whitespace-pre-wrap break-words text-foreground max-w-2xl mx-auto">
+            {payload.text}
+          </p>
+        ) : !payload.audio ? (
+          <p className="text-sm text-muted-foreground text-center">Empty note</p>
+        ) : null}
+        <div className="max-w-2xl mx-auto border-t border-border pt-4 space-y-2">
+          <p className="text-xs text-muted-foreground">Add a spoken note (transcribed to text)</p>
+          <button
+            type="button"
+            onClick={startAppendDictation}
+            disabled={dictating}
+            className="flex items-center gap-2 px-3 py-2 rounded-xl bg-secondary text-sm font-medium disabled:opacity-50"
+          >
+            <Mic className="w-4 h-4" />
+            {dictating ? "Listening…" : "Transcribe audio"}
+          </button>
+          {appendText ? (
+            <p className="text-sm leading-relaxed whitespace-pre-wrap break-words bg-secondary/50 rounded-xl p-3">
+              {appendText}
+            </p>
+          ) : null}
+        </div>
       </div>
     </motion.div>
   );

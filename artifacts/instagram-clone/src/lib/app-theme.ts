@@ -1,6 +1,6 @@
 /** App-wide color themes — nav, settings, profile chrome only (not chat bubbles). */
 
-export type AppThemeId = "grova" | "rose-love" | "ocean" | "midnight" | "golden" | "sakura-fall";
+export type AppThemeId = "grova" | "rose-love" | "ocean" | "midnight" | "golden" | "sakura-fall" | "sara-lavender";
 
 export const APP_THEME_CHANGED = "grova-app-theme-changed";
 
@@ -123,6 +123,28 @@ export const APP_THEMES: {
     },
   },
   {
+    id: "sara-lavender",
+    name: "Sara & Lily",
+    description: "Lavender sky · names fall ♡",
+    swatch: "bg-gradient-to-br from-violet-300 via-purple-200 to-lavender-300",
+    dark: {
+      "--app-background": "270 28% 9%",
+      "--app-foreground": "270 20% 94%",
+      "--app-primary": "270 65% 72%",
+      "--app-card": "270 24% 12%",
+      "--app-secondary": "270 20% 16%",
+      "--app-border": "270 18% 20%",
+    },
+    light: {
+      "--app-background": "270 45% 97%",
+      "--app-foreground": "270 30% 18%",
+      "--app-primary": "270 55% 58%",
+      "--app-card": "270 40% 99%",
+      "--app-secondary": "270 35% 94%",
+      "--app-border": "270 25% 88%",
+    },
+  },
+  {
     id: "sakura-fall",
     name: "Sakura Fall",
     description: "3D cherry blossoms ♡",
@@ -212,6 +234,10 @@ function syncAppChromeFromTheme() {
 
 export function isSakuraFallTheme(themeId?: AppThemeId): boolean {
   return (themeId ?? getStoredAppTheme()) === "sakura-fall";
+}
+
+export function isSaraLavenderTheme(themeId?: AppThemeId): boolean {
+  return (themeId ?? getStoredAppTheme()) === "sara-lavender";
 }
 
 export function applyAppTheme(themeId: AppThemeId) {

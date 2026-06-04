@@ -1,9 +1,12 @@
-import { useState, useEffect, useCallback } from "react";
-import { Plus, Trash2, Lock, X, Shield } from "lucide-react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { Plus, Trash2, Lock, X, Shield, Mic } from "lucide-react";
+import { toast } from "sonner";
+import { isTranscriptionSupported, transcribeFromMicrophone } from "@/lib/voice-transcribe";
 import { motion, AnimatePresence } from "framer-motion";
 import { api, type ApiSecretNote } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { encryptSecret, decryptSecret, isEncryptedSecret } from "@/lib/secret-crypto";
+import { formatSecretNotePlain } from "@/lib/secret-note-payload";
 import { partnerPossessiveNote } from "@/lib/partner-words";
 import { SecretNoteReader } from "@/components/SecretNoteReader";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -24,6 +27,13 @@ export default function SecretNotes() {
   const [reader, setReader] = useState<{ id: string; title: string; body: string } | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [dictating, setDictating] = useState(false);
+  const [voiceNoteUrl, setVoiceNoteUrl] = useState<string | null>(null);
+  const [recordingNote, setRecordingNote] = useState(false);
+  const dictationRef = useRef<{ stop: () => void } | null>(null);
+  const noteRecorderRef = useRef<MediaRecorder | null>(null);
+  const noteChunksRef = useRef<Blob[]>([]);
+  const noteStreamRef = useRef<MediaStream | null>(null);
 
   const loadNotes = useCallback(async () => {
     try {
@@ -65,13 +75,120 @@ export default function SecretNotes() {
     return () => es.close();
   }, [user, loadNotes, reader?.id]);
 
+  const stopDictation = useCallback(() => {
+    dictationRef.current?.stop();
+    dictationRef.current = null;
+    setDictating(false);
+  }, []);
+
+  useEffect(() => () => stopDictation(), [stopDictation]);
+
+  const startDictation = () => {
+    if (!isTranscriptionSupported()) {
+      toast.error("Voice typing needs Chrome or Edge.");
+      return;
+    }
+    stopDictation();
+    setDictating(true);
+    const prefix = content.trim();
+    const session = transcribeFromMicrophone((partial) => {
+      setContent(prefix ? `${prefix} ${partial}`.trim() : partial);
+    });
+    dictationRef.current = session;
+    void session.promise
+      .then((final) => {
+        if (final) setContent(prefix ? `${prefix} ${final}`.trim() : final);
+      })
+      .catch(() => toast.error("Could not transcribe audio."))
+      .finally(() => {
+        dictationRef.current = null;
+        setDictating(false);
+      });
+  };
+
+  const stopNoteRecording = useCallback(() => {
+    const rec = noteRecorderRef.current;
+    if (rec && rec.state !== "inactive") {
+      try {
+        rec.stop();
+      } catch {
+        /* ignore */
+      }
+    }
+    noteStreamRef.current?.getTracks().forEach((t) => t.stop());
+    noteStreamRef.current = null;
+    setRecordingNote(false);
+  }, []);
+
+  const startNoteRecording = async () => {
+    if (recordingNote) {
+      stopNoteRecording();
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      noteStreamRef.current = stream;
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : MediaRecorder.isTypeSupported("audio/webm")
+          ? "audio/webm"
+          : undefined;
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      noteChunksRef.current = [];
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) noteChunksRef.current.push(e.data);
+      };
+      recorder.onstop = () => {
+        const blob = new Blob(noteChunksRef.current, { type: mimeType || "audio/webm" });
+        noteChunksRef.current = [];
+        noteRecorderRef.current = null;
+        stream.getTracks().forEach((t) => t.stop());
+        noteStreamRef.current = null;
+        setRecordingNote(false);
+        if (blob.size > 0) {
+          if (voiceNoteUrl?.startsWith("blob:")) URL.revokeObjectURL(voiceNoteUrl);
+          setVoiceNoteUrl(URL.createObjectURL(blob));
+        }
+      };
+      noteRecorderRef.current = recorder;
+      recorder.start(250);
+      setRecordingNote(true);
+      toast.message("Recording voice note…", { description: "Tap again to stop and save." });
+    } catch {
+      toast.error("Could not access microphone.");
+    }
+  };
+
+  const voiceNoteUrlRef = useRef(voiceNoteUrl);
+  voiceNoteUrlRef.current = voiceNoteUrl;
+  useEffect(
+    () => () => {
+      stopNoteRecording();
+      const url = voiceNoteUrlRef.current;
+      if (url?.startsWith("blob:")) URL.revokeObjectURL(url);
+    },
+    [stopNoteRecording],
+  );
+
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!content.trim() || !password.trim() || !user) return;
+    if ((!content.trim() && !voiceNoteUrl) || !password.trim() || !user) return;
     setSubmitting(true);
     setError(null);
     try {
-      const encrypted = await encryptSecret(content.trim(), password.trim());
+      let audioData: string | undefined;
+      if (voiceNoteUrl) {
+        const res = await fetch(voiceNoteUrl);
+        const blob = await res.blob();
+        audioData = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result));
+          reader.onerror = () => reject(new Error("Could not read voice note"));
+          reader.readAsDataURL(blob);
+        });
+      }
+      const plain = formatSecretNotePlain({ text: content.trim(), audio: audioData });
+      const encrypted = await encryptSecret(plain, password.trim());
       const note = await api.addSecretNote({
         content: encrypted,
         author: user.id,
@@ -79,6 +196,8 @@ export default function SecretNotes() {
       setNotes((prev) => [note, ...prev]);
       setContent("");
       setPassword("");
+      if (voiceNoteUrl?.startsWith("blob:")) URL.revokeObjectURL(voiceNoteUrl);
+      setVoiceNoteUrl(null);
       setShowAdd(false);
     } catch (err) {
       console.error("Failed to add secret note:", err);
@@ -177,11 +296,41 @@ export default function SecretNotes() {
               <textarea
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
-                placeholder="Write your private message..."
+                placeholder="Write your private message or tap the mic to speak…"
                 rows={5}
                 className="w-full bg-secondary border border-border rounded-xl px-4 py-3 text-sm outline-none focus:border-primary transition-colors resize-none"
                 data-testid="input-secret-note-content"
               />
+              <button
+                type="button"
+                onClick={() => void startNoteRecording()}
+                className={`flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-sm font-medium border transition-colors ${
+                  recordingNote
+                    ? "bg-destructive/10 border-destructive/30 text-destructive"
+                    : "bg-secondary border-border hover:border-primary/40"
+                }`}
+              >
+                <Mic className="w-4 h-4" />
+                {recordingNote ? "Stop & save voice note" : voiceNoteUrl ? "Re-record voice note" : "Record voice note"}
+              </button>
+              {voiceNoteUrl ? (
+                <div className="rounded-xl border border-border bg-secondary/30 p-3">
+                  <p className="text-xs text-muted-foreground mb-2">Voice preview — saved with your passcode</p>
+                  <audio src={voiceNoteUrl} controls className="w-full" playsInline />
+                </div>
+              ) : null}
+              <button
+                type="button"
+                onClick={dictating ? stopDictation : startDictation}
+                className={`flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-sm font-medium border transition-colors ${
+                  dictating
+                    ? "bg-destructive/10 border-destructive/30 text-destructive"
+                    : "bg-secondary border-border hover:border-primary/40"
+                }`}
+              >
+                <Mic className="w-4 h-4" />
+                {dictating ? "Stop transcribing" : "Type from voice (live)"}
+              </button>
               <input
                 type="password"
                 value={password}
@@ -196,7 +345,7 @@ export default function SecretNotes() {
               </p>
               <button
                 type="submit"
-                disabled={!content.trim() || !password.trim() || submitting}
+                disabled={(!content.trim() && !voiceNoteUrl) || !password.trim() || submitting}
                 className="w-full py-2.5 bg-primary text-primary-foreground font-semibold rounded-xl disabled:opacity-50 text-sm"
                 data-testid="button-submit-secret-note"
               >

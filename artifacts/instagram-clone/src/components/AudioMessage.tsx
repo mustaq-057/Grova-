@@ -1,5 +1,9 @@
 import { useState, useRef, useEffect } from "react";
 import { Play, Pause, Mic } from "lucide-react";
+import { toast } from "sonner";
+import { isTranscriptionSupported, transcribeFromAudioUrl } from "@/lib/voice-transcribe";
+
+const STATIC_BARS = [4, 6, 9, 7, 10, 8, 6, 9, 7, 5, 8, 6, 4, 7, 9, 6, 8, 5, 7, 4];
 
 export function AudioMessage({ audioData, isMe }: { audioData: string; isMe: boolean }) {
   const [playing, setPlaying] = useState(false);
@@ -9,30 +13,29 @@ export function AudioMessage({ audioData, isMe }: { audioData: string; isMe: boo
   const [waveform, setWaveform] = useState<number[]>([]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
-  const bars = [3, 5, 8, 6, 9, 7, 5, 8, 6, 4, 7, 5, 3, 6, 8, 5, 7, 4, 6, 3];
 
-  const toggle = () => {
-    if (!audioRef.current) {
-      const audio = new Audio(audioData);
-      audioRef.current = audio;
-      audio.onended = () => {
-        setPlaying(false);
-        setProgress(0);
-      };
-      audio.ontimeupdate = () => {
-        if (audio.duration) {
-          setProgress(audio.currentTime / audio.duration);
-        }
-      };
-      // Generate waveform when audio loads
-      generateWaveform(audio);
-    }
+  const ensureAudio = async (): Promise<HTMLAudioElement> => {
+    if (audioRef.current) return audioRef.current;
+    const audio = new Audio(audioData);
+    audioRef.current = audio;
+    audio.onended = () => {
+      setPlaying(false);
+      setProgress(0);
+    };
+    audio.ontimeupdate = () => {
+      if (audio.duration) setProgress(audio.currentTime / audio.duration);
+    };
+    void generateWaveform(audio);
+    return audio;
+  };
 
+  const toggle = async () => {
+    const audio = await ensureAudio();
     if (playing) {
-      audioRef.current.pause();
+      audio.pause();
       setPlaying(false);
     } else {
-      audioRef.current.play().catch((err) => console.error("Audio playback failed:", err));
+      audio.play().catch((err) => console.error("Audio playback failed:", err));
       setPlaying(true);
     }
   };
@@ -40,96 +43,56 @@ export function AudioMessage({ audioData, isMe }: { audioData: string; isMe: boo
   const generateWaveform = async (audio: HTMLAudioElement) => {
     try {
       if (!audioContextRef.current) {
-        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+        audioContextRef.current = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
       }
-      
+      await audioContextRef.current.resume().catch(() => {});
       const response = await fetch(audioData);
       const arrayBuffer = await response.arrayBuffer();
       const audioBuffer = await audioContextRef.current.decodeAudioData(arrayBuffer);
-      
       const channelData = audioBuffer.getChannelData(0);
-      const samples = 50; // Number of bars in waveform
-      const blockSize = Math.floor(channelData.length / samples);
+      const samples = 24;
+      const blockSize = Math.max(1, Math.floor(channelData.length / samples));
       const waveformBars: number[] = [];
-      
       for (let i = 0; i < samples; i++) {
         let sum = 0;
         for (let j = 0; j < blockSize; j++) {
-          sum += Math.abs(channelData[i * blockSize + j]);
+          sum += Math.abs(channelData[i * blockSize + j] ?? 0);
         }
-        const average = sum / blockSize;
-        waveformBars.push(Math.min(average * 10, 1)); // Scale to 0-1 range
+        waveformBars.push(Math.min((sum / blockSize) * 10, 1));
       }
-      
       setWaveform(waveformBars);
-    } catch (error) {
-      console.error("Failed to generate waveform:", error);
-      // Fallback to random bars if waveform generation fails
-      setWaveform(bars.map(() => Math.random()));
+    } catch {
+      setWaveform(STATIC_BARS.map(() => 0.35 + Math.random() * 0.35));
     }
   };
 
   const transcribeAudio = async () => {
-    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-      alert("Speech recognition is not supported in this browser");
+    if (!isTranscriptionSupported()) {
+      toast.error("Speech recognition is not supported here. Try Chrome on Android.");
       return;
     }
-
     setTranscribing(true);
+    setTranscript("");
     try {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      const recognition = new SpeechRecognition();
-      recognition.lang = 'en-US';
-      recognition.continuous = true;
-      recognition.interimResults = true;
-
-      let finalTranscript = '';
-
-      recognition.onresult = (event: any) => {
-        let interimTranscript = '';
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const transcript = event.results[i][0].transcript;
-          if (event.results[i].isFinal) {
-            finalTranscript += transcript + ' ';
-          } else {
-            interimTranscript += transcript;
-          }
-        }
-        setTranscript(finalTranscript + interimTranscript);
-      };
-
-      recognition.onerror = (event: any) => {
-        console.error("Speech recognition error:", event.error);
-        setTranscribing(false);
-      };
-
-      recognition.onend = () => {
-        setTranscribing(false);
-      };
-
-      // Play audio while transcribing
-      if (!audioRef.current) {
-        const audio = new Audio(audioData);
-        audioRef.current = audio;
+      const text = await transcribeFromAudioUrl(audioData, setTranscript);
+      if (!text.trim()) {
+        toast.message("No speech detected", {
+          description: "Try speaking closer to the mic when recording, or use Chrome.",
+        });
+      } else {
+        setTranscript(text);
       }
-      audioRef.current.play();
-      setPlaying(true);
-
-      recognition.start();
-
-      // Stop recognition when audio ends
-      audioRef.current.onended = () => {
-        recognition.stop();
-        setPlaying(false);
-        setProgress(0);
-      };
     } catch (error) {
       console.error("Transcription failed:", error);
+      toast.error("Could not transcribe this voice note", {
+        description:
+          "Playback transcription is limited on mobile. Record again and speak clearly, or use Chrome on desktop.",
+      });
+    } finally {
       setTranscribing(false);
     }
   };
 
-  // Cleanup on unmount to prevent memory leaks and sound leaks
   useEffect(() => {
     return () => {
       if (audioRef.current) {
@@ -141,99 +104,73 @@ export function AudioMessage({ audioData, isMe }: { audioData: string; isMe: boo
     };
   }, []);
 
+  const bars = waveform.length > 0 ? waveform : STATIC_BARS;
+  const barHeights = bars.map((a) => Math.max(3, Math.min(16, (typeof a === "number" ? a : 0.5) * 16)));
+
   return (
-    <div className="flex flex-col gap-2">
-      <button
-        onClick={toggle}
-        className={`flex items-center gap-3 px-3 py-2.5 min-w-[170px] transition-all hover:bg-black/5 active:scale-[0.98] ${
-          isMe ? "text-white/95" : "text-foreground"
+    <div className="flex flex-col gap-1.5 max-w-[min(260px,88vw)]">
+      <div
+        className={`flex items-center gap-2.5 px-3 py-2 rounded-2xl overflow-hidden ${
+          isMe ? "bg-white/15" : "bg-primary/10"
         }`}
-        aria-label={playing ? "Pause voice message" : "Play voice message"}
       >
-        <style>{`
-          @keyframes waveAnimation {
-            0%, 100% { transform: scaleY(0.4); }
-            50% { transform: scaleY(1.1); }
-          }
-        `}</style>
-        <div
-          className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-transform ${
-            isMe ? "bg-white/20 text-white" : "bg-primary/10 text-primary"
+        <button
+          type="button"
+          onClick={() => void toggle()}
+          className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition-transform ${
+            isMe ? "bg-white/25 text-white" : "bg-primary/15 text-primary"
           } ${playing ? "scale-105" : ""}`}
+          aria-label={playing ? "Pause voice message" : "Play voice message"}
         >
-          {playing ? <Pause className="w-3.5 h-3.5 fill-current" /> : <Play className="w-3.5 h-3.5 fill-current ml-0.5" />}
-        </div>
-        <div className="flex gap-0.5 items-center h-6 shrink-0">
-          {waveform.length > 0 ? (
-            waveform.map((amplitude, i) => {
-              const isActive = progress > 0 && (i / waveform.length) <= progress;
-              return (
-                <div
-                  key={i}
-                  className={`w-0.5 rounded-full transition-colors duration-150 ${
-                    isMe
-                      ? isActive
-                        ? "bg-white"
-                        : "bg-white/40"
-                      : isActive
+          {playing ? <Pause className="w-4 h-4 fill-current" /> : <Play className="w-4 h-4 fill-current ml-0.5" />}
+        </button>
+
+        <div className="flex-1 min-w-0 flex items-center gap-0.5 h-5 overflow-hidden">
+          {barHeights.map((h, i) => {
+            const isActive = progress > 0 && i / barHeights.length <= progress;
+            return (
+              <div
+                key={i}
+                className={`w-[3px] rounded-full shrink-0 transition-colors ${
+                  isMe
+                    ? isActive
+                      ? "bg-white"
+                      : "bg-white/35"
+                    : isActive
                       ? "bg-primary"
-                      : "bg-muted-foreground/30"
-                  }`}
-                  style={{
-                    height: `${Math.max(4, amplitude * 24)}px`,
-                    transformOrigin: "center",
-                    animation: playing ? "waveAnimation 1.2s ease-in-out infinite" : "none",
-                    animationDelay: `${i * 0.05}s`,
-                  }}
-                />
-              );
-            })
-          ) : (
-            bars.map((h, i) => {
-              const isActive = progress > 0 && (i / bars.length) <= progress;
-              return (
-                <div
-                  key={i}
-                  className={`w-0.5 rounded-full transition-colors duration-150 ${
-                    isMe
-                      ? isActive
-                        ? "bg-white"
-                        : "bg-white/40"
-                      : isActive
-                      ? "bg-primary"
-                      : "bg-muted-foreground/30"
-                  }`}
-                  style={{
-                    height: `${h}px`,
-                    transformOrigin: "center",
-                    animation: playing ? "waveAnimation 1.2s ease-in-out infinite" : "none",
-                    animationDelay: `${i * 0.05}s`,
-                  }}
-                />
-              );
-            })
-          )}
+                      : "bg-muted-foreground/25"
+                }`}
+                style={{
+                  height: `${h}px`,
+                  transform: playing && isActive ? `scaleY(${1 + Math.sin(i * 0.5) * 0.15})` : undefined,
+                  transformOrigin: "center",
+                }}
+              />
+            );
+          })}
         </div>
-        <span className="text-[10px] font-medium tracking-wide uppercase opacity-70 shrink-0">Voice</span>
-      </button>
+
+        <span className="text-[9px] font-semibold tracking-wider uppercase opacity-60 shrink-0">Voice</span>
+      </div>
+
       <button
-        onClick={transcribeAudio}
+        type="button"
+        onClick={() => void transcribeAudio()}
         disabled={transcribing}
-        className={`flex items-center gap-2 px-3 py-2 text-xs rounded-lg transition-all ${
-          transcribing
-            ? "opacity-50 cursor-not-allowed"
-            : "hover:bg-black/5 active:scale-[0.98]"
-        } ${isMe ? "text-white/80" : "text-foreground/70"}`}
+        className={`flex items-center gap-2 px-3 py-1.5 text-xs rounded-lg w-fit transition-all ${
+          transcribing ? "opacity-50 cursor-not-allowed" : "hover:bg-black/5 active:scale-[0.98]"
+        } ${isMe ? "text-white/75" : "text-foreground/65"}`}
         aria-label="Transcribe voice message"
       >
         <Mic className="w-3.5 h-3.5" />
-        {transcribing ? "Transcribing..." : "Transcribe"}
+        {transcribing ? "Transcribing…" : "Transcribe"}
       </button>
-      {transcript && (
-        <p className="text-xs px-3 py-2 bg-black/5 rounded-lg max-w-[250px]">
+
+      {transcript ? (
+        <p className={`text-xs px-3 py-2 rounded-lg max-w-full break-words ${isMe ? "bg-white/10 text-white/90" : "bg-black/5"}`}>
           {transcript}
         </p>
-      )}
+      ) : null}
     </div>
   );
 }

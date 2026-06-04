@@ -11,6 +11,42 @@ const MAX_POSTS_PER_USER = 20;
 
 const router = Router();
 
+async function enrichSinglePost(postId: string, userId: string) {
+  const result = await db.execute("SELECT * FROM posts WHERE id = $1", [postId]);
+  const row = result.rows[0] as Record<string, unknown> | undefined;
+  if (!row) return null;
+
+  const [likes, comments, reactionsResult] = await Promise.all([
+    db.execute("SELECT user_id FROM post_likes WHERE post_id = $1", [postId]),
+    db.execute("SELECT COUNT(*)::int AS cnt FROM post_comments WHERE post_id = $1", [postId]),
+    db.execute("SELECT emoji, user_id FROM post_reactions WHERE post_id = $1", [postId]),
+  ]);
+
+  const likeRows = likes.rows as { user_id: string }[];
+  const commentCount = Number((comments.rows[0] as { cnt?: number })?.cnt ?? 0);
+  const reactionRows = reactionsResult.rows as { emoji: string; user_id: string }[];
+  const reactionCounts: Record<string, number> = {};
+  for (const r of reactionRows) {
+    reactionCounts[r.emoji] = (reactionCounts[r.emoji] ?? 0) + 1;
+  }
+  const myReaction = reactionRows.find((r) => r.user_id === userId)?.emoji;
+
+  return {
+    id: postId,
+    authorId: String(row.author_id),
+    mediaUrl: String(row.media_url),
+    caption: String(row.caption ?? ""),
+    location: String(row.location ?? ""),
+    aspectRatio: String(row.aspect_ratio ?? "4:5"),
+    createdAt: String(row.created_at),
+    likeCount: likeRows.length,
+    likedByMe: likeRows.some((l) => l.user_id === userId),
+    commentCount,
+    myReaction,
+    reactionCounts,
+  };
+}
+
 async function enrichPosts(userId: string) {
   const result = await db.execute(
     "SELECT * FROM posts ORDER BY created_at DESC LIMIT 50",
@@ -144,7 +180,7 @@ router.post("/posts/:id/react", rateLimiters.messages, authenticate, async (req,
         [postId, userId, emoji, new Date().toISOString()],
       );
     }
-    const [post] = await enrichPosts(userId).then((p) => p.filter((x) => x.id === postId));
+    const post = await enrichSinglePost(postId, userId);
     if (post) broadcast("post-reacted", post);
     res.json(post ?? { success: true });
   } catch {
@@ -168,7 +204,7 @@ router.post("/posts/:id/like", rateLimiters.messages, authenticate, async (req, 
         [postId, userId, new Date().toISOString()],
       );
     }
-    const [post] = await enrichPosts(userId).then((p) => p.filter((x) => x.id === postId));
+    const post = await enrichSinglePost(postId, userId);
     if (post) broadcast("post-liked", post);
     res.json(post ?? { success: true });
   } catch {

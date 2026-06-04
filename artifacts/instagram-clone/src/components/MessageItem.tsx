@@ -15,6 +15,7 @@ import { isCallLogMessage } from "@/lib/call-chat-log";
 import { getPartnerBubbleColors } from "@/lib/themes";
 import { getQuickReactions, onQuickReactionsChanged } from "@/lib/quick-reactions";
 import { parseMediaViewMode } from "@/lib/message-utils";
+import { MessageText } from "@/lib/linkify";
 import { useEffect } from "react";
 
 function isEmojiOnlyText(text?: string): boolean {
@@ -26,12 +27,6 @@ function isEmojiOnlyText(text?: string): boolean {
 function hasArabic(text?: string): boolean {
   if (!text) return false;
   return /[\u0600-\u06FF]/.test(text);
-}
-
-function formatBubbleTime(ts: string): string {
-  const d = new Date(ts);
-  if (isNaN(d.getTime())) return "";
-  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
 }
 
 export interface MessageItemProps {
@@ -261,9 +256,9 @@ export const MessageItem = memo(function MessageItem({
             </a>
           )}
         </div>
-      ) : (
-        msg.text
-      )}
+      ) : msg.text ? (
+        <MessageText text={msg.text} />
+      ) : null}
     </>
   );
 
@@ -396,9 +391,6 @@ export const MessageItem = memo(function MessageItem({
           >
             {seenLabel}
           </p>
-        )}
-        {!isMe && !isEphemeralMedia && (
-          <p className="text-[10px] text-muted-foreground/50 mt-0.5 pl-1">{formatBubbleTime(msg.timestamp)}</p>
         )}
       </div>
     </div>

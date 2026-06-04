@@ -16,7 +16,15 @@ if (!useCloudinary && !useB2) {
 }
 
 if (useCloudinary) {
-  cloudinary.config({ secure: true });
+  const match = cloudinaryUrl!.match(/cloudinary:\/\/([^:]+):([^@]+)@(.+)/);
+  if (match) {
+    cloudinary.config({
+      cloud_name: match[3],
+      api_key: match[1],
+      api_secret: match[2],
+      secure: true,
+    });
+  }
 }
 if (useCloudinary && useB2) {
   console.info("[storage] Primary: Cloudinary, fallback: Backblaze B2");

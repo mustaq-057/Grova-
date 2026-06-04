@@ -35,7 +35,14 @@ export function PostFeed() {
     loadPosts();
     const es = user ? new EventSource(`/api/sse?userId=${user.id}`) : null;
     es?.addEventListener("post-added", () => loadPosts());
-    es?.addEventListener("post-liked", () => loadPosts());
+    es?.addEventListener("post-liked", (e) => {
+      try {
+        const updated = JSON.parse((e as MessageEvent).data) as ApiPost;
+        setPosts((prev) => prev.map((p) => (p.id === updated.id ? { ...p, ...updated } : p)));
+      } catch {
+        loadPosts();
+      }
+    });
     es?.addEventListener("post-reacted", (e) => {
       try {
         const updated = JSON.parse((e as MessageEvent).data) as ApiPost;
@@ -72,10 +79,28 @@ export function PostFeed() {
   }, [user?.id, loadPosts]);
 
   const toggleLike = async (postId: string) => {
+    const snapshot = posts.find((p) => p.id === postId);
+    if (!snapshot) return;
+
+    const nextLiked = !snapshot.likedByMe;
+    const nextCount = Math.max(0, (snapshot.likeCount ?? 0) + (nextLiked ? 1 : -1));
+    setPosts((prev) =>
+      prev.map((p) =>
+        p.id === postId ? { ...p, likedByMe: nextLiked, likeCount: nextCount } : p,
+      ),
+    );
+
     try {
       const updated = await api.togglePostLike(postId);
       setPosts((prev) => prev.map((p) => (p.id === postId ? updated : p)));
     } catch {
+      setPosts((prev) =>
+        prev.map((p) =>
+          p.id === postId
+            ? { ...p, likedByMe: snapshot.likedByMe, likeCount: snapshot.likeCount }
+            : p,
+        ),
+      );
       toast.error("Could not update like.");
     }
   };

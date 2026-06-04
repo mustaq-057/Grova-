@@ -52,7 +52,18 @@ export function browserViewUrl(fileUrl: string, fileName: string, mimeType?: str
   return viewUrl;
 }
 
+export function isMobileDevice(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+}
+
+/** Returns true when caller should show MobileFileOpenSheet instead of opening directly. */
+export function shouldUseMobileFilePicker(): boolean {
+  return isMobileDevice();
+}
+
 export function openFileInBrowser(fileUrl: string, fileName: string, mimeType?: string): void {
+  if (shouldUseMobileFilePicker()) return;
   const viewUrl = browserViewUrl(fileUrl, fileName, mimeType);
   const opened = window.open(viewUrl, "_blank", "noopener,noreferrer");
   if (!opened) window.location.assign(viewUrl);

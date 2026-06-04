@@ -49,4 +49,6 @@ async function start() {
   process.exit(1);
 }
 
-start();
+if (!process.env.VERCEL) {
+  start();
+}

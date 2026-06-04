@@ -48,7 +48,7 @@ import {
   getHiddenMessageIds,
 } from "@/lib/hidden-messages";
 import { mergeMessagesById } from "@/lib/chat-sync";
-import { downloadChatAsImage } from "@/lib/chat-download";
+import { downloadChatAsImage, downloadChatAsText } from "@/lib/chat-download";
 import { uploadMediaToB2, uploadMediaFile } from "@/lib/media-upload";
 import {
   classifyMediaFile,
@@ -179,6 +179,7 @@ export default function Messages() {
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const messageInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -981,15 +982,18 @@ export default function Messages() {
         return;
       }
       toast.loading(`Exporting ${visible.length} messages…`, { id: toastId });
+      downloadChatAsText(visible, user.id, user.name, pName);
       const pages = await downloadChatAsImage(visible, user.id, user.name, pName, (cur, total) => {
-        toast.loading(`Downloading part ${cur} of ${total}…`, { id: toastId });
+        if (total > 1) toast.loading(`Saving image part ${cur} of ${total}…`, { id: toastId });
       });
       finishToast(
         toastId,
         {
           type: "success",
           message:
-            pages > 1 ? `Saved ${pages} images (${visible.length} messages).` : `Chat saved (${visible.length} messages).`,
+            pages > 1
+              ? `Saved readable .txt + ${pages} image parts.`
+              : `Chat saved as .txt${pages ? " + image" : ""} (${visible.length} messages).`,
         },
       );
     } catch (err) {
@@ -1370,41 +1374,26 @@ export default function Messages() {
     return messages.filter(msg => msg.threadId === threadId || msg.id === threadId);
   }, [messages]);
 
-  const exportChatHistory = useCallback(() => {
-    if (!user || messages.length === 0) return;
-    
-    const exportData = {
-      exportedAt: new Date().toISOString(),
-      userId: user.id,
-      partnerId,
-      partnerName: pName,
-      messageCount: messages.length,
-      messages: messages.map(msg => ({
-        id: msg.id,
-        senderId: msg.senderId,
-        text: msg.text,
-        type: msg.type,
-        timestamp: msg.timestamp,
-        liked: msg.liked,
-        deleted: msg.deleted,
-        variant: msg.variant,
-        companionSticker: msg.companionSticker,
-        reaction: msg.reaction,
-        pinned: msg.pinned,
-      }))
-    };
-    
-    const dataStr = JSON.stringify(exportData, null, 2);
-    const dataBlob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(dataBlob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `chat-export-${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  }, [user, partnerId, pName, messages]);
+  const exportChatHistory = useCallback(async () => {
+    if (!user) return;
+    const toastId = "chat-export-info";
+    try {
+      toast.loading("Preparing export…", { id: toastId });
+      const all = await fetchAllMessagesForExport();
+      const visible = filterVisibleMessages(user.id, all);
+      if (visible.length === 0) {
+        finishToast(toastId, { type: "error", message: "No messages to export" });
+        return;
+      }
+      downloadChatAsText(visible, user.id, user.name, pName);
+      finishToast(toastId, { type: "success", message: `Exported ${visible.length} messages as .txt` });
+    } catch (err) {
+      finishToast(toastId, {
+        type: "error",
+        message: err instanceof Error ? err.message : "Could not export chat.",
+      });
+    }
+  }, [user, pName, fetchAllMessagesForExport]);
 
   const deleteMessage = useCallback(async (id: string) => {
     try {
@@ -1525,7 +1514,9 @@ export default function Messages() {
       const normalized = normalizePastedFile(file, clipboardItemType);
       const toastId = `media-pick-${Date.now()}`;
       const quickDoc = isDocumentFile(normalized, clipboardItemType);
-      if (!quickDoc) {
+      const likelyVideo =
+        clipboardItemType?.startsWith("video/") || isVideoFile(normalized, clipboardItemType);
+      if (!quickDoc && !likelyVideo) {
         toast.loading("Preparing media…", { id: toastId });
       }
 
@@ -1533,12 +1524,15 @@ export default function Messages() {
       try {
         if (quickDoc) {
           kind = "other";
-        } else if (clipboardItemType?.startsWith("video/") || isVideoFile(normalized, clipboardItemType)) {
+        } else if (likelyVideo) {
           kind = "video";
         } else if (clipboardItemType?.startsWith("image/")) {
           kind = "image";
         } else {
-          kind = await classifyMediaFile(normalized, clipboardItemType);
+          const magic = await detectMediaByMagicBytes(normalized);
+          if (magic === "video") kind = "video";
+          else if (magic === "image") kind = "image";
+          else kind = await classifyMediaFile(normalized, clipboardItemType);
         }
         if (kind === "image") {
           const magic = await detectMediaByMagicBytes(normalized);
@@ -1553,11 +1547,11 @@ export default function Messages() {
       const isEphemeral = mediaViewMode === "once" || mediaViewMode === "twice";
 
       const MAX_FILE_SIZE =
-        kind === "video" ? 10 * 1024 * 1024 : kind === "image" ? 25 * 1024 * 1024 : 25 * 1024 * 1024;
+        kind === "video" ? 60 * 1024 * 1024 : kind === "image" ? 25 * 1024 * 1024 : 25 * 1024 * 1024;
       if (normalized.size > MAX_FILE_SIZE) {
         finishToast(toastId, {
           type: "error",
-          message: kind === "video" ? "Video too large (max 10MB)." : "File too large (max 25MB).",
+          message: kind === "video" ? "Video too large (max 60MB)." : "File too large (max 25MB).",
         });
         filePickInFlightRef.current = false;
         return;
@@ -1599,11 +1593,13 @@ export default function Messages() {
           );
           setMessages((prev) => [...prev, optimistic]);
           scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
-          finishToast(toastId, { type: "none" });
-          toast.loading("Uploading video…", { id: toastId });
+          toast.loading("Sending video…", { id: toastId });
 
           try {
-            const duration = await getVideoDurationSafe(normalized);
+            const durationPromise = getVideoDurationSafe(normalized);
+            const uploadPromise = uploadMediaFile(normalized, mime);
+            const [duration, url] = await Promise.all([durationPromise, uploadPromise]);
+
             if (duration > 60) {
               pendingOutgoingRef.current.delete(tempId);
               setMessages((prev) => prev.filter((m) => m.id !== tempId));
@@ -1612,7 +1608,6 @@ export default function Messages() {
               return;
             }
 
-            const url = await uploadMediaFile(normalized, mime);
             const sticker = mediaModeSticker(mediaViewMode);
             const outgoing = await prepareOutgoingMessage({
               senderId: user.id,
@@ -2236,6 +2231,11 @@ export default function Messages() {
         data-testid="messages-list"
         ref={messagesContainerRef}
         style={{ scrollBehavior: 'auto' }}
+        onClick={(e) => {
+          const t = e.target as HTMLElement;
+          if (t.closest("button, a, input, textarea, video, audio, [role='button']")) return;
+          messageInputRef.current?.focus();
+        }}
       >
         {/* New messages indicator */}
         {hasNewMessages && !isNearBottom && (
@@ -2510,6 +2510,7 @@ export default function Messages() {
 
       {/* ── Input Bar ── */}
       <MessageInput
+        ref={messageInputRef}
         input={input}
         setInput={setInput}
         onInputActivity={handleInputActivity}

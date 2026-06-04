@@ -14,7 +14,8 @@ import {
 } from "@/lib/notifications-feed";
 import { AvatarImage } from "@/components/AvatarImage";
 import { FallingFlowersOverlay } from "@/components/FallingFlowersOverlay";
-import { APP_THEME_CHANGED, getStoredAppTheme, isSakuraFallTheme, type AppThemeId } from "@/lib/app-theme";
+import { FallingNamesOverlay } from "@/components/FallingNamesOverlay";
+import { APP_THEME_CHANGED, getStoredAppTheme, isSakuraFallTheme, isSaraLavenderTheme, type AppThemeId } from "@/lib/app-theme";
 import { MobileMenuGrid } from "./MobileMenuGrid";
 
 type NavItem = {
@@ -33,6 +34,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const isChat = location === "/chat";
   const showSakura = isSakuraFallTheme(appTheme);
+  const showSaraLavender = isSaraLavenderTheme(appTheme);
 
   useEffect(() => {
     const onTheme = () => setAppTheme(getStoredAppTheme());
@@ -94,6 +96,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-[100dvh] app-chrome bg-background text-foreground overflow-hidden relative">
       {showSakura && <FallingFlowersOverlay />}
+      {showSaraLavender && <FallingNamesOverlay />}
       {/* Desktop Sidebar */}
       <nav className="hidden md:flex flex-col w-[72px] lg:w-[244px] border-r border-border h-full px-3 py-6 justify-between shrink-0 bg-background/50 app-chrome relative z-10">
         <div className="flex flex-col gap-6 h-full min-h-0">

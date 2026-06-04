@@ -1,37 +1,46 @@
 # Deploy Grova on Vercel
 
-## Frontend (Vercel)
+## One project (UI + API)
 
-This repo’s `vercel.json` builds the **static UI** only. The API must run on a Node host (Railway, Render, Fly.io, VPS) because it uses Express, WebSockets, and long-lived DB connections.
+`vercel.json` builds the React app and exposes the Express API as a serverless function at `/api/*`.
 
 1. Import [https://github.com/mustaq-057/Grova-](https://github.com/mustaq-057/Grova-) on Vercel.
-2. Set **Root Directory** to the repo root (default).
-3. Add environment variables in Vercel (see below). For the UI, you only need `VITE_GIPHY_API_KEY` if using GIFs.
-4. After deploy, set your API host’s `ALLOWED_ORIGINS` to include your Vercel URL (e.g. `https://your-app.vercel.app`).
+2. Root directory: repo root (default).
+3. Add **all** environment variables from `.env.example` (see below).
+4. Deploy. Open your `*.vercel.app` URL — the UI calls `/api` on the same host.
 
-## API (separate host — recommended)
+### Required env (Project → Settings → Environment Variables)
+
+| Variable | Notes |
+|----------|--------|
+| `DATABASE_URL` | Neon **pooled** Postgres URL |
+| `ENCRYPTION_KEY` | 64 hex chars |
+| `ENCRYPTION_PASSWORD` | Server encryption unlock |
+| `DEFAULT_COUPLE_CODE` | First-time seed |
+| `PRIMARY_AUTH_EMAILS` | Comma-separated |
+| `PRIMARY_AUTH_PASSWORD_1` | Login password |
+| `ALLOWED_ORIGINS` | Your Vercel URL + custom domain |
+| `CLOUDINARY_URL` or B2 keys | Media uploads |
+| `VITE_GIPHY_API_KEY` | GIF picker (build-time) |
+
+Optional: `B2_*`, `VAPID_*`, `TURN_*`
+
+### Limits on Vercel
+
+- **SSE / live sync**: connections may drop after ~60s; the app falls back to polling where needed.
+- **Scheduled messages worker**: not running on serverless — use a VPS cron or Railway for that if you rely on it.
+- **WebRTC calls**: still need TURN env vars; calls are peer-to-peer.
+
+For full-time SSE + workers, run `pnpm start:grova` on Railway/Render/Fly instead.
+
+## Local production smoke test
 
 ```bash
 pnpm install
 pnpm run build:grova
-NODE_ENV=production PORT=5000 pnpm --filter @workspace/api-server run start
+VERCEL=1 NODE_ENV=production node artifacts/api-server/dist/vercel-entry.mjs
 ```
 
-Required env on the API server:
+## Frontend-only (API elsewhere)
 
-- `DATABASE_URL` (Neon pooled Postgres)
-- `ENCRYPTION_KEY`, `ENCRYPTION_PASSWORD`
-- `DEFAULT_COUPLE_CODE`
-- `PRIMARY_AUTH_EMAILS` (comma-separated)
-- `PRIMARY_AUTH_PASSWORD_1` (password with `@` / `#` — do not use comma lists)
-- `ALLOWED_ORIGINS` (your Vercel URL + custom domain)
-- `CLOUDINARY_URL` (optional, for media)
-
-## Same-origin production (UI + API on one server)
-
-Use `pnpm start:grova` on a VPS instead of splitting Vercel + API. Point your domain to that server with HTTPS (Caddy/nginx).
-
-## Auth
-
-- Allowed emails are set via `PRIMARY_AUTH_EMAILS`.
-- After **2 failed** email/password attempts, login is blocked for **30 minutes** per IP + email.
+If the API runs on Railway/Render, set Vercel env `API_URL=https://your-api-host` and use a rewrite/proxy — or point the built app’s API base URL to that host in your deployment docs.
