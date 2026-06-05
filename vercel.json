@@ -9,11 +9,13 @@
       "maxDuration": 10
     },
     "api/index.mjs": {
-      "maxDuration": 60
+      "maxDuration": 60,
+      "includeFiles": "artifacts/api-server/dist/**"
     }
   },
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api" },
+    { "source": "/api/healthz", "destination": "/api/healthz" },
+    { "source": "/api/(.*)", "destination": "/api/index" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],
   "headers": [

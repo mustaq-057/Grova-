@@ -32,10 +32,13 @@ if (process.env.VERCEL === "1") {
   run("corepack pnpm", "corepack", ["prepare", "pnpm@9.15.9", "--activate"]);
 }
 
-if (!run("pnpm install (frozen)", "pnpm", ["install", "--frozen-lockfile"])) {
-  console.log("[grova-build] frozen lockfile install failed, retrying without --frozen-lockfile");
-  if (!run("pnpm install", "pnpm", ["install"])) {
-    process.exit(1);
+// Vercel already runs installCommand — skip duplicate install (fewer warnings, faster builds).
+if (process.env.VERCEL !== "1") {
+  if (!run("pnpm install (frozen)", "pnpm", ["install", "--frozen-lockfile"])) {
+    console.log("[grova-build] frozen lockfile install failed, retrying without --frozen-lockfile");
+    if (!run("pnpm install", "pnpm", ["install"])) {
+      process.exit(1);
+    }
   }
 }
 
@@ -47,7 +50,7 @@ if (!run("api", "pnpm", ["--filter", "@workspace/api-server", "run", "build"])) 
   process.exit(1);
 }
 
-if (!run("api bundle sync", "node", ["scripts/sync-vercel-api.mjs"])) {
+if (!run("api bundle verify", "node", ["scripts/verify-vercel-api.mjs"])) {
   process.exit(1);
 }
 
