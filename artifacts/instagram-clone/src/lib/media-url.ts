@@ -36,6 +36,10 @@ export function resolveChatImageUrl(url: string | undefined): string | undefined
   return resolveStorageMediaUrl(url, { fileName: "photo.jpg", mimeType: "image/jpeg" });
 }
 
+export function resolvePostMediaUrl(url: string | undefined): string | undefined {
+  return resolveStorageMediaUrl(url, { fileName: "post.jpg", mimeType: "image/jpeg" });
+}
+
 export function resolveChatVideoUrl(
   url: string | undefined,
   fileName?: string,

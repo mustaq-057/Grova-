@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { api } from "@/lib/api";
 import { bumpAvatarVersion } from "@/lib/avatar-display";
-import { readFileAsDataUrl, uploadMediaToB2 } from "@/lib/media-upload";
+import { readFileAsDataUrl, uploadMedia } from "@/lib/media-upload";
 
 const MAX_AVATAR_BYTES = 12 * 1024 * 1024;
 
@@ -49,7 +49,7 @@ export function useProfileAvatarCrop() {
       setAvatarToCrop(null);
       setUploading(true);
       try {
-        const cloudUrl = await uploadMediaToB2(croppedDataUrl, pendingContentType);
+        const cloudUrl = await uploadMedia(croppedDataUrl, pendingContentType);
         const updated = await api.updateProfile(user.id, { avatar: cloudUrl });
         bumpAvatarVersion(user.id);
         setUser({ ...user, avatar: updated.avatar });

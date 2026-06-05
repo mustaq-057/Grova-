@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { useAuth } from "@/lib/auth";
 import { useLocation } from "wouter";
 import { savePost, getPosts, clearLegacyLocalMedia } from "@/lib/local-posts";
-import { uploadMediaToB2 } from "@/lib/media-upload";
+import { uploadMedia } from "@/lib/media-upload";
 import { ImageCropModal } from "@/components/ImageCropModal";
 
 const MAX_IMAGES = 20;
@@ -94,7 +94,7 @@ export default memo(function Create() {
     try {
       clearLegacyLocalMedia(myId);
       for (const photo of queue) {
-        const mediaUrl = await uploadMediaToB2(photo.dataUrl);
+        const mediaUrl = await uploadMedia(photo.dataUrl, "image/jpeg");
         await savePost(myId, {
           image: mediaUrl,
           caption: caption.trim(),
@@ -110,7 +110,11 @@ export default memo(function Create() {
       setLocation("/");
     } catch (err) {
       console.error("Share failed:", err);
-      alert(err instanceof Error ? err.message : "Failed to upload. Check your connection.");
+      alert(
+        err instanceof Error
+          ? err.message
+          : "Failed to upload. Set CLOUDINARY_URL in your server .env and redeploy.",
+      );
     } finally {
       setSharing(false);
     }
