@@ -8,12 +8,12 @@
     "api/healthz.mjs": {
       "maxDuration": 10
     },
-    "api/[[...path]].mjs": {
-      "maxDuration": 60,
-      "includeFiles": "artifacts/api-server/dist/**"
+    "api/index.mjs": {
+      "maxDuration": 60
     }
   },
   "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],
   "headers": [

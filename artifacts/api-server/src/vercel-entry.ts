@@ -36,25 +36,34 @@ function ensureReady(): Promise<void> {
   return ready;
 }
 
-/** Restore full /api/... path when a rewrite collapses the URL to /api only. */
+/**
+ * Vercel rewrites /api/foo/bar → /api, so Express must see the original path.
+ * Headers vary by runtime; try all known sources.
+ */
 function restoreRequestPath(req: import("http").IncomingMessage): void {
   const current = (req.url ?? "").split("?")[0];
-  if (current && current !== "/api" && current !== "/api/") return;
+  if (current.length > "/api".length && current !== "/api/") return;
 
-  const raw =
-    (typeof req.headers["x-vercel-original-url"] === "string" && req.headers["x-vercel-original-url"]) ||
-    (typeof req.headers["x-invoke-path"] === "string" && req.headers["x-invoke-path"]) ||
-    "";
-  if (!raw) return;
+  const headers = req.headers;
+  const candidates = [
+    headers["x-vercel-original-url"],
+    headers["x-invoke-path"],
+    headers["x-forwarded-uri"],
+    headers["x-original-url"],
+    headers["x-matched-path"],
+  ].filter((h): h is string => typeof h === "string" && h.length > 0);
 
-  try {
-    const pathname = raw.startsWith("http") ? new URL(raw).pathname : raw.split("?")[0];
-    if (pathname.startsWith("/api/") && pathname.length > "/api/".length) {
-      const qs = req.url?.includes("?") ? `?${req.url.split("?")[1]}` : "";
-      req.url = pathname + qs;
+  for (const raw of candidates) {
+    try {
+      const pathname = raw.startsWith("http") ? new URL(raw).pathname : raw.split("?")[0];
+      if (!pathname.startsWith("/api")) continue;
+      const qsFromReq = req.url?.includes("?") ? req.url.slice(req.url.indexOf("?")) : "";
+      const qsFromRaw = raw.includes("?") ? `?${raw.split("?").slice(1).join("?")}` : "";
+      req.url = pathname + (qsFromReq || qsFromRaw);
+      return;
+    } catch {
+      /* try next header */
     }
-  } catch {
-    /* keep req.url */
   }
 }
 

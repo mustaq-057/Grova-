@@ -10,15 +10,45 @@ globalThis.require = createRequire(import.meta.url);
 
 const artifactDir = path.dirname(fileURLToPath(import.meta.url));
 
+/** Vercel only needs vercel-entry; externalize heavy deps so the function stays under size limits. */
+const isVercelBuild = process.env.VERCEL === "1";
+
+const runtimeExternal = [
+  "express",
+  "cors",
+  "cookie-parser",
+  "compression",
+  "helmet",
+  "express-rate-limit",
+  "pino",
+  "pino-http",
+  "pg",
+  "@neondatabase/serverless",
+  "ws",
+  "@aws-sdk/client-s3",
+  "cloudinary",
+  "bcryptjs",
+  "dotenv",
+  "speakeasy",
+];
+
 async function buildAll() {
   const distDir = path.resolve(artifactDir, "dist");
   await rm(distDir, { recursive: true, force: true });
 
+  const entryPoints = isVercelBuild
+    ? [path.resolve(artifactDir, "src/vercel-entry.ts")]
+    : [
+        path.resolve(artifactDir, "src/index.ts"),
+        path.resolve(artifactDir, "src/vercel-entry.ts"),
+      ];
+
+  if (isVercelBuild) {
+    console.log("[api-build] Vercel mode: vercel-entry only, runtime deps externalized");
+  }
+
   await esbuild({
-    entryPoints: [
-      path.resolve(artifactDir, "src/index.ts"),
-      path.resolve(artifactDir, "src/vercel-entry.ts"),
-    ],
+    entryPoints,
     platform: "node",
     bundle: true,
     format: "esm",
@@ -31,6 +61,7 @@ async function buildAll() {
     // - uses native modules and loads them dynamically (e.g. sharp)
     // - use path traversal to read files (e.g. @google-cloud/secret-manager loads sibling .proto files)
     external: [
+      ...runtimeExternal,
       "*.node",
       "sharp",
       "better-sqlite3",
@@ -104,11 +135,13 @@ async function buildAll() {
       "puppeteer-core",
       "electron",
     ],
-    sourcemap: "linked",
-    plugins: [
-      // pino relies on workers to handle logging, instead of externalizing it we use a plugin to handle it
-      esbuildPluginPino({ transports: ["pino-pretty"] })
-    ],
+    sourcemap: isVercelBuild ? false : "linked",
+    plugins: isVercelBuild
+      ? []
+      : [
+          // pino relies on workers to handle logging, instead of externalizing it we use a plugin to handle it
+          esbuildPluginPino({ transports: ["pino-pretty"] }),
+        ],
     // Make sure packages that are cjs only (e.g. express) but are bundled continue to work in our esm output file
     banner: {
       js: `import { createRequire as __bannerCrReq } from 'node:module';

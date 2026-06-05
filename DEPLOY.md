@@ -54,7 +54,7 @@ Do **not** upload `.env` to GitHub.
 2. If `authConfigured` is false, set **`PRIMARY_AUTH_EMAILS`** and **`PRIMARY_AUTH_PASSWORD_1`** in Vercel → Environment Variables → **Production**, then **Redeploy** (not just rebuild cache).
 3. Emails in **`PRIMARY_AUTH_EMAILS`** must match **exactly** (lowercase). Example: `you@gmail.com,partner@gmail.com` — no spaces around `@`, no quotes.
 4. Ensure **`ALLOWED_ORIGINS`** includes your live URL, e.g. `https://your-app.vercel.app` (no trailing slash).
-5. After pushing latest `main`, Vercel must use **`api/[[...path]].mjs`** (catch-all) — not a rewrite that collapses `/api/*` to `/api` only.
+5. Vercel must use **`api/index.mjs`** + rewrite `/api/(.*)` → `/api`. Do **not** use `api/[[...path]].mjs` — nested routes like `/api/auth/primary-login` 404 on non-Next.js projects.
 
 ## 7. If login fails
 
