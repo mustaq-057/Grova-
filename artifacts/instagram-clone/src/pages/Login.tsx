@@ -122,6 +122,12 @@ export default memo(function Login() {
         setError("Invalid email or password. One attempt left.");
       } else if (msg.toLowerCase().includes("too many") || msg.includes("429")) {
         setError("Too many wrong attempts. Login blocked for 30 minutes. Try again later.");
+      } else if (serverOnline && /\(HTTP |request failed|not found/i.test(msg)) {
+        setError(
+          msg.includes("Not allowed by CORS")
+            ? "CORS blocked login. Add your site URL to ALLOWED_ORIGINS in Vercel (no trailing slash), then redeploy."
+            : `Login API error: ${msg}. Health check passed — check Vercel → Logs for the /api function.`,
+        );
       } else if (/request failed|not found|failed to fetch|cannot reach/i.test(msg)) {
         setError(
           "Cannot reach the login API. Open /api/healthz on your site — if it fails, redeploy on Vercel and check DATABASE_URL, ENCRYPTION_*, and PRIMARY_AUTH_* (Cloudinary is only needed for photo uploads).",

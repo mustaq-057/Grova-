@@ -87,25 +87,7 @@ function buildAllowedOrigins(): string[] {
 
 const allowedOrigins = buildAllowedOrigins();
 
-app.use(cors({
-  origin: (origin, callback) => {
-    // Allow requests with no origin (same-origin requests, mobile apps, etc.)
-    if (!origin) return callback(null, true);
-    
-    // For development, allow all localhost and 127.0.0.1 origins, plus network interfaces
-    if (isDev) {
-      if (origin.includes('localhost') || origin.includes('127.0.0.1') || origin.includes('10.') || origin.includes('192.')) {
-        callback(null, true);
-      } else {
-        logger.warn({ origin, allowedOrigins }, 'CORS request from unexpected origin');
-        callback(null, true); // Allow anyway in dev mode
-      }
-    } else if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
+const corsOptions = {
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: [
@@ -116,7 +98,40 @@ app.use(cors({
     "X-Client-Id",
     "X-Client-Origin",
   ],
-}));
+};
+
+function isOriginAllowed(origin: string | undefined, requestHost: string): boolean {
+  if (!origin) return true;
+  if (isDev) {
+    if (origin.includes('localhost') || origin.includes('127.0.0.1') || origin.includes('10.') || origin.includes('192.')) {
+      return true;
+    }
+    logger.warn({ origin, allowedOrigins }, 'CORS request from unexpected origin');
+    return true;
+  }
+  if (allowedOrigins.includes(origin)) return true;
+  try {
+    const originHost = new URL(origin).host;
+    if (originHost && requestHost && originHost === requestHost) return true;
+  } catch {
+    /* ignore */
+  }
+  return false;
+}
+
+app.use((req, res, next) => {
+  const requestHost = String(req.headers.host || "").split(":")[0];
+  cors({
+    ...corsOptions,
+    origin: (origin, callback) => {
+      if (isOriginAllowed(origin, requestHost)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+  })(req, res, next);
+});
 
 app.use(cookieParser());
 

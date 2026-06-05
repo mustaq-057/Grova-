@@ -1,7 +1,7 @@
 import crypto from "crypto";
 
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
-const ENCRYPTION_PASSWORD = process.env.ENCRYPTION_PASSWORD;
+const ENCRYPTION_KEY = (process.env.ENCRYPTION_KEY || "").trim();
+const ENCRYPTION_PASSWORD = (process.env.ENCRYPTION_PASSWORD || "").trim();
 const ALGORITHM = "aes-256-gcm";
 
 // Key version tracking for rotation

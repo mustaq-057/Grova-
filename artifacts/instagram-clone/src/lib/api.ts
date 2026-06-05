@@ -104,7 +104,8 @@ async function apiFetch<T = unknown>(path: string, options?: RequestInit, attemp
         typeof err.attemptsRemaining === "number"
           ? ` Attempts remaining: ${err.attemptsRemaining}.`
           : "";
-      throw new Error(`${err.error || "Request failed"}${attemptsSuffix}`);
+      const detail = err.error || "Request failed";
+      throw new Error(`${detail} (HTTP ${res.status})${attemptsSuffix}`);
     }
 
     return res.json() as Promise<T>;

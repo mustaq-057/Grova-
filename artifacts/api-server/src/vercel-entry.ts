@@ -36,9 +36,19 @@ function ensureReady(): Promise<void> {
   return ready;
 }
 
+function pathnameFromHeader(raw: string): string | null {
+  try {
+    const pathname = raw.startsWith("http") ? new URL(raw).pathname : raw.split("?")[0];
+    if (!pathname.startsWith("/api/") || pathname === "/api/") return null;
+    return pathname;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Vercel rewrites /api/foo/bar → /api?__path=foo/bar (see vercel.json).
- * Restore the original path so Express routes match.
+ * Prefer original-path headers first — query __path often truncates at "/" (e.g. auth only).
  */
 function restoreRequestPath(req: import("http").IncomingMessage): void {
   const rawUrl = req.url ?? "/";
@@ -46,39 +56,36 @@ function restoreRequestPath(req: import("http").IncomingMessage): void {
   const pathOnly = qIndex >= 0 ? rawUrl.slice(0, qIndex) : rawUrl;
   if (pathOnly.length > "/api".length && pathOnly !== "/api/") return;
 
+  const headers = req.headers;
+  const headerCandidates = [
+    headers["x-vercel-original-url"],
+    headers["x-invoke-path"],
+    headers["x-forwarded-uri"],
+    headers["x-original-url"],
+    headers["x-matched-path"],
+    headers["x-vercel-sc-path"],
+  ].filter((h): h is string => typeof h === "string" && h.length > 0);
+
+  for (const raw of headerCandidates) {
+    const pathname = pathnameFromHeader(raw);
+    if (!pathname) continue;
+    const qsFromReq = rawUrl.includes("?") ? rawUrl.slice(rawUrl.indexOf("?")) : "";
+    const qsFromRaw = raw.includes("?") ? `?${raw.split("?").slice(1).join("?")}` : "";
+    req.url = pathname + (qsFromReq || qsFromRaw);
+    return;
+  }
+
   try {
     const parsed = new URL(rawUrl, "http://grova.internal");
     const sub = parsed.searchParams.get("__path");
     if (sub) {
       parsed.searchParams.delete("__path");
       const restQs = parsed.search;
-      req.url = `/api/${sub.replace(/^\//, "")}${restQs}`;
-      return;
+      const decoded = decodeURIComponent(sub).replace(/^\//, "");
+      req.url = `/api/${decoded}${restQs}`;
     }
   } catch {
-    /* fall through to header fallbacks */
-  }
-
-  const headers = req.headers;
-  const candidates = [
-    headers["x-vercel-original-url"],
-    headers["x-invoke-path"],
-    headers["x-forwarded-uri"],
-    headers["x-original-url"],
-    headers["x-matched-path"],
-  ].filter((h): h is string => typeof h === "string" && h.length > 0);
-
-  for (const raw of candidates) {
-    try {
-      const pathname = raw.startsWith("http") ? new URL(raw).pathname : raw.split("?")[0];
-      if (!pathname.startsWith("/api")) continue;
-      const qsFromReq = req.url?.includes("?") ? req.url.slice(req.url.indexOf("?")) : "";
-      const qsFromRaw = raw.includes("?") ? `?${raw.split("?").slice(1).join("?")}` : "";
-      req.url = pathname + (qsFromReq || qsFromRaw);
-      return;
-    } catch {
-      /* try next header */
-    }
+    /* leave url as-is */
   }
 }
 

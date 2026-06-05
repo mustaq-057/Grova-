@@ -30,7 +30,9 @@ export default function handler(_req, res) {
       api: true,
       dbConfigured,
       authConfigured: authEmails > 0 && hasPassword,
-      encryptionConfigured: Boolean(process.env.ENCRYPTION_KEY && process.env.ENCRYPTION_PASSWORD),
+      encryptionConfigured:
+        (process.env.ENCRYPTION_KEY || "").trim().length === 64 &&
+        (process.env.ENCRYPTION_PASSWORD || "").trim().length >= 8,
       cloudinaryConfigured,
     }),
   );
