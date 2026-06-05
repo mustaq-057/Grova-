@@ -117,8 +117,14 @@ export default memo(function Login() {
         setError("Invalid email or password. One attempt left.");
       } else if (msg.toLowerCase().includes("too many") || msg.includes("429")) {
         setError("Too many wrong attempts. Login blocked for 30 minutes. Try again later.");
-      } else {
+      } else if (/request failed|not found|failed to fetch|cannot reach/i.test(msg)) {
+        setError(
+          "Cannot reach the login API. Redeploy on Vercel with the latest code and check Environment Variables.",
+        );
+      } else if (msg.toLowerCase().includes("invalid email or password")) {
         setError("Invalid email or password.");
+      } else {
+        setError(msg || "Login failed. Check Vercel env vars (PRIMARY_AUTH_*) and redeploy.");
       }
     } finally {
       setLoading(false);

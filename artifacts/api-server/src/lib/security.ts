@@ -99,12 +99,13 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction):
     return;
   }
 
-  const skipPaths = new Set([
-    "/auth/primary-login",
-    "/auth/login",
-    "/auth/refresh",
-  ]);
-  if (skipPaths.has(req.path)) {
+  const path = req.path || "";
+  const url = (req.originalUrl || "").split("?")[0];
+  const publicAuthPaths = ["/auth/primary-login", "/auth/login", "/auth/refresh"];
+  const isPublicAuth = publicAuthPaths.some(
+    (p) => path === p || path.endsWith(p) || url === p || url.endsWith(p) || url.endsWith(`/api${p}`),
+  );
+  if (isPublicAuth) {
     next();
     return;
   }
