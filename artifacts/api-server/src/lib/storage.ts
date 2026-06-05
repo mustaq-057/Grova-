@@ -1,25 +1,54 @@
 import { Readable } from "node:stream";
 import { v2 as cloudinary } from "cloudinary";
 
-const cloudinaryUrl = process.env.CLOUDINARY_URL;
+let cloudinaryReady = false;
 
-if (!cloudinaryUrl?.startsWith("cloudinary://")) {
-  throw new Error(
-    "FATAL: CLOUDINARY_URL must be set (cloudinary://API_KEY:API_SECRET@CLOUD_NAME). Get it from https://console.cloudinary.com",
-  );
+/** Configure Cloudinary once — lazy so login/API boot even if media env is wrong. */
+function ensureCloudinary(): void {
+  if (cloudinaryReady) return;
+
+  const url = (process.env.CLOUDINARY_URL || "").trim();
+  const cloudName = (process.env.CLOUDINARY_CLOUD_NAME || "").trim();
+  const apiKey = (process.env.CLOUDINARY_API_KEY || "").trim();
+  const apiSecret = (process.env.CLOUDINARY_API_SECRET || "").trim();
+
+  if (url.startsWith("cloudinary://")) {
+    const match = url.match(/cloudinary:\/\/([^:]+):([^@]+)@(.+)/);
+    if (!match) {
+      throw new Error(
+        "CLOUDINARY_URL format invalid. Use cloudinary://API_KEY:API_SECRET@CLOUD_NAME (no quotes). Or set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET.",
+      );
+    }
+    cloudinary.config({
+      cloud_name: match[3]!.trim(),
+      api_key: match[1]!.trim(),
+      api_secret: match[2]!.trim(),
+      secure: true,
+    });
+  } else if (cloudName && apiKey && apiSecret) {
+    cloudinary.config({
+      cloud_name: cloudName,
+      api_key: apiKey,
+      api_secret: apiSecret,
+      secure: true,
+    });
+  } else {
+    throw new Error(
+      "Cloudinary not configured. Set CLOUDINARY_URL or CLOUDINARY_CLOUD_NAME + CLOUDINARY_API_KEY + CLOUDINARY_API_SECRET in Vercel Environment Variables.",
+    );
+  }
+
+  cloudinaryReady = true;
 }
 
-const match = cloudinaryUrl.match(/cloudinary:\/\/([^:]+):([^@]+)@(.+)/);
-if (match) {
-  cloudinary.config({
-    cloud_name: match[3],
-    api_key: match[1],
-    api_secret: match[2],
-    secure: true,
-  });
+export function isCloudinaryConfigured(): boolean {
+  try {
+    ensureCloudinary();
+    return true;
+  } catch {
+    return false;
+  }
 }
-
-console.info("[storage] Using Cloudinary for media uploads");
 
 function cloudinaryResourceType(contentType: string): "image" | "video" | "raw" {
   if (contentType.startsWith("video/")) return "video";
@@ -28,6 +57,7 @@ function cloudinaryResourceType(contentType: string): "image" | "video" | "raw" 
 }
 
 async function uploadToCloudinary(key: string, buffer: Buffer, contentType: string): Promise<string> {
+  ensureCloudinary();
   const resourceType = cloudinaryResourceType(contentType);
   const publicId = `grova/${key.replace(/\.[^.]+$/, "")}`;
   const opts = {
@@ -69,6 +99,7 @@ export async function uploadMedia(key: string, buffer: Buffer, contentType: stri
 }
 
 export async function deleteImage(key: string): Promise<void> {
+  ensureCloudinary();
   const publicId = `grova/${key.replace(/\.[^.]+$/, "")}`;
   await cloudinary.uploader.destroy(publicId, { resource_type: "image" }).catch(() => {});
   await cloudinary.uploader.destroy(publicId, { resource_type: "raw" }).catch(() => {});

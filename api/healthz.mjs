@@ -12,6 +12,14 @@ export default function handler(_req, res) {
     Boolean((process.env.PRIMARY_AUTH_PASSWORDS || "").trim()) ||
     Boolean((process.env.PRIMARY_AUTH_PASSWORD_HASHES || "").trim());
   const dbConfigured = /^postgres(ql)?:\/\//.test(String(process.env.DATABASE_URL || ""));
+  const cloudinaryUrl = String(process.env.CLOUDINARY_URL || "").trim();
+  const cloudinaryConfigured =
+    cloudinaryUrl.startsWith("cloudinary://") ||
+    Boolean(
+      process.env.CLOUDINARY_CLOUD_NAME &&
+        process.env.CLOUDINARY_API_KEY &&
+        process.env.CLOUDINARY_API_SECRET,
+    );
 
   res.statusCode = 200;
   res.setHeader("Content-Type", "application/json");
@@ -23,6 +31,7 @@ export default function handler(_req, res) {
       dbConfigured,
       authConfigured: authEmails > 0 && hasPassword,
       encryptionConfigured: Boolean(process.env.ENCRYPTION_KEY && process.env.ENCRYPTION_PASSWORD),
+      cloudinaryConfigured,
     }),
   );
 }

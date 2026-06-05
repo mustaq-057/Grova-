@@ -26,7 +26,7 @@ Required:
 | `PRIMARY_AUTH_EMAILS` | Comma-separated emails |
 | `PRIMARY_AUTH_PASSWORD_1` | Login password |
 | `ALLOWED_ORIGINS` | `https://your-app.vercel.app` (+ custom domain). Optional on Vercel — `VERCEL_URL` is added automatically |
-| `CLOUDINARY_URL` or `B2_*` | Media uploads |
+| `CLOUDINARY_URL` **or** `CLOUDINARY_CLOUD_NAME` + `CLOUDINARY_API_KEY` + `CLOUDINARY_API_SECRET` | Media uploads (no quotes in values) |
 | `VITE_GIPHY_API_KEY` | Build-time — enable GIF picker |
 
 Optional: `VAPID_*`, `TURN_*`, `STUN_*`
