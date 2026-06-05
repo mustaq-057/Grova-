@@ -195,14 +195,18 @@ export function validateEnv(): void {
     throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
   }
   
-  // Validate encryption key length
-  const encryptionKey = process.env.ENCRYPTION_KEY!;
+  // Validate encryption key length (trim — Vercel paste often adds trailing newline)
+  const encryptionKey = (process.env.ENCRYPTION_KEY || "").trim();
   if (encryptionKey.length !== 64) {
-    throw new Error('ENCRYPTION_KEY must be 64 characters (32 bytes in hex)');
+    throw new Error(
+      `ENCRYPTION_KEY must be 64 characters (32 bytes in hex); got ${encryptionKey.length} after trim`,
+    );
   }
-  
-  // Validate encryption password exists and is not empty
-  const encryptionPassword = process.env.ENCRYPTION_PASSWORD!;
+  if (!/^[0-9a-fA-F]{64}$/.test(encryptionKey)) {
+    throw new Error('ENCRYPTION_KEY must be 64 hex characters (0-9, a-f only)');
+  }
+
+  const encryptionPassword = (process.env.ENCRYPTION_PASSWORD || "").trim();
   if (encryptionPassword.length < 8) {
     throw new Error('ENCRYPTION_PASSWORD must be at least 8 characters long');
   }
