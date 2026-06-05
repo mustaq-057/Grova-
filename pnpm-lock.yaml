@@ -95,9 +95,6 @@ importers:
       bcryptjs:
         specifier: ^3.0.3
         version: 3.0.3
-      better-sqlite3:
-        specifier: ^11.7.0
-        version: 11.10.0
       cloudinary:
         specifier: ^2.10.0
         version: 2.10.0
@@ -165,6 +162,9 @@ importers:
       '@types/ws':
         specifier: ^8.18.1
         version: 8.18.1
+      better-sqlite3:
+        specifier: ^11.7.0
+        version: 11.10.0
       dotenv-cli:
         specifier: ^11.0.0
         version: 11.0.0

@@ -50,11 +50,15 @@ if (!run("api", "pnpm", ["--filter", "@workspace/api-server", "run", "build"])) 
   process.exit(1);
 }
 
-if (!run("api bundle verify", "node", ["scripts/verify-vercel-api.mjs"])) {
+if (!run("api bundle sync", "node", ["scripts/sync-vercel-api.mjs"])) {
   process.exit(1);
 }
 
 if (!run("dist sync", "node", ["scripts/sync-vercel-dist.mjs"])) {
+  process.exit(1);
+}
+
+if (!run("verify deploy artifacts", "node", ["scripts/verify-vercel-build.mjs"])) {
   process.exit(1);
 }
 

@@ -1,2 +1,7 @@
-/** Vercel API entry — all /api/* routes rewrite here (see vercel.json). */
-export { default } from "../artifacts/api-server/dist/vercel-entry.mjs";
+/**
+ * Vercel API entry — all /api/* (except /api/healthz) rewrite to /api (this file).
+ * Bundle lives in ./_dist/ (copied at build time).
+ */
+import handler from "./_dist/vercel-entry.mjs";
+
+export default handler;
