@@ -81,6 +81,7 @@ import {
   scrollChatForComposerChange,
 } from "@/lib/chat-scroll";
 import { readChatCache, writeChatCache } from "@/lib/chat-cache";
+import { resolveChatImageUrl, resolveChatVideoUrl } from "@/lib/media-url";
 import DoodleCanvas, { DOODLE_HEIGHT_STEP, DOODLE_MIN_HEIGHT } from "@/components/DoodleCanvas";
 import { ImageCropModal } from "@/components/ImageCropModal";
 import { partnerTypingLine } from "@/lib/partner-words";
@@ -1344,9 +1345,13 @@ export default function Messages() {
               : m,
           ),
         );
+        const openedDisplay =
+          opened.kind === "video"
+            ? resolveChatVideoUrl(opened.url, msg.text, msg.fileType)
+            : resolveChatImageUrl(opened.url);
         setMediaViewer({
           messageId: msg.id,
-          url: opened.url,
+          url: openedDisplay ?? opened.url,
           kind: opened.kind,
           timed: true,
           useVideoDuration: opened.kind === "video",
@@ -1355,11 +1360,15 @@ export default function Messages() {
         return;
       }
 
-      const url = msg.type === "image" ? msg.imageUrl || msg.imageData : msg.fileData;
-      if (!url) return;
+      const raw = msg.type === "image" ? msg.imageUrl || msg.imageData : msg.fileData;
+      if (!raw) return;
+      const display =
+        msg.type === "video"
+          ? resolveChatVideoUrl(raw, msg.text, msg.fileType)
+          : resolveChatImageUrl(raw);
       setMediaViewer({
         messageId: msg.id,
-        url,
+        url: display ?? raw,
         kind: msg.type === "video" ? "video" : "image",
         timed: false,
         useVideoDuration: false,

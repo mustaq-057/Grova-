@@ -16,6 +16,7 @@ import { getPartnerBubbleColors } from "@/lib/themes";
 import { getQuickReactions, onQuickReactionsChanged } from "@/lib/quick-reactions";
 import { parseLegacyReply, parseMediaViewMode } from "@/lib/message-utils";
 import { MessageText } from "@/lib/linkify";
+import { resolveChatImageUrl, resolveChatVideoUrl } from "@/lib/media-url";
 import { useEffect } from "react";
 
 function isEmojiOnlyText(text?: string): boolean {
@@ -78,6 +79,7 @@ export const MessageItem = memo(function MessageItem({
   const [isSwiping, setIsSwiping] = useState(false);
   const [quickReactions, setQuickReactions] = useState(getQuickReactions);
   const [showReactionEmojiPicker, setShowReactionEmojiPicker] = useState(false);
+  const [imageLoadFailed, setImageLoadFailed] = useState(false);
   const reactBtnRef = useRef<HTMLButtonElement>(null);
   const bubbleWrapRef = useRef<HTMLDivElement>(null);
   const touchStartX = useRef(0);
@@ -99,6 +101,18 @@ export const MessageItem = memo(function MessageItem({
   const isText = useMemo(() => msg.type === "text" || msg.type === "heart", [msg.type]);
   const useCuteBubble = useMemo(() => isText && !isEmojiOnly && !isDua && msg.variant === "cute", [isText, isEmojiOnly, isDua, msg.variant]);
   const rtl = useMemo(() => hasArabic(msg.text), [msg.text]);
+  const imageDisplaySrc = useMemo(
+    () => resolveChatImageUrl(msg.imageUrl || msg.imageData),
+    [msg.imageUrl, msg.imageData],
+  );
+  const videoDisplaySrc = useMemo(
+    () => resolveChatVideoUrl(msg.fileData, msg.text, msg.fileType),
+    [msg.fileData, msg.text, msg.fileType],
+  );
+
+  useEffect(() => {
+    setImageLoadFailed(false);
+  }, [imageDisplaySrc]);
 
   const legacyReply = useMemo(
     () => (!msg.replyToText && msg.text ? parseLegacyReply(msg.text) : null),
@@ -214,15 +228,26 @@ export const MessageItem = memo(function MessageItem({
             sentAt={msg.timestamp}
             onOpen={() => onOpenMedia?.(msg)}
           />
-        ) : (
+        ) : imageDisplaySrc && !imageLoadFailed ? (
           <img
-            src={msg.imageUrl || msg.imageData}
+            src={imageDisplaySrc}
             alt=""
-            className="max-w-[min(280px,92vw)] max-h-[340px] w-auto h-auto object-contain rounded-2xl block cursor-pointer"
+            className="max-w-[min(280px,92vw)] max-h-[340px] w-auto h-auto object-contain rounded-2xl block cursor-pointer bg-black/20"
             loading="lazy"
+            decoding="async"
+            referrerPolicy="no-referrer"
             onLoad={onMediaLoad}
+            onError={() => setImageLoadFailed(true)}
             onClick={() => onOpenMedia?.(msg)}
           />
+        ) : (
+          <button
+            type="button"
+            onClick={() => onOpenMedia?.(msg)}
+            className="max-w-[min(280px,92vw)] min-h-[120px] px-4 py-6 rounded-2xl bg-[#262626] border border-white/10 text-sm text-white/70 text-center"
+          >
+            Photo couldn&apos;t load · Tap to open
+          </button>
         )
       ) : isVideo && (msg.fileData || mediaLimit > 0) ? (
         isEphemeralMedia ? (
@@ -236,14 +261,16 @@ export const MessageItem = memo(function MessageItem({
             sentAt={msg.timestamp}
             onOpen={() => onOpenMedia?.(msg)}
           />
-        ) : (
+        ) : videoDisplaySrc ? (
           <video
-            src={msg.fileData}
+            src={videoDisplaySrc}
             controls
             playsInline
             className="max-w-[min(280px,92vw)] max-h-[340px] w-auto h-auto object-contain rounded-2xl block cursor-pointer"
             onClick={() => onOpenMedia?.(msg)}
           />
+        ) : (
+          <p className="text-sm text-muted-foreground italic px-1">Video unavailable</p>
         )
       ) : isFile && msg.fileData ? (
         <ChatFileBubble msg={msg} isMe={isMe} />

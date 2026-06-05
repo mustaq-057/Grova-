@@ -20,6 +20,7 @@ const router = Router();
 function allowedMediaHostname(hostname: string): boolean {
   const host = hostname.toLowerCase();
   if (host === "res.cloudinary.com" || host.endsWith(".cloudinary.com")) return true;
+  if (host.includes("backblazeb2.com")) return true;
   try {
     const b2 = process.env.B2_ENDPOINT ? new URL(process.env.B2_ENDPOINT).hostname : "";
     if (b2 && (host === b2 || host.endsWith(b2))) return true;
