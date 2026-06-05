@@ -30,6 +30,9 @@ export interface Message {
   variant?: "cute" | "default";
   companionSticker?: string;
   reaction?: string;
+  replyToId?: string;
+  replyToText?: string;
+  replyToSenderId?: string;
   threadId?: string;
   threadParentId?: string;
   threadReplyCount?: number;
@@ -58,8 +61,24 @@ function parseMediaViewMode(companionSticker?: string): "keep" | "once" | "twice
   return "keep";
 }
 
+function displayReactionForViewer(
+  row: Record<string, unknown>,
+  viewerId?: string,
+): string | undefined {
+  const myReaction = row.my_reaction ? String(row.my_reaction) : undefined;
+  const partnerReaction = row.partner_reaction ? String(row.partner_reaction) : undefined;
+  if (viewerId) {
+    const senderId = String(row.sender_id);
+    return senderId === viewerId ? partnerReaction : myReaction;
+  }
+  return row.reaction ? String(row.reaction) : myReaction ?? partnerReaction;
+}
+
 // Helper function to convert database row to Message
-function rowToMessage(row: Record<string, unknown>): Message & { readAt?: string; seenByPartner?: boolean } {
+function rowToMessage(
+  row: Record<string, unknown>,
+  viewerId?: string,
+): Message & { readAt?: string; seenByPartner?: boolean } {
   const partnerRead = row.partner_read_at ? String(row.partner_read_at) : undefined;
   let location: { lat: number; lng: number } | undefined;
   if (row.location) {
@@ -91,7 +110,10 @@ function rowToMessage(row: Record<string, unknown>): Message & { readAt?: string
     deletedAt: row.deleted_at ? String(row.deleted_at) : undefined,
     variant: row.variant === "cute" || row.variant === "default" ? row.variant : undefined,
     companionSticker: row.companion_sticker ? String(row.companion_sticker) : undefined,
-    reaction: row.reaction ? String(row.reaction) : undefined,
+    reaction: displayReactionForViewer(row, viewerId),
+    replyToId: row.reply_to_id ? String(row.reply_to_id) : undefined,
+    replyToText: row.reply_to_text ? decryptStoredField(row.reply_to_text) : undefined,
+    replyToSenderId: row.reply_to_sender_id ? String(row.reply_to_sender_id) : undefined,
     threadId: row.thread_id ? String(row.thread_id) : undefined,
     threadParentId: row.thread_parent_id ? String(row.thread_parent_id) : undefined,
     threadReplyCount: row.thread_reply_count ? Number(row.thread_reply_count) : undefined,
@@ -116,14 +138,23 @@ router.get("/messages", optionalAuth, async (req, res) => {
 
     let query = `
       SELECT m.*,
-             (SELECT emoji FROM message_reactions WHERE message_id = m.id ORDER BY timestamp DESC LIMIT 1) as reaction,
+             (SELECT emoji FROM message_reactions WHERE message_id = m.id AND user_id = ? ORDER BY timestamp DESC LIMIT 1) as my_reaction,
+             (SELECT emoji FROM message_reactions WHERE message_id = m.id AND user_id = ? ORDER BY timestamp DESC LIMIT 1) as partner_reaction,
              (SELECT read_at FROM message_read_receipts WHERE message_id = m.id AND user_id = ? LIMIT 1) as partner_read_at,
              (SELECT COUNT(*) FROM message_media_opens WHERE message_id = m.id AND user_id = ?) as viewer_media_open_count,
              (SELECT MAX(opened_at) FROM message_media_opens WHERE message_id = m.id AND user_id = ?) as partner_media_opened_at
       FROM messages m
       WHERE m.deleted = 0 AND (m.sender_id = ? OR m.sender_id = ?)
     `;
-    const params: unknown[] = [partnerId, authenticatedUserId, partnerId, authenticatedUserId, partnerId];
+    const params: unknown[] = [
+      authenticatedUserId,
+      partnerId,
+      partnerId,
+      authenticatedUserId,
+      partnerId,
+      authenticatedUserId,
+      partnerId,
+    ];
 
     if (chatClearedAt) {
       query += " AND m.timestamp > ?";
@@ -141,7 +172,7 @@ router.get("/messages", optionalAuth, async (req, res) => {
 
     const result = await db.query(query, params);
     console.log("Database query result:", result.rows.length, "messages found");
-    const messages = result.rows.map(rowToMessage).reverse();
+    const messages = result.rows.map((row) => rowToMessage(row, authenticatedUserId)).reverse();
 
     let countSql =
       "SELECT COUNT(*) as total FROM messages WHERE deleted = 0 AND (sender_id = ? OR sender_id = ?)";
@@ -217,7 +248,24 @@ router.post("/messages", authenticate, validateBody({
 }), async (req, res) => {
   const body = req.body as Partial<Message>;
   const authenticatedUserId = (req as AuthenticatedRequest).user!.id;
-  let { senderId, text, type, audioData, gifUrl, imageData, imageUrl, fileData, fileType, fileSize, location, variant, companionSticker } = body;
+  let {
+    senderId,
+    text,
+    type,
+    audioData,
+    gifUrl,
+    imageData,
+    imageUrl,
+    fileData,
+    fileType,
+    fileSize,
+    location,
+    variant,
+    companionSticker,
+    replyToId,
+    replyToText,
+    replyToSenderId,
+  } = body;
 
   if (senderId !== authenticatedUserId) {
     senderId = authenticatedUserId;
@@ -247,6 +295,7 @@ router.post("/messages", authenticate, validateBody({
   const id = randomUUID();
   const timestamp = new Date().toISOString();
   const encryptedText = encryptStoredField(text ?? undefined);
+  const encryptedReplyText = encryptStoredField(replyToText ?? undefined);
   const encryptedAudio = encryptStoredField(audioData);
   const encryptedImage = encryptStoredField(imageData);
   const encryptedFile = encryptStoredField(fileData);
@@ -254,8 +303,8 @@ router.post("/messages", authenticate, validateBody({
 
   try {
     await db.execute(
-      `INSERT INTO messages (id, sender_id, text, type, audio_data, gif_url, image_data, image_url, file_data, file_type, file_size, location, timestamp, liked, deleted, variant, companion_sticker)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO messages (id, sender_id, text, type, audio_data, gif_url, image_data, image_url, file_data, file_type, file_size, location, timestamp, liked, deleted, variant, companion_sticker, reply_to_id, reply_to_text, reply_to_sender_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         senderId!,
@@ -274,6 +323,9 @@ router.post("/messages", authenticate, validateBody({
         0,
         variant ?? "default",
         companionSticker ?? null,
+        replyToId ?? null,
+        encryptedReplyText ?? null,
+        replyToSenderId ?? null,
       ]
     );
     const msg: Message = {
@@ -293,6 +345,9 @@ router.post("/messages", authenticate, validateBody({
       liked: false,
       variant: variant ?? "default",
       companionSticker,
+      replyToId,
+      replyToText,
+      replyToSenderId,
     };
 
     const partnerId = senderId === "me" ? "wife" : "me";
@@ -376,10 +431,11 @@ router.patch("/messages/:id/like", authenticate, async (req, res) => {
     const messageId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     const result = await db.query(`
       SELECT m.*,
-             (SELECT emoji FROM message_reactions WHERE message_id = m.id ORDER BY timestamp DESC LIMIT 1) as reaction
+             (SELECT emoji FROM message_reactions WHERE message_id = m.id AND user_id = ? ORDER BY timestamp DESC LIMIT 1) as my_reaction,
+             (SELECT emoji FROM message_reactions WHERE message_id = m.id AND user_id = ? ORDER BY timestamp DESC LIMIT 1) as partner_reaction
       FROM messages m
       WHERE m.id = ?
-    `, [messageId]);
+    `, [authenticatedUserId, partnerId, messageId]);
     const row = result.rows[0];
 
     if (!row || row.deleted === 1) {
@@ -396,7 +452,7 @@ router.patch("/messages/:id/like", authenticate, async (req, res) => {
     const newLiked = row.liked === 1 || row.liked === true ? 0 : 1;
     await db.execute("UPDATE messages SET liked = ? WHERE id = ?", [newLiked, messageId]);
 
-    const msg = rowToMessage(row);
+    const msg = rowToMessage(row, authenticatedUserId);
     msg.liked = newLiked === 1;
 
     broadcast("message-liked", { ...msg, likedBy: authenticatedUserId }, String(row.sender_id));
@@ -420,13 +476,15 @@ router.patch("/messages/:id/edit", authenticate, async (req, res) => {
       return;
     }
 
+    const partnerId = authenticatedUserId === "me" ? "wife" : "me";
     const messageId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     const result = await db.query(`
       SELECT m.*,
-             (SELECT emoji FROM message_reactions WHERE message_id = m.id ORDER BY timestamp DESC LIMIT 1) as reaction
+             (SELECT emoji FROM message_reactions WHERE message_id = m.id AND user_id = ? ORDER BY timestamp DESC LIMIT 1) as my_reaction,
+             (SELECT emoji FROM message_reactions WHERE message_id = m.id AND user_id = ? ORDER BY timestamp DESC LIMIT 1) as partner_reaction
       FROM messages m
       WHERE m.id = ?
-    `, [messageId]);
+    `, [authenticatedUserId, partnerId, messageId]);
     const row = result.rows[0];
 
     if (!row) {
@@ -452,7 +510,7 @@ router.patch("/messages/:id/edit", authenticate, async (req, res) => {
       [encryptedText, messageId]
     );
 
-    const msg = rowToMessage(row);
+    const msg = rowToMessage(row, authenticatedUserId);
     msg.text = text.trim();
 
     broadcast("message-edited", msg);
@@ -466,13 +524,15 @@ router.patch("/messages/:id/edit", authenticate, async (req, res) => {
 router.delete("/messages/:id", authenticate, async (req, res) => {
   try {
     const authenticatedUserId = (req as AuthenticatedRequest).user!.id;
+    const partnerId = authenticatedUserId === "me" ? "wife" : "me";
     const messageId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     const result = await db.query(`
       SELECT m.*,
-             (SELECT emoji FROM message_reactions WHERE message_id = m.id ORDER BY timestamp DESC LIMIT 1) as reaction
+             (SELECT emoji FROM message_reactions WHERE message_id = m.id AND user_id = ? ORDER BY timestamp DESC LIMIT 1) as my_reaction,
+             (SELECT emoji FROM message_reactions WHERE message_id = m.id AND user_id = ? ORDER BY timestamp DESC LIMIT 1) as partner_reaction
       FROM messages m
       WHERE m.id = ?
-    `, [messageId]);
+    `, [authenticatedUserId, partnerId, messageId]);
     const row = result.rows[0] as Record<string, unknown> | undefined;
 
     if (!row) {
@@ -503,7 +563,7 @@ router.delete("/messages/:id", authenticate, async (req, res) => {
       }
     }
 
-    const msg = rowToMessage(row);
+    const msg = rowToMessage(row, authenticatedUserId);
     msg.text = undefined;
     msg.audioData = undefined;
     msg.gifUrl = undefined;

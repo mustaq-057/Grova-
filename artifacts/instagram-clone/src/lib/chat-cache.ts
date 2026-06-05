@@ -1,0 +1,66 @@
+import type { ApiMessage } from "./api";
+
+const CACHE_VERSION = 1;
+const MAX_CACHED = 80;
+
+type ChatCachePayload = {
+  v: number;
+  at: string;
+  messages: ApiMessage[];
+};
+
+function cacheKey(userId: string): string {
+  return `grova_chat_v${CACHE_VERSION}_${userId}`;
+}
+
+/** Strip heavy blobs so sessionStorage stays small and fast to parse. */
+function slimMessage(m: ApiMessage): ApiMessage {
+  return {
+    id: m.id,
+    senderId: m.senderId,
+    text: m.text,
+    type: m.type,
+    timestamp: m.timestamp,
+    liked: m.liked,
+    deleted: m.deleted,
+    variant: m.variant,
+    companionSticker: m.companionSticker,
+    reaction: m.reaction,
+    replyToId: m.replyToId,
+    replyToText: m.replyToText,
+    replyToSenderId: m.replyToSenderId,
+    gifUrl: m.gifUrl,
+    imageUrl: m.imageUrl,
+    seenByPartner: m.seenByPartner,
+    readAt: m.readAt,
+    pinned: m.pinned,
+    mediaViewMode: m.mediaViewMode,
+    mediaOpenCount: m.mediaOpenCount,
+  };
+}
+
+export function readChatCache(userId: string): ApiMessage[] | null {
+  try {
+    const raw = sessionStorage.getItem(cacheKey(userId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as ChatCachePayload;
+    if (parsed.v !== CACHE_VERSION || !Array.isArray(parsed.messages)) return null;
+    return parsed.messages.filter((m) => m?.id && m.timestamp);
+  } catch {
+    return null;
+  }
+}
+
+export function writeChatCache(userId: string, messages: ApiMessage[]): void {
+  try {
+    const tail = messages.slice(-MAX_CACHED).map(slimMessage);
+    const payload: ChatCachePayload = {
+      v: CACHE_VERSION,
+      at: new Date().toISOString(),
+      messages: tail,
+    };
+    sessionStorage.setItem(cacheKey(userId), JSON.stringify(payload));
+  } catch {
+    /* quota or private mode */
+  }
+}

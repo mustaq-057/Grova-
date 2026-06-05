@@ -1,24 +1,32 @@
-/** Instant scroll to latest message — no scrollIntoView animation through history. */
+/** Instant scroll to latest message — no animated scroll through history. */
 export function scrollChatToBottom(
   container: HTMLElement | null,
-  bottomAnchor?: HTMLElement | null,
+  _bottomAnchor?: HTMLElement | null,
 ): void {
   if (!container) return;
-  const run = () => {
-    container.scrollTop = container.scrollHeight;
-    bottomAnchor?.scrollIntoView({ block: "end", behavior: "instant" as ScrollBehavior });
-  };
-  run();
-  requestAnimationFrame(run);
-  requestAnimationFrame(run);
+  container.scrollTop = container.scrollHeight;
 }
 
-/** Call after images/GIFs load — layout height changes after first scroll. */
+/** Repeat scroll across layout passes (images, replies, decrypt text expansion). */
 export function scrollChatToBottomAfterPaint(
   container: HTMLElement | null,
   bottomAnchor?: HTMLElement | null,
 ): void {
-  scrollChatToBottom(container, bottomAnchor);
-  requestAnimationFrame(() => scrollChatToBottom(container, bottomAnchor));
-  setTimeout(() => scrollChatToBottom(container, bottomAnchor), 120);
+  if (!container) return;
+
+  const run = () => scrollChatToBottom(container, bottomAnchor);
+  run();
+  requestAnimationFrame(run);
+  requestAnimationFrame(() => requestAnimationFrame(run));
+  setTimeout(run, 0);
+  setTimeout(run, 80);
+  setTimeout(run, 200);
+}
+
+/** Keep pinned to bottom while composer grows (reply bar, edit bar). */
+export function scrollChatForComposerChange(
+  container: HTMLElement | null,
+  bottomAnchor?: HTMLElement | null,
+): void {
+  scrollChatToBottomAfterPaint(container, bottomAnchor);
 }

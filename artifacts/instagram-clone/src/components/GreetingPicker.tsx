@@ -26,7 +26,7 @@ export default function GreetingPicker({ onSelect, onClose }: Props) {
               onClick={() => { onSelect(g); onClose(); }}
               className="text-left text-xs px-3 py-2 rounded-full bg-secondary text-foreground hover:bg-secondary/80 transition-colors flex items-center gap-1.5"
             >
-              <span>{g.companionSticker}</span>
+              <span className="emoji-native text-base leading-none shrink-0">{g.companionSticker}</span>
               <span>{g.text}</span>
             </button>
           ))}

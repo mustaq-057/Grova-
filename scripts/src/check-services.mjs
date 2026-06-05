@@ -35,25 +35,6 @@ async function run() {
     results.push(["Cloudinary", `FAIL: ${e.message}`]);
   }
 
-  try {
-    if (!process.env.B2_KEY_ID || !process.env.B2_APPLICATION_KEY || !process.env.B2_ENDPOINT) {
-      throw new Error("B2 credentials incomplete in .env");
-    }
-    const { S3Client, HeadBucketCommand } = await import("@aws-sdk/client-s3");
-    const s3 = new S3Client({
-      region: "us-east-1",
-      endpoint: process.env.B2_ENDPOINT,
-      credentials: {
-        accessKeyId: process.env.B2_KEY_ID,
-        secretAccessKey: process.env.B2_APPLICATION_KEY,
-      },
-    });
-    await s3.send(new HeadBucketCommand({ Bucket: process.env.B2_BUCKET_NAME || "grova-images" }));
-    results.push(["Backblaze B2", "OK"]);
-  } catch (e) {
-    results.push(["Backblaze B2", `FAIL: ${e.message}`]);
-  }
-
   console.log("\nService connectivity:\n");
   for (const [name, status] of results) {
     console.log(`  ${status.startsWith("OK") ? "✅" : "❌"} ${name}: ${status}`);

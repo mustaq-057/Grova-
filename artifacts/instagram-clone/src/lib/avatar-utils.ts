@@ -1,5 +1,5 @@
 import { AVATARS } from "./avatars";
-import { getAccessToken } from "./session";
+import { resolveStorageMediaUrl } from "./media-url";
 
 /** Stock Unsplash placeholder — not a user-uploaded photo. */
 export function isStockAvatar(url: string | undefined, userId: string): boolean {
@@ -13,15 +13,6 @@ export function isStockAvatar(url: string | undefined, userId: string): boolean 
   );
 }
 
-function needsStorageProxy(url: string): boolean {
-  try {
-    const host = new URL(url).hostname.toLowerCase();
-    return host.includes("backblazeb2.com");
-  } catch {
-    return false;
-  }
-}
-
 /** Cloudinary URLs load in <img>; private B2 URLs need the authenticated API proxy. */
 export function resolveAvatarDisplayUrl(
   url: string,
@@ -30,20 +21,13 @@ export function resolveAvatarDisplayUrl(
 ): string {
   if (url.startsWith("data:")) return url;
 
-  let display = url;
+  let display = resolveStorageMediaUrl(url, { fileName: "avatar.jpg", mimeType: "image/jpeg" }) ?? url;
   const v = cacheBust ?? 0;
   if (v) {
     const sep = display.includes("?") ? "&" : "?";
     display = `${display}${sep}v=${v}`;
   }
-
-  if (!needsStorageProxy(url)) return display;
-
-  const token = getAccessToken();
-  if (!token) return display;
-
-  const proxied = `/api/media/inline?url=${encodeURIComponent(url)}&token=${encodeURIComponent(token)}`;
-  return v ? `${proxied}&v=${v}` : proxied;
+  return display;
 }
 
 /** Prefer the newer custom upload over a stale stock URL from a racey refetch. */

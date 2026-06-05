@@ -44,8 +44,8 @@ export async function uploadMediaBinary(file: File | Blob, contentType: string):
   return body.url;
 }
 
-/** Upload base64 data URL to Backblaze B2 via API. Returns public URL. */
-export async function uploadMediaToB2(dataUrl: string, contentType?: string): Promise<string> {
+/** Upload base64 data URL to Cloudinary via API. Returns public URL. */
+export async function uploadMedia(dataUrl: string, contentType?: string): Promise<string> {
   const mime = contentType ?? guessContentType(dataUrl);
   const base64Data = dataUrl.replace(/^data:[^;]+;base64,/, "");
   const approxBytes = Math.floor((base64Data.length * 3) / 4);
@@ -71,7 +71,7 @@ export async function uploadMediaToB2(dataUrl: string, contentType?: string): Pr
   return body.url;
 }
 
-/** Upload a File/Blob — binary path to B2/Cloudinary (best for mobile camera, docs, video). */
+/** Upload a File/Blob — binary path to Cloudinary (best for mobile camera, docs, video). */
 export async function uploadMediaFile(file: File | Blob, contentType?: string): Promise<string> {
   const mime = normalizeUploadMime(
     contentType ||
@@ -88,8 +88,11 @@ export async function uploadMediaFile(file: File | Blob, contentType?: string): 
     return uploadMediaBinary(file, mime);
   }
   const dataUrl = await readFileAsDataUrl(file);
-  return uploadMediaToB2(dataUrl, mime || guessContentType(dataUrl));
+  return uploadMedia(dataUrl, mime || guessContentType(dataUrl));
 }
+
+/** @deprecated Use uploadMedia — kept for older imports */
+export const uploadMediaToB2 = uploadMedia;
 
 export function readFileAsDataUrl(file: Blob): Promise<string> {
   return new Promise((resolve, reject) => {

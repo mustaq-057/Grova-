@@ -124,7 +124,7 @@ export default memo(function Login() {
         setError("Too many wrong attempts. Login blocked for 30 minutes. Try again later.");
       } else if (/request failed|not found|failed to fetch|cannot reach/i.test(msg)) {
         setError(
-          "Cannot reach the login API. Redeploy on Vercel with the latest code and check Environment Variables.",
+          "Cannot reach the login API. Open /api/healthz on your site — if it fails, redeploy on Vercel and check DATABASE_URL, ENCRYPTION_*, and PRIMARY_AUTH_* (Cloudinary is only needed for photo uploads).",
         );
       } else if (msg.toLowerCase().includes("invalid email or password")) {
         setError("Invalid email or password. Check PRIMARY_AUTH_EMAILS matches your email exactly on Vercel.");

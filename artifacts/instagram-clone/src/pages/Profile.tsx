@@ -10,6 +10,7 @@ import { useProfileAvatarCrop } from "@/hooks/useProfileAvatarCrop";
 import { unreadCount, NOTIFY_CHANGED } from "@/lib/notifications-feed";
 import { AvatarImage } from "@/components/AvatarImage";
 import { getPosts, clearLegacyLocalMedia, type StoredPost } from "@/lib/local-posts";
+import { resolvePostMediaUrl } from "@/lib/media-url";
 
 export default memo(function Profile() {
   const { user, setUser, partner, refreshProfiles } = useAuth();
@@ -216,7 +217,12 @@ export default memo(function Profile() {
           <div className="grid grid-cols-3 gap-0.5">
             {posts.map((post) => (
               <div key={post.id} className="aspect-square bg-secondary/30 overflow-hidden">
-                <img src={post.mediaUrl} alt={post.caption || "Post"} className="w-full h-full object-cover" loading="lazy" />
+                <img
+                  src={resolvePostMediaUrl(post.mediaUrl) ?? post.mediaUrl}
+                  alt={post.caption || "Post"}
+                  className="w-full h-full object-cover"
+                  loading="lazy"
+                />
               </div>
             ))}
           </div>

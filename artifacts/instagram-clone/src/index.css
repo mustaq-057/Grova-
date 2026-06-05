@@ -285,11 +285,11 @@
   grid-row: 2;
   min-height: 0;
   overflow-x: hidden;
+  scroll-padding-bottom: 1.5rem;
+  padding-bottom: 0.75rem;
 }
 .chat-message-row {
-  content-visibility: auto;
-  contain-intrinsic-size: auto 72px;
-  contain: layout style paint;
+  /* Avoid content-visibility here — it underestimates height and breaks stick-to-bottom. */
 }
 .chat-panel-bottom {
   grid-row: 3;

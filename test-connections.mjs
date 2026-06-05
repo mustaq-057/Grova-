@@ -34,7 +34,6 @@ if (!dbUrl?.startsWith("postgresql://")) {
   }
 }
 
-console.log(env.CLOUDINARY_URL ? "✅ Cloudinary configured" : "⚠️  CLOUDINARY_URL not set");
-console.log(env.B2_KEY_ID ? "✅ B2 configured" : "⚠️  B2 not set");
+console.log(env.CLOUDINARY_URL ? "✅ Cloudinary configured" : "⚠️  CLOUDINARY_URL not set (required for uploads)");
 console.log(env.ENCRYPTION_KEY?.length === 64 ? "✅ Encryption key length OK" : "⚠️  ENCRYPTION_KEY");
 console.log("\nDone.\n");

@@ -42,7 +42,11 @@ router.post("/reactions", rateLimiters.messages, authenticate, async (req, res) 
         [messageId, userId, emoji]
       );
     } else {
-      // Add the reaction
+      // One reaction per user — replace any previous emoji on this message
+      await db.execute(
+        "DELETE FROM message_reactions WHERE message_id = $1 AND user_id = $2",
+        [messageId, userId]
+      );
       const id = randomUUID();
       const timestamp = new Date().toISOString();
       await db.execute(

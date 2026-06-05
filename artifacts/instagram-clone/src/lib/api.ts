@@ -159,6 +159,9 @@ export type ApiMessage = {
   readAt?: string;
   seenByPartner?: boolean;
   reaction?: string;
+  replyToId?: string;
+  replyToText?: string;
+  replyToSenderId?: string;
   pinned?: boolean;
   threadId?: string;
   threadParentId?: string;
