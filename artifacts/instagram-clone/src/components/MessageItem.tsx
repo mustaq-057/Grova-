@@ -369,11 +369,11 @@ export const MessageItem = memo(function MessageItem({
         )}
 
         {hasReply && (
-          <div className={`w-full mb-1.5 ${isMe ? "items-end" : "items-start"} flex flex-col`}>
+          <div className={`w-full max-w-full mb-1.5 ${isMe ? "items-end" : "items-start"} flex flex-col`}>
             <p className="text-[11px] sm:text-xs text-muted-foreground/90 mb-1 px-0.5">
               {isMe ? "You" : partnerName} replied to {replyTargetLabel}
             </p>
-            <div className="w-full rounded-2xl bg-[#262626] border border-white/10 px-4 py-3 text-[15px] sm:text-[16px] text-white/85 leading-snug">
+            <div className="w-full max-w-full rounded-2xl bg-[#262626] border border-white/10 px-3 py-2 text-[14px] sm:text-[15px] text-white/85 leading-snug max-h-28 overflow-y-auto scrollbar-hide whitespace-pre-wrap break-words">
               {quotedText}
             </div>
           </div>

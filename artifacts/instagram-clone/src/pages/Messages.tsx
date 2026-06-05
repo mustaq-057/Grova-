@@ -75,7 +75,12 @@ import {
 import { isReadReceiptsEnabled, isShowPresenceEnabled, areNotificationsEnabled } from "@/lib/couple-sync";
 import { isChatBlocked, setChatBlocked, getCuteMode, setCuteMode } from "@/lib/client-memory";
 import { hydrateQuickReactions } from "@/lib/quick-reactions";
-import { scrollChatToBottom, scrollChatToBottomAfterPaint } from "@/lib/chat-scroll";
+import {
+  scrollChatToBottom,
+  scrollChatToBottomAfterPaint,
+  scrollChatForComposerChange,
+} from "@/lib/chat-scroll";
+import { readChatCache, writeChatCache } from "@/lib/chat-cache";
 import DoodleCanvas, { DOODLE_HEIGHT_STEP, DOODLE_MIN_HEIGHT } from "@/components/DoodleCanvas";
 import { ImageCropModal } from "@/components/ImageCropModal";
 import { partnerTypingLine } from "@/lib/partner-words";
@@ -222,6 +227,8 @@ export default function Messages() {
   const pendingRequestsRef = useRef<Map<string, Promise<any>>>(new Map());
   const previousMessagesLengthRef = useRef(0);
   const isInitialLoadRef = useRef(true);
+  const stickToBottomRef = useRef(false);
+  const lastMessageTailRef = useRef("");
   const hasMessagesRef = useRef(false);
   const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const maxSseRetries = 10; // Maximum number of SSE reconnection attempts
@@ -240,9 +247,16 @@ export default function Messages() {
   const partnerActive = isPartnerActiveInChat(partnerLastSeen);
   const showPartnerTyping = isTyping && partnerActive;
 
-  const scrollToBottomForMedia = useCallback(() => {
+  const requestStickToBottom = useCallback(() => {
+    stickToBottomRef.current = true;
+    isNearBottomRef.current = true;
+    setIsNearBottom(true);
     scrollChatToBottomAfterPaint(messagesContainerRef.current, bottomRef.current);
   }, []);
+
+  const scrollToBottomForMedia = useCallback(() => {
+    requestStickToBottom();
+  }, [requestStickToBottom]);
 
   const expandDoodleSpace = useCallback(() => {
     setDoodleHeight((h) => h + DOODLE_HEIGHT_STEP);
@@ -312,20 +326,27 @@ export default function Messages() {
       const pending = prev.filter((m) => pendingOutgoingRef.current.has(m.id));
       const next = mergeMessagesById(preview, pending);
       messagesSigRef.current = messagesListSignature(next);
+      if (user?.id) writeChatCache(user.id, next);
       return next;
     });
+    if (isNearBottomRef.current || isInitialLoadRef.current) {
+      stickToBottomRef.current = true;
+    }
     void normalizeMessages(raw).then((fromServer) => {
-      isInitialLoadRef.current = true;
       startTransition(() => {
         setMessages((prev) => {
           const pending = prev.filter((m) => pendingOutgoingRef.current.has(m.id));
           const next = mergeMessagesById(fromServer, pending);
           messagesSigRef.current = messagesListSignature(next);
+          if (user?.id) writeChatCache(user.id, next);
           return next;
         });
       });
+      if (isNearBottomRef.current || isInitialLoadRef.current) {
+        stickToBottomRef.current = true;
+      }
     });
-  }, []);
+  }, [user?.id]);
 
   // Load messages function (can be called from retry button)
   const loadMessages = useCallback(async () => {
@@ -465,6 +486,13 @@ export default function Messages() {
     };
 
     void hydrateQuickReactions();
+    const cached = readChatCache(user.id);
+    if (cached && cached.length > 0) {
+      isInitialLoadRef.current = true;
+      stickToBottomRef.current = true;
+      setMessages(cached);
+      messagesSigRef.current = messagesListSignature(cached);
+    }
     loadMessages();
 
     const pollSyncMessages = () => {
@@ -553,7 +581,8 @@ export default function Messages() {
           if (msg.senderId === partnerId && !isNearBottomRef.current) {
             setHasNewMessages(true);
           } else {
-            scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
+            stickToBottomRef.current = true;
+            scrollChatToBottomAfterPaint(messagesContainerRef.current, bottomRef.current);
           }
         } catch (err) {
           console.error("Failed to handle new message:", err);
@@ -903,40 +932,60 @@ export default function Messages() {
     };
   }, [user]);
 
-  // Jump to latest on first paint (no animated scroll through history)
+  // Stick to bottom: first load, own messages, decrypt height changes, reply bar, explicit requests
   useLayoutEffect(() => {
     if (messages.length === 0) return;
-    if (!isInitialLoadRef.current) return;
-    scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
-    isInitialLoadRef.current = false;
-    previousMessagesLengthRef.current = messages.length;
-    setHasNewMessages(false);
-  }, [messages]);
 
-  // New messages: scroll if you sent it, you're already at bottom, or it's media you sent
-  useEffect(() => {
-    if (isInitialLoadRef.current) return;
-    const prevLen = previousMessagesLengthRef.current;
-    if (messages.length <= prevLen) {
-      previousMessagesLengthRef.current = messages.length;
-      return;
-    }
     const last = messages[messages.length - 1];
+    const tailSig = last
+      ? `${last.id}:${last.text?.length ?? 0}:${last.type}:${last.replyToText?.length ?? 0}`
+      : "";
+    const tailChanged = tailSig !== lastMessageTailRef.current;
+    lastMessageTailRef.current = tailSig;
+
     const isOwn = last?.senderId === user?.id;
     const isMedia = last?.type === "gif" || last?.type === "image" || last?.type === "video";
+    const firstPaint = isInitialLoadRef.current;
 
-    if (isOwn || isNearBottom || (isOwn && isMedia)) {
-      if (isMedia) {
+    const shouldStick =
+      stickToBottomRef.current ||
+      firstPaint ||
+      isOwn ||
+      (isNearBottomRef.current && tailChanged);
+
+    if (shouldStick) {
+      if (isMedia || firstPaint || stickToBottomRef.current) {
         scrollChatToBottomAfterPaint(messagesContainerRef.current, bottomRef.current);
       } else {
         scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
       }
       setHasNewMessages(false);
-    } else if (last?.senderId === partnerId) {
+      stickToBottomRef.current = false;
+    } else if (
+      !firstPaint &&
+      tailChanged &&
+      last?.senderId === partnerId &&
+      messages.length > previousMessagesLengthRef.current
+    ) {
       setHasNewMessages(true);
     }
+
+    if (firstPaint) isInitialLoadRef.current = false;
     previousMessagesLengthRef.current = messages.length;
-  }, [messages, isNearBottom, user?.id, partnerId]);
+  }, [messages, user?.id, partnerId]);
+
+  // Composer grew (reply / edit bar) — keep latest message visible
+  useLayoutEffect(() => {
+    if (!replyTo && !editingMessage) return;
+    stickToBottomRef.current = true;
+    scrollChatForComposerChange(messagesContainerRef.current, bottomRef.current);
+  }, [replyTo, editingMessage]);
+
+  const startReply = useCallback((msg: ApiMessage) => {
+    setReplyTo(msg);
+    stickToBottomRef.current = true;
+    scrollChatForComposerChange(messagesContainerRef.current, bottomRef.current);
+  }, []);
 
   // Scroll position detection - track if user is near bottom (debounced for performance)
   useEffect(() => {
@@ -1183,7 +1232,7 @@ export default function Messages() {
         messagesSigRef.current = messagesListSignature(next);
         return next;
       });
-      scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
+      requestStickToBottom();
 
       const outgoing = await prepareOutgoingMessage({ senderId: user.id, ...partial });
       const saved = await api.sendMessage(outgoing);
@@ -1192,9 +1241,11 @@ export default function Messages() {
       setMessages((prev) => {
         const found = prev.find(m => m.id === tempId);
         if (!found) return prev;
-        return prev.map((m) => (m.id === tempId ? display : m));
+        const next = prev.map((m) => (m.id === tempId ? display : m));
+        if (user.id) writeChatCache(user.id, next);
+        return next;
       });
-      scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
+      requestStickToBottom();
     } catch (err) {
       console.error("Failed to send message:", err);
       if (tempId) {
@@ -1204,7 +1255,7 @@ export default function Messages() {
       setError("Message did not send. Check your connection and try again.");
       throw err;
     }
-  }, [user, online]);
+  }, [user, online, requestStickToBottom]);
 
   sendMsgRef.current = sendMsg;
   userIdRef.current = user?.id;
@@ -2436,7 +2487,7 @@ export default function Messages() {
                   onReact={handleReact}
                   onUnsend={handleUnsend}
                   onPin={handlePin}
-                  onReply={setReplyTo}
+                  onReply={startReply}
                   onEdit={handleEdit}
                   onOpenMenu={(m, rect) => setContextMenu({ msg: m, top: rect.bottom + 4, left: rect.left })}
                   onOpenMedia={openMediaMessage}
@@ -2604,7 +2655,7 @@ export default function Messages() {
                     onReact={handleReact}
                     onUnsend={handleUnsend}
                     onPin={handlePin}
-                    onReply={setReplyTo}
+                    onReply={startReply}
                     onOpenMenu={(m, rect) => setContextMenu({ msg: m, top: rect.bottom + 4, left: rect.left })}
                     onOpenMedia={openMediaMessage}
                     prevMsg={prevMsg}
@@ -2814,7 +2865,7 @@ export default function Messages() {
           isMe={contextMenu.msg.senderId === user.id}
           canEdit={canEditMessage(contextMenu.msg)}
           onClose={() => setContextMenu(null)}
-          onReply={() => setReplyTo(contextMenu.msg)}
+          onReply={() => startReply(contextMenu.msg)}
           onCopy={() => {
             if (contextMenu.msg.text) navigator.clipboard.writeText(contextMenu.msg.text);
           }}
