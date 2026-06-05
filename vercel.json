@@ -13,7 +13,8 @@
     }
   },
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api" },
+    { "source": "/api/healthz", "destination": "/api/healthz" },
+    { "source": "/api/:path*", "destination": "/api?__path=:path*" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],
   "headers": [

@@ -37,12 +37,27 @@ function ensureReady(): Promise<void> {
 }
 
 /**
- * Vercel rewrites /api/foo/bar → /api, so Express must see the original path.
- * Headers vary by runtime; try all known sources.
+ * Vercel rewrites /api/foo/bar → /api?__path=foo/bar (see vercel.json).
+ * Restore the original path so Express routes match.
  */
 function restoreRequestPath(req: import("http").IncomingMessage): void {
-  const current = (req.url ?? "").split("?")[0];
-  if (current.length > "/api".length && current !== "/api/") return;
+  const rawUrl = req.url ?? "/";
+  const qIndex = rawUrl.indexOf("?");
+  const pathOnly = qIndex >= 0 ? rawUrl.slice(0, qIndex) : rawUrl;
+  if (pathOnly.length > "/api".length && pathOnly !== "/api/") return;
+
+  try {
+    const parsed = new URL(rawUrl, "http://grova.internal");
+    const sub = parsed.searchParams.get("__path");
+    if (sub) {
+      parsed.searchParams.delete("__path");
+      const restQs = parsed.search;
+      req.url = `/api/${sub.replace(/^\//, "")}${restQs}`;
+      return;
+    }
+  } catch {
+    /* fall through to header fallbacks */
+  }
 
   const headers = req.headers;
   const candidates = [

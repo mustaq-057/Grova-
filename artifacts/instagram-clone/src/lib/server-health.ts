@@ -3,6 +3,7 @@ export type ApiHealth = {
   authConfigured?: boolean;
   dbConfigured?: boolean;
   encryptionConfigured?: boolean;
+  startupError?: string;
 };
 
 /** Quick check that the API is reachable (via Vite proxy in dev or same origin in prod). */
@@ -19,13 +20,22 @@ export async function probeApiHealth(timeoutMs = 12_000): Promise<ApiHealth> {
         signal: ctrl.signal,
       });
       clearTimeout(timer);
+      const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
       if (res.ok) {
-        const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
         return {
           reachable: true,
           authConfigured: data.authConfigured === true,
           dbConfigured: data.dbConfigured === true || data.db === true,
           encryptionConfigured: data.encryptionConfigured === true,
+        };
+      }
+      if (res.status === 503 && typeof data.error === "string") {
+        return {
+          reachable: true,
+          authConfigured: false,
+          dbConfigured: false,
+          encryptionConfigured: false,
+          startupError: data.error,
         };
       }
     } catch {
@@ -40,6 +50,9 @@ export async function probeApiHealth(timeoutMs = 12_000): Promise<ApiHealth> {
 
 export function configErrorFromHealth(health: ApiHealth): string | null {
   if (!health.reachable) return null;
+  if (health.startupError) {
+    return `${health.startupError} Fix Vercel env vars and redeploy.`;
+  }
   if (!health.encryptionConfigured) {
     return "Set ENCRYPTION_KEY and ENCRYPTION_PASSWORD in Vercel env vars, then redeploy.";
   }
