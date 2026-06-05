@@ -5,26 +5,33 @@ process.env.VERCEL ??= "1";
 import app from "./app";
 import { initDb } from "./lib/db";
 import { authenticateEncryption } from "./lib/encryption";
+import { validateEnv } from "./lib/security";
 import { logger } from "./lib/logger";
 
-const encryptionPassword = process.env.ENCRYPTION_PASSWORD;
-if (!encryptionPassword) {
-  throw new Error("ENCRYPTION_PASSWORD is required");
-}
-if (!authenticateEncryption(encryptionPassword)) {
-  throw new Error("Invalid ENCRYPTION_PASSWORD");
-}
-
 let ready: Promise<void> | null = null;
+let readyError: string | null = null;
 
-function ensureDb(): Promise<void> {
+function ensureReady(): Promise<void> {
+  if (readyError) return Promise.reject(new Error(readyError));
   if (!ready) {
-    ready = initDb()
-      .then(() => logger.info("Vercel handler: database ready"))
-      .catch((err) => {
+    ready = (async () => {
+      try {
+        validateEnv();
+        const encryptionPassword = process.env.ENCRYPTION_PASSWORD;
+        if (!encryptionPassword) {
+          throw new Error("ENCRYPTION_PASSWORD is required");
+        }
+        if (!authenticateEncryption(encryptionPassword)) {
+          throw new Error("Invalid ENCRYPTION_PASSWORD");
+        }
+        await initDb();
+        logger.info("Vercel handler: database ready");
+      } catch (err) {
         ready = null;
+        readyError = err instanceof Error ? err.message : String(err);
         throw err;
-      });
+      }
+    })();
   }
   return ready;
 }
@@ -51,9 +58,29 @@ function restoreRequestPath(req: import("http").IncomingMessage): void {
   }
 }
 
+function sendJson(
+  res: import("http").ServerResponse,
+  status: number,
+  body: Record<string, unknown>,
+): void {
+  res.statusCode = status;
+  res.setHeader("Content-Type", "application/json");
+  res.end(JSON.stringify(body));
+}
+
 /** Vercel serverless entry — Express handles /api/* */
 export default async function handler(req: import("http").IncomingMessage, res: import("http").ServerResponse) {
   restoreRequestPath(req);
-  await ensureDb();
+  try {
+    await ensureReady();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[vercel] startup failed:", message);
+    sendJson(res, 503, {
+      error: message,
+      hint: "Fix Environment Variables on Vercel (Settings → Environment Variables) and redeploy.",
+    });
+    return;
+  }
   return app(req, res);
 }

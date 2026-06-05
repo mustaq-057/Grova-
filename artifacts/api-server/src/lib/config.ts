@@ -3,7 +3,8 @@ import { AppConfig, DefaultProfile } from "../types";
 function resolveDefaultCoupleCode(): string {
   const fromEnv = process.env.DEFAULT_COUPLE_CODE?.trim();
   if (fromEnv) return fromEnv;
-  if (process.env.NODE_ENV === "production") {
+  // Defer hard failure to validateEnv() — importing config must not crash Vercel cold start.
+  if (process.env.NODE_ENV === "production" && !process.env.VERCEL) {
     throw new Error("DEFAULT_COUPLE_CODE must be set in production");
   }
   return "change-me-before-hosting";

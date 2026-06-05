@@ -220,6 +220,14 @@ export function validateEnv(): void {
     throw new Error("PRIMARY_AUTH_EMAILS and at least one PRIMARY_AUTH_PASSWORD (or hash) are required");
   }
 
+  if (process.env.NODE_ENV === "production" && !process.env.DEFAULT_COUPLE_CODE?.trim()) {
+    throw new Error("DEFAULT_COUPLE_CODE is required in production");
+  }
+
+  if (!/^postgres(ql)?:\/\//.test(String(process.env.DATABASE_URL || ""))) {
+    throw new Error("DATABASE_URL must be a Neon postgresql:// connection string");
+  }
+
   if (process.env.NODE_ENV === "production") {
     const allowedOrigins = (process.env.ALLOWED_ORIGINS || "").trim();
     const vercelHost = (process.env.VERCEL_URL || "").trim();

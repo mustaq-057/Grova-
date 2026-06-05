@@ -8,7 +8,7 @@ import { initEncryption } from "@/lib/crypto";
 import { getDefaultEmail, saveDefaultEmail } from "@/lib/session";
 import { AVATARS } from "@/lib/avatars";
 import { AvatarImage } from "@/components/AvatarImage";
-import { probeApiHealth } from "@/lib/server-health";
+import { probeApiHealth, configErrorFromHealth } from "@/lib/server-health";
 import { readLoginProfiles, writeLoginProfiles, type LoginProfileRow } from "@/lib/profile-cache";
 
 type Step = "primary" | "pick" | "code";
@@ -58,14 +58,19 @@ export default memo(function Login() {
       ? "Cannot reach Grova right now. Check your connection and try again."
       : "Cannot reach the server. Run pnpm dev:grova and open http://localhost:5000";
     const check = async () => {
-      const ok = await probeApiHealth();
+      const health = await probeApiHealth();
       if (cancelled) return;
-      if (ok) {
+      const configErr = configErrorFromHealth(health);
+      if (health.reachable) {
         failStreak = 0;
         setServerOnline(true);
-        setError((prev) =>
-          prev.includes("Cannot reach") ? "" : prev,
-        );
+        if (configErr) {
+          setError(configErr);
+        } else {
+          setError((prev) =>
+            prev.includes("Cannot reach") || prev.includes("Vercel env") ? "" : prev,
+          );
+        }
       } else {
         failStreak += 1;
         if (failStreak >= 2) {

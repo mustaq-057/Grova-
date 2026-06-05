@@ -7,19 +7,20 @@ import {
   type PgPoolLike,
 } from "./postgres-pool";
 
-if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL must be set. Did you forget to provision a database?");
-}
-
-const databaseUrl = normalizePostgresUrl(process.env.DATABASE_URL);
-
-const envIsPostgres =
-  databaseUrl.startsWith("postgresql://") || databaseUrl.startsWith("postgres://");
-
-if (!envIsPostgres) {
-  throw new Error(
-    "FATAL: Only PostgreSQL/Neon is supported. Use DATABASE_URL=postgresql://... from https://console.neon.tech",
-  );
+function resolveDatabaseUrl(): string {
+  const raw = process.env.DATABASE_URL;
+  if (!raw) {
+    throw new Error("DATABASE_URL must be set. Did you forget to provision a database?");
+  }
+  const databaseUrl = normalizePostgresUrl(raw);
+  const envIsPostgres =
+    databaseUrl.startsWith("postgresql://") || databaseUrl.startsWith("postgres://");
+  if (!envIsPostgres) {
+    throw new Error(
+      "FATAL: Only PostgreSQL/Neon is supported. Use DATABASE_URL=postgresql://... from https://console.neon.tech",
+    );
+  }
+  return databaseUrl;
 }
 
 function prepareSql(sql: string): string {
@@ -39,6 +40,7 @@ function sleep(ms: number) {
 
 
 let pgPool: Awaited<ReturnType<typeof createPostgresPool>> | null = null;
+let poolInit: Promise<PgPoolLike> | null = null;
 
 const dbRef: { handle: DbHandle } = { handle: null! };
 
@@ -71,19 +73,34 @@ function createPostgresDb(pool: PgPoolLike): DbHandle {
   };
 }
 
-if (envIsPostgres) {
-  pgPool = await createPostgresPool(databaseUrl);
-  console.log(
-    isNeonHost(databaseUrl)
-      ? "[neon] Using PostgreSQL (Neon cloud, WebSocket)"
-      : "[db] Using PostgreSQL",
-  );
-  setActiveDb(createPostgresDb(pgPool));
+async function ensurePool(): Promise<PgPoolLike> {
+  if (pgPool) return pgPool;
+  if (!poolInit) {
+    poolInit = (async () => {
+      const databaseUrl = resolveDatabaseUrl();
+      const pool = await createPostgresPool(databaseUrl);
+      pgPool = pool;
+      setActiveDb(createPostgresDb(pool));
+      console.log(
+        isNeonHost(databaseUrl)
+          ? "[neon] Using PostgreSQL (Neon cloud, WebSocket)"
+          : "[db] Using PostgreSQL",
+      );
+      return pool;
+    })();
+  }
+  return poolInit;
 }
 
 const db: DbHandle = {
-  execute: (sql, params) => dbRef.handle.execute(sql, params),
-  query: (sql, params) => dbRef.handle.query(sql, params),
+  execute: async (sql, params) => {
+    await ensurePool();
+    return dbRef.handle.execute(sql, params);
+  },
+  query: async (sql, params) => {
+    await ensurePool();
+    return dbRef.handle.query(sql, params);
+  },
 };
 
 export default db;
@@ -96,9 +113,9 @@ export function isDbReady(): boolean {
 
 /** Lightweight ping for health checks (does not run schema migrations). */
 export async function pingDatabase(): Promise<boolean> {
-  if (!pgPool) return false;
   try {
-    await pgPool.query("SELECT 1");
+    const pool = await ensurePool();
+    await pool.query("SELECT 1");
     return true;
   } catch {
     return false;
@@ -106,13 +123,11 @@ export async function pingDatabase(): Promise<boolean> {
 }
 
 async function verifyPostgresConnection(retries = 5): Promise<void> {
-  if (!pgPool) {
-    throw new Error("PostgreSQL pool not initialized");
-  }
+  const pool = await ensurePool();
   let lastErr: unknown;
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      await pgPool.query("SELECT 1");
+      await pool.query("SELECT 1");
       console.log("[neon] PostgreSQL connected successfully");
       return;
     } catch (err) {

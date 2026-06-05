@@ -20,7 +20,7 @@ router.get("/healthz", async (_req, res) => {
     Boolean((process.env.PRIMARY_AUTH_PASSWORD_HASHES || "").trim());
 
   const ok = dbConnected && isDbReady() && authEmailsConfigured > 0 && hasPassword;
-  res.status(ok ? 200 : 503).json({
+  res.status(200).json({
     status: ok ? "ok" : "degraded",
     db: dbConnected && isDbReady(),
     authConfigured: authEmailsConfigured > 0 && hasPassword,

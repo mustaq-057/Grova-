@@ -13,11 +13,31 @@ import { authenticate } from "./lib/auth-middleware";
 import { handleBinaryMediaUpload } from "./routes/images";
 import { setupCompression } from "./lib/compression";
 
-// Validate environment variables on startup
-validateEnv();
+// Validate environment variables on startup (Vercel defers to vercel-entry ensureReady).
+if (!process.env.VERCEL) {
+  validateEnv();
+}
 
 const app: Express = express();
 app.disable("x-powered-by");
+
+/** Vercel catch-all may deliver paths without the /api prefix — normalize before routing. */
+app.use((req, _res, next) => {
+  const url = req.url ?? "";
+  const pathOnly = url.split("?")[0];
+  const qs = url.includes("?") ? url.slice(url.indexOf("?")) : "";
+  if (!pathOnly.startsWith("/api/") && !pathOnly.startsWith("/api")) {
+    if (
+      pathOnly.startsWith("/auth/") ||
+      pathOnly === "/healthz" ||
+      pathOnly.startsWith("/messages") ||
+      pathOnly.startsWith("/profile")
+    ) {
+      req.url = `/api${pathOnly}${qs}`;
+    }
+  }
+  next();
+});
 app.set("trust proxy", process.env.TRUSTED_PROXIES || (process.env.NODE_ENV === "production" ? "loopback, linklocal, uniquelocal" : false));
 
 app.use(
