@@ -9,6 +9,7 @@ import { AvatarImage } from "@/components/AvatarImage";
 import { PostFeed } from "@/components/PostFeed";
 import { PARTNER_CHANGED } from "@/lib/couple-sync";
 import { parsePresenceResponse } from "@/lib/presence-api";
+import { USER_TIMEZONES } from "@/lib/timezones";
 
 export default memo(function Home() {
   const { user, partner: authPartner } = useAuth();
@@ -85,15 +86,12 @@ export default memo(function Home() {
     const updateTime = () => {
       const now = new Date();
       const timeOpts: Intl.DateTimeFormatOptions = {
-        timeZone: "Africa/Casablanca",
         hour: "numeric",
         minute: "2-digit",
         hour12: true,
       };
-      const moroccoTimeStr = now.toLocaleTimeString("en-US", timeOpts);
-      const indiaTimeStr = now.toLocaleTimeString("en-US", { ...timeOpts, timeZone: "Asia/Kolkata" });
-      setMoroccoTime(moroccoTimeStr);
-      setIndiaTime(indiaTimeStr);
+      setMoroccoTime(now.toLocaleTimeString("en-US", { ...timeOpts, timeZone: USER_TIMEZONES.me }));
+      setIndiaTime(now.toLocaleTimeString("en-US", { ...timeOpts, timeZone: USER_TIMEZONES.wife }));
     };
     updateTime();
     const interval = setInterval(updateTime, 30_000);

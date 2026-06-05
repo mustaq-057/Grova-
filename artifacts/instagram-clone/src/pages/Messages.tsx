@@ -34,6 +34,7 @@ import { ChatInbox } from "@/components/ChatInbox";
 import { AppThemeModal } from "@/components/AppThemeModal";
 import { MessageContextMenu } from "@/components/MessageContextMenu";
 import { ReplyPreview } from "@/components/ReplyPreview";
+import { EditMessageBar } from "@/components/EditMessageBar";
 import { defaultAvatar } from "@/lib/avatars";
 import { AvatarImage } from "@/components/AvatarImage";
 import { saveMemoryFromMessage, removeMemory } from "@/lib/memories";
@@ -177,6 +178,7 @@ export default function Messages() {
   const [replyTo, setReplyTo] = useState<ApiMessage | null>(null);
   const [editingMessage, setEditingMessage] = useState<ApiMessage | null>(null);
   const [editText, setEditText] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
   const [sharingLocation, setSharingLocation] = useState(false);
   const [imageToCrop, setImageToCrop] = useState<string | null>(null);
   const [doodleOpen, setDoodleOpen] = useState(false);
@@ -1323,12 +1325,23 @@ export default function Messages() {
   }, []);
 
   const sendText = useCallback((rawText: string) => {
-    let text = rawText.trim();
+    const text = rawText.trim();
     if (!text) return;
-    if (replyTo?.text) {
-      const snippet = replyTo.text.slice(0, 80);
-      text = `↩ ${snippet}${replyTo.text.length > 80 ? "…" : ""}\n${text}`;
-    }
+    const replyMeta = replyTo
+      ? {
+          replyToId: replyTo.id,
+          replyToText:
+            replyTo.text?.slice(0, 200) ||
+            (replyTo.type === "audio"
+              ? "Voice message"
+              : replyTo.type === "image"
+                ? "Photo"
+                : replyTo.type === "video"
+                  ? "Video"
+                  : "Message"),
+          replyToSenderId: replyTo.senderId,
+        }
+      : {};
     setReplyTo(null);
     const modeStickers: Record<string, string> = {
       frog: "🐸",
@@ -1338,6 +1351,7 @@ export default function Messages() {
     sendMsg({
       text,
       type: "text",
+      ...replyMeta,
       ...(cuteMode
         ? { variant: "cute" as const, companionSticker: modeStickers[cuteMode] || "🐸" }
         : { variant: "default" as const }),
@@ -1389,15 +1403,22 @@ export default function Messages() {
     setEditingMessage(msg);
     setEditText(msg.text || "");
     setReplyTo(null);
+    setContextMenu(null);
   }, []);
 
   const handleSaveEdit = useCallback(async () => {
-    if (!editingMessage || !editText.trim() || !user) return;
-    
+    if (!editingMessage || !editText.trim() || !user || editSaving) return;
+    if (editText.trim() === (editingMessage.text || "").trim()) {
+      setEditingMessage(null);
+      setEditText("");
+      return;
+    }
+
+    setEditSaving(true);
     try {
       await api.editMessage(editingMessage.id, editText.trim(), user.id);
       setMessages((prev) => {
-        const found = prev.find(m => m.id === editingMessage.id);
+        const found = prev.find((m) => m.id === editingMessage.id);
         if (!found) return prev;
         return prev.map((m) => (m.id === editingMessage.id ? { ...m, text: editText.trim() } : m));
       });
@@ -1405,13 +1426,17 @@ export default function Messages() {
       setEditText("");
     } catch (err) {
       console.error("Failed to edit message:", err);
+      toast.error("Could not edit — only within 1 hour of sending.", { duration: 4000 });
+    } finally {
+      setEditSaving(false);
     }
-  }, [editingMessage, editText, user]);
+  }, [editingMessage, editText, user, editSaving]);
 
   const handleCancelEdit = useCallback(() => {
+    if (editSaving) return;
     setEditingMessage(null);
     setEditText("");
-  }, []);
+  }, [editSaving]);
 
   const handleShareLocation = useCallback(() => {
     if (!navigator.geolocation) {
@@ -2175,24 +2200,6 @@ export default function Messages() {
     [user],
   );
 
-  const handleEditMessage = useCallback(
-    async (msg: ApiMessage) => {
-      if (!user || !msg.text) return;
-      const next = window.prompt("Edit message", msg.text);
-      if (next == null || next.trim() === msg.text) return;
-      try {
-        await api.editMessage(msg.id, next.trim(), user.id);
-        setMessages((prev) =>
-          prev.map((m) => (m.id === msg.id ? { ...m, text: next.trim() } : m)),
-        );
-      } catch (err) {
-        console.error("Edit failed:", err);
-        window.alert("Could not edit — only within 1 hour of sending.");
-      }
-    },
-    [user],
-  );
-
   const handlePin = useCallback(async (id: string) => {
     if (!user) return;
     const msg = messages.find((m) => m.id === id);
@@ -2262,8 +2269,8 @@ export default function Messages() {
 
   // Memoize grouped messages to avoid regrouping on every render
   const groupedMessages = useMemo(() => {
-    return groupByDay(filteredMessages);
-  }, [filteredMessages]);
+    return groupByDay(filteredMessages, user?.id);
+  }, [filteredMessages, user?.id]);
 
   const lastSeenOutgoingId = useMemo(
     () => findLastSeenOutgoingId(filteredMessages, user?.id),
@@ -2420,6 +2427,7 @@ export default function Messages() {
                   key={msg.id}
                   msg={msg}
                   isMe={isMe}
+                  myId={user?.id ?? "me"}
                   partnerName={pName}
                   partnerAvatar={pAvatar}
                   theme={theme}
@@ -2432,7 +2440,7 @@ export default function Messages() {
                   onEdit={handleEdit}
                   onOpenMenu={(m, rect) => setContextMenu({ msg: m, top: rect.bottom + 4, left: rect.left })}
                   onOpenMedia={openMediaMessage}
-                  seenLabel={buildSeenLabel(msg, isMe, lastSeenOutgoingId)}
+                  seenLabel={buildSeenLabel(msg, isMe, lastSeenOutgoingId, partnerId)}
                   onStartThread={handleStartThread}
                   onReplyToThread={handleReplyToThread}
                   onMediaLoad={scrollToBottomForMedia}
@@ -2570,13 +2578,15 @@ export default function Messages() {
 
         {groupedMessages.map((group, groupIndex) => (
           <div key={`${group.dayKey}-${groupIndex}`}>
-            <p className="text-center text-[11px] text-muted-foreground/70 my-4 font-medium">{group.label}</p>
+            {group.label ? (
+              <p className="text-center text-[11px] text-muted-foreground/70 my-4 font-medium">{group.label}</p>
+            ) : null}
             {group.msgs
               .filter((msg: ApiMessage) => !msg.pinned)
               .map((msg, i, arr) => {
               const isMe = msg.senderId === user?.id;
               const prevMsg = arr[i - 1];
-              const timeGap = shouldShowTimeGap(prevMsg, msg);
+              const timeGap = shouldShowTimeGap(prevMsg, msg, user?.id);
               return (
                 <div key={msg.id} className="chat-message-row">
                   {timeGap && (
@@ -2585,6 +2595,7 @@ export default function Messages() {
                   <MessageItem
                     msg={msg}
                     isMe={isMe}
+                    myId={user?.id ?? "me"}
                     partnerName={pName}
                     partnerAvatar={pAvatar}
                     theme={theme}
@@ -2597,7 +2608,7 @@ export default function Messages() {
                     onOpenMenu={(m, rect) => setContextMenu({ msg: m, top: rect.bottom + 4, left: rect.left })}
                     onOpenMedia={openMediaMessage}
                     prevMsg={prevMsg}
-                    seenLabel={buildSeenLabel(msg, isMe, lastSeenOutgoingId)}
+                    seenLabel={buildSeenLabel(msg, isMe, lastSeenOutgoingId, partnerId)}
                     onStartThread={handleStartThread}
                     onReplyToThread={handleReplyToThread}
                     onMediaLoad={scrollToBottomForMedia}
@@ -2614,36 +2625,13 @@ export default function Messages() {
       <div className="chat-panel-bottom shrink-0">
       {/* ── Edit Message Bar ── */}
       {editingMessage && (
-        <div className="px-3 sm:px-4 py-2 bg-secondary/30 border-t border-border/50 flex items-center gap-2">
-          <input
-            type="text"
-            value={editText}
-            onChange={(e) => setEditText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                handleSaveEdit();
-              } else if (e.key === "Escape") {
-                handleCancelEdit();
-              }
-            }}
-            placeholder="Edit message..."
-            className="flex-1 px-4 py-2 bg-background border border-border rounded-full text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-            autoFocus
-          />
-          <button
-            onClick={handleSaveEdit}
-            className="px-4 py-2 bg-primary text-primary-foreground rounded-full text-sm font-medium hover:bg-primary/90 transition-colors"
-          >
-            Save
-          </button>
-          <button
-            onClick={handleCancelEdit}
-            className="px-4 py-2 bg-secondary text-foreground rounded-full text-sm font-medium hover:bg-secondary/80 transition-colors"
-          >
-            Cancel
-          </button>
-        </div>
+        <EditMessageBar
+          value={editText}
+          onChange={setEditText}
+          onSave={handleSaveEdit}
+          onCancel={handleCancelEdit}
+          saving={editSaving}
+        />
       )}
 
       {doodleOpen && (
@@ -2842,7 +2830,7 @@ export default function Messages() {
           }
           onEdit={
             canEditMessage(contextMenu.msg)
-              ? () => handleEditMessage(contextMenu.msg)
+              ? () => handleEdit(contextMenu.msg)
               : undefined
           }
           onDownloadChat={contextMenu.msg.type !== "audio" ? downloadChatImages : undefined}

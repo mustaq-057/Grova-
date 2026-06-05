@@ -14,7 +14,7 @@ import type { ApiMessage } from "@/lib/api";
 import { isCallLogMessage } from "@/lib/call-chat-log";
 import { getPartnerBubbleColors } from "@/lib/themes";
 import { getQuickReactions, onQuickReactionsChanged } from "@/lib/quick-reactions";
-import { parseMediaViewMode } from "@/lib/message-utils";
+import { parseLegacyReply, parseMediaViewMode } from "@/lib/message-utils";
 import { MessageText } from "@/lib/linkify";
 import { useEffect } from "react";
 
@@ -32,6 +32,7 @@ function hasArabic(text?: string): boolean {
 export interface MessageItemProps {
   msg: ApiMessage;
   isMe: boolean;
+  myId: string;
   partnerName: string;
   partnerAvatar: string;
   theme: { bubbleColor: string; bubbleBorder: string };
@@ -54,6 +55,7 @@ export interface MessageItemProps {
 export const MessageItem = memo(function MessageItem({
   msg,
   isMe,
+  myId,
   partnerName,
   partnerAvatar,
   theme,
@@ -95,8 +97,24 @@ export const MessageItem = memo(function MessageItem({
   const isCallLog = useMemo(() => isCallLogMessage(msg.text), [msg.text]);
   const isDua = useMemo(() => msg.type === "text" && msg.companionSticker === "🤲", [msg.type, msg.companionSticker]);
   const isText = useMemo(() => msg.type === "text" || msg.type === "heart", [msg.type]);
-  const useCuteBubble = useMemo(() => isMe && isText && !isEmojiOnly && !isDua && msg.variant === "cute", [isMe, isText, isEmojiOnly, isDua, msg.variant]);
+  const useCuteBubble = useMemo(() => isText && !isEmojiOnly && !isDua && msg.variant === "cute", [isText, isEmojiOnly, isDua, msg.variant]);
   const rtl = useMemo(() => hasArabic(msg.text), [msg.text]);
+
+  const legacyReply = useMemo(
+    () => (!msg.replyToText && msg.text ? parseLegacyReply(msg.text) : null),
+    [msg.replyToText, msg.text],
+  );
+  const quotedText = msg.replyToText ?? legacyReply?.quoted;
+  const displayText = legacyReply?.body ?? msg.text;
+  const hasReply = Boolean(quotedText);
+
+  const replyTargetLabel = useMemo(() => {
+    if (!hasReply) return "";
+    const targetId = msg.replyToSenderId;
+    if (!targetId) return partnerName;
+    if (targetId === myId) return "yourself";
+    return partnerName;
+  }, [hasReply, msg.replyToSenderId, myId, partnerName]);
 
   const bubbleStyle = isMe
     ? { backgroundColor: theme.bubbleColor, borderColor: theme.bubbleBorder }
@@ -256,8 +274,8 @@ export const MessageItem = memo(function MessageItem({
             </a>
           )}
         </div>
-      ) : msg.text ? (
-        <MessageText text={msg.text} />
+      ) : displayText ? (
+        <MessageText text={displayText} />
       ) : null}
     </>
   );
@@ -271,7 +289,7 @@ export const MessageItem = memo(function MessageItem({
       <>{bubbleContent}</>
     ) : useCuteBubble ? (
       <CuteMessageBubble
-        isMe
+        isMe={isMe}
         companionSticker={msg.companionSticker}
         dir={rtl ? "rtl" : "ltr"}
         bubbleColor={theme.bubbleColor}
@@ -350,13 +368,24 @@ export const MessageItem = memo(function MessageItem({
           />
         )}
 
+        {hasReply && (
+          <div className={`w-full mb-1.5 ${isMe ? "items-end" : "items-start"} flex flex-col`}>
+            <p className="text-[11px] sm:text-xs text-muted-foreground/90 mb-1 px-0.5">
+              {isMe ? "You" : partnerName} replied to {replyTargetLabel}
+            </p>
+            <div className="w-full rounded-2xl bg-[#262626] border border-white/10 px-4 py-3 text-[15px] sm:text-[16px] text-white/85 leading-snug">
+              {quotedText}
+            </div>
+          </div>
+        )}
+
         {bubbleNode}
 
         {msg.reaction && (
           <button
             type="button"
             onClick={() => handleReaction(msg.reaction!)}
-            className={`text-sm -mt-1 mb-0.5 z-10 ${isMe ? "mr-1" : "ml-1"}`}
+            className={`emoji-native text-[1.1rem] leading-none -mt-1 mb-0.5 z-10 ${isMe ? "mr-1" : "ml-1"}`}
             title={`React with ${msg.reaction}`}
             aria-label={`Reacted with ${msg.reaction}`}
           >

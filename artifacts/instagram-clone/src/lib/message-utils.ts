@@ -5,6 +5,7 @@ import {
   type EncryptedMessageBody,
   isEncryptionReady,
 } from "./crypto";
+import { calendarDayKey, formatClockInZone, getUserTimeZone } from "./timezones";
 
 /** Server AES blobs — legacy 3-part or versioned 4-part when decrypt fails. */
 const SERVER_CIPHER_RE =
@@ -112,6 +113,9 @@ export async function prepareOutgoingMessage(
     location: partial.location,
     variant: partial.variant,
     companionSticker: partial.companionSticker,
+    replyToId: partial.replyToId,
+    replyToText: partial.replyToText,
+    replyToSenderId: partial.replyToSenderId,
   };
 }
 
@@ -149,8 +153,22 @@ export function buildOptimisticMessage(
     liked: false,
     variant: partial.variant,
     companionSticker: partial.companionSticker,
+    replyToId: partial.replyToId,
+    replyToText: partial.replyToText,
+    replyToSenderId: partial.replyToSenderId,
     mediaViewMode: ephemeral ? mediaViewMode : partial.mediaViewMode,
   };
+}
+
+/** Legacy replies stored as `↩ quoted…\nbody` in message text. */
+export function parseLegacyReply(text: string): { quoted: string; body: string } | null {
+  if (!text.startsWith("↩")) return null;
+  const newline = text.indexOf("\n");
+  if (newline < 0) return null;
+  const quoted = text.slice(1).trimStart().replace(/…$/, "").trim();
+  const body = text.slice(newline + 1);
+  if (!quoted || !body) return null;
+  return { quoted, body };
 }
 
 export function messagePreview(msg: ApiMessage): string {
@@ -205,29 +223,41 @@ export function formatPresence(lastSeen: number | undefined): { label: string; o
   return { label, online: false };
 }
 
-export function formatSeenTime(iso: string): string {
+/** Format read time in the reader's home timezone (partner country clock). */
+export function formatSeenTime(iso: string, readerUserId?: string): string {
   const d = new Date(iso);
   if (isNaN(d.getTime())) return "";
-  const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+  const timeZone = getUserTimeZone(readerUserId);
   const now = new Date();
-  if (d.toDateString() === now.toDateString()) return time;
+  const readDay = calendarDayKey(d, timeZone);
+  const todayDay = calendarDayKey(now, timeZone);
   const yesterday = new Date(now);
   yesterday.setDate(yesterday.getDate() - 1);
-  if (d.toDateString() === yesterday.toDateString()) return `yesterday ${time}`;
-  return `${d.toLocaleDateString([], { month: "short", day: "numeric" })} ${time}`;
+  const yesterdayDay = calendarDayKey(yesterday, timeZone);
+  const time = formatClockInZone(d, timeZone, true);
+
+  if (readDay === todayDay) return time;
+  if (readDay === yesterdayDay) return `Yesterday ${time}`;
+  const date = new Intl.DateTimeFormat(undefined, {
+    timeZone,
+    month: "short",
+    day: "numeric",
+  }).format(d);
+  return `${date} ${time}`;
 }
 
-/** "Just seen" or "Seen · 20:41" — only on the last outgoing message in the thread that was read. */
+/** "Just seen" or "Seen · 3:45 PM IST" — only on the last outgoing message in the thread that was read. */
 export function buildSeenLabel(
   msg: ApiMessage,
   isMe: boolean,
   lastSeenOutgoingId: string | null,
+  partnerId?: string,
 ): string | undefined {
   if (!isMe || !msg.seenByPartner || msg.deleted || msg.id !== lastSeenOutgoingId) return undefined;
   if (msg.readAt) {
     const readMs = Date.now() - new Date(msg.readAt).getTime();
     if (readMs >= 0 && readMs < 60_000) return "Just seen";
-    const time = formatSeenTime(msg.readAt);
+    const time = formatSeenTime(msg.readAt, partnerId);
     return time ? `Seen · ${time}` : "Seen";
   }
   return "Seen";

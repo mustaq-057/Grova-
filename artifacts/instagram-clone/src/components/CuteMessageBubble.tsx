@@ -33,33 +33,38 @@ export function CuteMessageBubble({
   bubbleColor,
   bubbleBorder,
 }: Props) {
+  const stickerEl = companionSticker ? (
+    <span
+      className="emoji-native text-2xl shrink-0 mb-0.5 select-none drop-shadow-sm"
+      aria-hidden
+      title="Companion"
+    >
+      {companionSticker}
+    </span>
+  ) : null;
+
   if (!isMe) {
     const partner = getPartnerBubbleColors({ bubbleColor, bubbleBorder });
     return (
-      <div
-        dir={dir}
-        className={`chat-bubble-text relative px-4 py-2.5 rounded-[24px] text-[16px] leading-relaxed rounded-bl-md border-2 text-white ${className}`}
-        style={{
-          backgroundColor: partner.fill,
-          borderColor: partner.border,
-        }}
-      >
-        {children}
+      <div className={`relative flex items-end gap-1 max-w-full ${className}`}>
+        {stickerEl}
+        <div
+          dir={dir}
+          className="chat-bubble-text relative px-4 py-2.5 rounded-[24px] text-[16px] leading-relaxed rounded-bl-md border-2 text-white min-w-0"
+          style={{
+            backgroundColor: partner.fill,
+            borderColor: partner.border,
+          }}
+        >
+          {children}
+        </div>
       </div>
     );
   }
 
   return (
     <div className={`relative flex items-end gap-1 max-w-full ${className}`}>
-      {companionSticker ? (
-        <span
-          className="text-2xl shrink-0 mb-0.5 select-none drop-shadow-sm"
-          aria-hidden
-          title="Companion"
-        >
-          {companionSticker}
-        </span>
-      ) : null}
+      {stickerEl}
       <div className="relative min-w-0">
         <div className="absolute -top-1.5 -right-1.5 z-10 pointer-events-none">
           <Heart className="w-4 h-4 fill-red-500 text-red-500 drop-shadow" aria-hidden />
