@@ -53,9 +53,13 @@ function buildAllowedOrigins(): string[] {
     .split(",")
     .map((o) => o.trim())
     .filter(Boolean);
-  const vercelHosts = [process.env.VERCEL_URL, process.env.VERCEL_BRANCH_URL]
+  const vercelHosts = [
+    process.env.VERCEL_URL,
+    process.env.VERCEL_BRANCH_URL,
+    process.env.VERCEL_PROJECT_PRODUCTION_URL,
+  ]
     .filter(Boolean)
-    .map((h) => `https://${h}`);
+    .map((h) => (h!.startsWith("http") ? h! : `https://${h}`));
   const devDefaults = ["http://localhost:5000", "http://127.0.0.1:5000"];
   const merged = [...new Set([...fromEnv, ...vercelHosts, ...(isDev ? devDefaults : [])])];
   return merged.length > 0 ? merged : devDefaults;

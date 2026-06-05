@@ -50,7 +50,11 @@ Do **not** upload `.env` to GitHub.
 
 ## 6. If login always says "Invalid email or password" but env vars are set
 
-Older deploys routed only `/api/healthz` correctly; `/api/auth/*` returned 404. Ensure `api/index.mjs` + `vercel.json` rewrite `/api/(.*)` → `/api` are deployed, then **Redeploy**.
+1. Open **`https://YOUR-APP.vercel.app/api/healthz`** — you should see `{"status":"ok","db":true,"authConfigured":true}`. If `db` is false, fix **`DATABASE_URL`** (Neon **pooled** URL, `postgresql://...?sslmode=require`, no `channel_binding`).
+2. If `authConfigured` is false, set **`PRIMARY_AUTH_EMAILS`** and **`PRIMARY_AUTH_PASSWORD_1`** in Vercel → Environment Variables → **Production**, then **Redeploy** (not just rebuild cache).
+3. Emails in **`PRIMARY_AUTH_EMAILS`** must match **exactly** (lowercase). Example: `you@gmail.com,partner@gmail.com` — no spaces around `@`, no quotes.
+4. Ensure **`ALLOWED_ORIGINS`** includes your live URL, e.g. `https://your-app.vercel.app` (no trailing slash).
+5. After pushing latest `main`, Vercel must use **`api/[[...path]].mjs`** (catch-all) — not a rewrite that collapses `/api/*` to `/api` only.
 
 ## 7. If login fails
 

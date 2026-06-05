@@ -29,8 +29,31 @@ function ensureDb(): Promise<void> {
   return ready;
 }
 
+/** Restore full /api/... path when a rewrite collapses the URL to /api only. */
+function restoreRequestPath(req: import("http").IncomingMessage): void {
+  const current = (req.url ?? "").split("?")[0];
+  if (current && current !== "/api" && current !== "/api/") return;
+
+  const raw =
+    (typeof req.headers["x-vercel-original-url"] === "string" && req.headers["x-vercel-original-url"]) ||
+    (typeof req.headers["x-invoke-path"] === "string" && req.headers["x-invoke-path"]) ||
+    "";
+  if (!raw) return;
+
+  try {
+    const pathname = raw.startsWith("http") ? new URL(raw).pathname : raw.split("?")[0];
+    if (pathname.startsWith("/api/") && pathname.length > "/api/".length) {
+      const qs = req.url?.includes("?") ? `?${req.url.split("?")[1]}` : "";
+      req.url = pathname + qs;
+    }
+  } catch {
+    /* keep req.url */
+  }
+}
+
 /** Vercel serverless entry — Express handles /api/* */
 export default async function handler(req: import("http").IncomingMessage, res: import("http").ServerResponse) {
+  restoreRequestPath(req);
   await ensureDb();
   return app(req, res);
 }

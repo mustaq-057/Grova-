@@ -45,7 +45,7 @@ function cookieConfig(maxAge: number) {
   return {
     httpOnly: true,
     secure: isProd,
-    sameSite: "strict" as const,
+    sameSite: (isProd ? "lax" : "strict") as "lax" | "strict",
     maxAge,
     path: "/",
   };
@@ -77,7 +77,7 @@ function sha256(value: string): string {
 
 function listFromEnv(key: string): string[] {
   return (process.env[key] || "")
-    .split(",")
+    .split(/[,;]/)
     .map((s) => s.trim().replace(/^['"]|['"]$/g, "").toLowerCase())
     .filter(Boolean);
 }
@@ -564,7 +564,13 @@ router.post("/auth/primary-login", rateLimiters.auth, validateBody({
       primaryToken,
     });
     res.json({ ok: true, expiresAt: now + PRIMARY_SESSION_MS });
-  } catch {
+  } catch (err) {
+    console.error("[auth] primary-login failed:", err);
+    const msg = err instanceof Error ? err.message : String(err);
+    if (/connect|database|postgres|neon|timeout|ECONNREFUSED/i.test(msg)) {
+      res.status(503).json({ error: "Database unavailable. Check DATABASE_URL on Vercel and redeploy." });
+      return;
+    }
     res.status(500).json({ error: "Primary login failed" });
   }
 });

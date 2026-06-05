@@ -94,6 +94,17 @@ export function isDbReady(): boolean {
   return dbReady;
 }
 
+/** Lightweight ping for health checks (does not run schema migrations). */
+export async function pingDatabase(): Promise<boolean> {
+  if (!pgPool) return false;
+  try {
+    await pgPool.query("SELECT 1");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function verifyPostgresConnection(retries = 5): Promise<void> {
   if (!pgPool) {
     throw new Error("PostgreSQL pool not initialized");

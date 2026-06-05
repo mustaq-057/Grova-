@@ -122,7 +122,9 @@ export default memo(function Login() {
           "Cannot reach the login API. Redeploy on Vercel with the latest code and check Environment Variables.",
         );
       } else if (msg.toLowerCase().includes("invalid email or password")) {
-        setError("Invalid email or password.");
+        setError("Invalid email or password. Check PRIMARY_AUTH_EMAILS matches your email exactly on Vercel.");
+      } else if (msg.toLowerCase().includes("database unavailable")) {
+        setError("Database is not connected. Set DATABASE_URL (Neon) in Vercel env vars and redeploy.");
       } else {
         setError(msg || "Login failed. Check Vercel env vars (PRIMARY_AUTH_*) and redeploy.");
       }
