@@ -258,8 +258,61 @@ export default function Messages() {
   }, []);
 
   const scrollToBottomForMedia = useCallback(() => {
-    requestStickToBottom();
+    if (isNearBottomRef.current || stickToBottomRef.current) {
+      requestStickToBottom();
+    }
   }, [requestStickToBottom]);
+
+  const highlightHandledRef = useRef<string | null>(null);
+
+  const scrollToHighlightedMessage = useCallback(async (messageId: string) => {
+    isNearBottomRef.current = false;
+    stickToBottomRef.current = false;
+    setIsNearBottom(false);
+
+    const flash = (el: Element) => {
+      el.classList.add("message-highlight-flash");
+      window.setTimeout(() => el.classList.remove("message-highlight-flash"), 2600);
+    };
+
+    const tryScroll = (): boolean => {
+      const el = document.querySelector(`[data-testid="message-${messageId}"]`);
+      if (!el) return false;
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      flash(el);
+      return true;
+    };
+
+    if (tryScroll()) {
+      window.history.replaceState({}, "", "/chat");
+      return;
+    }
+
+    let offset = messages.length;
+    let more = hasMore;
+    for (let attempt = 0; attempt < 40 && more; attempt += 1) {
+      const data = await api.getMessages({ offset });
+      const older = await normalizeMessages(data.messages || []);
+      if (older.length === 0) break;
+
+      setMessages((prev) => {
+        const existing = new Set(prev.map((m) => m.id));
+        const unique = older.filter((m) => !existing.has(m.id));
+        if (unique.length === 0) return prev;
+        return [...unique, ...prev];
+      });
+
+      offset += older.length;
+      more = data.pagination?.hasMore ?? false;
+      setHasMore(more);
+
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      if (tryScroll()) {
+        window.history.replaceState({}, "", "/chat");
+        return;
+      }
+    }
+  }, [messages.length, hasMore]);
 
   const expandDoodleSpace = useCallback(() => {
     setDoodleHeight((h) => h + DOODLE_HEIGHT_STEP);
@@ -545,7 +598,7 @@ export default function Messages() {
 
       if (channel.mode === "poll") {
         livePollStop = channel.stop;
-        presencePollId = window.setInterval(syncPresenceFromServer, 2500);
+        presencePollId = window.setInterval(syncPresenceFromServer, 2_000);
         void syncPresenceFromServer();
         return;
       }
@@ -880,7 +933,7 @@ export default function Messages() {
           void openLiveChannel(user!.id, pollSyncMessages, { forcePoll: true }).then((channel) => {
             if (!mounted || !channel || channel.mode !== "poll") return;
             livePollStop = channel.stop;
-            presencePollId = window.setInterval(syncPresenceFromServer, 2500);
+            presencePollId = window.setInterval(syncPresenceFromServer, 2_000);
             void syncPresenceFromServer();
           });
           return;
@@ -933,7 +986,7 @@ export default function Messages() {
     document.addEventListener("visibilitychange", onVisible);
     const interval = setInterval(() => {
       if (document.visibilityState === "visible") syncFromServer();
-    }, import.meta.env.PROD ? 12_000 : 180_000);
+    }, import.meta.env.PROD ? 8_000 : 180_000);
 
     return () => {
       document.removeEventListener("visibilitychange", onVisible);
@@ -952,14 +1005,12 @@ export default function Messages() {
     const tailChanged = tailSig !== lastMessageTailRef.current;
     lastMessageTailRef.current = tailSig;
 
-    const isOwn = last?.senderId === user?.id;
     const isMedia = last?.type === "gif" || last?.type === "image" || last?.type === "video";
     const firstPaint = isInitialLoadRef.current;
 
     const shouldStick =
       stickToBottomRef.current ||
       firstPaint ||
-      isOwn ||
       (isNearBottomRef.current && tailChanged);
 
     if (shouldStick) {
@@ -983,6 +1034,18 @@ export default function Messages() {
     previousMessagesLengthRef.current = messages.length;
   }, [messages, user?.id, partnerId]);
 
+  // Jump to pinned memory from /chat?highlight=<messageId>
+  useEffect(() => {
+    if (!user) return;
+    const highlightId = new URLSearchParams(window.location.search).get("highlight");
+    if (!highlightId) return;
+    if (highlightHandledRef.current === highlightId) return;
+    if (messages.length === 0) return;
+
+    highlightHandledRef.current = highlightId;
+    void scrollToHighlightedMessage(highlightId);
+  }, [user, messages.length, scrollToHighlightedMessage]);
+
   // Composer grew (reply / edit bar) — keep latest message visible
   useLayoutEffect(() => {
     if (!replyTo && !editingMessage) return;
@@ -1004,19 +1067,15 @@ export default function Messages() {
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
     const handleScroll = () => {
+      const { scrollHeight, scrollTop, clientHeight } = container;
+      const isNear = scrollHeight - (scrollTop + clientHeight) < 100;
+      isNearBottomRef.current = isNear;
+      if (!isNear) stickToBottomRef.current = false;
+
       if (debounceTimer) clearTimeout(debounceTimer);
-      
       debounceTimer = setTimeout(() => {
-        // Check if user is within 100px of the bottom
-        const { scrollHeight, scrollTop, clientHeight } = container;
-        const isNear = scrollHeight - (scrollTop + clientHeight) < 100;
-        isNearBottomRef.current = isNear;
         setIsNearBottom(isNear);
-        
-        // Clear "new messages" indicator when user scrolls to bottom
-        if (isNear) {
-          setHasNewMessages(false);
-        }
+        if (isNear) setHasNewMessages(false);
       }, 50);
     };
 
@@ -1058,7 +1117,7 @@ export default function Messages() {
           unreadSet.has(m.id) ? { ...m, read: true, readAt: m.readAt ?? readAt } : m,
         );
       });
-    }, 100);
+    }, 50);
 
     return () => clearTimeout(timer);
   }, [messages, user, partnerId]);
@@ -1079,7 +1138,12 @@ export default function Messages() {
           if (prev.some((m) => m.id === msg.id)) return prev;
           return [...prev, msg];
         });
-        scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
+        if (isNearBottomRef.current) {
+          stickToBottomRef.current = true;
+          scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
+        } else {
+          setHasNewMessages(true);
+        }
       } catch {
         /* ignore */
       }
@@ -1286,11 +1350,13 @@ export default function Messages() {
       scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
       try {
         const url = await uploadMediaFile(file, mime);
+        const sticker =
+          mediaViewMode === "once" ? "__vm:once" : mediaViewMode === "twice" ? "__vm:twice" : undefined;
         const outgoing = await prepareOutgoingMessage({
           senderId: user.id,
           type: "image",
           imageUrl: url,
-          companionSticker: mediaModeSticker(mediaViewMode),
+          ...(sticker ? { companionSticker: sticker } : {}),
         });
         const saved = await api.sendMessage(outgoing);
         const [display] = await normalizeMessages([saved]);
@@ -1306,7 +1372,7 @@ export default function Messages() {
         throw err;
       }
     },
-    [user, mediaModeSticker, mediaViewMode],
+    [user, mediaViewMode],
   );
 
   const uploadAndSendEphemeralMedia = useCallback(

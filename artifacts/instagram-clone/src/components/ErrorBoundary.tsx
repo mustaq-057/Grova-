@@ -14,33 +14,39 @@ export class ErrorBoundary extends Component<Props, State> {
     console.error("UI error:", error, info.componentStack);
   }
 
+  private handleRetry = () => {
+    this.setState({ error: null });
+  };
+
   render() {
     if (this.state.error) {
       return (
         <div className="flex min-h-[100dvh] flex-col items-center justify-center gap-4 bg-background p-6 text-center text-foreground">
-          <h1 className="text-lg font-semibold">Something went wrong</h1>
+          <h1 className="text-lg font-semibold">Grova hit a snag</h1>
           <p className="max-w-sm text-sm text-muted-foreground">
-            {import.meta.env.PROD ? (
-              <>Something broke on this screen. Refresh the page and sign in again if needed.</>
-            ) : (
-              <>
-                Refresh the page. If it keeps happening, run{" "}
-                <code className="rounded bg-muted px-1">pnpm dev:grova</code> and sign in again.
-              </>
-            )}
+            Tap reload to continue. Your messages are safe on the server.
           </p>
           {import.meta.env.DEV && this.state.error && (
             <pre className="max-w-lg overflow-auto rounded bg-muted p-2 text-left text-xs text-destructive">
               {this.state.error.message}
             </pre>
           )}
-          <button
-            type="button"
-            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
-            onClick={() => window.location.reload()}
-          >
-            Reload
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              className="rounded-lg bg-secondary px-4 py-2 text-sm font-medium text-foreground"
+              onClick={this.handleRetry}
+            >
+              Try again
+            </button>
+            <button
+              type="button"
+              className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+              onClick={() => window.location.reload()}
+            >
+              Reload
+            </button>
+          </div>
         </div>
       );
     }

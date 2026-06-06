@@ -336,6 +336,21 @@
   }
 }
 
+@keyframes message-highlight-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 hsl(var(--primary) / 0);
+  }
+  35% {
+    box-shadow: 0 0 0 4px hsl(var(--primary) / 0.45);
+  }
+}
+
+.message-highlight-flash {
+  border-radius: 1rem;
+  animation: message-highlight-pulse 1.2s ease-in-out 2;
+}
+
 .app-chrome {
   --background: var(--app-background);
   --foreground: var(--app-foreground);

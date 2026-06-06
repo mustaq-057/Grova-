@@ -119,11 +119,7 @@ async function apiFetch<T = unknown>(path: string, options?: RequestInit, attemp
       return apiFetch<T>(path, options, attempt + 1);
     }
     if (isNetwork) {
-      throw new Error(
-        import.meta.env.PROD
-          ? "Connection lost — check your internet and try again."
-          : "Failed to fetch — is the API running? Use pnpm dev:grova and open http://localhost:5000",
-      );
+      throw new Error("Connection lost — check your internet and try again.");
     }
     throw err;
   } finally {
