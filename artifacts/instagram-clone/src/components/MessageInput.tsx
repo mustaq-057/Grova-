@@ -138,7 +138,7 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
       e.target.value = "";
       return;
     }
-    onImageSelect(file);
+    onImageSelect(file, file.type || undefined);
     e.target.value = "";
   }, [onImageSelect]);
 

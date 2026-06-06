@@ -101,6 +101,9 @@ export function sniffBufferMime(buffer: Buffer, headerMime: string): string {
     return header;
   }
   if (buffer.length >= 12 && buffer[4] === 0x66 && buffer[5] === 0x74 && buffer[6] === 0x79 && buffer[7] === 0x70) {
+    const brand = buffer.toString("ascii", 8, 12);
+    const heicBrands = new Set(["heic", "heix", "hevc", "hevx", "heis", "heim", "mif1", "msf1", "avif", "avis"]);
+    if (heicBrands.has(brand)) return brand.startsWith("avif") ? "image/avif" : "image/heic";
     return "video/mp4";
   }
   if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {

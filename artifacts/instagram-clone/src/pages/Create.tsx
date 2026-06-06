@@ -5,6 +5,7 @@ import { useAuth } from "@/lib/auth";
 import { useLocation } from "wouter";
 import { savePost, getPosts, clearLegacyLocalMedia } from "@/lib/local-posts";
 import { uploadMedia } from "@/lib/media-upload";
+import { detectMediaByMagicBytes, isAcceptedGalleryImage, normalizeGalleryFile } from "@/lib/media-file";
 import { ImageCropModal } from "@/components/ImageCropModal";
 
 const MAX_IMAGES = 20;
@@ -38,8 +39,24 @@ export default memo(function Create() {
       .catch(() => setPhotoCount(0));
   }, [user]);
 
-  const addFiles = (files: FileList | File[]) => {
-    const list = Array.from(files).filter((f) => f.type.startsWith("image/"));
+  const addFiles = async (files: FileList | File[]) => {
+    const candidates = Array.from(files).map((f) => normalizeGalleryFile(f));
+    const list: File[] = [];
+    for (const file of candidates) {
+      if (isAcceptedGalleryImage(file)) {
+        list.push(file);
+        continue;
+      }
+      const magic = await detectMediaByMagicBytes(file);
+      if (magic === "image") {
+        list.push(
+          new File([file], file.name || `image-${Date.now()}.jpg`, {
+            type: "image/jpeg",
+            lastModified: file.lastModified,
+          }),
+        );
+      }
+    }
     if (list.length === 0) {
       alert("Only photos are supported.");
       return;
@@ -94,7 +111,8 @@ export default memo(function Create() {
     try {
       clearLegacyLocalMedia(myId);
       for (const photo of queue) {
-        const mediaUrl = await uploadMedia(photo.dataUrl, "image/jpeg");
+        const mime = photo.dataUrl.match(/^data:([^;]+);/)?.[1] ?? "image/jpeg";
+        const mediaUrl = await uploadMedia(photo.dataUrl, mime);
         await savePost(myId, {
           image: mediaUrl,
           caption: caption.trim(),

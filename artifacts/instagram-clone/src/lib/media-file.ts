@@ -1,5 +1,44 @@
 const VIDEO_EXT = /\.(mp4|webm|mov|avi|mkv|m4v|3gp|mpeg|mpg)$/i;
 const IMAGE_EXT = /\.(jpe?g|png|gif|webp|bmp|heic|heif|avif)$/i;
+const HEIC_IMAGE_BRANDS = new Set([
+  "heic",
+  "heix",
+  "hevc",
+  "hevx",
+  "heis",
+  "heim",
+  "mif1",
+  "msf1",
+  "avif",
+  "avis",
+]);
+
+const EXT_TO_MIME: Record<string, string> = {
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  gif: "image/gif",
+  webp: "image/webp",
+  heic: "image/heic",
+  heif: "image/heif",
+  avif: "image/avif",
+  bmp: "image/bmp",
+  mp4: "video/mp4",
+  mov: "video/quicktime",
+  webm: "video/webm",
+  m4v: "video/x-m4v",
+  "3gp": "video/3gpp",
+};
+
+function readIsoFtypBrand(bytes: Uint8Array): string | null {
+  if (bytes.length < 12) return null;
+  if (bytes[4] !== 0x66 || bytes[5] !== 0x74 || bytes[6] !== 0x79 || bytes[7] !== 0x70) return null;
+  return String.fromCharCode(bytes[8], bytes[9], bytes[10], bytes[11]);
+}
+
+function classifyIsoFtypBrand(brand: string): "image" | "video" {
+  return HEIC_IMAGE_BRANDS.has(brand) ? "image" : "video";
+}
 const DOCUMENT_EXT =
   /\.(pdf|docx?|xlsx?|pptx?|txt|csv|rtf|odt|ods|odp|pages|numbers|key)$/i;
 const GENERIC_CLIPBOARD_NAME = /^(?:image\.png|blob|file)$/i;
@@ -43,6 +82,35 @@ export function normalizePastedFile(file: File, itemType?: string): File {
     return new File([file], name, { type: type || file.type, lastModified: file.lastModified });
   }
   return file;
+}
+
+/** Gallery / file-picker picks often have empty MIME — infer from extension. */
+export function normalizeGalleryFile(file: File, hintType?: string): File {
+  let normalized = normalizePastedFile(file, hintType);
+  const type = normalized.type?.split(";")[0]?.trim().toLowerCase() || "";
+  if (type && type !== "application/octet-stream") return normalized;
+
+  const ext = normalized.name.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1];
+  const inferred = ext ? EXT_TO_MIME[ext] : undefined;
+  if (!inferred) return normalized;
+
+  return new File([normalized], normalized.name, {
+    type: inferred,
+    lastModified: normalized.lastModified,
+  });
+}
+
+export function isHeicOrHeif(file: File): boolean {
+  const type = file.type?.toLowerCase() || "";
+  if (type === "image/heic" || type === "image/heif") return true;
+  return /\.hei[cf]$/i.test(file.name);
+}
+
+export function isAcceptedGalleryImage(file: File): boolean {
+  const normalized = normalizeGalleryFile(file);
+  if (normalized.type.startsWith("image/")) return true;
+  if (normalized.name && IMAGE_EXT.test(normalized.name)) return true;
+  return false;
 }
 
 export function extractClipboardFiles(cd: DataTransfer | null | undefined): { file: File; itemType?: string }[] {
@@ -160,13 +228,14 @@ export async function detectMediaByMagicBytes(file: File): Promise<"image" | "vi
     }
     if (bytes[0] === 0x1a && bytes[1] === 0x45 && bytes[2] === 0xdf && bytes[3] === 0xa3) return "video";
     if (
-      bytes.length >= 8 &&
+      bytes.length >= 12 &&
       bytes[4] === 0x66 &&
       bytes[5] === 0x74 &&
       bytes[6] === 0x79 &&
       bytes[7] === 0x70
     ) {
-      return "video";
+      const brand = readIsoFtypBrand(bytes);
+      return brand ? classifyIsoFtypBrand(brand) : "video";
     }
   } catch {
     /* ignore */

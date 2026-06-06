@@ -62,7 +62,9 @@ import {
   getVideoDurationSafe,
   guessVideoMime,
   isDocumentFile,
+  isHeicOrHeif,
   isVideoFile,
+  normalizeGalleryFile,
   normalizePastedFile,
 } from "@/lib/media-file";
 import {
@@ -1267,6 +1269,46 @@ export default function Messages() {
   sendMsgRef.current = sendMsg;
   userIdRef.current = user?.id;
 
+  const uploadAndSendGalleryImage = useCallback(
+    async (file: File) => {
+      if (!user) return;
+      const tempId = crypto.randomUUID();
+      const mime = file.type || "image/jpeg";
+      const localPreview = URL.createObjectURL(file);
+      pendingOutgoingRef.current.add(tempId);
+      setMessages((prev) => [
+        ...prev,
+        buildOptimisticMessage(
+          { senderId: user.id, type: "image", imageUrl: localPreview },
+          tempId,
+        ),
+      ]);
+      scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
+      try {
+        const url = await uploadMediaFile(file, mime);
+        const outgoing = await prepareOutgoingMessage({
+          senderId: user.id,
+          type: "image",
+          imageUrl: url,
+          companionSticker: mediaModeSticker(mediaViewMode),
+        });
+        const saved = await api.sendMessage(outgoing);
+        const [display] = await normalizeMessages([saved]);
+        URL.revokeObjectURL(localPreview);
+        pendingOutgoingRef.current.delete(tempId);
+        setMessages((prev) => prev.map((m) => (m.id === tempId ? display : m)));
+        scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
+      } catch (err) {
+        URL.revokeObjectURL(localPreview);
+        pendingOutgoingRef.current.delete(tempId);
+        setMessages((prev) => prev.filter((m) => m.id !== tempId));
+        toast.error(err instanceof Error ? err.message : "Failed to send photo.", { duration: 4000 });
+        throw err;
+      }
+    },
+    [user, mediaModeSticker, mediaViewMode],
+  );
+
   const uploadAndSendEphemeralMedia = useCallback(
     async (
       file: File,
@@ -1738,7 +1780,9 @@ export default function Messages() {
       const unlockTimer = window.setTimeout(() => {
         filePickInFlightRef.current = false;
       }, 90_000);
-      const normalized = normalizePastedFile(file, clipboardItemType);
+      const normalized = clipboardItemType
+        ? normalizePastedFile(file, clipboardItemType)
+        : normalizeGalleryFile(file);
       const toastId = `media-pick-${Date.now()}`;
       const quickDoc = isDocumentFile(normalized, clipboardItemType);
       const likelyVideo =
@@ -1785,6 +1829,8 @@ export default function Messages() {
         if (kind === "image") {
           if (isEphemeral) {
             await uploadAndSendEphemeralMedia(normalized, "image", mediaViewMode);
+          } else if (isHeicOrHeif(normalized)) {
+            await uploadAndSendGalleryImage(normalized);
           } else {
             setPendingImageType(normalized.type || clipboardItemType || "image/jpeg");
             setImageToCrop(URL.createObjectURL(normalized));
@@ -1866,7 +1912,7 @@ export default function Messages() {
         filePickInFlightRef.current = false;
       }
     },
-    [uploadAndSendFile, uploadAndSendEphemeralMedia, mediaViewMode, mediaModeSticker, user],
+    [uploadAndSendFile, uploadAndSendGalleryImage, uploadAndSendEphemeralMedia, mediaViewMode, mediaModeSticker, user],
   );
 
   const handleFileChange = useCallback(
