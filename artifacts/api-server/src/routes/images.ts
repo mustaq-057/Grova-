@@ -8,6 +8,7 @@ import {
   ensureFileNameWithExtension,
   extForContentType,
   resolveContentType,
+  sniffBufferMime,
 } from "../lib/file-mime";
 
 // Helper to normalize Express params (can be string or string[])
@@ -155,7 +156,7 @@ export async function handleBinaryMediaUpload(req: Request, res: Response): Prom
     }
 
     const headerMime = String(req.headers["content-type"] || "application/octet-stream").split(";")[0].trim();
-    const mime = headerMime || "application/octet-stream";
+    const mime = sniffBufferMime(buffer, headerMime);
     const key = `${randomUUID()}.${extForContentType(mime)}`;
     const url = await uploadMedia(key, buffer, mime);
 

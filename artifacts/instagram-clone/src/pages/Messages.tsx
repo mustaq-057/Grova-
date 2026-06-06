@@ -874,7 +874,13 @@ export default function Messages() {
         // Check if we've exceeded max retries
         const retryCount = sseRetryCountRef.current;
         if (retryCount >= maxSseRetries) {
-          console.error("SSE max retries exceeded, stopping reconnection");
+          console.warn("SSE max retries exceeded, falling back to polling");
+          void openLiveChannel(user!.id, pollSyncMessages, { forcePoll: true }).then((channel) => {
+            if (!mounted || !channel || channel.mode !== "poll") return;
+            livePollStop = channel.stop;
+            presencePollId = window.setInterval(syncPresenceFromServer, 2500);
+            void syncPresenceFromServer();
+          });
           return;
         }
 
@@ -925,7 +931,7 @@ export default function Messages() {
     document.addEventListener("visibilitychange", onVisible);
     const interval = setInterval(() => {
       if (document.visibilityState === "visible") syncFromServer();
-    }, import.meta.env.PROD ? 45_000 : 180_000);
+    }, import.meta.env.PROD ? 12_000 : 180_000);
 
     return () => {
       document.removeEventListener("visibilitychange", onVisible);
@@ -1050,7 +1056,7 @@ export default function Messages() {
           unreadSet.has(m.id) ? { ...m, read: true, readAt: m.readAt ?? readAt } : m,
         );
       });
-    }, 400);
+    }, 100);
 
     return () => clearTimeout(timer);
   }, [messages, user, partnerId]);
@@ -1708,10 +1714,11 @@ export default function Messages() {
       } catch (uploadError) {
         console.error("File upload failed:", uploadError);
         setMessages((prev) => prev.filter((m) => m.id !== tempId));
-        alert(
+        toast.error(
           uploadError instanceof Error
             ? uploadError.message
-            : "File upload failed. Check your connection and storage settings.",
+            : "File upload failed. Check your connection and try again.",
+          { duration: 4000 },
         );
       }
     },
@@ -1736,9 +1743,6 @@ export default function Messages() {
       const quickDoc = isDocumentFile(normalized, clipboardItemType);
       const likelyVideo =
         clipboardItemType?.startsWith("video/") || isVideoFile(normalized, clipboardItemType);
-      if (!quickDoc && !likelyVideo) {
-        toast.loading("Preparing media…", { id: toastId });
-      }
 
       let kind: "image" | "video" | "other";
       try {
@@ -1780,11 +1784,8 @@ export default function Messages() {
       try {
         if (kind === "image") {
           if (isEphemeral) {
-            toast.loading("Sending photo…", { id: toastId });
             await uploadAndSendEphemeralMedia(normalized, "image", mediaViewMode);
-            finishToast(toastId, { type: "success", message: "Photo sent" });
           } else {
-            finishToast(toastId, { type: "none" });
             setPendingImageType(normalized.type || clipboardItemType || "image/jpeg");
             setImageToCrop(URL.createObjectURL(normalized));
           }
@@ -1813,7 +1814,6 @@ export default function Messages() {
           );
           setMessages((prev) => [...prev, optimistic]);
           scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
-          toast.dismiss(toastId);
 
           try {
             const duration = await getVideoDurationSafe(normalized);
@@ -1853,9 +1853,7 @@ export default function Messages() {
             );
           }
         } else {
-          toast.loading("Uploading file…", { id: toastId });
           await uploadAndSendFile(normalized);
-          finishToast(toastId, { type: "success", message: "File sent" });
         }
       } catch (error) {
         console.error("Failed to process file:", error);
@@ -2001,8 +1999,6 @@ export default function Messages() {
           buildOptimisticMessage({ senderId, type: "audio" }, tempId),
         ]);
         scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
-        const loadingId = toast.loading("Sending voice message…");
-
         void (async () => {
           try {
             const voiceMime = (mimeType || "audio/webm").split(";")[0]?.trim() || "audio/webm";
@@ -2017,15 +2013,14 @@ export default function Messages() {
             pendingOutgoingRef.current.delete(tempId);
             setMessages((prev) => prev.map((m) => (m.id === tempId ? display : m)));
             scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
-            finishToast(loadingId, { type: "success", message: "Voice message sent" });
           } catch (err) {
             console.error("Voice upload failed:", err);
             pendingOutgoingRef.current.delete(tempId);
             setMessages((prev) => prev.filter((m) => m.id !== tempId));
-            finishToast(loadingId, {
-              type: "error",
-              message: err instanceof Error ? err.message : "Voice message failed to send",
-            });
+            toast.error(
+              err instanceof Error ? err.message : "Voice message failed to send",
+              { duration: 4000 },
+            );
           } finally {
             voiceSendInFlightRef.current = false;
           }

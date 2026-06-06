@@ -32,7 +32,7 @@ export const MessageText = memo(function MessageText({ text, className }: Props)
             href={part.value}
             target="_blank"
             rel="noopener noreferrer"
-            className="underline underline-offset-2 break-all"
+            className="underline underline-offset-2 break-words"
             onClick={(e) => e.stopPropagation()}
           >
             {part.value}

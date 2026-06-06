@@ -4,10 +4,23 @@ export type LiveChannel =
   | { mode: "sse"; eventSource: EventSource }
   | { mode: "poll"; intervalMs: number; stop: () => void };
 
+export function startPollChannel(onPoll: () => void, intervalMs = 4_000): LiveChannel {
+  const id = window.setInterval(onPoll, intervalMs);
+  window.setTimeout(onPoll, 800);
+  return {
+    mode: "poll",
+    intervalMs,
+    stop: () => window.clearInterval(id),
+  };
+}
+
 export async function openLiveChannel(
   userId: string,
   onPoll: () => void,
+  opts?: { forcePoll?: boolean },
 ): Promise<LiveChannel | null> {
+  if (opts?.forcePoll) return startPollChannel(onPoll);
+
   const url = `/api/sse?userId=${encodeURIComponent(userId)}`;
 
   try {
@@ -16,14 +29,7 @@ export async function openLiveChannel(
     if (contentType.includes("application/json")) {
       const body = (await probe.json()) as { mode?: string; pollIntervalMs?: number };
       if (body.mode === "poll") {
-        const intervalMs = body.pollIntervalMs ?? 12_000;
-        const id = window.setInterval(onPoll, intervalMs);
-        window.setTimeout(onPoll, 1500);
-        return {
-          mode: "poll",
-          intervalMs,
-          stop: () => window.clearInterval(id),
-        };
+        return startPollChannel(onPoll, body.pollIntervalMs ?? 4_000);
       }
     }
   } catch {
@@ -34,8 +40,6 @@ export async function openLiveChannel(
     const eventSource = new EventSource(url, { withCredentials: true });
     return { mode: "sse", eventSource };
   } catch {
-    const id = window.setInterval(onPoll, 12_000);
-    window.setTimeout(onPoll, 1500);
-    return { mode: "poll", intervalMs: 12_000, stop: () => window.clearInterval(id) };
+    return startPollChannel(onPoll);
   }
 }

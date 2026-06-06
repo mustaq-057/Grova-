@@ -1,4 +1,5 @@
 import { getAuthHeaders } from "./session";
+import { tryRefreshSession } from "./api";
 
 /** Always prefer raw binary upload (no base64 bloat). */
 const BINARY_UPLOAD_MIN_BYTES = 0;
@@ -9,7 +10,8 @@ function normalizeUploadMime(mime: string): string {
 
 function binaryUploadHeaders(contentType: string): Record<string, string> {
   const auth = getAuthHeaders();
-  return { "Content-Type": contentType, ...auth };
+  // auth includes Content-Type: application/json — must override with real file mime
+  return { ...auth, "Content-Type": contentType };
 }
 
 function guessContentType(dataUrl: string): string {
@@ -18,7 +20,11 @@ function guessContentType(dataUrl: string): string {
 }
 
 /** Raw body upload — much faster than base64 for photos and videos. */
-export async function uploadMediaBinary(file: File | Blob, contentType: string): Promise<string> {
+export async function uploadMediaBinary(
+  file: File | Blob,
+  contentType: string,
+  attempt = 0,
+): Promise<string> {
   const mime = normalizeUploadMime(contentType);
   const controller = new AbortController();
   const timeoutMs = mime.startsWith("video/") ? 300_000 : 120_000;
@@ -33,8 +39,18 @@ export async function uploadMediaBinary(file: File | Blob, contentType: string):
       body: file,
       signal: controller.signal,
     });
+  } catch (err) {
+    clearTimeout(timer);
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw new Error("Upload timed out — try a shorter video or better connection.");
+    }
+    throw err;
   } finally {
     clearTimeout(timer);
+  }
+  if ((res.status === 401 || res.status === 403) && attempt === 0) {
+    const refreshed = await tryRefreshSession();
+    if (refreshed) return uploadMediaBinary(file, contentType, attempt + 1);
   }
   if (!res.ok) {
     const err = (await res.json().catch(() => ({ error: "Upload failed" }))) as { error?: string };

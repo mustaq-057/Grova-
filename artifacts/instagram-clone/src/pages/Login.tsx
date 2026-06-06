@@ -162,7 +162,11 @@ export default memo(function Login() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : "";
       if (msg.includes("fetch") || msg.includes("Failed") || msg.includes("Network") || msg.includes("API running")) {
-        setError("Cannot reach the server. Run pnpm dev:grova and open http://localhost:5000");
+        setError(
+          import.meta.env.PROD
+            ? "Cannot reach Grova right now. Check your connection and try again."
+            : "Cannot reach the server. Run pnpm dev:grova and open http://localhost:5000",
+        );
       } else if (msg.toLowerCase().includes("too many")) {
         setError("Too many wrong attempts. Wait 30 minutes or restart the server, then try again.");
       } else if (/Attempts remaining: (\d+)/i.test(msg)) {

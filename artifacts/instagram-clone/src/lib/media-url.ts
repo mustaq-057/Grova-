@@ -16,8 +16,21 @@ export function resolveStorageMediaUrl(
 ): string | undefined {
   if (!url?.trim()) return undefined;
   const trimmed = url.trim();
+
   if (trimmed.startsWith("blob:") || trimmed.startsWith("data:")) return trimmed;
+
+  // Re-resolve stored proxy URLs so token is fresh (share-to-chat used to save these).
+  if (trimmed.startsWith("/api/media/inline")) {
+    try {
+      const inner = new URL(trimmed, "http://grova.local").searchParams.get("url");
+      if (inner) return resolveStorageMediaUrl(inner, opts);
+    } catch {
+      /* fall through */
+    }
+  }
+
   if (trimmed.startsWith("/api/")) return trimmed;
+
   if (!needsStorageProxy(trimmed)) return trimmed;
 
   const params = new URLSearchParams({

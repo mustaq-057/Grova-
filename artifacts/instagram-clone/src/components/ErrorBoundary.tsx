@@ -20,8 +20,14 @@ export class ErrorBoundary extends Component<Props, State> {
         <div className="flex min-h-[100dvh] flex-col items-center justify-center gap-4 bg-background p-6 text-center text-foreground">
           <h1 className="text-lg font-semibold">Something went wrong</h1>
           <p className="max-w-sm text-sm text-muted-foreground">
-            Refresh the page. If it keeps happening, run{" "}
-            <code className="rounded bg-muted px-1">pnpm dev:grova</code> and sign in again.
+            {import.meta.env.PROD ? (
+              <>Something broke on this screen. Refresh the page and sign in again if needed.</>
+            ) : (
+              <>
+                Refresh the page. If it keeps happening, run{" "}
+                <code className="rounded bg-muted px-1">pnpm dev:grova</code> and sign in again.
+              </>
+            )}
           </p>
           {import.meta.env.DEV && this.state.error && (
             <pre className="max-w-lg overflow-auto rounded bg-muted p-2 text-left text-xs text-destructive">
