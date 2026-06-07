@@ -38,8 +38,8 @@ import { EditMessageBar } from "@/components/EditMessageBar";
 import { defaultAvatar } from "@/lib/avatars";
 import { AvatarImage } from "@/components/AvatarImage";
 import { saveMemoryFromMessage, removeMemory } from "@/lib/memories";
-import { getStoredAppTheme, isEternalAuroraTheme, type AppThemeId } from "@/lib/app-theme";
-import { ChatAuroraLayer } from "@/components/ChatAuroraLayer";
+import { APP_THEME_CHANGED, getStoredAppTheme, getPremiumChatThemeClass, isPremiumAnimatedTheme, type AppThemeId } from "@/lib/app-theme";
+import { ChatThemeLayer } from "@/components/ChatThemeLayer";
 import {
   filterVisibleMessages,
   hideMessageForUser,
@@ -50,7 +50,7 @@ import {
   getHiddenMessageIds,
 } from "@/lib/hidden-messages";
 import { parsePresenceResponse, isPartnerActiveInChat } from "@/lib/presence-api";
-import { mergeMessagesById } from "@/lib/chat-sync";
+import { reconcilePendingOptimistics, replaceOptimisticMessage } from "@/lib/chat-sync";
 import { mergeMessagesIfChanged, messagesListSignature } from "@/lib/message-list-perf";
 import { downloadChatAsImage, downloadChatAsText } from "@/lib/chat-download";
 import { openLiveChannel } from "@/lib/sse-client";
@@ -99,29 +99,6 @@ function finishToast(
   toast.dismiss(loadingId);
   if (result.type === "success") toast.success(result.message, { duration: 2500 });
   else if (result.type === "error") toast.error(result.message, { duration: 4000 });
-}
-
-/** Swap temp upload row for server row without duplicate blob + cloud videos. */
-function replaceOutgoingVideoMessage(
-  prev: ApiMessage[],
-  tempId: string,
-  display: ApiMessage,
-  senderId: string,
-): ApiMessage[] {
-  const displayTime = new Date(display.timestamp).getTime();
-  const filtered = prev.filter((m) => {
-    if (m.id === tempId || m.id === display.id) return false;
-    if (
-      m.senderId === senderId &&
-      m.type === "video" &&
-      m.fileData?.startsWith("blob:") &&
-      Math.abs(new Date(m.timestamp).getTime() - displayTime) < 120_000
-    ) {
-      return false;
-    }
-    return true;
-  });
-  return [...filtered, display];
 }
 
 function TypingDots() {
@@ -394,8 +371,7 @@ export default function Messages() {
     if (raw.length === 0) return;
     const preview = previewMessagesForDisplay(raw);
     setMessages((prev) => {
-      const pending = prev.filter((m) => pendingOutgoingRef.current.has(m.id));
-      const next = mergeMessagesById(preview, pending);
+      const next = reconcilePendingOptimistics(prev, preview, pendingOutgoingRef.current);
       messagesSigRef.current = messagesListSignature(next);
       if (user?.id) writeChatCache(user.id, next);
       return next;
@@ -406,8 +382,7 @@ export default function Messages() {
     void normalizeMessages(raw).then((fromServer) => {
       startTransition(() => {
         setMessages((prev) => {
-          const pending = prev.filter((m) => pendingOutgoingRef.current.has(m.id));
-          const next = mergeMessagesById(fromServer, pending);
+          const next = reconcilePendingOptimistics(prev, fromServer, pendingOutgoingRef.current);
           messagesSigRef.current = messagesListSignature(next);
           if (user?.id) writeChatCache(user.id, next);
           return next;
@@ -443,8 +418,11 @@ export default function Messages() {
           const more = data.pagination?.hasMore ?? false;
           setHasMore(more);
         } else {
-          setMessages([]);
-          messagesSigRef.current = "0";
+          setMessages((prev) => {
+            const pending = prev.filter((m) => pendingOutgoingRef.current.has(m.id));
+            messagesSigRef.current = pending.length ? messagesListSignature(pending) : "0";
+            return pending;
+          });
           setHasMore(false);
         }
         return data;
@@ -566,19 +544,8 @@ export default function Messages() {
         const mergePreview = (fresh: ApiMessage[]) => {
           startTransition(() => {
             setMessages((prev) => {
-              const cleaned = prev.filter((m) => {
-                if (!pendingOutgoingRef.current.has(m.id)) return true;
-                if (m.type !== "video" || !m.fileData?.startsWith("blob:")) return true;
-                const serverHasSame = fresh.some(
-                  (f) =>
-                    f.senderId === m.senderId &&
-                    f.type === "video" &&
-                    Math.abs(new Date(f.timestamp).getTime() - new Date(m.timestamp).getTime()) < 120_000,
-                );
-                if (serverHasSame) pendingOutgoingRef.current.delete(m.id);
-                return !serverHasSame;
-              });
-              const next = mergeMessagesIfChanged(cleaned, fresh, mergeMessagesById);
+              const merged = reconcilePendingOptimistics(prev, fresh, pendingOutgoingRef.current);
+              const next = mergeMessagesIfChanged(prev, merged, (_, m) => m);
               if (!next) return prev;
               messagesSigRef.current = messagesListSignature(next);
               return next;
@@ -625,7 +592,15 @@ export default function Messages() {
           const mergeIncoming = (prev: ApiMessage[], incoming: ApiMessage) => {
             const existingIds = new Set(prev.map((m) => m.id));
             if (existingIds.has(incoming.id)) {
-              return prev.map((m) => (m.id === incoming.id ? incoming : m));
+              return prev.map((m) => {
+                if (m.id !== incoming.id) return m;
+                const incomingText = incoming.text ?? "";
+                const prevText = m.text ?? "";
+                if (incomingText === "…" && prevText && prevText !== "…") {
+                  return { ...incoming, text: prevText };
+                }
+                return incoming;
+              });
             }
             if (incoming.senderId === user?.id) {
               const optimisticIdx = prev.findIndex(
@@ -776,7 +751,10 @@ export default function Messages() {
         }
       };
 
-      const handleMessagesCleared = () => { if (mounted) setMessages([]); };
+      const handleMessagesCleared = () => {
+        if (!mounted) return;
+        setMessages((prev) => prev.filter((m) => pendingOutgoingRef.current.has(m.id)));
+      };
 
       const pushCallSignal = (type: "answer" | "ice", data: unknown) => {
         callSignalSeq.current += 1;
@@ -991,7 +969,7 @@ export default function Messages() {
         es = null;
       }
     };
-  }, [user, partnerId, loadMessages, refreshCouplePrefs]);
+  }, [user?.id, partnerId, loadMessages, refreshCouplePrefs]);
 
   // Keep chat in sync across tabs/devices (SSE can miss events while backgrounded)
   useEffect(() => {
@@ -1000,7 +978,7 @@ export default function Messages() {
     const syncFromServer = () => {
       void api.getMessages().then(async (data) => {
         const fresh = await normalizeMessages(data.messages ?? []);
-        setMessages((prev) => mergeMessagesById(prev, fresh));
+        setMessages((prev) => reconcilePendingOptimistics(prev, fresh, pendingOutgoingRef.current));
         setHasMore(fresh.length > 0 && (data.pagination?.hasMore ?? false));
       }).catch(() => {});
     };
@@ -1018,7 +996,13 @@ export default function Messages() {
       document.removeEventListener("visibilitychange", onVisible);
       clearInterval(interval);
     };
-  }, [user]);
+  }, [user?.id]);
+
+  useEffect(() => {
+    const onTheme = () => setAppThemeId(getStoredAppTheme());
+    window.addEventListener(APP_THEME_CHANGED, onTheme);
+    return () => window.removeEventListener(APP_THEME_CHANGED, onTheme);
+  }, []);
 
   // Stick to bottom: first load, own messages, decrypt height changes, reply bar, explicit requests
   useLayoutEffect(() => {
@@ -1200,31 +1184,6 @@ export default function Messages() {
 
   useEffect(() => {
     if (!user) return;
-    const onPartnerMessage = async (e: Event) => {
-      try {
-        const raw = (e as CustomEvent<ApiMessage>).detail;
-        const [msg] = await normalizeMessages([raw]);
-        if (msg.senderId !== partnerId) return;
-        setMessages((prev) => {
-          if (prev.some((m) => m.id === msg.id)) return prev;
-          return [...prev, msg];
-        });
-        if (isNearBottomRef.current) {
-          stickToBottomRef.current = true;
-          scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
-        } else {
-          setHasNewMessages(true);
-        }
-      } catch {
-        /* ignore */
-      }
-    };
-    window.addEventListener("grova-partner-message", onPartnerMessage);
-    return () => window.removeEventListener("grova-partner-message", onPartnerMessage);
-  }, [user, partnerId, pName, pAvatar]);
-
-  useEffect(() => {
-    if (!user) return;
     const n = messages.filter((m) => m.senderId === partnerId && !m.deleted && !m.read).length;
     setUnreadChat(n);
   }, [messages, user, partnerId]);
@@ -1391,10 +1350,8 @@ export default function Messages() {
       const [display] = await normalizeMessages([saved]);
       pendingOutgoingRef.current.delete(tempId);
       setMessages((prev) => {
-        const found = prev.find(m => m.id === tempId);
-        if (!found) return prev;
-        const next = prev.map((m) => (m.id === tempId ? display : m));
-        if (user.id) writeChatCache(user.id, next);
+        const next = replaceOptimisticMessage(prev, tempId!, display, user.id);
+        writeChatCache(user.id, next);
         return next;
       });
       requestStickToBottom();
@@ -1441,7 +1398,7 @@ export default function Messages() {
         const [display] = await normalizeMessages([saved]);
         URL.revokeObjectURL(localPreview);
         pendingOutgoingRef.current.delete(tempId);
-        setMessages((prev) => prev.map((m) => (m.id === tempId ? display : m)));
+        setMessages((prev) => replaceOptimisticMessage(prev, tempId, display, user.id));
         scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
       } catch (err) {
         URL.revokeObjectURL(localPreview);
@@ -1508,7 +1465,7 @@ export default function Messages() {
         const [display] = await normalizeMessages([saved]);
         if (localPreview) URL.revokeObjectURL(localPreview);
         pendingOutgoingRef.current.delete(tempId);
-        setMessages((prev) => prev.map((m) => (m.id === tempId ? display : m)));
+        setMessages((prev) => replaceOptimisticMessage(prev, tempId, display, user.id));
         scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
       } catch (err) {
         console.error("Failed to send ephemeral media:", err);
@@ -1864,6 +1821,7 @@ export default function Messages() {
       if (!user) return;
 
       const tempId = crypto.randomUUID();
+      pendingOutgoingRef.current.add(tempId);
       const optimistic = buildOptimisticMessage(
         {
           senderId: user.id,
@@ -1889,10 +1847,12 @@ export default function Messages() {
         });
         const saved = await api.sendMessage(outgoing);
         const [display] = await normalizeMessages([saved]);
-        setMessages((prev) => prev.map((m) => (m.id === tempId ? display : m)));
+        pendingOutgoingRef.current.delete(tempId);
+        setMessages((prev) => replaceOptimisticMessage(prev, tempId, display, user.id));
         scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
       } catch (uploadError) {
         console.error("File upload failed:", uploadError);
+        pendingOutgoingRef.current.delete(tempId);
         setMessages((prev) => prev.filter((m) => m.id !== tempId));
         toast.error(
           uploadError instanceof Error
@@ -2025,7 +1985,7 @@ export default function Messages() {
             const [display] = await normalizeMessages([saved]);
             URL.revokeObjectURL(previewUrl);
             pendingOutgoingRef.current.delete(tempId);
-            setMessages((prev) => replaceOutgoingVideoMessage(prev, tempId, display, user.id));
+            setMessages((prev) => replaceOptimisticMessage(prev, tempId, display, user.id));
             scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
           } catch (videoErr) {
             pendingOutgoingRef.current.delete(tempId);
@@ -2195,7 +2155,7 @@ export default function Messages() {
             const saved = await api.sendMessage(outgoing);
             const [display] = await normalizeMessages([saved]);
             pendingOutgoingRef.current.delete(tempId);
-            setMessages((prev) => prev.map((m) => (m.id === tempId ? display : m)));
+            setMessages((prev) => replaceOptimisticMessage(prev, tempId, display, senderId));
             scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
           } catch (err) {
             console.error("Voice upload failed:", err);
@@ -2523,7 +2483,7 @@ export default function Messages() {
     return map;
   }, [messages]);
 
-  const showChatAurora = isEternalAuroraTheme(appThemeId);
+  const premiumChatClass = getPremiumChatThemeClass(appThemeId);
 
   if (blocked) {
     return (
@@ -2550,9 +2510,9 @@ export default function Messages() {
         />
       )}
     <div
-      className={`chat-panel flex-1 min-w-0 h-full min-h-0 relative bg-black ${showChatAurora ? "eternal-aurora-chat" : ""}`}
+      className={`chat-panel flex-1 min-w-0 h-full min-h-0 relative bg-black ${premiumChatClass ?? ""}`}
     >
-      {showChatAurora && <ChatAuroraLayer />}
+      {isPremiumAnimatedTheme(appThemeId) && <ChatThemeLayer variant={appThemeId} />}
 
       <div className="chat-panel-top shrink-0 z-20 flex flex-col relative">
       {/* ── Header ── */}

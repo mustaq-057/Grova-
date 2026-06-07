@@ -11,7 +11,17 @@ export type AppThemeId =
   | "sakura-fall"
   | "sara-lavender"
   | "book-bouquet"
-  | "eternal-aurora";
+  | "eternal-aurora"
+  | "aurora-infinity"
+  | "moonlit-blossom"
+  | "ocean-aurora";
+
+const PREMIUM_ANIMATED_THEMES: AppThemeId[] = [
+  "eternal-aurora",
+  "aurora-infinity",
+  "moonlit-blossom",
+  "ocean-aurora",
+];
 
 const THEME_BACKGROUNDS: Partial<Record<AppThemeId, string>> = {
   "sara-lavender": "/themes/sara-lilies.jpg",
@@ -226,6 +236,72 @@ export const APP_THEMES: {
       "--app-border": "280 25% 90%",
     },
   },
+  {
+    id: "aurora-infinity",
+    name: "Aurora Infinity",
+    description: "Real northern lights ribbons ✨",
+    swatch: "bg-gradient-to-br from-emerald-500 via-teal-400 to-purple-600",
+    dark: {
+      "--app-background": "160 35% 6%",
+      "--app-foreground": "150 25% 95%",
+      "--app-primary": "158 72% 58%",
+      "--app-card": "165 30% 10%",
+      "--app-secondary": "168 28% 14%",
+      "--app-border": "165 22% 20%",
+    },
+    light: {
+      "--app-background": "155 40% 97%",
+      "--app-foreground": "165 35% 14%",
+      "--app-primary": "158 65% 42%",
+      "--app-card": "0 0% 100%",
+      "--app-secondary": "155 35% 94%",
+      "--app-border": "160 25% 88%",
+    },
+  },
+  {
+    id: "moonlit-blossom",
+    name: "Moonlit Blossom",
+    description: "Blue moonlit flower field 🌙",
+    swatch: "bg-gradient-to-br from-indigo-950 via-blue-700 to-cyan-400",
+    dark: {
+      "--app-background": "228 45% 8%",
+      "--app-foreground": "210 40% 96%",
+      "--app-primary": "205 90% 62%",
+      "--app-card": "225 38% 11%",
+      "--app-secondary": "222 32% 15%",
+      "--app-border": "220 28% 22%",
+    },
+    light: {
+      "--app-background": "215 50% 97%",
+      "--app-foreground": "225 35% 16%",
+      "--app-primary": "205 75% 48%",
+      "--app-card": "0 0% 100%",
+      "--app-secondary": "210 40% 95%",
+      "--app-border": "215 30% 88%",
+    },
+  },
+  {
+    id: "ocean-aurora",
+    name: "Ocean Aurora",
+    description: "Cliffside ocean & aurora 🌊",
+    swatch: "bg-gradient-to-br from-slate-900 via-emerald-700 to-teal-400",
+    dark: {
+      "--app-background": "210 40% 7%",
+      "--app-foreground": "180 20% 94%",
+      "--app-primary": "168 65% 55%",
+      "--app-card": "215 35% 10%",
+      "--app-secondary": "212 30% 14%",
+      "--app-border": "210 25% 20%",
+    },
+    light: {
+      "--app-background": "200 35% 97%",
+      "--app-foreground": "210 30% 14%",
+      "--app-primary": "168 55% 40%",
+      "--app-card": "0 0% 100%",
+      "--app-secondary": "195 30% 94%",
+      "--app-border": "200 22% 86%",
+    },
+  },
 ];
 
 let currentAppTheme: AppThemeId = "grova";
@@ -299,6 +375,16 @@ export function isSakuraFallTheme(themeId?: AppThemeId): boolean {
 
 export function isEternalAuroraTheme(themeId?: AppThemeId): boolean {
   return (themeId ?? getStoredAppTheme()) === "eternal-aurora";
+}
+
+export function isPremiumAnimatedTheme(themeId?: AppThemeId): boolean {
+  return PREMIUM_ANIMATED_THEMES.includes(themeId ?? getStoredAppTheme());
+}
+
+export function getPremiumChatThemeClass(themeId?: AppThemeId): string | null {
+  const id = themeId ?? getStoredAppTheme();
+  if (!PREMIUM_ANIMATED_THEMES.includes(id)) return null;
+  return `${id}-chat`;
 }
 
 export function isSaraLavenderTheme(themeId?: AppThemeId): boolean {

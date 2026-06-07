@@ -11,9 +11,13 @@ export function mergeMessagesById(existing: ApiMessage[], incoming: ApiMessage[]
       map.set(m.id, m);
       continue;
     }
-    // Server does not return client read flags — keep local read/seen state.
+    const incomingText = m.text ?? "";
+    const prevText = prev.text ?? "";
+    const text =
+      incomingText === "…" && prevText && prevText !== "…" ? prevText : m.text ?? prev.text;
     map.set(m.id, {
       ...m,
+      text,
       read: prev.read || m.read,
       readAt: prev.readAt ?? m.readAt,
       seenByPartner: m.seenByPartner || prev.seenByPartner,
@@ -22,6 +26,61 @@ export function mergeMessagesById(existing: ApiMessage[], incoming: ApiMessage[]
   return Array.from(map.values()).sort(
     (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
   );
+}
+
+/** Match an optimistic outgoing row to its server copy. */
+export function findOptimisticMatch(
+  optimistic: ApiMessage,
+  serverMessages: ApiMessage[],
+): ApiMessage | undefined {
+  const optTime = new Date(optimistic.timestamp).getTime();
+  return serverMessages.find(
+    (f) =>
+      f.senderId === optimistic.senderId &&
+      f.type === optimistic.type &&
+      f.id !== optimistic.id &&
+      Math.abs(new Date(f.timestamp).getTime() - optTime) < 120_000,
+  );
+}
+
+/** Drop optimistic rows once the server has the real message, then merge fresh data. */
+export function reconcilePendingOptimistics(
+  prev: ApiMessage[],
+  fresh: ApiMessage[],
+  pendingIds: Set<string>,
+): ApiMessage[] {
+  const cleaned = prev.filter((m) => {
+    if (!pendingIds.has(m.id)) return true;
+    const match = findOptimisticMatch(m, fresh);
+    if (match) {
+      pendingIds.delete(m.id);
+      return false;
+    }
+    return true;
+  });
+  return mergeMessagesById(cleaned, fresh);
+}
+
+/** Swap temp upload/send row for the server row without duplicate entries. */
+export function replaceOptimisticMessage(
+  prev: ApiMessage[],
+  tempId: string,
+  display: ApiMessage,
+  senderId: string,
+): ApiMessage[] {
+  const displayTime = new Date(display.timestamp).getTime();
+  const filtered = prev.filter((m) => {
+    if (m.id === tempId || m.id === display.id) return false;
+    if (
+      m.senderId === senderId &&
+      m.type === display.type &&
+      Math.abs(new Date(m.timestamp).getTime() - displayTime) < 120_000
+    ) {
+      return false;
+    }
+    return true;
+  });
+  return [...filtered, display];
 }
 
 export async function fetchAndMergeMessages(current: ApiMessage[], getMessages: () => Promise<{ messages?: ApiMessage[] }>): Promise<ApiMessage[]> {

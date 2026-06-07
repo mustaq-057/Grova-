@@ -25,7 +25,7 @@ export const AppThemeModal = memo(function AppThemeModal({ show, onClose, curren
           </button>
         </div>
         <p className="text-xs text-muted-foreground mb-4">
-          Nav, profile & settings only — chat colors use the palette button in chat.
+          Animated themes appear on Home, Chat, Profile & Settings. Chat bubble colors use the palette button in chat.
         </p>
         <div className="grid grid-cols-2 gap-3">
           {APP_THEMES.map((t) => (

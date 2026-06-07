@@ -1,0 +1,22 @@
+import { memo } from "react";
+import { isPremiumAnimatedTheme, type AppThemeId } from "@/lib/app-theme";
+
+type Props = { variant: AppThemeId };
+
+/** In-chat premium theme layer — single pass, no global duplicate. */
+export const ChatThemeLayer = memo(function ChatThemeLayer({ variant }: Props) {
+  if (!isPremiumAnimatedTheme(variant)) return null;
+
+  return (
+    <div
+      className={`chat-theme-layer pointer-events-none absolute inset-0 z-0 overflow-hidden premium-scene premium-scene--${variant}`}
+      aria-hidden
+    >
+      <div className="premium-scene-base" />
+      <div className="premium-ribbon premium-ribbon-1" />
+      <div className="premium-ribbon premium-ribbon-2" />
+      <div className="premium-particles" />
+      <div className="chat-theme-scrim" />
+    </div>
+  );
+});

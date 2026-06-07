@@ -15,14 +15,14 @@ import {
 import { AvatarImage } from "@/components/AvatarImage";
 import { FallingFlowersOverlay } from "@/components/FallingFlowersOverlay";
 import { FallingNamesOverlay } from "@/components/FallingNamesOverlay";
-import { AuroraOverlay } from "@/components/AuroraOverlay";
+import { PremiumThemeOverlay } from "@/components/PremiumThemeOverlay";
 import { ThemeBackgroundOverlay } from "@/components/ThemeBackgroundOverlay";
 import {
   APP_THEME_CHANGED,
   getStoredAppTheme,
   isSakuraFallTheme,
-  isEternalAuroraTheme,
   isSaraLavenderTheme,
+  isPremiumAnimatedTheme,
   themeUsesPhotoBackground,
   type AppThemeId,
 } from "@/lib/app-theme";
@@ -44,7 +44,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const isChat = location === "/chat";
   const showSakura = isSakuraFallTheme(appTheme);
-  const showAurora = isEternalAuroraTheme(appTheme);
+  const showPremiumScene = isPremiumAnimatedTheme(appTheme) && !isChat;
   const showSaraLavender = isSaraLavenderTheme(appTheme);
   const showThemeBg = themeUsesPhotoBackground(appTheme);
 
@@ -110,7 +110,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-[100dvh] app-chrome bg-background text-foreground overflow-hidden relative">
       {showThemeBg && <ThemeBackgroundOverlay themeId={appTheme} />}
-      {showAurora && <AuroraOverlay />}
+      {showPremiumScene && <PremiumThemeOverlay themeId={appTheme} />}
       {showSakura && <FallingFlowersOverlay />}
       {showSaraLavender && <FallingNamesOverlay />}
       {/* Desktop Sidebar */}
