@@ -170,10 +170,17 @@ router.post("/posts", rateLimiters.messages, authenticate, async (req, res) => {
   const primaryUrl = urls[0]!;
   const mediaUrlsJson = urls.length > 1 ? JSON.stringify(urls) : null;
   try {
-    await db.execute(
-      "INSERT INTO posts (id, author_id, media_url, media_urls, caption, location, aspect_ratio, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
-      [id, userId, primaryUrl, mediaUrlsJson, caption ?? "", location ?? "", aspectRatio ?? "4:5", createdAt],
-    );
+    try {
+      await db.execute(
+        "INSERT INTO posts (id, author_id, media_url, media_urls, caption, location, aspect_ratio, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+        [id, userId, primaryUrl, mediaUrlsJson, caption ?? "", location ?? "", aspectRatio ?? "4:5", createdAt],
+      );
+    } catch {
+      await db.execute(
+        "INSERT INTO posts (id, author_id, media_url, caption, location, aspect_ratio, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+        [id, userId, primaryUrl, caption ?? "", location ?? "", aspectRatio ?? "4:5", createdAt],
+      );
+    }
     const post = {
       id,
       authorId: userId,

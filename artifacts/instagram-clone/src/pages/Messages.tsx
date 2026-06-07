@@ -1100,18 +1100,28 @@ export default function Messages() {
     };
   }, []);
 
-  // Mark partner messages as read when chat is visible (instant feel for "Just seen")
-  useEffect(() => {
+  const markedReadRef = useRef<Set<string>>(new Set());
+
+  const markPartnerMessagesRead = useCallback(() => {
     if (!user || !isReadReceiptsEnabled()) return;
     if (document.visibilityState !== "visible") return;
 
     const unreadIds = messages
-      .filter((m) => m.senderId === partnerId && !m.read && !m.deleted)
+      .filter(
+        (m) =>
+          m.senderId === partnerId &&
+          !m.read &&
+          !m.deleted &&
+          !markedReadRef.current.has(m.id),
+      )
       .map((m) => m.id);
     if (unreadIds.length === 0) return;
 
+    for (const id of unreadIds) markedReadRef.current.add(id);
     const readAt = new Date().toISOString();
-    api.markMessagesReadBatch(unreadIds, user.id).catch(() => {});
+    api.markMessagesReadBatch(unreadIds, user.id).catch(() => {
+      for (const id of unreadIds) markedReadRef.current.delete(id);
+    });
     setMessages((prev) => {
       const unreadSet = new Set(unreadIds);
       return prev.map((m) =>
@@ -1121,25 +1131,15 @@ export default function Messages() {
   }, [messages, user, partnerId]);
 
   useEffect(() => {
+    markPartnerMessagesRead();
+  }, [markPartnerMessagesRead]);
+
+  useEffect(() => {
     if (!user || !isReadReceiptsEnabled()) return;
-    const onVisible = () => {
-      if (document.visibilityState !== "visible") return;
-      const unreadIds = messages
-        .filter((m) => m.senderId === partnerId && !m.read && !m.deleted)
-        .map((m) => m.id);
-      if (unreadIds.length === 0) return;
-      const readAt = new Date().toISOString();
-      api.markMessagesReadBatch(unreadIds, user.id).catch(() => {});
-      setMessages((prev) => {
-        const unreadSet = new Set(unreadIds);
-        return prev.map((m) =>
-          unreadSet.has(m.id) ? { ...m, read: true, readAt: m.readAt ?? readAt } : m,
-        );
-      });
-    };
+    const onVisible = () => markPartnerMessagesRead();
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
-  }, [messages, user, partnerId]);
+  }, [user, markPartnerMessagesRead]);
 
   useEffect(() => {
     clearUnreadChatBadge();
