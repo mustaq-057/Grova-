@@ -27,6 +27,9 @@ import {
   type AppThemeId,
 } from "@/lib/app-theme";
 import { MobileMenuGrid } from "./MobileMenuGrid";
+import { api } from "@/lib/api";
+import { writeChatCache } from "@/lib/chat-cache";
+import { normalizeMessages } from "@/lib/message-utils";
 
 type NavItem = {
   icon: typeof Home;
@@ -89,6 +92,25 @@ export function Layout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (location === "/chat") markChatOpened();
   }, [location]);
+
+  // Warm chat cache before opening /chat so messages paint instantly
+  useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+    void api
+      .getMessages({ limit: 80 })
+      .then(async (data) => {
+        if (cancelled) return;
+        const raw = data.messages ?? [];
+        if (raw.length === 0) return;
+        const normalized = await normalizeMessages(raw);
+        if (!cancelled) writeChatCache(user.id, normalized);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
 
   const navItems: NavItem[] = [
     { icon: Home, label: "Home", href: "/" },

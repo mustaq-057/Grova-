@@ -9,7 +9,16 @@ import { useAuth } from "@/lib/auth";
 export default function Tasks() {
   const { user, partner } = useAuth();
   const partnerId = user?.id === "me" ? "wife" : "me";
-  const otherLabel = partner?.name?.split(" ")[0] ?? "Them";
+  const mustaqLabel =
+    user?.id === "me"
+      ? (user.name?.split(" ")[0] ?? "Mustaq")
+      : (partner?.name?.split(" ")[0] ?? "Mustaq");
+  const saraLabel =
+    user?.id === "wife"
+      ? (user.name?.split(" ")[0] ?? "Sara")
+      : (partner?.name?.split(" ")[0] ?? "Sara");
+  const myAssignValue = user?.id === "me" ? "me" : "wife";
+  const partnerAssignValue = user?.id === "me" ? "wife" : "me";
   const [tasks, setTasks] = useState<ApiTask[]>([]);
   const { showLoading, finishLoading } = useFeatureLoading(tasks.length === 0);
   const [showAdd, setShowAdd] = useState(false);
@@ -86,8 +95,10 @@ export default function Tasks() {
 
   const getAssignedLabel = (assignee: string) => {
     if (assignee === "both") return "Both";
-    if (assignee === user?.id) return "You";
-    if (assignee === partnerId) return otherLabel;
+    if (assignee === "me") return mustaqLabel;
+    if (assignee === "wife") return saraLabel;
+    if (assignee === user?.id) return user?.id === "me" ? mustaqLabel : saraLabel;
+    if (assignee === partnerId) return user?.id === "me" ? saraLabel : mustaqLabel;
     return assignee;
   };
 
@@ -149,8 +160,12 @@ export default function Tasks() {
                   data-testid="input-task-assigned"
                 >
                   <option value="both">Both</option>
-                  <option value={user?.id ?? "me"}>You</option>
-                  <option value={partnerId}>{otherLabel}</option>
+                  <option value={myAssignValue}>
+                    {user?.id === "me" ? mustaqLabel : saraLabel} (You)
+                  </option>
+                  <option value={partnerAssignValue}>
+                    {user?.id === "me" ? saraLabel : mustaqLabel}
+                  </option>
                 </select>
               </div>
               <div>

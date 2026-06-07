@@ -1,4 +1,5 @@
 import type { ApiMessage } from "./api";
+import { readSessionSnapshot } from "./profile-cache";
 
 const CACHE_VERSION = 1;
 const MAX_CACHED = 80;
@@ -51,6 +52,13 @@ function slimMessage(m: ApiMessage): ApiMessage {
     mediaViewMode: m.mediaViewMode,
     mediaOpenCount: m.mediaOpenCount,
   };
+}
+
+/** Sync read for first paint — avoids empty chat flash on enter. */
+export function readChatCacheForCurrentUser(): ApiMessage[] {
+  const uid = readSessionSnapshot()?.user?.id;
+  if (!uid) return [];
+  return readChatCache(uid) ?? [];
 }
 
 export function readChatCache(userId: string): ApiMessage[] | null {

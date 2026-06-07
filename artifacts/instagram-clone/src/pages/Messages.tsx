@@ -92,7 +92,7 @@ import {
   scrollChatForComposerChange,
   scrollMessageIntoCenter,
 } from "@/lib/chat-scroll";
-import { readChatCache, writeChatCache } from "@/lib/chat-cache";
+import { readChatCache, readChatCacheForCurrentUser, writeChatCache } from "@/lib/chat-cache";
 import { resolveChatImageUrl, resolveChatVideoUrl } from "@/lib/media-url";
 import DoodleCanvas, { DOODLE_HEIGHT_STEP, DOODLE_MIN_HEIGHT } from "@/components/DoodleCanvas";
 import { ImageCropModal } from "@/components/ImageCropModal";
@@ -126,11 +126,17 @@ function TypingDots() {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 type CallState = { status: "outgoing" | "incoming" | "active"; type: "audio" | "video"; incomingOffer?: RTCSessionDescriptionInit } | null;
 
+function initialChatMessages(): ApiMessage[] {
+  return readChatCacheForCurrentUser();
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function Messages() {
   const { user, partner, chatThemeId, updateChatTheme, refreshCouplePrefs } = useAuth();
-  const [messages, setMessages] = useState<ApiMessage[]>([]);
-  const messagesSigRef = useRef("");
+  const [messages, setMessages] = useState<ApiMessage[]>(initialChatMessages);
+  const messagesSigRef = useRef(
+    messages.length ? messagesListSignature(messages) : "0",
+  );
   const [showInfo, setShowInfo] = useState(false);
   const [showThemes, setShowThemes] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -216,7 +222,7 @@ export default function Messages() {
   const sseRetryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingRequestsRef = useRef<Map<string, Promise<any>>>(new Map());
   const previousMessagesLengthRef = useRef(0);
-  const isInitialLoadRef = useRef(true);
+  const isInitialLoadRef = useRef(messages.length > 0);
   const stickToBottomRef = useRef(false);
   const lastMessageTailRef = useRef("");
   const hasMessagesRef = useRef(false);
@@ -545,12 +551,16 @@ export default function Messages() {
     };
 
     void hydrateQuickReactions();
-    const cached = readChatCache(user.id);
-    if (cached && cached.length > 0) {
-      isInitialLoadRef.current = true;
+    if (messages.length === 0) {
+      const cached = readChatCache(user.id);
+      if (cached && cached.length > 0) {
+        isInitialLoadRef.current = true;
+        stickToBottomRef.current = true;
+        setMessages(cached);
+        messagesSigRef.current = messagesListSignature(cached);
+      }
+    } else {
       stickToBottomRef.current = true;
-      setMessages(cached);
-      messagesSigRef.current = messagesListSignature(cached);
     }
     loadMessages();
 
