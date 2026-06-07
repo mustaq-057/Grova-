@@ -23,6 +23,15 @@ function pickMediaUrl(incoming?: string, prev?: string): string | undefined {
   return incoming;
 }
 
+/** Re-attach rows that vanished during a bad optimistic reconcile / poll race. */
+export function preserveDroppedMessages(prev: ApiMessage[], next: ApiMessage[]): ApiMessage[] {
+  if (next.length >= prev.length) return next;
+  const nextIds = new Set(next.map((m) => m.id));
+  const missing = prev.filter((m) => !nextIds.has(m.id) && !m.deleted);
+  if (missing.length === 0) return next;
+  return mergeMessagesById(next, missing);
+}
+
 /** Keep locally unsent rows tombstoned even if a stale poll returns full content. */
 export function enforceUnsentMessages(
   messages: ApiMessage[],
@@ -107,22 +116,36 @@ function outgoingContentMatches(optimistic: ApiMessage, server: ApiMessage): boo
 export function findOptimisticMatch(
   optimistic: ApiMessage,
   serverMessages: ApiMessage[],
+  opts?: { allowBlobMatch?: boolean },
 ): ApiMessage | undefined {
   const optTime = new Date(optimistic.timestamp).getTime();
-  return serverMessages.find((f) => {
+  const allowBlob = opts?.allowBlobMatch ?? false;
+
+  const candidates = serverMessages.filter((f) => {
     if (f.id === optimistic.id) return false;
     if (f.senderId !== optimistic.senderId || f.type !== optimistic.type) return false;
     const serverTime = new Date(f.timestamp).getTime();
-    if (Math.abs(serverTime - optTime) > 30_000) return false;
-    if (optimistic.type === "text" || optimistic.type === "gif") {
-      return outgoingContentMatches(optimistic, f);
+    const dt = Math.abs(serverTime - optTime);
+
+    if (optimistic.type === "text") {
+      return dt <= 8_000 && outgoingContentMatches(optimistic, f);
     }
-    // Hosted uploads: optimistic row uses blob preview, server row uses Cloudinary URL.
+    if (optimistic.type === "gif") {
+      return dt <= 15_000 && outgoingContentMatches(optimistic, f);
+    }
+    // Never guess blob uploads during poll merge — wait for send/SSE confirmation.
     if (hasLocalMediaPreview(optimistic)) {
-      return serverTime >= optTime - 5_000;
+      return allowBlob && dt <= 15_000 && serverTime >= optTime - 5_000;
     }
-    if (outgoingContentMatches(optimistic, f)) return true;
-    return serverTime >= optTime - 5_000;
+    if (outgoingContentMatches(optimistic, f)) return dt <= 15_000;
+    return dt <= 8_000 && serverTime >= optTime - 3_000;
+  });
+
+  if (candidates.length === 0) return undefined;
+  return candidates.reduce((best, f) => {
+    const d = Math.abs(new Date(f.timestamp).getTime() - optTime);
+    const bd = Math.abs(new Date(best.timestamp).getTime() - optTime);
+    return d < bd ? f : best;
   });
 }
 

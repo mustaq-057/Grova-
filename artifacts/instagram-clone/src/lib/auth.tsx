@@ -203,7 +203,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const profileSession = hasSession();
     if (snapshot?.user && profileSession) {
       setNotificationViewer(snapshot.user.id, snapshot.user.name);
-      setAuthReady(true);
     }
 
     const restoreProfileSession = async (): Promise<boolean> => {

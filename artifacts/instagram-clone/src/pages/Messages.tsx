@@ -53,6 +53,7 @@ import { parsePresenceResponse, isPartnerActiveInChat } from "@/lib/presence-api
 import {
   enforceUnsentMessages,
   findOptimisticMatch,
+  preserveDroppedMessages,
   reconcilePendingOptimistics,
   replaceOptimisticMessage,
   tombstoneMessage,
@@ -241,6 +242,7 @@ export default function Messages() {
   const showPartnerTyping = isTyping;
 
   const requestStickToBottom = useCallback(() => {
+    if (isPrependingRef.current) return;
     stickToBottomRef.current = true;
     isNearBottomRef.current = true;
     setIsNearBottom(true);
@@ -383,7 +385,8 @@ export default function Messages() {
     void normalizeMessages(raw).then((fromServer) => {
       setMessages((prev) => {
         const merged = reconcilePendingOptimistics(prev, fromServer, pendingOutgoingRef.current);
-        const next = enforceUnsentMessages(merged, unsentIdsRef.current);
+        const guarded = enforceUnsentMessages(merged, unsentIdsRef.current);
+        const next = preserveDroppedMessages(prev, guarded);
         messagesSigRef.current = messagesListSignature(next);
         if (user?.id) writeChatCache(user.id, next);
         return next;
@@ -466,6 +469,8 @@ export default function Messages() {
       const older = await normalizeMessages(data.messages || []);
       if (older.length === 0) {
         setHasMore(false);
+        isPrependingRef.current = false;
+        prependScrollHeightRef.current = null;
         return;
       }
       
@@ -484,6 +489,9 @@ export default function Messages() {
       // Don't set error state for load more failures, just log it
     } finally {
       setLoadingMore(false);
+      if (prependScrollHeightRef.current === null) {
+        isPrependingRef.current = false;
+      }
     }
   }, [loadingMore, hasMore, messages.length]);
 
@@ -491,7 +499,13 @@ export default function Messages() {
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && !loadingMore && hasMore && messages.length > 0) {
+        if (
+          entries[0].isIntersecting &&
+          !loadingMore &&
+          !isPrependingRef.current &&
+          hasMore &&
+          messages.length > 0
+        ) {
           loadMoreMessages();
         }
       },
@@ -550,7 +564,8 @@ export default function Messages() {
         setMessages((prev) => {
           const merged = reconcilePendingOptimistics(prev, fresh, pendingOutgoingRef.current);
           const guarded = enforceUnsentMessages(merged, unsentIdsRef.current);
-          const next = mergeMessagesIfChanged(prev, guarded, (_, m) => m);
+          const preserved = preserveDroppedMessages(prev, guarded);
+          const next = mergeMessagesIfChanged(prev, preserved, (_, m) => m);
           if (!next) return prev;
           messagesSigRef.current = messagesListSignature(next);
           if (user?.id) writeChatCache(user.id, next);
@@ -599,7 +614,7 @@ export default function Messages() {
               const optimisticIdx = prev.findIndex(
                 (m) =>
                   pendingOutgoingRef.current.has(m.id) &&
-                  findOptimisticMatch(m, [msg]) !== undefined,
+                  findOptimisticMatch(m, [msg], { allowBlobMatch: true }) !== undefined,
               );
               if (optimisticIdx >= 0) {
                 pendingOutgoingRef.current.delete(prev[optimisticIdx]!.id);
@@ -970,7 +985,8 @@ export default function Messages() {
         setMessages((prev) => {
           const merged = reconcilePendingOptimistics(prev, fresh, pendingOutgoingRef.current);
           const guarded = enforceUnsentMessages(merged, unsentIdsRef.current);
-          const next = mergeMessagesIfChanged(prev, guarded, (_, m) => m);
+          const preserved = preserveDroppedMessages(prev, guarded);
+          const next = mergeMessagesIfChanged(prev, preserved, (_, m) => m);
           if (!next) return prev;
           messagesSigRef.current = messagesListSignature(next);
           if (user?.id) writeChatCache(user.id, next);
@@ -1020,10 +1036,11 @@ export default function Messages() {
     const isOwnLast = last?.senderId === user?.id;
 
     const shouldStick =
-      stickToBottomRef.current ||
-      firstPaint ||
-      (isOwnLast && tailChanged) ||
-      (isNearBottomRef.current && tailChanged);
+      !isPrependingRef.current &&
+      (stickToBottomRef.current ||
+        firstPaint ||
+        (isOwnLast && tailChanged) ||
+        (isNearBottomRef.current && tailChanged));
 
     if (shouldStick) {
       scrollChatToBottomAfterPaint(
@@ -2794,18 +2811,14 @@ export default function Messages() {
             )}
           </div>
         )}
-        {/* Profile header */}
-        <div className="flex flex-col items-center gap-2 py-3 md:py-8 mb-1 md:mb-2 shrink-0">
-          <AvatarImage src={pAvatar} userId={partnerId} alt={`Profile picture of ${pName}`} className="w-14 h-14 md:w-24 md:h-24 rounded-full object-cover" />
-          <p className="font-bold text-sm md:text-lg">{pName}</p>
-          <span className="text-[10px] md:text-xs bg-secondary/60 px-3 py-1 rounded-full text-muted-foreground">Just the two of you ♥</span>
-          {showPartnerTyping && (
-            <div className="flex items-center gap-1 text-xs text-primary mt-1">
-              <span>{partnerTypingLine(partnerId)}</span>
-              <TypingDots />
-            </div>
-          )}
-        </div>
+        {/* Profile header — only when chat is empty so scroll stays on messages */}
+        {visibleMessages.length <= 3 && (
+          <div className="flex flex-col items-center gap-2 py-3 md:py-6 mb-1 shrink-0">
+            <AvatarImage src={pAvatar} userId={partnerId} alt={`Profile picture of ${pName}`} className="w-14 h-14 md:w-20 md:h-20 rounded-full object-cover" />
+            <p className="font-bold text-sm md:text-base">{pName}</p>
+            <span className="text-[10px] md:text-xs bg-secondary/60 px-3 py-1 rounded-full text-muted-foreground">Just the two of you ♥</span>
+          </div>
+        )}
 
         {error && messages.length === 0 && visibleMessages.length === 0 && (
           <div
