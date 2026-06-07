@@ -2,6 +2,7 @@ import { memo } from "react";
 import { Search } from "lucide-react";
 import { usePresenceLabel } from "@/hooks/usePresenceLabel";
 import { AvatarImage } from "@/components/AvatarImage";
+import { partnerTypingLine } from "@/lib/partner-words";
 
 type Props = {
   userName: string;
@@ -10,6 +11,7 @@ type Props = {
   partnerAvatar: string;
   partnerLastSeen?: number;
   lastPreview?: string;
+  partnerTyping?: boolean;
   active: boolean;
 };
 
@@ -20,6 +22,7 @@ export const ChatInbox = memo(function ChatInbox({
   partnerAvatar,
   partnerLastSeen,
   lastPreview,
+  partnerTyping,
   active,
 }: Props) {
   const presence = usePresenceLabel(partnerLastSeen);
@@ -52,7 +55,9 @@ export const ChatInbox = memo(function ChatInbox({
         <AvatarImage src={partnerAvatar} userId={partnerId} alt="" className="w-12 h-12 rounded-full object-cover shrink-0" />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold truncate">{partnerName}</p>
-          <p className="text-xs text-muted-foreground truncate">{lastPreview || presence.label}</p>
+          <p className={`text-xs truncate ${partnerTyping ? "text-primary font-medium" : "text-muted-foreground"}`}>
+            {partnerTyping ? partnerTypingLine(partnerId) : lastPreview || presence.label}
+          </p>
         </div>
         {presence.online && <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" />}
       </button>

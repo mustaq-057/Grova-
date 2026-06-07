@@ -1,5 +1,5 @@
 import { useState, useEffect, memo } from "react";
-import { Settings, Bell, Edit3, Check, X, Camera, Grid3X3 } from "lucide-react";
+import { Settings, Bell, Edit3, Check, X, Camera, Grid3X3, Layers } from "lucide-react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -11,6 +11,7 @@ import { unreadCount, NOTIFY_CHANGED } from "@/lib/notifications-feed";
 import { AvatarImage } from "@/components/AvatarImage";
 import { getPosts, clearLegacyLocalMedia, type StoredPost } from "@/lib/local-posts";
 import { resolvePostMediaUrl } from "@/lib/media-url";
+import { getPostMediaUrls, postHasCarousel } from "@/lib/post-media";
 
 export default memo(function Profile() {
   const { user, setUser, partner, refreshProfiles } = useAuth();
@@ -216,13 +217,18 @@ export default memo(function Profile() {
           </div>
           <div className="grid grid-cols-3 gap-0.5">
             {posts.map((post) => (
-              <div key={post.id} className="aspect-square bg-secondary/30 overflow-hidden">
+              <div key={post.id} className="relative aspect-square bg-secondary/30 overflow-hidden">
                 <img
-                  src={resolvePostMediaUrl(post.mediaUrl) ?? post.mediaUrl}
+                  src={resolvePostMediaUrl(getPostMediaUrls(post)[0]) ?? getPostMediaUrls(post)[0]}
                   alt={post.caption || "Post"}
                   className="w-full h-full object-cover"
                   loading="lazy"
                 />
+                {postHasCarousel(post) && (
+                  <span className="absolute top-1.5 right-1.5 text-white drop-shadow-md">
+                    <Layers className="w-4 h-4" strokeWidth={2.5} />
+                  </span>
+                )}
               </div>
             ))}
           </div>

@@ -4,6 +4,8 @@ import { tryRefreshSession } from "./api";
 /** Always prefer raw binary upload (no base64 bloat). */
 const BINARY_UPLOAD_MIN_BYTES = 0;
 
+const RETRYABLE_STATUS = new Set([408, 429, 502, 503, 504]);
+
 function normalizeUploadMime(mime: string): string {
   return mime.split(";")[0]?.trim().toLowerCase() || "application/octet-stream";
 }
@@ -17,6 +19,13 @@ function binaryUploadHeaders(contentType: string): Record<string, string> {
 function guessContentType(dataUrl: string): string {
   const match = dataUrl.match(/^data:([^;]+);/);
   return match?.[1] ?? "image/jpeg";
+}
+
+async function refreshSessionIfUnauthorized(status: number, attempt: number): Promise<boolean> {
+  if ((status === 401 || status === 403) && attempt === 0) {
+    return tryRefreshSession();
+  }
+  return false;
 }
 
 /** Raw body upload — much faster than base64 for photos and videos. */
@@ -44,13 +53,21 @@ export async function uploadMediaBinary(
     if (err instanceof DOMException && err.name === "AbortError") {
       throw new Error("Upload timed out — try a shorter video or better connection.");
     }
+    if (attempt < 1) {
+      await new Promise((r) => setTimeout(r, 600));
+      return uploadMediaBinary(file, contentType, attempt + 1);
+    }
     throw err;
   } finally {
     clearTimeout(timer);
   }
-  if ((res.status === 401 || res.status === 403) && attempt === 0) {
-    const refreshed = await tryRefreshSession();
-    if (refreshed) return uploadMediaBinary(file, contentType, attempt + 1);
+
+  if (await refreshSessionIfUnauthorized(res.status, attempt)) {
+    return uploadMediaBinary(file, contentType, attempt + 1);
+  }
+  if (RETRYABLE_STATUS.has(res.status) && attempt < 1) {
+    await new Promise((r) => setTimeout(r, 600));
+    return uploadMediaBinary(file, contentType, attempt + 1);
   }
   if (!res.ok) {
     const err = (await res.json().catch(() => ({ error: "Upload failed" }))) as { error?: string };
@@ -61,7 +78,7 @@ export async function uploadMediaBinary(
 }
 
 /** Upload base64 data URL to Cloudinary via API. Returns public URL. */
-export async function uploadMedia(dataUrl: string, contentType?: string): Promise<string> {
+export async function uploadMedia(dataUrl: string, contentType?: string, attempt = 0): Promise<string> {
   const mime = contentType ?? guessContentType(dataUrl);
   const base64Data = dataUrl.replace(/^data:[^;]+;base64,/, "");
   const approxBytes = Math.floor((base64Data.length * 3) / 4);
@@ -79,6 +96,13 @@ export async function uploadMedia(dataUrl: string, contentType?: string): Promis
       contentType: mime,
     }),
   });
+  if (await refreshSessionIfUnauthorized(res.status, attempt)) {
+    return uploadMedia(dataUrl, contentType, attempt + 1);
+  }
+  if (RETRYABLE_STATUS.has(res.status) && attempt < 1) {
+    await new Promise((r) => setTimeout(r, 600));
+    return uploadMedia(dataUrl, contentType, attempt + 1);
+  }
   if (!res.ok) {
     const err = (await res.json().catch(() => ({ error: "Upload failed" }))) as { error?: string };
     throw new Error(err.error ?? "Failed to upload to cloud storage");

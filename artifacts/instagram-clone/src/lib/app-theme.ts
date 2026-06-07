@@ -10,7 +10,8 @@ export type AppThemeId =
   | "golden"
   | "sakura-fall"
   | "sara-lavender"
-  | "book-bouquet";
+  | "book-bouquet"
+  | "eternal-aurora";
 
 const THEME_BACKGROUNDS: Partial<Record<AppThemeId, string>> = {
   "sara-lavender": "/themes/sara-lilies.jpg",
@@ -203,6 +204,28 @@ export const APP_THEMES: {
       "--app-border": "350 30% 90%",
     },
   },
+  {
+    id: "eternal-aurora",
+    name: "Eternal Aurora",
+    description: "Northern lights of love ✨",
+    swatch: "bg-gradient-to-br from-violet-600 via-fuchsia-500 to-cyan-400",
+    dark: {
+      "--app-background": "258 32% 7%",
+      "--app-foreground": "280 30% 96%",
+      "--app-primary": "292 85% 72%",
+      "--app-card": "260 28% 11%",
+      "--app-secondary": "262 24% 15%",
+      "--app-border": "265 20% 22%",
+    },
+    light: {
+      "--app-background": "280 45% 98%",
+      "--app-foreground": "265 35% 18%",
+      "--app-primary": "285 70% 58%",
+      "--app-card": "0 0% 100%",
+      "--app-secondary": "285 40% 96%",
+      "--app-border": "280 25% 90%",
+    },
+  },
 ];
 
 let currentAppTheme: AppThemeId = "grova";
@@ -272,6 +295,10 @@ function syncAppChromeFromTheme() {
 
 export function isSakuraFallTheme(themeId?: AppThemeId): boolean {
   return (themeId ?? getStoredAppTheme()) === "sakura-fall";
+}
+
+export function isEternalAuroraTheme(themeId?: AppThemeId): boolean {
+  return (themeId ?? getStoredAppTheme()) === "eternal-aurora";
 }
 
 export function isSaraLavenderTheme(themeId?: AppThemeId): boolean {

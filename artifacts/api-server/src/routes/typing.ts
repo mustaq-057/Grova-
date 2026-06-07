@@ -21,7 +21,7 @@ router.post("/typing", rateLimiters.messages, authenticate, async (req, res) => 
       return;
     }
 
-    const until = typing ? Date.now() + 5000 : 0;
+    const until = typing ? Date.now() + 8000 : 0;
     try {
       await db.execute("UPDATE devices SET typing_until = ? WHERE user_id = ?", [until, userId]);
     } catch {

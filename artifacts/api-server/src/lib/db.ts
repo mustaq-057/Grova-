@@ -340,6 +340,14 @@ export async function initDb() {
 
     await db.execute(`CREATE INDEX IF NOT EXISTS idx_post_comments_post ON post_comments(post_id)`);
 
+    for (const sql of ["ALTER TABLE posts ADD COLUMN IF NOT EXISTS media_urls TEXT"]) {
+      try {
+        await db.execute(sql);
+      } catch {
+        /* column may exist */
+      }
+    }
+
     await db.execute(`
       CREATE TABLE IF NOT EXISTS hidden_messages (
         user_id TEXT NOT NULL,

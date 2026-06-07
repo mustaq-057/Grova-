@@ -441,6 +441,49 @@ html[data-photo-theme="true"] .app-chrome [class*="bg-card"] {
   will-change: transform, opacity;
 }
 
+/* Eternal Aurora theme — drifting color bands */
+@keyframes aurora-drift {
+  0%, 100% {
+    transform: translate3d(-8%, 0, 0) scale(1.05);
+    opacity: 0.45;
+  }
+  50% {
+    transform: translate3d(8%, -4%, 0) scale(1.12);
+    opacity: 0.7;
+  }
+}
+
+.aurora-band {
+  position: absolute;
+  width: 140%;
+  height: 55%;
+  left: -20%;
+  border-radius: 50%;
+  filter: blur(72px);
+  animation: aurora-drift 14s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+.aurora-band-1 {
+  top: -8%;
+  background: radial-gradient(ellipse at center, rgba(167, 139, 250, 0.55), transparent 70%);
+  animation-duration: 16s;
+}
+
+.aurora-band-2 {
+  top: 18%;
+  background: radial-gradient(ellipse at center, rgba(244, 114, 182, 0.45), transparent 72%);
+  animation-duration: 20s;
+  animation-delay: -4s;
+}
+
+.aurora-band-3 {
+  top: 42%;
+  background: radial-gradient(ellipse at center, rgba(34, 211, 238, 0.35), transparent 70%);
+  animation-duration: 18s;
+  animation-delay: -8s;
+}
+
 @layer utilities {
   .no-default-hover-elevate {}
   .no-default-active-elevate {}

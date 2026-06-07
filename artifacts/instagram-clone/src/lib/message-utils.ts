@@ -256,7 +256,7 @@ export function buildSeenLabel(
   if (!isMe || !msg.seenByPartner || msg.deleted || msg.id !== lastSeenOutgoingId) return undefined;
   if (msg.readAt) {
     const readMs = Date.now() - new Date(msg.readAt).getTime();
-    if (readMs >= 0 && readMs < 60_000) return "Just seen";
+    if (readMs >= 0 && readMs < 120_000) return "Just seen";
     const time = formatSeenTime(msg.readAt, partnerId);
     return time ? `Seen · ${time}` : "Seen";
   }

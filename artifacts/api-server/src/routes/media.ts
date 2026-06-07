@@ -11,6 +11,49 @@ const MAX_POSTS_PER_USER = 20;
 
 const router = Router();
 
+function parsePostMedia(row: Record<string, unknown>): { mediaUrl: string; mediaUrls: string[] } {
+  const mediaUrl = String(row.media_url ?? "");
+  const raw = row.media_urls;
+  if (raw && typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const urls = parsed.filter((u): u is string => typeof u === "string" && u.length > 0);
+        if (urls.length > 0) {
+          return { mediaUrl: urls[0]!, mediaUrls: urls };
+        }
+      }
+    } catch {
+      /* ignore invalid JSON */
+    }
+  }
+  return { mediaUrl, mediaUrls: mediaUrl ? [mediaUrl] : [] };
+}
+
+function rowToPostPayload(
+  row: Record<string, unknown>,
+  extras: {
+    likeCount: number;
+    likedByMe: boolean;
+    commentCount: number;
+    myReaction?: string;
+    reactionCounts?: Record<string, number>;
+  },
+) {
+  const { mediaUrl, mediaUrls } = parsePostMedia(row);
+  return {
+    id: String(row.id),
+    authorId: String(row.author_id),
+    mediaUrl,
+    mediaUrls,
+    caption: String(row.caption ?? ""),
+    location: String(row.location ?? ""),
+    aspectRatio: String(row.aspect_ratio ?? "4:5"),
+    createdAt: String(row.created_at),
+    ...extras,
+  };
+}
+
 async function enrichSinglePost(postId: string, userId: string) {
   const result = await db.execute("SELECT * FROM posts WHERE id = $1", [postId]);
   const row = result.rows[0] as Record<string, unknown> | undefined;
@@ -31,20 +74,13 @@ async function enrichSinglePost(postId: string, userId: string) {
   }
   const myReaction = reactionRows.find((r) => r.user_id === userId)?.emoji;
 
-  return {
-    id: postId,
-    authorId: String(row.author_id),
-    mediaUrl: String(row.media_url),
-    caption: String(row.caption ?? ""),
-    location: String(row.location ?? ""),
-    aspectRatio: String(row.aspect_ratio ?? "4:5"),
-    createdAt: String(row.created_at),
+  return rowToPostPayload(row, {
     likeCount: likeRows.length,
     likedByMe: likeRows.some((l) => l.user_id === userId),
     commentCount,
     myReaction,
     reactionCounts,
-  };
+  });
 }
 
 async function enrichPosts(userId: string) {
@@ -76,20 +112,13 @@ async function enrichPosts(userId: string) {
         reactionCounts[r.emoji] = (reactionCounts[r.emoji] ?? 0) + 1;
       }
       const myReaction = reactionRows.find((r) => r.user_id === userId)?.emoji;
-      return {
-        id,
-        authorId: String(row.author_id),
-        mediaUrl: String(row.media_url),
-        caption: String(row.caption ?? ""),
-        location: String(row.location ?? ""),
-        aspectRatio: String(row.aspect_ratio ?? "4:5"),
-        createdAt: String(row.created_at),
+      return rowToPostPayload(row, {
         likeCount: likeRows.length,
         likedByMe: likeRows.some((l) => l.user_id === userId),
         commentCount,
         myReaction,
         reactionCounts,
-      };
+      });
     }),
   );
   return enriched;
@@ -107,14 +136,22 @@ router.get("/posts", rateLimiters.read, authenticate, async (req, res) => {
 
 router.post("/posts", rateLimiters.messages, authenticate, async (req, res) => {
   const userId = (req as { user?: { id: string } }).user!.id;
-  const { mediaUrl, caption, location, aspectRatio } = req.body as {
+  const { mediaUrl, mediaUrls, caption, location, aspectRatio } = req.body as {
     mediaUrl?: string;
+    mediaUrls?: string[];
     caption?: string;
     location?: string;
     aspectRatio?: string;
   };
-  if (!mediaUrl) {
-    res.status(400).json({ error: "mediaUrl required" });
+
+  const urls = Array.isArray(mediaUrls) && mediaUrls.length > 0
+    ? mediaUrls.filter((u): u is string => typeof u === "string" && u.length > 0)
+    : mediaUrl
+      ? [mediaUrl]
+      : [];
+
+  if (urls.length === 0) {
+    res.status(400).json({ error: "mediaUrl or mediaUrls required" });
     return;
   }
   const countResult = await db.execute(
@@ -130,15 +167,18 @@ router.post("/posts", rateLimiters.messages, authenticate, async (req, res) => {
   }
   const id = randomUUID();
   const createdAt = new Date().toISOString();
+  const primaryUrl = urls[0]!;
+  const mediaUrlsJson = urls.length > 1 ? JSON.stringify(urls) : null;
   try {
     await db.execute(
-      "INSERT INTO posts (id, author_id, media_url, caption, location, aspect_ratio, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7)",
-      [id, userId, mediaUrl, caption ?? "", location ?? "", aspectRatio ?? "4:5", createdAt],
+      "INSERT INTO posts (id, author_id, media_url, media_urls, caption, location, aspect_ratio, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+      [id, userId, primaryUrl, mediaUrlsJson, caption ?? "", location ?? "", aspectRatio ?? "4:5", createdAt],
     );
     const post = {
       id,
       authorId: userId,
-      mediaUrl,
+      mediaUrl: primaryUrl,
+      mediaUrls: urls,
       caption: caption ?? "",
       location: location ?? "",
       aspectRatio: aspectRatio ?? "4:5",

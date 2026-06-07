@@ -10,6 +10,8 @@ import { openLiveChannel } from "@/lib/sse-client";
 import { askPartner, partnerHimHer, partnerIsFemale } from "@/lib/partner-words";
 import { AvatarImage } from "@/components/AvatarImage";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { PostCarousel } from "@/components/PostCarousel";
+import { getPostMediaUrls } from "@/lib/post-media";
 import { resolvePostMediaUrl } from "@/lib/media-url";
 
 export function PostFeed() {
@@ -180,7 +182,7 @@ export function PostFeed() {
       await api.sendMessage({
         senderId: user.id,
         type: "image",
-        imageUrl: resolvePostMediaUrl(post.mediaUrl) ?? post.mediaUrl,
+        imageUrl: resolvePostMediaUrl(getPostMediaUrls(post)[0]) ?? getPostMediaUrls(post)[0],
         text: msg,
       });
       toast.success("Sent to chat!");
@@ -259,14 +261,11 @@ export function PostFeed() {
                     </button>
                   ) : null}
                 </div>
-                <div className={`${ratioClass} bg-secondary/30 mx-0 overflow-hidden`}>
-                  <img
-                    src={resolvePostMediaUrl(post.mediaUrl) ?? post.mediaUrl}
-                    alt={post.caption || "Post"}
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                  />
-                </div>
+                <PostCarousel
+                  urls={getPostMediaUrls(post)}
+                  alt={post.caption || "Post"}
+                  ratioClass={ratioClass}
+                />
 
                 <div className="px-4 pt-2 flex items-center gap-4">
                   <button

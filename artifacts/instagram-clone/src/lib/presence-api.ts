@@ -22,7 +22,7 @@ export function parsePresenceResponse(raw: PresenceResponse | Record<string, num
 }
 
 /** Partner considered online in chat (heartbeat + poll friendly). */
-export function isPartnerActiveInChat(lastSeen: number | undefined, windowMs = 180_000): boolean {
+export function isPartnerActiveInChat(lastSeen: number | undefined, windowMs = 600_000): boolean {
   if (!lastSeen) return false;
   return Date.now() - lastSeen < windowMs;
 }

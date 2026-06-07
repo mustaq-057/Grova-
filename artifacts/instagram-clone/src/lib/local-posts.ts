@@ -9,10 +9,12 @@ export async function getPosts(userId: string): Promise<StoredPost[]> {
 
 export async function savePost(
   _userId: string,
-  post: { image: string; caption: string; location: string; ratio: string; at: string },
+  post: { image: string; images?: string[]; caption: string; location: string; ratio: string; at: string },
 ): Promise<StoredPost> {
+  const urls = post.images?.length ? post.images : [post.image];
   return api.addPost({
-    mediaUrl: post.image,
+    mediaUrl: urls[0]!,
+    mediaUrls: urls.length > 1 ? urls : undefined,
     caption: post.caption,
     location: post.location,
     aspectRatio: post.ratio,

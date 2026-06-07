@@ -44,8 +44,12 @@ router.post("/read-receipts", rateLimiters.messages, authenticate, async (req, r
         [id, messageId, userId, readAt]
       );
 
-      // Broadcast read receipt
-      broadcast("message-read", { messageId, userId, readAt });
+      const senderResult = await db.execute(
+        "SELECT sender_id FROM messages WHERE id = $1",
+        [messageId],
+      );
+      const senderId = (senderResult.rows[0] as { sender_id?: string } | undefined)?.sender_id;
+      broadcast("message-read", { messageId, userId, readAt }, senderId);
     }
 
     res.json({ success: true });
@@ -71,7 +75,7 @@ router.post("/read-receipts/batch", rateLimiters.messages, authenticate, async (
     }
 
     const readAt = new Date().toISOString();
-    const marked: string[] = [];
+    const marked: { messageId: string; senderId?: string }[] = [];
 
     for (const messageId of messageIds.slice(0, 100)) {
       const existing = await db.execute(
@@ -84,12 +88,17 @@ router.post("/read-receipts/batch", rateLimiters.messages, authenticate, async (
           "INSERT INTO message_read_receipts (id, message_id, user_id, read_at) VALUES ($1, $2, $3, $4)",
           [id, messageId, userId, readAt],
         );
-        marked.push(messageId);
+        const senderResult = await db.execute(
+          "SELECT sender_id FROM messages WHERE id = $1",
+          [messageId],
+        );
+        const senderId = (senderResult.rows[0] as { sender_id?: string } | undefined)?.sender_id;
+        marked.push({ messageId, senderId });
       }
     }
 
-    for (const messageId of marked) {
-      broadcast("message-read", { messageId, userId, readAt });
+    for (const { messageId, senderId } of marked) {
+      broadcast("message-read", { messageId, userId, readAt }, senderId);
     }
 
     res.json({ success: true, marked: marked.length, readAt });

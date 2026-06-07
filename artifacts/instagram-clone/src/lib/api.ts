@@ -231,6 +231,7 @@ export type ApiPost = {
   id: string;
   authorId: string;
   mediaUrl: string;
+  mediaUrls?: string[];
   caption: string;
   location: string;
   aspectRatio: string;
@@ -552,8 +553,13 @@ export const api = {
 
   getPosts: () => apiFetch<ApiPost[]>("/posts"),
 
-  addPost: (post: { mediaUrl: string; caption?: string; location?: string; aspectRatio?: string }) =>
-    apiFetch<ApiPost>("/posts", { method: "POST", body: JSON.stringify(post) }),
+  addPost: (post: {
+    mediaUrl: string;
+    mediaUrls?: string[];
+    caption?: string;
+    location?: string;
+    aspectRatio?: string;
+  }) => apiFetch<ApiPost>("/posts", { method: "POST", body: JSON.stringify(post) }),
 
   deletePost: (id: string) => apiFetch<{ success: boolean }>(`/posts/${id}`, { method: "DELETE" }),
 

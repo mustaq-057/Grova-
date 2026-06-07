@@ -441,8 +441,10 @@ export const MessageItem = memo(function MessageItem({
 
         {isMe && seenLabel && (
           <p
-            className={`text-[11px] mt-0.5 pr-1 font-medium ${
-              seenLabel === "Just seen" ? "text-primary/90" : "text-muted-foreground/80"
+            className={`text-[11px] mt-0.5 pr-1 font-medium transition-all duration-300 ${
+              seenLabel === "Just seen"
+                ? "text-primary animate-pulse"
+                : "text-muted-foreground/80"
             }`}
           >
             {seenLabel}

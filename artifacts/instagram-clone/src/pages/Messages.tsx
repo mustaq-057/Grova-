@@ -248,7 +248,7 @@ export default function Messages() {
   const theme = THEMES.find(t => t.id === chatThemeId) ?? THEMES[0]!;
   const presence = usePresenceLabel(partnerLastSeen);
   const partnerActive = isPartnerActiveInChat(partnerLastSeen);
-  const showPartnerTyping = isTyping && partnerActive;
+  const showPartnerTyping = isTyping;
 
   const requestStickToBottom = useCallback(() => {
     stickToBottomRef.current = true;
@@ -598,7 +598,7 @@ export default function Messages() {
 
       if (channel.mode === "poll") {
         livePollStop = channel.stop;
-        presencePollId = window.setInterval(syncPresenceFromServer, 2_000);
+        presencePollId = window.setInterval(syncPresenceFromServer, 1_000);
         void syncPresenceFromServer();
         return;
       }
@@ -836,7 +836,7 @@ export default function Messages() {
             setIsTyping(d.typing);
             if (d.typing) {
               if (typingTimeout) clearTimeout(typingTimeout);
-              typingTimeout = setTimeout(() => setIsTyping(false), 3000);
+              typingTimeout = setTimeout(() => setIsTyping(false), 5000);
             }
           }
         } catch (err) {
@@ -933,7 +933,7 @@ export default function Messages() {
           void openLiveChannel(user!.id, pollSyncMessages, { forcePoll: true }).then((channel) => {
             if (!mounted || !channel || channel.mode !== "poll") return;
             livePollStop = channel.stop;
-            presencePollId = window.setInterval(syncPresenceFromServer, 2_000);
+            presencePollId = window.setInterval(syncPresenceFromServer, 1_000);
             void syncPresenceFromServer();
           });
           return;
@@ -1100,15 +1100,34 @@ export default function Messages() {
     };
   }, []);
 
-  // Mark partner messages as read when viewed (debounced batch — avoids N API calls)
+  // Mark partner messages as read when chat is visible (instant feel for "Just seen")
   useEffect(() => {
     if (!user || !isReadReceiptsEnabled()) return;
+    if (document.visibilityState !== "visible") return;
+
     const unreadIds = messages
       .filter((m) => m.senderId === partnerId && !m.read && !m.deleted)
       .map((m) => m.id);
     if (unreadIds.length === 0) return;
 
-    const timer = setTimeout(() => {
+    const readAt = new Date().toISOString();
+    api.markMessagesReadBatch(unreadIds, user.id).catch(() => {});
+    setMessages((prev) => {
+      const unreadSet = new Set(unreadIds);
+      return prev.map((m) =>
+        unreadSet.has(m.id) ? { ...m, read: true, readAt: m.readAt ?? readAt } : m,
+      );
+    });
+  }, [messages, user, partnerId]);
+
+  useEffect(() => {
+    if (!user || !isReadReceiptsEnabled()) return;
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      const unreadIds = messages
+        .filter((m) => m.senderId === partnerId && !m.read && !m.deleted)
+        .map((m) => m.id);
+      if (unreadIds.length === 0) return;
       const readAt = new Date().toISOString();
       api.markMessagesReadBatch(unreadIds, user.id).catch(() => {});
       setMessages((prev) => {
@@ -1117,9 +1136,9 @@ export default function Messages() {
           unreadSet.has(m.id) ? { ...m, read: true, readAt: m.readAt ?? readAt } : m,
         );
       });
-    }, 50);
-
-    return () => clearTimeout(timer);
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
   }, [messages, user, partnerId]);
 
   useEffect(() => {
@@ -1286,6 +1305,12 @@ export default function Messages() {
   }, []);
 
   // Send helpers
+  const stopTyping = useCallback(() => {
+    if (!user) return;
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    void api.sendTyping(user.id, partnerId, false);
+  }, [user, partnerId]);
+
   const sendMsg = useCallback(async (partial: Partial<ApiMessage>) => {
     if (!user) return;
 
@@ -1293,6 +1318,8 @@ export default function Messages() {
       setError("You're offline. Connect to the internet to send messages.");
       return;
     }
+
+    stopTyping();
 
     let tempId: string | null = null;
     try {
@@ -1328,7 +1355,7 @@ export default function Messages() {
       setError("Message did not send. Check your connection and try again.");
       throw err;
     }
-  }, [user, online, requestStickToBottom]);
+  }, [user, online, requestStickToBottom, stopTyping]);
 
   sendMsgRef.current = sendMsg;
   userIdRef.current = user?.id;
@@ -1501,6 +1528,7 @@ export default function Messages() {
   const sendText = useCallback((rawText: string) => {
     const text = rawText.trim();
     if (!text) return;
+    stopTyping();
     const replyMeta = replyTo
       ? {
           replyToId: replyTo.id,
@@ -1530,7 +1558,7 @@ export default function Messages() {
         ? { variant: "cute" as const, companionSticker: modeStickers[cuteMode] || "🐸" }
         : { variant: "default" as const }),
     });
-  }, [sendMsg, cuteMode, replyTo]);
+  }, [sendMsg, cuteMode, replyTo, stopTyping]);
 
   // Debounced search handler
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1555,13 +1583,13 @@ export default function Messages() {
       return;
     }
     const now = Date.now();
-    if (now - lastTypingPingRef.current > 900) {
+    if (now - lastTypingPingRef.current > 400) {
       lastTypingPingRef.current = now;
       void api.sendTyping(user.id, partnerId, true);
     }
     typingTimeoutRef.current = setTimeout(() => {
       void api.sendTyping(user.id, partnerId, false);
-    }, 2000);
+    }, 1500);
   }, [user, partnerId]);
 
   const sendGreeting = useCallback((g: GreetingTemplate) => {
@@ -2464,6 +2492,7 @@ export default function Messages() {
           partnerAvatar={pAvatar}
           partnerLastSeen={partnerLastSeen}
           lastPreview={lastPreview}
+          partnerTyping={showPartnerTyping}
           active
         />
       )}
@@ -2787,6 +2816,15 @@ export default function Messages() {
         ))}
 
         <div ref={bottomRef} className="h-4 shrink-0" aria-hidden />
+        {showPartnerTyping && (
+          <div className="flex items-end gap-2 px-2 pb-2 shrink-0">
+            <AvatarImage src={pAvatar} userId={partnerId} alt="" className="w-6 h-6 rounded-full object-cover shrink-0" />
+            <div className="bg-secondary/80 rounded-2xl rounded-bl-md px-3 py-2 flex items-center gap-1.5">
+              <span className="text-xs text-muted-foreground">{partnerTypingLine(partnerId)}</span>
+              <TypingDots />
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="chat-panel-bottom shrink-0">

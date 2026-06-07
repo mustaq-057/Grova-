@@ -110,17 +110,20 @@ export default memo(function Create() {
     setSharing(true);
     try {
       clearLegacyLocalMedia(myId);
+      const uploadedUrls: string[] = [];
       for (const photo of queue) {
         const mime = photo.dataUrl.match(/^data:([^;]+);/)?.[1] ?? "image/jpeg";
         const mediaUrl = await uploadMedia(photo.dataUrl, mime);
-        await savePost(myId, {
-          image: mediaUrl,
-          caption: caption.trim(),
-          location: location.trim(),
-          ratio: "4:5",
-          at: new Date().toISOString(),
-        });
+        uploadedUrls.push(mediaUrl);
       }
+      await savePost(myId, {
+        image: uploadedUrls[0]!,
+        images: uploadedUrls.length > 1 ? uploadedUrls : undefined,
+        caption: caption.trim(),
+        location: location.trim(),
+        ratio: "4:5",
+        at: new Date().toISOString(),
+      });
       setQueue([]);
       setCaption("");
       setLocationLabel("");
@@ -285,7 +288,7 @@ export default memo(function Create() {
             className="w-full py-3.5 bg-primary text-primary-foreground font-semibold rounded-xl flex items-center justify-center gap-2 disabled:opacity-60"
           >
             <Check className="w-5 h-5" />
-            {sharing ? "Uploading…" : `Share ${queue.length} photo${queue.length === 1 ? "" : "s"}`}
+            {sharing ? "Uploading…" : queue.length === 1 ? "Share photo" : `Share ${queue.length} photos as one post`}
           </motion.button>
         </motion.div>
       )}
