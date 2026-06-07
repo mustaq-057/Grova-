@@ -18,6 +18,12 @@ export function mergeMessagesById(existing: ApiMessage[], incoming: ApiMessage[]
     map.set(m.id, {
       ...m,
       text,
+      imageUrl: m.imageUrl ?? prev.imageUrl,
+      imageData: m.imageData ?? prev.imageData,
+      audioData: m.audioData ?? prev.audioData,
+      fileData: m.fileData ?? prev.fileData,
+      fileType: m.fileType ?? prev.fileType,
+      fileSize: m.fileSize ?? prev.fileSize,
       read: prev.read || m.read,
       readAt: prev.readAt ?? m.readAt,
       seenByPartner: m.seenByPartner || prev.seenByPartner,
@@ -53,6 +59,7 @@ export function reconcilePendingOptimistics(
   fresh: ApiMessage[],
   pendingIds: Set<string>,
 ): ApiMessage[] {
+  const pending = prev.filter((m) => pendingIds.has(m.id));
   const cleaned = prev.filter((m) => {
     if (!pendingIds.has(m.id)) return true;
     const match = findOptimisticMatch(m, fresh);
@@ -62,7 +69,10 @@ export function reconcilePendingOptimistics(
     }
     return true;
   });
-  return mergeMessagesById(cleaned, fresh);
+  const merged = mergeMessagesById(cleaned, fresh);
+  const stillPending = pending.filter((m) => pendingIds.has(m.id));
+  if (stillPending.length === 0) return merged;
+  return mergeMessagesById(merged, stillPending);
 }
 
 /** Swap temp upload/send row for the server row without duplicate entries. */

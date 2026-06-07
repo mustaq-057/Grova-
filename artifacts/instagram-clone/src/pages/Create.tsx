@@ -5,7 +5,7 @@ import { useAuth } from "@/lib/auth";
 import { useLocation } from "wouter";
 import { savePost, getPosts, clearLegacyLocalMedia } from "@/lib/local-posts";
 import { uploadMedia } from "@/lib/media-upload";
-import { detectMediaByMagicBytes, isAcceptedGalleryImage, normalizeGalleryFile } from "@/lib/media-file";
+import { isAcceptedGalleryImage, normalizeGalleryFile, prepareImageForUpload } from "@/lib/media-file";
 import { ImageCropModal } from "@/components/ImageCropModal";
 import { countPostImages } from "@/lib/post-media";
 
@@ -44,21 +44,14 @@ export default memo(function Create() {
   }, [user]);
 
   const addFiles = async (files: FileList | File[]) => {
-    const candidates = Array.from(files).map((f) => normalizeGalleryFile(f));
     const list: File[] = [];
-    for (const file of candidates) {
-      if (isAcceptedGalleryImage(file)) {
-        list.push(file);
-        continue;
-      }
-      const magic = await detectMediaByMagicBytes(file);
-      if (magic === "image") {
-        list.push(
-          new File([file], file.name || `image-${Date.now()}.jpg`, {
-            type: "image/jpeg",
-            lastModified: file.lastModified,
-          }),
-        );
+    for (const raw of Array.from(files)) {
+      try {
+        const normalized = normalizeGalleryFile(raw);
+        if (!isAcceptedGalleryImage(normalized)) continue;
+        list.push(await prepareImageForUpload(normalized));
+      } catch {
+        /* skip unreadable picks */
       }
     }
     if (list.length === 0) {

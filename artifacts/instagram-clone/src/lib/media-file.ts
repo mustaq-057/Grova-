@@ -276,6 +276,8 @@ export async function sniffVideoFile(file: File): Promise<boolean> {
   });
 }
 
+const CAMERA_PHOTO_NAME = /^(IMG_|DSC_|DCIM|PXL_|MVIMG_|photo_|image_|Screenshot)/i;
+
 export async function classifyMediaFile(file: File, hintType?: string): Promise<"image" | "video" | "other"> {
   const type = mimeType(file, hintType);
   if (type.startsWith("video/")) return "video";
@@ -288,15 +290,125 @@ export async function classifyMediaFile(file: File, hintType?: string): Promise<
   if (isVideoFile(file, hintType)) return "video";
   if (isImageFile(file, hintType)) return "image";
 
+  if (CAMERA_PHOTO_NAME.test(file.name)) {
+    const sniff = await detectMediaByMagicBytes(file);
+    if (sniff === "image") return "image";
+  }
+
   // Pasted screen recordings often lack MIME/filename — prefer fast magic bytes, then short sniff.
   const ambiguousName = !file.name || GENERIC_CLIPBOARD_NAME.test(file.name);
   if (ambiguousName && file.size > 200 * 1024 && !isDocumentFile(file, hintType)) {
+    const sniff = await detectMediaByMagicBytes(file);
+    if (sniff === "image") return "image";
     return "video";
   }
   if (ambiguousName || file.size > 32_000) {
     if (await sniffVideoFile(file)) return "video";
   }
   return "other";
+}
+
+async function canBrowserDecodeImage(file: File): Promise<boolean> {
+  if (typeof createImageBitmap === "function") {
+    try {
+      const bmp = await createImageBitmap(file);
+      bmp.close();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(true);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve(false);
+    };
+    img.src = url;
+  });
+}
+
+async function fileToJpegBlob(file: File, maxDim = 4096, quality = 0.88): Promise<Blob> {
+  let source: ImageBitmap | HTMLImageElement;
+  const url = URL.createObjectURL(file);
+  try {
+    if (typeof createImageBitmap === "function") {
+      try {
+        source = await createImageBitmap(file);
+      } catch {
+        source = await new Promise<HTMLImageElement>((resolve, reject) => {
+          const img = new Image();
+          img.onload = () => resolve(img);
+          img.onerror = () => reject(new Error("Could not read photo. Try a different image."));
+          img.src = url;
+        });
+      }
+    } else {
+      source = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error("Could not read photo. Try a different image."));
+        img.src = url;
+      });
+    }
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+
+  const w = source instanceof HTMLImageElement ? source.naturalWidth : source.width;
+  const h = source instanceof HTMLImageElement ? source.naturalHeight : source.height;
+  let tw = w;
+  let th = h;
+  if (Math.max(w, h) > maxDim) {
+    const scale = maxDim / Math.max(w, h);
+    tw = Math.round(w * scale);
+    th = Math.round(h * scale);
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = tw;
+  canvas.height = th;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Could not process photo.");
+  ctx.drawImage(source as CanvasImageSource, 0, 0, tw, th);
+  if ("close" in source && typeof source.close === "function") source.close();
+
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error("Could not prepare photo."))),
+      "image/jpeg",
+      quality,
+    );
+  });
+}
+
+/** Normalize gallery/camera picks into a browser-friendly JPEG for upload. */
+export async function prepareImageForUpload(file: File, hintType?: string): Promise<File> {
+  const normalized = normalizeGalleryFile(file, hintType);
+  if (isHeicOrHeif(normalized)) return normalized;
+
+  const magic = await detectMediaByMagicBytes(normalized);
+  if (magic === "video") throw new Error("That file is a video, not a photo.");
+  if (magic !== "image" && !isAcceptedGalleryImage(normalized)) {
+    throw new Error("Could not read photo. Try a different image.");
+  }
+
+  if (
+    normalized.type === "image/jpeg" &&
+    normalized.size < 12 * 1024 * 1024 &&
+    (await canBrowserDecodeImage(normalized))
+  ) {
+    return normalized;
+  }
+
+  const blob = await fileToJpegBlob(normalized);
+  const baseName = normalized.name.replace(/\.[^.]+$/, "") || `photo-${Date.now()}`;
+  return new File([blob], `${baseName}.jpg`, { type: "image/jpeg", lastModified: Date.now() });
 }
 
 export function guessVideoMime(file: File, hintType?: string): string {

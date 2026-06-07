@@ -633,21 +633,6 @@ html[data-photo-theme="true"] .app-chrome [class*="bg-card"] {
   mix-blend-mode: screen;
 }
 
-.chat-panel.eternal-aurora-chat {
-  background: linear-gradient(180deg, #020617 0%, #0a1628 45%, #020617 100%) !important;
-}
-
-.chat-panel.eternal-aurora-chat .chat-panel-top,
-.chat-panel.eternal-aurora-chat .chat-panel-header {
-  background: hsl(222 47% 6% / 0.92);
-  border-color: hsl(160 60% 40% / 0.15);
-}
-
-.chat-panel.eternal-aurora-chat .chat-panel-input {
-  background: hsl(222 47% 6% / 0.94);
-  border-color: hsl(160 60% 40% / 0.12);
-}
-
 /* ── Premium animated themes (shared + per-variant) ── */
 .premium-scene {
   contain: strict;
@@ -722,37 +707,7 @@ html[data-photo-theme="true"] .app-chrome [class*="bg-card"] {
   animation: premium-particle-float 10s ease-in-out infinite;
 }
 
-/* Eternal Aurora */
-.premium-scene--eternal-aurora .premium-scene-base {
-  background: radial-gradient(ellipse 90% 60% at 50% -10%, rgba(52, 211, 153, 0.22), transparent 65%),
-    linear-gradient(180deg, #020617 0%, #0a1628 50%, #020617 100%);
-}
-.premium-scene--eternal-aurora .premium-ribbon-1 {
-  background: linear-gradient(105deg, transparent, rgba(52, 211, 153, 0.5) 35%, rgba(167, 139, 250, 0.35) 70%, transparent);
-}
-.premium-scene--eternal-aurora .premium-ribbon-2 {
-  background: linear-gradient(75deg, transparent, rgba(244, 114, 182, 0.4) 40%, rgba(34, 211, 238, 0.35) 75%, transparent);
-}
-.premium-scene--eternal-aurora .premium-ribbon-3 {
-  background: linear-gradient(95deg, transparent, rgba(99, 102, 241, 0.3) 50%, rgba(52, 211, 153, 0.35) 80%, transparent);
-}
-
-/* Aurora Infinity — green/teal/cyan/emerald/purple */
-.premium-scene--aurora-infinity .premium-scene-base {
-  background: radial-gradient(ellipse 80% 55% at 50% 0%, rgba(16, 185, 129, 0.25), transparent 70%),
-    linear-gradient(180deg, #021a14 0%, #042f2e 45%, #0f172a 100%);
-}
-.premium-scene--aurora-infinity .premium-ribbon-1 {
-  background: linear-gradient(100deg, transparent, rgba(52, 211, 153, 0.55) 30%, rgba(20, 184, 166, 0.4) 60%, transparent);
-}
-.premium-scene--aurora-infinity .premium-ribbon-2 {
-  background: linear-gradient(80deg, transparent, rgba(6, 182, 212, 0.45) 35%, rgba(139, 92, 246, 0.35) 70%, transparent);
-}
-.premium-scene--aurora-infinity .premium-ribbon-3 {
-  background: linear-gradient(90deg, transparent, rgba(16, 185, 129, 0.35) 45%, rgba(167, 139, 250, 0.28) 80%, transparent);
-}
-
-/* Moonlit Blossom — blue moon + flower field */
+/* Moonlit Blossom — blue moon + flower field + honey bees */
 .premium-scene--moonlit-blossom .premium-scene-base {
   background:
     radial-gradient(circle at 72% 18%, rgba(224, 242, 254, 0.35) 0%, rgba(224, 242, 254, 0.08) 8%, transparent 22%),
@@ -797,85 +752,50 @@ html[data-photo-theme="true"] .app-chrome [class*="bg-card"] {
     radial-gradient(2px 2px at 88% 78%, rgba(255, 244, 163, 0.65), transparent);
 }
 
-/* Ocean Aurora — cliff + waves + green aurora */
-.premium-scene--ocean-aurora .premium-scene-base {
-  background:
-    radial-gradient(ellipse 70% 45% at 50% 5%, rgba(52, 211, 153, 0.28), transparent 65%),
-    linear-gradient(180deg, #020617 0%, #0c4a6e 42%, #042f2e 72%, #020617 100%);
+@keyframes premium-bee-drift-1 {
+  0%, 100% { transform: translate(0, 0) rotate(-8deg); opacity: 0.75; }
+  50% { transform: translate(18vw, -6vh) rotate(12deg); opacity: 1; }
 }
-.premium-scene--ocean-aurora .premium-scene-base::before {
-  content: "";
+
+@keyframes premium-bee-drift-2 {
+  0%, 100% { transform: translate(0, 0) rotate(6deg); opacity: 0.7; }
+  50% { transform: translate(-14vw, -10vh) rotate(-14deg); opacity: 0.95; }
+}
+
+@keyframes premium-bee-drift-3 {
+  0%, 100% { transform: translate(0, 0) rotate(4deg); opacity: 0.65; }
+  50% { transform: translate(10vw, 4vh) rotate(-10deg); opacity: 0.9; }
+}
+
+.premium-bees {
   position: absolute;
-  inset: auto 0 0 0;
-  height: 28%;
-  background: linear-gradient(180deg, transparent, rgba(15, 23, 42, 0.85) 40%, rgba(15, 23, 42, 0.95));
-  clip-path: polygon(0 40%, 18% 32%, 35% 38%, 52% 28%, 68% 36%, 82% 30%, 100% 38%, 100% 100%, 0 100%);
-}
-.premium-scene--ocean-aurora .premium-ribbon-1 {
-  background: linear-gradient(105deg, transparent, rgba(52, 211, 153, 0.5) 35%, rgba(20, 184, 166, 0.35) 70%, transparent);
-}
-.premium-scene--ocean-aurora .premium-ribbon-2 {
-  background: linear-gradient(85deg, transparent, rgba(34, 211, 238, 0.35) 40%, rgba(16, 185, 129, 0.4) 75%, transparent);
-}
-.premium-scene--ocean-aurora .premium-ribbon-3 {
-  height: 22%;
-  top: auto;
-  bottom: 8%;
-  filter: blur(28px);
-  background: linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.25) 30%, rgba(14, 165, 233, 0.2) 70%, transparent);
-  animation: premium-wave-shift 12s ease-in-out infinite;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
 }
 
-/* Chat panel chrome per premium theme */
-.chat-panel.eternal-aurora-chat,
-.chat-panel.aurora-infinity-chat,
-.chat-panel.moonlit-blossom-chat,
-.chat-panel.ocean-aurora-chat {
-  background: linear-gradient(180deg, #020617 0%, #0a1628 45%, #020617 100%) !important;
+.premium-bee {
+  position: absolute;
+  font-size: clamp(1rem, 2.4vw, 1.6rem);
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.35));
+  will-change: transform;
 }
 
-.chat-panel.aurora-infinity-chat {
-  background: linear-gradient(180deg, #021a14 0%, #042f2e 48%, #0f172a 100%) !important;
-}
+.premium-bee-1 { left: 8%; top: 62%; animation: premium-bee-drift-1 14s ease-in-out infinite; }
+.premium-bee-2 { left: 28%; top: 48%; animation: premium-bee-drift-2 18s ease-in-out infinite; animation-delay: -4s; }
+.premium-bee-3 { left: 52%; top: 58%; animation: premium-bee-drift-3 16s ease-in-out infinite; animation-delay: -8s; }
+.premium-bee-4 { left: 72%; top: 42%; animation: premium-bee-drift-1 20s ease-in-out infinite reverse; animation-delay: -6s; }
+.premium-bee-5 { left: 88%; top: 68%; animation: premium-bee-drift-2 15s ease-in-out infinite; animation-delay: -10s; }
 
+/* Chat panel chrome — Moonlit Blossom */
 .chat-panel.moonlit-blossom-chat {
   background: linear-gradient(180deg, #050b1f 0%, #0c1a3a 50%, #071428 100%) !important;
-}
-
-.chat-panel.ocean-aurora-chat {
-  background: linear-gradient(180deg, #020617 0%, #0c4a6e 45%, #042f2e 100%) !important;
-}
-
-.chat-panel.eternal-aurora-chat .chat-panel-top,
-.chat-panel.eternal-aurora-chat .chat-panel-header,
-.chat-panel.aurora-infinity-chat .chat-panel-top,
-.chat-panel.aurora-infinity-chat .chat-panel-header,
-.chat-panel.moonlit-blossom-chat .chat-panel-top,
-.chat-panel.moonlit-blossom-chat .chat-panel-header,
-.chat-panel.ocean-aurora-chat .chat-panel-top,
-.chat-panel.ocean-aurora-chat .chat-panel-header {
-  background: hsl(222 47% 6% / 0.92);
-  border-color: hsl(160 60% 40% / 0.15);
 }
 
 .chat-panel.moonlit-blossom-chat .chat-panel-top,
 .chat-panel.moonlit-blossom-chat .chat-panel-header {
   background: hsl(228 45% 8% / 0.92);
   border-color: hsl(205 60% 45% / 0.18);
-}
-
-.chat-panel.ocean-aurora-chat .chat-panel-top,
-.chat-panel.ocean-aurora-chat .chat-panel-header {
-  background: hsl(210 40% 7% / 0.92);
-  border-color: hsl(168 50% 40% / 0.15);
-}
-
-.chat-panel.eternal-aurora-chat .chat-panel-input,
-.chat-panel.aurora-infinity-chat .chat-panel-input,
-.chat-panel.moonlit-blossom-chat .chat-panel-input,
-.chat-panel.ocean-aurora-chat .chat-panel-input {
-  background: hsl(222 47% 6% / 0.94);
-  border-color: hsl(160 60% 40% / 0.12);
 }
 
 .chat-panel.moonlit-blossom-chat .chat-panel-input {
@@ -897,7 +817,8 @@ html[data-photo-theme="true"] .app-chrome [class*="bg-card"] {
   .aurora-stars-global,
   .premium-ribbon,
   .premium-particles,
-  .premium-scene--moonlit-blossom .premium-scene-base::after {
+  .premium-scene--moonlit-blossom .premium-scene-base::after,
+  .premium-bee {
     animation: none !important;
   }
 }

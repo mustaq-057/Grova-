@@ -10,7 +10,7 @@ import { MessageInput } from "@/components/MessageInput";
 import { InfoPanel } from "@/components/InfoPanel";
 import { Link } from "wouter";
 import type { GreetingTemplate } from "@/lib/greeting-messages";
-import { normalizeMessages, previewMessagesForDisplay, prepareOutgoingMessage, buildOptimisticMessage, buildSeenLabel, findLastSeenOutgoingId, messagePreview, replyPreviewLabel } from "@/lib/message-utils";
+import { normalizeMessages, prepareOutgoingMessage, buildOptimisticMessage, buildSeenLabel, findLastSeenOutgoingId, messagePreview, replyPreviewLabel } from "@/lib/message-utils";
 import { callStartedText, callEndedText, isCallLogMessage } from "@/lib/call-chat-log";
 import { usePresenceLabel } from "@/hooks/usePresenceLabel";
 import { groupByDay, shouldShowTimeGap } from "@/lib/message-helpers";
@@ -63,10 +63,10 @@ import {
   getVideoDurationSafe,
   guessVideoMime,
   isDocumentFile,
-  isHeicOrHeif,
   isVideoFile,
   normalizeGalleryFile,
   normalizePastedFile,
+  prepareImageForUpload,
 } from "@/lib/media-file";
 import {
   addNotification,
@@ -369,24 +369,12 @@ export default function Messages() {
 
   const applyMessageBatch = useCallback((raw: ApiMessage[]) => {
     if (raw.length === 0) return;
-    const preview = previewMessagesForDisplay(raw);
-    setMessages((prev) => {
-      const next = reconcilePendingOptimistics(prev, preview, pendingOutgoingRef.current);
-      messagesSigRef.current = messagesListSignature(next);
-      if (user?.id) writeChatCache(user.id, next);
-      return next;
-    });
-    if (isNearBottomRef.current || isInitialLoadRef.current) {
-      stickToBottomRef.current = true;
-    }
     void normalizeMessages(raw).then((fromServer) => {
-      startTransition(() => {
-        setMessages((prev) => {
-          const next = reconcilePendingOptimistics(prev, fromServer, pendingOutgoingRef.current);
-          messagesSigRef.current = messagesListSignature(next);
-          if (user?.id) writeChatCache(user.id, next);
-          return next;
-        });
+      setMessages((prev) => {
+        const next = reconcilePendingOptimistics(prev, fromServer, pendingOutgoingRef.current);
+        messagesSigRef.current = messagesListSignature(next);
+        if (user?.id) writeChatCache(user.id, next);
+        return next;
       });
       if (isNearBottomRef.current || isInitialLoadRef.current) {
         stickToBottomRef.current = true;
@@ -540,22 +528,18 @@ export default function Messages() {
       if (!mounted) return;
       void api.getMessages().then(async (data) => {
         const raw = data.messages ?? [];
-        const preview = previewMessagesForDisplay(raw);
-        const mergePreview = (fresh: ApiMessage[]) => {
-          startTransition(() => {
-            setMessages((prev) => {
-              const merged = reconcilePendingOptimistics(prev, fresh, pendingOutgoingRef.current);
-              const next = mergeMessagesIfChanged(prev, merged, (_, m) => m);
-              if (!next) return prev;
-              messagesSigRef.current = messagesListSignature(next);
-              return next;
-            });
-            setHasMore(fresh.length > 0 && (data.pagination?.hasMore ?? false));
-          });
-        };
-        if (raw.length > 0) mergePreview(preview);
+        if (raw.length === 0) return;
         const fresh = await normalizeMessages(raw);
-        mergePreview(fresh);
+        if (!mounted) return;
+        setMessages((prev) => {
+          const merged = reconcilePendingOptimistics(prev, fresh, pendingOutgoingRef.current);
+          const next = mergeMessagesIfChanged(prev, merged, (_, m) => m);
+          if (!next) return prev;
+          messagesSigRef.current = messagesListSignature(next);
+          if (user?.id) writeChatCache(user.id, next);
+          return next;
+        });
+        setHasMore(fresh.length > 0 && (data.pagination?.hasMore ?? false));
       }).catch(() => {});
     };
 
@@ -587,58 +571,36 @@ export default function Messages() {
         if (!mounted) return;
         try {
           const raw = JSON.parse(e.data) as ApiMessage;
-          const [preview] = previewMessagesForDisplay([raw]);
+          const [msg] = await normalizeMessages([raw]);
+          if (!mounted) return;
 
-          const mergeIncoming = (prev: ApiMessage[], incoming: ApiMessage) => {
-            const existingIds = new Set(prev.map((m) => m.id));
-            if (existingIds.has(incoming.id)) {
-              return prev.map((m) => {
-                if (m.id !== incoming.id) return m;
-                const incomingText = incoming.text ?? "";
-                const prevText = m.text ?? "";
-                if (incomingText === "…" && prevText && prevText !== "…") {
-                  return { ...incoming, text: prevText };
-                }
-                return incoming;
-              });
+          setMessages((prev) => {
+            if (prev.some((m) => m.id === msg.id)) {
+              return prev.map((m) => (m.id === msg.id ? { ...m, ...msg, text: msg.text ?? m.text } : m));
             }
-            if (incoming.senderId === user?.id) {
+            if (msg.senderId === user?.id) {
               const optimisticIdx = prev.findIndex(
                 (m) =>
                   m.senderId === user.id &&
-                  m.id !== incoming.id &&
-                  m.type === incoming.type &&
-                  Math.abs(
-                    new Date(m.timestamp).getTime() - new Date(incoming.timestamp).getTime(),
-                  ) < 120_000,
+                  m.id !== msg.id &&
+                  m.type === msg.type &&
+                  Math.abs(new Date(m.timestamp).getTime() - new Date(msg.timestamp).getTime()) < 120_000,
               );
               if (optimisticIdx >= 0) {
+                pendingOutgoingRef.current.delete(prev[optimisticIdx]!.id);
                 const next = [...prev];
-                next[optimisticIdx] = incoming;
+                next[optimisticIdx] = msg;
                 return next;
               }
             }
-            return [...prev, incoming];
-          };
-
-          setMessages((prev) => mergeIncoming(prev, preview));
-
-          if (preview.senderId === partnerId && !isNearBottomRef.current) {
-            setHasNewMessages(true);
-          } else if (isNearBottomRef.current) {
-            stickToBottomRef.current = true;
-            requestAnimationFrame(() => {
-              scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
-            });
-          }
-
-          const [msg] = await normalizeMessages([raw]);
-          if (!mounted) return;
-          startTransition(() => {
-            setMessages((prev) => mergeIncoming(prev, msg));
+            return [...prev, msg];
           });
-          if (msg.senderId !== partnerId && isNearBottomRef.current) {
+
+          if (msg.senderId === partnerId && !isNearBottomRef.current) {
+            setHasNewMessages(true);
+          } else {
             stickToBottomRef.current = true;
+            requestStickToBottom();
           }
         } catch (err) {
           console.error("Failed to handle new message:", err);
@@ -978,7 +940,13 @@ export default function Messages() {
     const syncFromServer = () => {
       void api.getMessages().then(async (data) => {
         const fresh = await normalizeMessages(data.messages ?? []);
-        setMessages((prev) => reconcilePendingOptimistics(prev, fresh, pendingOutgoingRef.current));
+        setMessages((prev) => {
+          const merged = reconcilePendingOptimistics(prev, fresh, pendingOutgoingRef.current);
+          const next = mergeMessagesIfChanged(prev, merged, (_, m) => m);
+          if (!next) return prev;
+          messagesSigRef.current = messagesListSignature(next);
+          return next;
+        });
         setHasMore(fresh.length > 0 && (data.pagination?.hasMore ?? false));
       }).catch(() => {});
     };
@@ -1017,10 +985,12 @@ export default function Messages() {
 
     const isMedia = last?.type === "gif" || last?.type === "image" || last?.type === "video";
     const firstPaint = isInitialLoadRef.current;
+    const isOwnLast = last?.senderId === user?.id;
 
     const shouldStick =
       stickToBottomRef.current ||
       firstPaint ||
+      (isOwnLast && tailChanged) ||
       (isNearBottomRef.current && tailChanged);
 
     if (shouldStick) {
@@ -1348,9 +1318,10 @@ export default function Messages() {
       const outgoing = await prepareOutgoingMessage({ senderId: user.id, ...partial });
       const saved = await api.sendMessage(outgoing);
       const [display] = await normalizeMessages([saved]);
-      pendingOutgoingRef.current.delete(tempId);
       setMessages((prev) => {
         const next = replaceOptimisticMessage(prev, tempId!, display, user.id);
+        pendingOutgoingRef.current.delete(tempId!);
+        messagesSigRef.current = messagesListSignature(next);
         writeChatCache(user.id, next);
         return next;
       });
@@ -1397,9 +1368,14 @@ export default function Messages() {
         const saved = await api.sendMessage(outgoing);
         const [display] = await normalizeMessages([saved]);
         URL.revokeObjectURL(localPreview);
-        pendingOutgoingRef.current.delete(tempId);
-        setMessages((prev) => replaceOptimisticMessage(prev, tempId, display, user.id));
-        scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
+        setMessages((prev) => {
+          const next = replaceOptimisticMessage(prev, tempId, display, user.id);
+          pendingOutgoingRef.current.delete(tempId);
+          messagesSigRef.current = messagesListSignature(next);
+          writeChatCache(user.id, next);
+          return next;
+        });
+        requestStickToBottom();
       } catch (err) {
         URL.revokeObjectURL(localPreview);
         pendingOutgoingRef.current.delete(tempId);
@@ -1925,13 +1901,14 @@ export default function Messages() {
 
       try {
         if (kind === "image") {
+          const prepared = await prepareImageForUpload(normalized, clipboardItemType);
           if (isEphemeral) {
-            await uploadAndSendEphemeralMedia(normalized, "image", mediaViewMode);
-          } else if (isHeicOrHeif(normalized)) {
-            await uploadAndSendGalleryImage(normalized);
+            await uploadAndSendEphemeralMedia(prepared, "image", mediaViewMode);
+          } else if (!clipboardItemType) {
+            await uploadAndSendGalleryImage(prepared);
           } else {
-            setPendingImageType(normalized.type || clipboardItemType || "image/jpeg");
-            setImageToCrop(URL.createObjectURL(normalized));
+            setPendingImageType(prepared.type || "image/jpeg");
+            setImageToCrop(URL.createObjectURL(prepared));
           }
         } else if (kind === "video") {
           const mime = guessVideoMime(normalized, clipboardItemType);

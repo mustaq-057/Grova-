@@ -11,17 +11,15 @@ export type AppThemeId =
   | "sakura-fall"
   | "sara-lavender"
   | "book-bouquet"
-  | "eternal-aurora"
-  | "aurora-infinity"
-  | "moonlit-blossom"
-  | "ocean-aurora";
+  | "moonlit-blossom";
 
-const PREMIUM_ANIMATED_THEMES: AppThemeId[] = [
+const PREMIUM_ANIMATED_THEMES: AppThemeId[] = ["moonlit-blossom"];
+
+const RETIRED_PREMIUM_THEMES = new Set([
   "eternal-aurora",
   "aurora-infinity",
-  "moonlit-blossom",
   "ocean-aurora",
-];
+]);
 
 const THEME_BACKGROUNDS: Partial<Record<AppThemeId, string>> = {
   "sara-lavender": "/themes/sara-lilies.jpg",
@@ -215,53 +213,9 @@ export const APP_THEMES: {
     },
   },
   {
-    id: "eternal-aurora",
-    name: "Eternal Aurora",
-    description: "Northern lights of love ✨",
-    swatch: "bg-gradient-to-br from-violet-600 via-fuchsia-500 to-cyan-400",
-    dark: {
-      "--app-background": "258 32% 7%",
-      "--app-foreground": "280 30% 96%",
-      "--app-primary": "292 85% 72%",
-      "--app-card": "260 28% 11%",
-      "--app-secondary": "262 24% 15%",
-      "--app-border": "265 20% 22%",
-    },
-    light: {
-      "--app-background": "280 45% 98%",
-      "--app-foreground": "265 35% 18%",
-      "--app-primary": "285 70% 58%",
-      "--app-card": "0 0% 100%",
-      "--app-secondary": "285 40% 96%",
-      "--app-border": "280 25% 90%",
-    },
-  },
-  {
-    id: "aurora-infinity",
-    name: "Aurora Infinity",
-    description: "Real northern lights ribbons ✨",
-    swatch: "bg-gradient-to-br from-emerald-500 via-teal-400 to-purple-600",
-    dark: {
-      "--app-background": "160 35% 6%",
-      "--app-foreground": "150 25% 95%",
-      "--app-primary": "158 72% 58%",
-      "--app-card": "165 30% 10%",
-      "--app-secondary": "168 28% 14%",
-      "--app-border": "165 22% 20%",
-    },
-    light: {
-      "--app-background": "155 40% 97%",
-      "--app-foreground": "165 35% 14%",
-      "--app-primary": "158 65% 42%",
-      "--app-card": "0 0% 100%",
-      "--app-secondary": "155 35% 94%",
-      "--app-border": "160 25% 88%",
-    },
-  },
-  {
     id: "moonlit-blossom",
     name: "Moonlit Blossom",
-    description: "Blue moonlit flower field 🌙",
+    description: "Blue moonlit flower field with honey bees 🌙🐝",
     swatch: "bg-gradient-to-br from-indigo-950 via-blue-700 to-cyan-400",
     dark: {
       "--app-background": "228 45% 8%",
@@ -278,28 +232,6 @@ export const APP_THEMES: {
       "--app-card": "0 0% 100%",
       "--app-secondary": "210 40% 95%",
       "--app-border": "215 30% 88%",
-    },
-  },
-  {
-    id: "ocean-aurora",
-    name: "Ocean Aurora",
-    description: "Cliffside ocean & aurora 🌊",
-    swatch: "bg-gradient-to-br from-slate-900 via-emerald-700 to-teal-400",
-    dark: {
-      "--app-background": "210 40% 7%",
-      "--app-foreground": "180 20% 94%",
-      "--app-primary": "168 65% 55%",
-      "--app-card": "215 35% 10%",
-      "--app-secondary": "212 30% 14%",
-      "--app-border": "210 25% 20%",
-    },
-    light: {
-      "--app-background": "200 35% 97%",
-      "--app-foreground": "210 30% 14%",
-      "--app-primary": "168 55% 40%",
-      "--app-card": "0 0% 100%",
-      "--app-secondary": "195 30% 94%",
-      "--app-border": "200 22% 86%",
     },
   },
 ];
@@ -373,10 +305,6 @@ export function isSakuraFallTheme(themeId?: AppThemeId): boolean {
   return (themeId ?? getStoredAppTheme()) === "sakura-fall";
 }
 
-export function isEternalAuroraTheme(themeId?: AppThemeId): boolean {
-  return (themeId ?? getStoredAppTheme()) === "eternal-aurora";
-}
-
 export function isPremiumAnimatedTheme(themeId?: AppThemeId): boolean {
   return PREMIUM_ANIMATED_THEMES.includes(themeId ?? getStoredAppTheme());
 }
@@ -434,7 +362,9 @@ export function getPhotoScrimGradient(themeId: AppThemeId, dark: boolean): strin
 }
 
 export function applyAppTheme(themeId: AppThemeId) {
-  currentAppTheme = APP_THEMES.some((t) => t.id === themeId) ? themeId : "grova";
+  const resolved =
+    RETIRED_PREMIUM_THEMES.has(themeId) ? "moonlit-blossom" : themeId;
+  currentAppTheme = APP_THEMES.some((t) => t.id === resolved) ? resolved : "grova";
   const theme = APP_THEMES.find((t) => t.id === currentAppTheme) ?? APP_THEMES[0]!;
   const vars = darkMode ? theme.dark : theme.light;
   const root = document.documentElement;

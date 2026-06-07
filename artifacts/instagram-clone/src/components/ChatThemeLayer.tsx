@@ -16,6 +16,13 @@ export const ChatThemeLayer = memo(function ChatThemeLayer({ variant }: Props) {
       <div className="premium-ribbon premium-ribbon-1" />
       <div className="premium-ribbon premium-ribbon-2" />
       <div className="premium-particles" />
+      {variant === "moonlit-blossom" && (
+        <div className="premium-bees" aria-hidden>
+          <span className="premium-bee premium-bee-1">🐝</span>
+          <span className="premium-bee premium-bee-2">🐝</span>
+          <span className="premium-bee premium-bee-3">🐝</span>
+        </div>
+      )}
       <div className="chat-theme-scrim" />
     </div>
   );
