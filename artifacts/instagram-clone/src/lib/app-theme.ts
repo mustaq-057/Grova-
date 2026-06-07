@@ -215,7 +215,7 @@ export const APP_THEMES: {
   {
     id: "moonlit-blossom",
     name: "Moonlit Blossom",
-    description: "Blue moonlit flower field with honey bees 🌙🐝",
+    description: "Blue moonlit flower field with lightning green bees 🌙🐝",
     swatch: "bg-gradient-to-br from-indigo-950 via-blue-700 to-cyan-400",
     dark: {
       "--app-background": "228 45% 8%",
@@ -226,12 +226,12 @@ export const APP_THEMES: {
       "--app-border": "220 28% 22%",
     },
     light: {
-      "--app-background": "215 50% 97%",
-      "--app-foreground": "225 35% 16%",
-      "--app-primary": "205 75% 48%",
+      "--app-background": "215 55% 99%",
+      "--app-foreground": "225 35% 14%",
+      "--app-primary": "205 80% 46%",
       "--app-card": "0 0% 100%",
-      "--app-secondary": "210 40% 95%",
-      "--app-border": "215 30% 88%",
+      "--app-secondary": "210 45% 97%",
+      "--app-border": "215 28% 90%",
     },
   },
 ];

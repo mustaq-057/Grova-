@@ -18,13 +18,19 @@ export const PremiumThemeOverlay = memo(function PremiumThemeOverlay({ themeId }
       <div className="premium-ribbon premium-ribbon-3" />
       <div className="premium-particles" />
       {themeId === "moonlit-blossom" && (
-        <div className="premium-bees" aria-hidden>
-          <span className="premium-bee premium-bee-1">🐝</span>
-          <span className="premium-bee premium-bee-2">🐝</span>
-          <span className="premium-bee premium-bee-3">🐝</span>
-          <span className="premium-bee premium-bee-4">🐝</span>
-          <span className="premium-bee premium-bee-5">🐝</span>
-        </div>
+        <>
+          <div className="premium-moon" aria-hidden />
+          <div className="premium-bees" aria-hidden>
+            <span className="premium-bee premium-bee-1">🐝</span>
+            <span className="premium-bee premium-bee-2">🐝</span>
+            <span className="premium-bee premium-bee-3">🐝</span>
+            <span className="premium-bee premium-bee-4">🐝</span>
+            <span className="premium-bee premium-bee-5">🐝</span>
+            <span className="premium-bee premium-bee-6">🐝</span>
+            <span className="premium-bee premium-bee-7">🐝</span>
+            <span className="premium-bee premium-bee-8">🐝</span>
+          </div>
+        </>
       )}
       <div className="premium-scene-scrim" />
     </div>

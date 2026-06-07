@@ -718,14 +718,28 @@ html[data-photo-theme="true"] .app-chrome [class*="bg-card"] {
 .premium-scene--moonlit-blossom .premium-scene-base::after {
   content: "";
   position: absolute;
-  width: 18vmin;
-  height: 18vmin;
-  top: 8%;
-  right: 18%;
+  width: 20vmin;
+  height: 20vmin;
+  top: 7%;
+  right: 16%;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(240, 249, 255, 0.9) 0%, rgba(186, 230, 253, 0.35) 45%, transparent 70%);
-  filter: blur(2px);
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.98) 0%, rgba(224, 242, 254, 0.55) 42%, transparent 72%);
+  filter: blur(1.5px);
+  box-shadow: 0 0 48px rgba(186, 230, 253, 0.45), 0 0 96px rgba(147, 197, 253, 0.25);
   animation: premium-moon-glow 14s ease-in-out infinite;
+}
+
+.premium-moon {
+  position: absolute;
+  width: 16vmin;
+  height: 16vmin;
+  top: 9%;
+  right: 19%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, rgba(255, 255, 255, 0.95), rgba(224, 242, 254, 0.4) 55%, transparent 75%);
+  box-shadow: 0 0 32px rgba(191, 219, 254, 0.55), 0 0 64px rgba(96, 165, 250, 0.28);
+  animation: premium-moon-glow 14s ease-in-out infinite;
+  pointer-events: none;
 }
 .premium-scene--moonlit-blossom .premium-ribbon-1 {
   background: linear-gradient(180deg, transparent, rgba(59, 130, 246, 0.25) 60%, rgba(37, 99, 235, 0.35) 100%);
@@ -768,6 +782,16 @@ html[data-photo-theme="true"] .app-chrome [class*="bg-card"] {
   50% { transform: translate(10vw, 4vh) rotate(-10deg); opacity: 0.9; }
 }
 
+@keyframes premium-bee-drift-4 {
+  0%, 100% { transform: translate(0, 0) rotate(-5deg); opacity: 0.72; }
+  50% { transform: translate(-10vw, -5vh) rotate(10deg); opacity: 0.98; }
+}
+
+@keyframes premium-bee-glow {
+  0%, 100% { filter: drop-shadow(0 0 5px #4ade80) drop-shadow(0 0 10px #22c55e) hue-rotate(0deg); }
+  50% { filter: drop-shadow(0 0 9px #86efac) drop-shadow(0 0 16px #4ade80) hue-rotate(12deg); }
+}
+
 .premium-bees {
   position: absolute;
   inset: 0;
@@ -777,16 +801,20 @@ html[data-photo-theme="true"] .app-chrome [class*="bg-card"] {
 
 .premium-bee {
   position: absolute;
-  font-size: clamp(1rem, 2.4vw, 1.6rem);
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.35));
-  will-change: transform;
+  font-size: clamp(1rem, 2.4vw, 1.65rem);
+  filter: drop-shadow(0 0 6px #4ade80) drop-shadow(0 0 12px #22c55e) drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+  animation: premium-bee-glow 2.8s ease-in-out infinite;
+  will-change: transform, filter;
 }
 
-.premium-bee-1 { left: 8%; top: 62%; animation: premium-bee-drift-1 14s ease-in-out infinite; }
-.premium-bee-2 { left: 28%; top: 48%; animation: premium-bee-drift-2 18s ease-in-out infinite; animation-delay: -4s; }
-.premium-bee-3 { left: 52%; top: 58%; animation: premium-bee-drift-3 16s ease-in-out infinite; animation-delay: -8s; }
-.premium-bee-4 { left: 72%; top: 42%; animation: premium-bee-drift-1 20s ease-in-out infinite reverse; animation-delay: -6s; }
-.premium-bee-5 { left: 88%; top: 68%; animation: premium-bee-drift-2 15s ease-in-out infinite; animation-delay: -10s; }
+.premium-bee-1 { left: 6%; top: 64%; animation: premium-bee-drift-1 14s ease-in-out infinite, premium-bee-glow 2.8s ease-in-out infinite; }
+.premium-bee-2 { left: 22%; top: 46%; animation: premium-bee-drift-2 18s ease-in-out infinite, premium-bee-glow 3.1s ease-in-out infinite; animation-delay: -4s, -1s; }
+.premium-bee-3 { left: 40%; top: 56%; animation: premium-bee-drift-3 16s ease-in-out infinite, premium-bee-glow 2.6s ease-in-out infinite; animation-delay: -8s, -2s; }
+.premium-bee-4 { left: 58%; top: 44%; animation: premium-bee-drift-1 20s ease-in-out infinite reverse, premium-bee-glow 3.4s ease-in-out infinite; animation-delay: -6s, -0.5s; }
+.premium-bee-5 { left: 74%; top: 66%; animation: premium-bee-drift-2 15s ease-in-out infinite, premium-bee-glow 2.9s ease-in-out infinite; animation-delay: -10s, -1.5s; }
+.premium-bee-6 { left: 90%; top: 52%; animation: premium-bee-drift-4 17s ease-in-out infinite, premium-bee-glow 3.2s ease-in-out infinite; animation-delay: -3s, -2.2s; }
+.premium-bee-7 { left: 14%; top: 38%; animation: premium-bee-drift-3 19s ease-in-out infinite reverse, premium-bee-glow 2.7s ease-in-out infinite; animation-delay: -12s, -0.8s; }
+.premium-bee-8 { left: 48%; top: 72%; animation: premium-bee-drift-4 13s ease-in-out infinite reverse, premium-bee-glow 3s ease-in-out infinite; animation-delay: -7s, -1.8s; }
 
 /* Chat panel chrome — Moonlit Blossom */
 .chat-panel.moonlit-blossom-chat {
@@ -819,6 +847,7 @@ html[data-photo-theme="true"] .app-chrome [class*="bg-card"] {
   .premium-ribbon,
   .premium-particles,
   .premium-scene--moonlit-blossom .premium-scene-base::after,
+  .premium-moon,
   .premium-bee {
     animation: none !important;
   }

@@ -279,7 +279,7 @@ export default function DoodleCanvas({ onClose, onSend, canvasHeight, onExpandCa
     octx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
     octx.drawImage(canvas, 0, 0);
 
-    onSend(exportCanvas.toDataURL("image/jpeg", 0.92));
+    onSend(exportCanvas.toDataURL("image/jpeg", 0.82));
     onClose();
   };
 

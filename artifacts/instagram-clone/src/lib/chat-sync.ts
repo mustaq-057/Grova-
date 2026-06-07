@@ -14,13 +14,38 @@ export function tombstoneMessage(m: ApiMessage): ApiMessage {
   };
 }
 
+function isLocalMediaUrl(url?: string): boolean {
+  return Boolean(url?.startsWith("blob:") || url?.startsWith("data:"));
+}
+
+function isRemoteMediaUrl(url?: string): boolean {
+  return Boolean(url?.startsWith("http") || url?.startsWith("/api/"));
+}
+
+/** Keep blob/data previews visible until the remote asset is ready (avoids flash). */
 function pickMediaUrl(incoming?: string, prev?: string): string | undefined {
+  if (!incoming && !prev) return undefined;
   if (!incoming) return prev;
   if (!prev) return incoming;
-  const prevLocal = prev.startsWith("blob:") || prev.startsWith("data:");
-  const incomingRemote = incoming.startsWith("http") || incoming.startsWith("/api/");
-  if (prevLocal && incomingRemote) return incoming;
+  if (isLocalMediaUrl(prev) && isRemoteMediaUrl(incoming)) return prev;
+  if (isRemoteMediaUrl(prev) && isLocalMediaUrl(incoming)) return prev;
   return incoming;
+}
+
+function mergeOptimisticWithServer(optimistic: ApiMessage, server: ApiMessage): ApiMessage {
+  return {
+    ...server,
+    text: server.text ?? optimistic.text,
+    gifUrl: server.gifUrl || optimistic.gifUrl,
+    imageUrl: pickMediaUrl(server.imageUrl, optimistic.imageUrl),
+    imageData: pickMediaUrl(server.imageData, optimistic.imageData),
+    fileData: pickMediaUrl(server.fileData, optimistic.fileData),
+    audioData: server.audioData ?? optimistic.audioData,
+    fileType: server.fileType ?? optimistic.fileType,
+    fileSize: server.fileSize ?? optimistic.fileSize,
+    companionSticker: server.companionSticker ?? optimistic.companionSticker,
+    mediaViewMode: server.mediaViewMode ?? optimistic.mediaViewMode,
+  };
 }
 
 /** Re-attach rows that vanished during a bad optimistic reconcile / poll race. */
@@ -175,16 +200,55 @@ export function reconcilePendingOptimistics(
   return mergeMessagesById(merged, stillPending);
 }
 
-/** Swap temp upload/send row for the server row without duplicate entries. */
+/** Swap temp upload/send row for the server row in-place (stable scroll + no flash). */
 export function replaceOptimisticMessage(
   prev: ApiMessage[],
   tempId: string,
   display: ApiMessage,
   _senderId: string,
 ): ApiMessage[] {
-  const withoutTemp = prev.filter((m) => m.id !== tempId);
-  if (withoutTemp.some((m) => m.id === display.id)) return withoutTemp;
-  return [...withoutTemp, display];
+  const idx = prev.findIndex((m) => m.id === tempId);
+  const merged = idx >= 0 ? mergeOptimisticWithServer(prev[idx]!, display) : display;
+
+  if (prev.some((m) => m.id === merged.id && m.id !== tempId)) {
+    return prev.filter((m) => m.id !== tempId);
+  }
+
+  if (idx >= 0) {
+    const next = [...prev];
+    next[idx] = merged;
+    return next;
+  }
+
+  if (prev.some((m) => m.id === merged.id)) return prev.filter((m) => m.id !== tempId);
+  return [...prev, merged];
+}
+
+/** After remote media finishes loading, swap local preview for the hosted URL. */
+export function commitRemoteMediaUrl(
+  prev: ApiMessage[],
+  messageId: string,
+  field: "imageUrl" | "imageData" | "gifUrl" | "fileData",
+  remoteUrl: string,
+): ApiMessage[] {
+  const idx = prev.findIndex((m) => m.id === messageId);
+  if (idx < 0) return prev;
+  const row = prev[idx]!;
+  if (!isRemoteMediaUrl(remoteUrl)) return prev;
+  const hasLocal =
+    isLocalMediaUrl(row.imageUrl) || isLocalMediaUrl(row.imageData);
+  if (!hasLocal) return prev;
+  const next = [...prev];
+  const patch: Partial<ApiMessage> = {};
+  if (field === "imageUrl" || field === "imageData") {
+    patch.imageUrl = remoteUrl;
+    if (isLocalMediaUrl(row.imageData)) patch.imageData = undefined;
+    if (isLocalMediaUrl(row.imageUrl) && field === "imageData") patch.imageUrl = remoteUrl;
+  } else {
+    patch[field] = remoteUrl;
+  }
+  next[idx] = { ...row, ...patch };
+  return next;
 }
 
 export async function fetchAndMergeMessages(current: ApiMessage[], getMessages: () => Promise<{ messages?: ApiMessage[] }>): Promise<ApiMessage[]> {

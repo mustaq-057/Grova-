@@ -51,6 +51,7 @@ export interface MessageItemProps {
   onStartThread?: (msg: ApiMessage) => void;
   onReplyToThread?: (threadId: string) => void;
   onMediaLoad?: (messageId: string) => void;
+  onMediaCommitted?: (messageId: string, field: "imageUrl" | "imageData", remoteUrl: string) => void;
   onOpenMedia?: (msg: ApiMessage) => void;
   replySource?: ApiMessage;
   onJumpToMessage?: (messageId: string) => void;
@@ -72,6 +73,7 @@ export const MessageItem = memo(function MessageItem({
   onStartThread,
   onReplyToThread,
   onMediaLoad,
+  onMediaCommitted,
   onOpenMedia,
   replySource,
   onJumpToMessage,
@@ -86,6 +88,11 @@ export const MessageItem = memo(function MessageItem({
   const [showReactionEmojiPicker, setShowReactionEmojiPicker] = useState(false);
   const [imageLoadFailed, setImageLoadFailed] = useState(false);
   const [imageRetry, setImageRetry] = useState(0);
+  const remoteImageSrc = useMemo(
+    () => resolveChatImageUrl(msg.imageUrl || msg.imageData),
+    [msg.imageUrl, msg.imageData],
+  );
+  const [displayImageSrc, setDisplayImageSrc] = useState<string | undefined>(remoteImageSrc);
   const reactBtnRef = useRef<HTMLButtonElement>(null);
   const bubbleWrapRef = useRef<HTMLDivElement>(null);
   const touchStartX = useRef(0);
@@ -108,11 +115,55 @@ export const MessageItem = memo(function MessageItem({
   const useCuteBubble = useMemo(() => isText && !isEmojiOnly && !isDua && msg.variant === "cute", [isText, isEmojiOnly, isDua, msg.variant]);
   const rtl = useMemo(() => hasArabic(msg.text), [msg.text]);
   const imageDisplaySrc = useMemo(() => {
-    const base = resolveChatImageUrl(msg.imageUrl || msg.imageData);
+    const base = displayImageSrc;
     if (!base || imageRetry === 0) return base;
     const sep = base.includes("?") ? "&" : "?";
     return `${base}${sep}_retry=${imageRetry}`;
-  }, [msg.imageUrl, msg.imageData, imageRetry]);
+  }, [displayImageSrc, imageRetry]);
+
+  useEffect(() => {
+    const remote = remoteImageSrc;
+    if (!remote) {
+      setDisplayImageSrc(undefined);
+      return;
+    }
+    if (remote.startsWith("blob:") || remote.startsWith("data:")) {
+      setDisplayImageSrc(remote);
+      return;
+    }
+    setDisplayImageSrc((current) => {
+      if (!current) return remote;
+      const currentIsLocal = current.startsWith("blob:") || current.startsWith("data:");
+      return currentIsLocal ? current : remote;
+    });
+  }, [remoteImageSrc]);
+
+  useEffect(() => {
+    const remote = remoteImageSrc;
+    if (!remote || remote.startsWith("blob:") || remote.startsWith("data:")) return;
+    const showingLocal =
+      displayImageSrc?.startsWith("blob:") || displayImageSrc?.startsWith("data:");
+    if (!showingLocal || displayImageSrc === remote) return;
+
+    let cancelled = false;
+    const img = new Image();
+    img.onload = () => {
+      if (cancelled) return;
+      setDisplayImageSrc(remote);
+      const field =
+        msg.imageUrl?.startsWith("blob:") || msg.imageUrl?.startsWith("data:")
+          ? "imageUrl"
+          : "imageData";
+      onMediaCommitted?.(msg.id, field, remote);
+    };
+    img.onerror = () => {
+      if (!cancelled) setDisplayImageSrc(remote);
+    };
+    img.src = remote;
+    return () => {
+      cancelled = true;
+    };
+  }, [remoteImageSrc, displayImageSrc, msg.id, msg.imageUrl, onMediaCommitted]);
   const videoDisplaySrc = useMemo(
     () => resolveChatVideoUrl(msg.fileData, msg.text, msg.fileType),
     [msg.fileData, msg.text, msg.fileType],
@@ -123,16 +174,11 @@ export const MessageItem = memo(function MessageItem({
   );
 
   useEffect(() => {
-    const next = msg.imageUrl || msg.imageData || "";
-    const prev = imageDisplaySrc || "";
-    const localToRemote =
-      (prev.startsWith("blob:") || prev.startsWith("data:")) &&
-      next.startsWith("http");
-    if (!localToRemote) {
+    if (!remoteImageSrc?.startsWith("http")) {
       setImageLoadFailed(false);
       setImageRetry(0);
     }
-  }, [msg.imageUrl, msg.imageData, imageDisplaySrc]);
+  }, [remoteImageSrc]);
 
   const legacyReply = useMemo(
     () => (!msg.replyToText && msg.text ? parseLegacyReply(msg.text) : null),

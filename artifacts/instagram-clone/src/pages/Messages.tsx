@@ -51,8 +51,10 @@ import {
 } from "@/lib/hidden-messages";
 import { parsePresenceResponse, isPartnerActiveInChat } from "@/lib/presence-api";
 import {
+  commitRemoteMediaUrl,
   enforceUnsentMessages,
   findOptimisticMatch,
+  mergeMessagesById,
   preserveDroppedMessages,
   reconcilePendingOptimistics,
   replaceOptimisticMessage,
@@ -93,6 +95,13 @@ import {
   scrollMessageIntoCenter,
 } from "@/lib/chat-scroll";
 import { readChatCache, readChatCacheForCurrentUser, writeChatCache } from "@/lib/chat-cache";
+import {
+  clearChatScrollAnchor,
+  findTopVisibleMessageId,
+  readChatScrollAnchor,
+  restoreScrollToAnchor,
+  saveChatScrollAnchor,
+} from "@/lib/chat-scroll-anchor";
 import { resolveChatImageUrl, resolveChatVideoUrl } from "@/lib/media-url";
 import DoodleCanvas, { DOODLE_HEIGHT_STEP, DOODLE_MIN_HEIGHT } from "@/components/DoodleCanvas";
 import { ImageCropModal } from "@/components/ImageCropModal";
@@ -240,6 +249,9 @@ export default function Messages() {
   const isPrependingRef = useRef(false);
   const unsentIdsRef = useRef<Set<string>>(new Set());
   const recentTailIdsRef = useRef<Set<string>>(new Set());
+  const scrollAnchorSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingScrollRestoreRef = useRef<ReturnType<typeof readChatScrollAnchor>>(null);
+  const scrollRestoreAttemptsRef = useRef(0);
 
   const partnerId = useMemo(() => user?.id === "me" ? "wife" : "me", [user?.id]);
   const theme = THEMES.find(t => t.id === chatThemeId) ?? THEMES[0]!;
@@ -261,6 +273,13 @@ export default function Messages() {
       requestStickToBottom();
     }
   }, [requestStickToBottom]);
+
+  const handleMediaCommitted = useCallback(
+    (messageId: string, field: "imageUrl" | "imageData", remoteUrl: string) => {
+      setMessages((prev) => commitRemoteMediaUrl(prev, messageId, field, remoteUrl));
+    },
+    [],
+  );
 
   const highlightHandledRef = useRef<string | null>(null);
 
@@ -290,33 +309,23 @@ export default function Messages() {
 
     if (tryScroll()) return true;
 
-    let offset = messages.length;
-    let more = hasMore;
-    for (let attempt = 0; attempt < 40 && more; attempt += 1) {
-      const data = await api.getMessages({ offset });
-      const older = await normalizeMessages(data.messages || []);
-      if (older.length === 0) break;
+    try {
+      const data = await api.getMessageContext(messageId, 35);
+      const batch = await normalizeMessages(data.messages || []);
+      if (batch.length === 0) return false;
 
-      const container = messagesContainerRef.current;
-      prependScrollHeightRef.current = container?.scrollHeight ?? 0;
+      prependScrollHeightRef.current = null;
+      isPrependingRef.current = false;
 
-      setMessages((prev) => {
-        const existing = new Set(prev.map((m) => m.id));
-        const unique = older.filter((m) => !existing.has(m.id));
-        if (unique.length === 0) return prev;
-        return [...unique, ...prev];
-      });
-
-      offset += older.length;
-      more = data.pagination?.hasMore ?? false;
-      setHasMore(more);
+      setMessages((prev) => mergeMessagesById(prev, batch));
+      setHasMore(data.pagination?.hasMoreBefore ?? hasMore);
 
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-      await new Promise((r) => setTimeout(r, 32));
-      if (tryScroll()) return true;
+      return tryScroll();
+    } catch {
+      return false;
     }
-    return false;
-  }, [messages.length, hasMore]);
+  }, [hasMore]);
 
   const jumpToMessage = useCallback(
     (messageId: string) => {
@@ -553,14 +562,20 @@ export default function Messages() {
     void hydrateQuickReactions();
     if (messages.length === 0) {
       const cached = readChatCache(user.id);
+      const savedAnchor = readChatScrollAnchor(user.id);
+      if (savedAnchor) pendingScrollRestoreRef.current = savedAnchor;
       if (cached && cached.length > 0) {
         isInitialLoadRef.current = true;
-        stickToBottomRef.current = true;
+        if (!savedAnchor) stickToBottomRef.current = true;
         setMessages(cached);
         messagesSigRef.current = messagesListSignature(cached);
       }
-    } else {
+    } else if (isNearBottomRef.current && !pendingScrollRestoreRef.current) {
       stickToBottomRef.current = true;
+    }
+    if (user.id) {
+      const saved = readChatScrollAnchor(user.id);
+      if (saved) pendingScrollRestoreRef.current = saved;
     }
     loadMessages();
 
@@ -1045,10 +1060,25 @@ export default function Messages() {
     const firstPaint = isInitialLoadRef.current;
     const isOwnLast = last?.senderId === user?.id;
 
+    const restoreAnchor = pendingScrollRestoreRef.current;
+    if (restoreAnchor && messages.length > 0 && scrollRestoreAttemptsRef.current < 8) {
+      const container = messagesContainerRef.current;
+      const restored = restoreScrollToAnchor(container, restoreAnchor);
+      scrollRestoreAttemptsRef.current += 1;
+      if (restored) {
+        pendingScrollRestoreRef.current = null;
+        isNearBottomRef.current = false;
+        stickToBottomRef.current = false;
+        isInitialLoadRef.current = false;
+        return;
+      }
+    }
+
     const shouldStick =
       !isPrependingRef.current &&
+      !pendingScrollRestoreRef.current &&
       (stickToBottomRef.current ||
-        firstPaint ||
+        (firstPaint && !restoreAnchor) ||
         (isOwnLast && tailChanged) ||
         (isNearBottomRef.current && tailChanged));
 
@@ -1056,7 +1086,7 @@ export default function Messages() {
       scrollChatToBottomAfterPaint(
         messagesContainerRef.current,
         bottomRef.current,
-        firstPaint || (isOwnLast && tailChanged),
+        (firstPaint && !restoreAnchor) || (isOwnLast && tailChanged),
       );
       setHasNewMessages(false);
       stickToBottomRef.current = false;
@@ -1136,14 +1166,32 @@ export default function Messages() {
       if (debounceTimer) clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => {
         setIsNearBottom(isNear);
-        if (isNear) setHasNewMessages(false);
+        if (isNear) {
+          setHasNewMessages(false);
+          if (userIdRef.current) clearChatScrollAnchor(userIdRef.current);
+        } else {
+          const uid = userIdRef.current;
+          if (uid) {
+            const anchor = findTopVisibleMessageId(container);
+            if (anchor) saveChatScrollAnchor(uid, anchor.messageId, anchor.offsetPx);
+          }
+        }
       }, 50);
+
+      if (scrollAnchorSaveRef.current) clearTimeout(scrollAnchorSaveRef.current);
+      scrollAnchorSaveRef.current = setTimeout(() => {
+        const uid = userIdRef.current;
+        if (!uid || isNearBottomRef.current) return;
+        const anchor = findTopVisibleMessageId(container);
+        if (anchor) saveChatScrollAnchor(uid, anchor.messageId, anchor.offsetPx);
+      }, 180);
     };
 
     container.addEventListener('scroll', handleScroll);
     return () => {
       container.removeEventListener('scroll', handleScroll);
       if (debounceTimer) clearTimeout(debounceTimer);
+      if (scrollAnchorSaveRef.current) clearTimeout(scrollAnchorSaveRef.current);
     };
   }, []);
 
@@ -2736,6 +2784,7 @@ export default function Messages() {
                   onStartThread={handleStartThread}
                   onReplyToThread={handleReplyToThread}
                   onMediaLoad={scrollToBottomForMedia}
+                  onMediaCommitted={handleMediaCommitted}
                   replySource={msg.replyToId ? messageById.get(msg.replyToId) : undefined}
                   onJumpToMessage={jumpToMessage}
                 />
@@ -2902,6 +2951,7 @@ export default function Messages() {
                     onStartThread={handleStartThread}
                     onReplyToThread={handleReplyToThread}
                     onMediaLoad={scrollToBottomForMedia}
+                    onMediaCommitted={handleMediaCommitted}
                     replySource={msg.replyToId ? messageById.get(msg.replyToId) : undefined}
                     onJumpToMessage={jumpToMessage}
                   />
@@ -2940,14 +2990,48 @@ export default function Messages() {
           canvasHeight={doodleHeight}
           onExpandCanvas={expandDoodleSpace}
           onClose={closeDoodlePanel}
-          onSend={async (imageData) => {
+          onSend={(imageData) => {
             closeDoodlePanel();
-            try {
-              const url = await uploadMediaToB2(imageData, "image/jpeg");
-              sendMsg({ type: "image", imageUrl: url, text: "✏️ Doodle" });
-            } catch (err) {
-              alert(err instanceof Error ? err.message : "Doodle upload failed — check CLOUDINARY_URL in .env");
-            }
+            if (!user) return;
+            const tempId = crypto.randomUUID();
+            pendingOutgoingRef.current.add(tempId);
+            setMessages((prev) => [
+              ...prev,
+              buildOptimisticMessage(
+                { senderId: user.id, type: "image", imageData: imageData, text: "✏️ Doodle" },
+                tempId,
+              ),
+            ]);
+            requestStickToBottom();
+            void (async () => {
+              try {
+                const outgoing = await prepareOutgoingMessage({
+                  senderId: user.id,
+                  type: "image",
+                  imageUrl: "",
+                  text: "✏️ Doodle",
+                });
+                const url = await uploadMediaToB2(imageData, "image/jpeg");
+                outgoing.imageUrl = url;
+                const saved = await api.sendMessage(outgoing);
+                const [display] = await normalizeMessages([saved]);
+                setMessages((prev) => {
+                  const next = replaceOptimisticMessage(prev, tempId, display, user.id);
+                  pendingOutgoingRef.current.delete(tempId);
+                  messagesSigRef.current = messagesListSignature(next);
+                  writeChatCache(user.id, next);
+                  return next;
+                });
+                requestStickToBottom();
+              } catch (err) {
+                pendingOutgoingRef.current.delete(tempId);
+                setMessages((prev) => prev.filter((m) => m.id !== tempId));
+                toast.error(
+                  err instanceof Error ? err.message : "Doodle upload failed — check CLOUDINARY_URL in .env",
+                  { duration: 4000 },
+                );
+              }
+            })();
           }}
         />
       )}
