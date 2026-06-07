@@ -183,6 +183,18 @@ export function messagePreview(msg: ApiMessage): string {
   return msg.text || "Message";
 }
 
+/** Short label for reply composer and quoted blocks. */
+export function replyPreviewLabel(msg: ApiMessage): string {
+  if (msg.text?.trim()) return msg.text.slice(0, 280);
+  return messagePreview(msg);
+}
+
+const REPLY_PHOTO_LABELS = new Set(["Photo", "photo", "📷 Photo"]);
+
+export function isReplyPhotoPlaceholder(text?: string): boolean {
+  return Boolean(text && REPLY_PHOTO_LABELS.has(text.trim()));
+}
+
 export function formatPresence(lastSeen: number | undefined): { label: string; online: boolean } {
   if (!lastSeen) return { label: "Active a while ago", online: false };
 
@@ -256,7 +268,7 @@ export function buildSeenLabel(
   if (!isMe || !msg.seenByPartner || msg.deleted || msg.id !== lastSeenOutgoingId) return undefined;
   if (msg.readAt) {
     const readMs = Date.now() - new Date(msg.readAt).getTime();
-    if (readMs >= 0 && readMs < 120_000) return "Just seen";
+    if (readMs >= 0 && readMs < 180_000) return "Just seen";
     const time = formatSeenTime(msg.readAt, partnerId);
     return time ? `Seen · ${time}` : "Seen";
   }

@@ -53,8 +53,8 @@ export async function uploadMediaBinary(
     if (err instanceof DOMException && err.name === "AbortError") {
       throw new Error("Upload timed out — try a shorter video or better connection.");
     }
-    if (attempt < 1) {
-      await new Promise((r) => setTimeout(r, 600));
+    if (attempt < 2) {
+      await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
       return uploadMediaBinary(file, contentType, attempt + 1);
     }
     throw err;
@@ -65,8 +65,8 @@ export async function uploadMediaBinary(
   if (await refreshSessionIfUnauthorized(res.status, attempt)) {
     return uploadMediaBinary(file, contentType, attempt + 1);
   }
-  if (RETRYABLE_STATUS.has(res.status) && attempt < 1) {
-    await new Promise((r) => setTimeout(r, 600));
+  if (RETRYABLE_STATUS.has(res.status) && attempt < 2) {
+    await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
     return uploadMediaBinary(file, contentType, attempt + 1);
   }
   if (!res.ok) {

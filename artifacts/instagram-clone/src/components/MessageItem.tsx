@@ -14,7 +14,8 @@ import type { ApiMessage } from "@/lib/api";
 import { isCallLogMessage } from "@/lib/call-chat-log";
 import { getPartnerBubbleColors } from "@/lib/themes";
 import { getQuickReactions, onQuickReactionsChanged } from "@/lib/quick-reactions";
-import { parseLegacyReply, parseMediaViewMode } from "@/lib/message-utils";
+import { isReplyPhotoPlaceholder, parseLegacyReply, parseMediaViewMode, replyPreviewLabel } from "@/lib/message-utils";
+import { tryRefreshSession } from "@/lib/api";
 import { MessageText } from "@/lib/linkify";
 import { resolveChatImageUrl, resolveChatVideoUrl } from "@/lib/media-url";
 import { useEffect } from "react";
@@ -51,6 +52,8 @@ export interface MessageItemProps {
   onReplyToThread?: (threadId: string) => void;
   onMediaLoad?: () => void;
   onOpenMedia?: (msg: ApiMessage) => void;
+  replySource?: ApiMessage;
+  onJumpToMessage?: (messageId: string) => void;
 }
 
 export const MessageItem = memo(function MessageItem({
@@ -70,6 +73,8 @@ export const MessageItem = memo(function MessageItem({
   onReplyToThread,
   onMediaLoad,
   onOpenMedia,
+  replySource,
+  onJumpToMessage,
 }: MessageItemProps) {
   const sameSender = prevMsg?.senderId === msg.senderId;
   const [showReactions, setShowReactions] = useState(false);
@@ -80,6 +85,7 @@ export const MessageItem = memo(function MessageItem({
   const [quickReactions, setQuickReactions] = useState(getQuickReactions);
   const [showReactionEmojiPicker, setShowReactionEmojiPicker] = useState(false);
   const [imageLoadFailed, setImageLoadFailed] = useState(false);
+  const [imageRetry, setImageRetry] = useState(0);
   const reactBtnRef = useRef<HTMLButtonElement>(null);
   const bubbleWrapRef = useRef<HTMLDivElement>(null);
   const touchStartX = useRef(0);
@@ -101,10 +107,12 @@ export const MessageItem = memo(function MessageItem({
   const isText = useMemo(() => msg.type === "text" || msg.type === "heart", [msg.type]);
   const useCuteBubble = useMemo(() => isText && !isEmojiOnly && !isDua && msg.variant === "cute", [isText, isEmojiOnly, isDua, msg.variant]);
   const rtl = useMemo(() => hasArabic(msg.text), [msg.text]);
-  const imageDisplaySrc = useMemo(
-    () => resolveChatImageUrl(msg.imageUrl || msg.imageData),
-    [msg.imageUrl, msg.imageData],
-  );
+  const imageDisplaySrc = useMemo(() => {
+    const base = resolveChatImageUrl(msg.imageUrl || msg.imageData);
+    if (!base || imageRetry === 0) return base;
+    const sep = base.includes("?") ? "&" : "?";
+    return `${base}${sep}_retry=${imageRetry}`;
+  }, [msg.imageUrl, msg.imageData, imageRetry]);
   const videoDisplaySrc = useMemo(
     () => resolveChatVideoUrl(msg.fileData, msg.text, msg.fileType),
     [msg.fileData, msg.text, msg.fileType],
@@ -112,7 +120,8 @@ export const MessageItem = memo(function MessageItem({
 
   useEffect(() => {
     setImageLoadFailed(false);
-  }, [imageDisplaySrc]);
+    setImageRetry(0);
+  }, [msg.imageUrl, msg.imageData]);
 
   const legacyReply = useMemo(
     () => (!msg.replyToText && msg.text ? parseLegacyReply(msg.text) : null),
@@ -121,6 +130,15 @@ export const MessageItem = memo(function MessageItem({
   const quotedText = msg.replyToText ?? legacyReply?.quoted;
   const displayText = legacyReply?.body ?? msg.text;
   const hasReply = Boolean(quotedText);
+
+  const replyThumbSrc = useMemo(() => {
+    if (!replySource || replySource.type !== "image") return undefined;
+    return resolveChatImageUrl(replySource.imageUrl || replySource.imageData);
+  }, [replySource]);
+
+  const showReplyPhoto =
+    Boolean(replyThumbSrc) &&
+    (replySource?.type === "image" || isReplyPhotoPlaceholder(quotedText));
 
   const replyTargetLabel = useMemo(() => {
     if (!hasReply) return "";
@@ -240,7 +258,15 @@ export const MessageItem = memo(function MessageItem({
             decoding="async"
             referrerPolicy="no-referrer"
             onLoad={onMediaLoad}
-            onError={() => setImageLoadFailed(true)}
+            onError={() => {
+              if (imageRetry < 2) {
+                void tryRefreshSession().finally(() => {
+                  setImageRetry((n) => n + 1);
+                });
+              } else {
+                setImageLoadFailed(true);
+              }
+            }}
             onClick={() => onOpenMedia?.(msg)}
           />
         ) : (
@@ -403,9 +429,26 @@ export const MessageItem = memo(function MessageItem({
             <p className="text-[11px] sm:text-xs text-muted-foreground/90 mb-1 px-0.5">
               {isMe ? "You" : partnerName} replied to {replyTargetLabel}
             </p>
-            <div className="w-full max-w-full rounded-2xl bg-[#262626] border border-white/10 px-3 py-2 text-[14px] sm:text-[15px] text-white/85 leading-snug max-h-28 overflow-y-auto scrollbar-hide whitespace-pre-wrap break-words">
-              {quotedText}
-            </div>
+            <button
+              type="button"
+              onClick={() => msg.replyToId && onJumpToMessage?.(msg.replyToId)}
+              className={`w-full max-w-full rounded-2xl bg-[#262626] border border-white/10 px-3 py-2 text-left text-[14px] sm:text-[15px] text-white/85 leading-snug max-h-28 overflow-hidden scrollbar-hide transition-colors hover:bg-[#2e2e2e] active:bg-[#333] ${msg.replyToId ? "cursor-pointer" : "cursor-default"}`}
+              disabled={!msg.replyToId || !onJumpToMessage}
+            >
+              <div className="flex gap-2.5 items-start min-w-0">
+                {showReplyPhoto && replyThumbSrc ? (
+                  <img
+                    src={replyThumbSrc}
+                    alt=""
+                    className="w-12 h-12 rounded-lg object-cover shrink-0 bg-black/30"
+                    loading="lazy"
+                  />
+                ) : null}
+                <span className="flex-1 min-w-0 whitespace-pre-wrap break-words line-clamp-4">
+                  {replySource ? replyPreviewLabel(replySource) : quotedText}
+                </span>
+              </div>
+            </button>
           </div>
         )}
 

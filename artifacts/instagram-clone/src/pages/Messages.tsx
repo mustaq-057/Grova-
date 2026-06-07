@@ -10,7 +10,7 @@ import { MessageInput } from "@/components/MessageInput";
 import { InfoPanel } from "@/components/InfoPanel";
 import { Link } from "wouter";
 import type { GreetingTemplate } from "@/lib/greeting-messages";
-import { normalizeMessages, previewMessagesForDisplay, prepareOutgoingMessage, buildOptimisticMessage, buildSeenLabel, findLastSeenOutgoingId, messagePreview } from "@/lib/message-utils";
+import { normalizeMessages, previewMessagesForDisplay, prepareOutgoingMessage, buildOptimisticMessage, buildSeenLabel, findLastSeenOutgoingId, messagePreview, replyPreviewLabel } from "@/lib/message-utils";
 import { callStartedText, callEndedText, isCallLogMessage } from "@/lib/call-chat-log";
 import { usePresenceLabel } from "@/hooks/usePresenceLabel";
 import { groupByDay, shouldShowTimeGap } from "@/lib/message-helpers";
@@ -38,7 +38,8 @@ import { EditMessageBar } from "@/components/EditMessageBar";
 import { defaultAvatar } from "@/lib/avatars";
 import { AvatarImage } from "@/components/AvatarImage";
 import { saveMemoryFromMessage, removeMemory } from "@/lib/memories";
-import { getStoredAppTheme, type AppThemeId } from "@/lib/app-theme";
+import { getStoredAppTheme, isEternalAuroraTheme, type AppThemeId } from "@/lib/app-theme";
+import { ChatAuroraLayer } from "@/components/ChatAuroraLayer";
 import {
   filterVisibleMessages,
   hideMessageForUser,
@@ -81,6 +82,7 @@ import {
   scrollChatToBottom,
   scrollChatToBottomAfterPaint,
   scrollChatForComposerChange,
+  scrollMessageIntoCenter,
 } from "@/lib/chat-scroll";
 import { readChatCache, writeChatCache } from "@/lib/chat-cache";
 import { resolveChatImageUrl, resolveChatVideoUrl } from "@/lib/media-url";
@@ -243,6 +245,7 @@ export default function Messages() {
   const voiceSendInFlightRef = useRef(false);
   const sendMsgRef = useRef<(partial: Partial<ApiMessage>) => Promise<void>>(async () => {});
   const userIdRef = useRef<string | undefined>(undefined);
+  const prependScrollHeightRef = useRef<number | null>(null);
 
   const partnerId = useMemo(() => user?.id === "me" ? "wife" : "me", [user?.id]);
   const theme = THEMES.find(t => t.id === chatThemeId) ?? THEMES[0]!;
@@ -254,7 +257,7 @@ export default function Messages() {
     stickToBottomRef.current = true;
     isNearBottomRef.current = true;
     setIsNearBottom(true);
-    scrollChatToBottomAfterPaint(messagesContainerRef.current, bottomRef.current);
+    scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
   }, []);
 
   const scrollToBottomForMedia = useCallback(() => {
@@ -265,7 +268,7 @@ export default function Messages() {
 
   const highlightHandledRef = useRef<string | null>(null);
 
-  const scrollToHighlightedMessage = useCallback(async (messageId: string) => {
+  const scrollToHighlightedMessage = useCallback(async (messageId: string): Promise<boolean> => {
     isNearBottomRef.current = false;
     stickToBottomRef.current = false;
     setIsNearBottom(false);
@@ -276,17 +279,20 @@ export default function Messages() {
     };
 
     const tryScroll = (): boolean => {
-      const el = document.querySelector(`[data-testid="message-${messageId}"]`);
+      const el = document.querySelector(
+        `[data-testid="message-${messageId}"]`,
+      ) as HTMLElement | null;
       if (!el) return false;
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
-      flash(el);
+      const container = messagesContainerRef.current;
+      scrollMessageIntoCenter(container, el, "auto");
+      requestAnimationFrame(() => {
+        scrollMessageIntoCenter(container, el, "auto");
+        flash(el);
+      });
       return true;
     };
 
-    if (tryScroll()) {
-      window.history.replaceState({}, "", "/chat");
-      return;
-    }
+    if (tryScroll()) return true;
 
     let offset = messages.length;
     let more = hasMore;
@@ -294,6 +300,9 @@ export default function Messages() {
       const data = await api.getMessages({ offset });
       const older = await normalizeMessages(data.messages || []);
       if (older.length === 0) break;
+
+      const container = messagesContainerRef.current;
+      prependScrollHeightRef.current = container?.scrollHeight ?? 0;
 
       setMessages((prev) => {
         const existing = new Set(prev.map((m) => m.id));
@@ -307,12 +316,18 @@ export default function Messages() {
       setHasMore(more);
 
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-      if (tryScroll()) {
-        window.history.replaceState({}, "", "/chat");
-        return;
-      }
+      await new Promise((r) => setTimeout(r, 32));
+      if (tryScroll()) return true;
     }
+    return false;
   }, [messages.length, hasMore]);
+
+  const jumpToMessage = useCallback(
+    (messageId: string) => {
+      void scrollToHighlightedMessage(messageId);
+    },
+    [scrollToHighlightedMessage],
+  );
 
   const expandDoodleSpace = useCallback(() => {
     setDoodleHeight((h) => h + DOODLE_HEIGHT_STEP);
@@ -472,16 +487,8 @@ export default function Messages() {
         return;
       }
       
-      // Use requestAnimationFrame to ensure DOM updates before calculating scroll
-      requestAnimationFrame(() => {
-        if (container) {
-          const scrollHeightAfter = container.scrollHeight;
-          const heightDifference = scrollHeightAfter - scrollHeightBefore;
-          // Maintain scroll position by adjusting for new content
-          container.scrollTop = container.scrollTop + heightDifference;
-        }
-      });
-      
+      prependScrollHeightRef.current = scrollHeightBefore;
+
       setMessages((prev) => {
         const existing = new Set(prev.map((m) => m.id));
         const unique = older.filter((m) => !existing.has(m.id));
@@ -613,32 +620,50 @@ export default function Messages() {
         if (!mounted) return;
         try {
           const raw = JSON.parse(e.data) as ApiMessage;
-          const [msg] = await normalizeMessages([raw]);
-          setMessages(prev => {
-            const existingIds = new Set(prev.map(m => m.id));
-            if (existingIds.has(msg.id)) return prev;
-            if (msg.senderId === user?.id) {
+          const [preview] = previewMessagesForDisplay([raw]);
+
+          const mergeIncoming = (prev: ApiMessage[], incoming: ApiMessage) => {
+            const existingIds = new Set(prev.map((m) => m.id));
+            if (existingIds.has(incoming.id)) {
+              return prev.map((m) => (m.id === incoming.id ? incoming : m));
+            }
+            if (incoming.senderId === user?.id) {
               const optimisticIdx = prev.findIndex(
                 (m) =>
                   m.senderId === user.id &&
-                  m.id !== msg.id &&
-                  m.type === msg.type &&
-                  Math.abs(new Date(m.timestamp).getTime() - new Date(msg.timestamp).getTime()) < 120_000,
+                  m.id !== incoming.id &&
+                  m.type === incoming.type &&
+                  Math.abs(
+                    new Date(m.timestamp).getTime() - new Date(incoming.timestamp).getTime(),
+                  ) < 120_000,
               );
               if (optimisticIdx >= 0) {
                 const next = [...prev];
-                next[optimisticIdx] = msg;
+                next[optimisticIdx] = incoming;
                 return next;
               }
             }
-            return [...prev, msg];
-          });
-          
-          if (msg.senderId === partnerId && !isNearBottomRef.current) {
+            return [...prev, incoming];
+          };
+
+          setMessages((prev) => mergeIncoming(prev, preview));
+
+          if (preview.senderId === partnerId && !isNearBottomRef.current) {
             setHasNewMessages(true);
-          } else {
+          } else if (isNearBottomRef.current) {
             stickToBottomRef.current = true;
-            scrollChatToBottomAfterPaint(messagesContainerRef.current, bottomRef.current);
+            requestAnimationFrame(() => {
+              scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
+            });
+          }
+
+          const [msg] = await normalizeMessages([raw]);
+          if (!mounted) return;
+          startTransition(() => {
+            setMessages((prev) => mergeIncoming(prev, msg));
+          });
+          if (msg.senderId !== partnerId && isNearBottomRef.current) {
+            stickToBottomRef.current = true;
           }
         } catch (err) {
           console.error("Failed to handle new message:", err);
@@ -1015,8 +1040,12 @@ export default function Messages() {
       (isNearBottomRef.current && tailChanged);
 
     if (shouldStick) {
-      if (isMedia || firstPaint || stickToBottomRef.current) {
-        scrollChatToBottomAfterPaint(messagesContainerRef.current, bottomRef.current);
+      if (isMedia || firstPaint) {
+        scrollChatToBottomAfterPaint(
+          messagesContainerRef.current,
+          bottomRef.current,
+          firstPaint,
+        );
       } else {
         scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
       }
@@ -1035,6 +1064,17 @@ export default function Messages() {
     previousMessagesLengthRef.current = messages.length;
   }, [messages, user?.id, partnerId]);
 
+  // Restore scroll position after prepending older messages (load more / jump-to-memory)
+  useLayoutEffect(() => {
+    const before = prependScrollHeightRef.current;
+    if (before === null) return;
+    prependScrollHeightRef.current = null;
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    const diff = container.scrollHeight - before;
+    if (diff > 0) container.scrollTop = container.scrollTop + diff;
+  }, [messages]);
+
   // Jump to pinned memory from /chat?highlight=<messageId>
   useEffect(() => {
     if (!user) return;
@@ -1043,8 +1083,12 @@ export default function Messages() {
     if (highlightHandledRef.current === highlightId) return;
     if (messages.length === 0) return;
 
-    highlightHandledRef.current = highlightId;
-    void scrollToHighlightedMessage(highlightId);
+    void scrollToHighlightedMessage(highlightId).then((found) => {
+      if (found) {
+        highlightHandledRef.current = highlightId;
+        window.history.replaceState({}, "", "/chat");
+      }
+    });
   }, [user, messages.length, scrollToHighlightedMessage]);
 
   // Composer grew (reply / edit bar) — keep latest message visible
@@ -1540,15 +1584,7 @@ export default function Messages() {
     const replyMeta = replyTo
       ? {
           replyToId: replyTo.id,
-          replyToText:
-            replyTo.text?.slice(0, 200) ||
-            (replyTo.type === "audio"
-              ? "Voice message"
-              : replyTo.type === "image"
-                ? "Photo"
-                : replyTo.type === "video"
-                  ? "Video"
-                  : "Message"),
+          replyToText: replyPreviewLabel(replyTo).slice(0, 200),
           replyToSenderId: replyTo.senderId,
         }
       : {};
@@ -2481,6 +2517,14 @@ export default function Messages() {
     [filteredMessages, user?.id],
   );
 
+  const messageById = useMemo(() => {
+    const map = new Map<string, ApiMessage>();
+    for (const m of messages) map.set(m.id, m);
+    return map;
+  }, [messages]);
+
+  const showChatAurora = isEternalAuroraTheme(appThemeId);
+
   if (blocked) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4 text-center px-6">
@@ -2505,9 +2549,12 @@ export default function Messages() {
           active
         />
       )}
-    <div className="chat-panel flex-1 min-w-0 h-full min-h-0 relative bg-black">
+    <div
+      className={`chat-panel flex-1 min-w-0 h-full min-h-0 relative bg-black ${showChatAurora ? "eternal-aurora-chat" : ""}`}
+    >
+      {showChatAurora && <ChatAuroraLayer />}
 
-      <div className="chat-panel-top shrink-0 z-20 flex flex-col">
+      <div className="chat-panel-top shrink-0 z-20 flex flex-col relative">
       {/* ── Header ── */}
       <div className="chat-panel-header flex items-center gap-1.5 sm:gap-3 px-2 sm:px-4 py-1.5 sm:py-2.5 border-b shrink-0 text-white">
         <div className="relative shrink-0">
@@ -2593,7 +2640,7 @@ export default function Messages() {
 
       {/* ── Messages ── */}
       <div
-        className="chat-panel-messages overflow-y-auto px-2 sm:px-3 py-2 md:py-3 md:px-4 flex flex-col gap-1 scrollbar-hide"
+        className="chat-panel-messages relative z-[1] overflow-y-auto px-2 sm:px-3 py-2 md:py-3 md:px-4 flex flex-col gap-1 scrollbar-hide"
         data-testid="messages-list"
         ref={messagesContainerRef}
         style={{ scrollBehavior: 'auto' }}
@@ -2649,6 +2696,8 @@ export default function Messages() {
                   onStartThread={handleStartThread}
                   onReplyToThread={handleReplyToThread}
                   onMediaLoad={scrollToBottomForMedia}
+                  replySource={msg.replyToId ? messageById.get(msg.replyToId) : undefined}
+                  onJumpToMessage={jumpToMessage}
                 />
               );
             })}
@@ -2817,6 +2866,8 @@ export default function Messages() {
                     onStartThread={handleStartThread}
                     onReplyToThread={handleReplyToThread}
                     onMediaLoad={scrollToBottomForMedia}
+                    replySource={msg.replyToId ? messageById.get(msg.replyToId) : undefined}
+                    onJumpToMessage={jumpToMessage}
                   />
                 </div>
               );
@@ -2825,8 +2876,11 @@ export default function Messages() {
         ))}
 
         <div ref={bottomRef} className="h-4 shrink-0" aria-hidden />
+      </div>
+
+      <div className="chat-panel-bottom shrink-0 relative z-10">
         {showPartnerTyping && (
-          <div className="flex items-end gap-2 px-2 pb-2 shrink-0">
+          <div className="flex items-end gap-2 px-3 py-1.5 shrink-0 border-t border-white/5 bg-background/80 backdrop-blur-sm">
             <AvatarImage src={pAvatar} userId={partnerId} alt="" className="w-6 h-6 rounded-full object-cover shrink-0" />
             <div className="bg-secondary/80 rounded-2xl rounded-bl-md px-3 py-2 flex items-center gap-1.5">
               <span className="text-xs text-muted-foreground">{partnerTypingLine(partnerId)}</span>
@@ -2834,9 +2888,6 @@ export default function Messages() {
             </div>
           </div>
         )}
-      </div>
-
-      <div className="chat-panel-bottom shrink-0">
       {/* ── Edit Message Bar ── */}
       {editingMessage && (
         <EditMessageBar

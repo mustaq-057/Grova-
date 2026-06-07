@@ -19,6 +19,7 @@ import { getCouplePrefsCache } from "@/lib/client-memory";
 import type { CouplePrefs } from "@/lib/types";
 import { Link } from "wouter";
 import { applyColorMode, applyAppTheme, getStoredAppTheme, getStoredDarkMode, type AppThemeId } from "@/lib/app-theme";
+import { APP_VERSION } from "@/lib/app-version";
 import { AppThemeModal } from "@/components/AppThemeModal";
 
 function Toggle({ on, toggle }: { on: boolean; toggle: () => void }) {
@@ -397,7 +398,7 @@ export default memo(function Settings() {
           <p className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground border-b border-border/50">About</p>
           <div className="flex items-center gap-4 px-4 py-3.5">
             <div className="w-10 h-10 bg-gradient-to-br from-pink-500/20 to-purple-500/20 rounded-xl flex items-center justify-center"><Heart className="w-5 h-5 text-pink-500" strokeWidth={1.5} /></div>
-            <div className="flex-1"><p className="text-sm font-medium">Grova v1.1</p><p className="text-xs text-muted-foreground">Built just for two ♥</p></div>
+            <div className="flex-1"><p className="text-sm font-medium">Grova v{APP_VERSION}</p><p className="text-xs text-muted-foreground">Built just for two ♥</p></div>
           </div>
         </div>
 
