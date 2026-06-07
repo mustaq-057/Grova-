@@ -34,19 +34,59 @@ export function mergeMessagesById(existing: ApiMessage[], incoming: ApiMessage[]
   );
 }
 
+function hasLocalMediaPreview(m: ApiMessage): boolean {
+  const urls = [m.imageUrl, m.imageData, m.fileData, m.audioData];
+  return urls.some((u) => u?.startsWith("blob:") || u?.startsWith("data:"));
+}
+
+function outgoingContentMatches(optimistic: ApiMessage, server: ApiMessage): boolean {
+  if (optimistic.type === "text") {
+    const a = optimistic.text ?? "";
+    const b = server.text ?? "";
+    return a.length > 0 && a === b;
+  }
+  if (optimistic.type === "gif") {
+    return Boolean(optimistic.gifUrl && optimistic.gifUrl === server.gifUrl);
+  }
+  if (optimistic.type === "image") {
+    return Boolean(
+      (optimistic.imageUrl && optimistic.imageUrl === server.imageUrl) ||
+        (optimistic.imageData && optimistic.imageData === server.imageData),
+    );
+  }
+  if (optimistic.type === "audio") {
+    return Boolean(optimistic.audioData && optimistic.audioData === server.audioData);
+  }
+  if (optimistic.type === "video") {
+    return (
+      (optimistic.fileData && optimistic.fileData === server.fileData) ||
+      (optimistic.text ?? "") === (server.text ?? "")
+    );
+  }
+  return (optimistic.text ?? "") === (server.text ?? "");
+}
+
 /** Match an optimistic outgoing row to its server copy. */
 export function findOptimisticMatch(
   optimistic: ApiMessage,
   serverMessages: ApiMessage[],
 ): ApiMessage | undefined {
   const optTime = new Date(optimistic.timestamp).getTime();
-  return serverMessages.find(
-    (f) =>
-      f.senderId === optimistic.senderId &&
-      f.type === optimistic.type &&
-      f.id !== optimistic.id &&
-      Math.abs(new Date(f.timestamp).getTime() - optTime) < 120_000,
-  );
+  return serverMessages.find((f) => {
+    if (f.id === optimistic.id) return false;
+    if (f.senderId !== optimistic.senderId || f.type !== optimistic.type) return false;
+    const serverTime = new Date(f.timestamp).getTime();
+    if (Math.abs(serverTime - optTime) > 30_000) return false;
+    if (optimistic.type === "text" || optimistic.type === "gif") {
+      return outgoingContentMatches(optimistic, f);
+    }
+    // Hosted uploads: optimistic row uses blob preview, server row uses Cloudinary URL.
+    if (hasLocalMediaPreview(optimistic)) {
+      return serverTime >= optTime - 5_000;
+    }
+    if (outgoingContentMatches(optimistic, f)) return true;
+    return serverTime >= optTime - 5_000;
+  });
 }
 
 export function isSameOutgoingMessage(a: ApiMessage, b: ApiMessage): boolean {
@@ -80,21 +120,11 @@ export function replaceOptimisticMessage(
   prev: ApiMessage[],
   tempId: string,
   display: ApiMessage,
-  senderId: string,
+  _senderId: string,
 ): ApiMessage[] {
-  const displayTime = new Date(display.timestamp).getTime();
-  const filtered = prev.filter((m) => {
-    if (m.id === tempId || m.id === display.id) return false;
-    if (
-      m.senderId === senderId &&
-      m.type === display.type &&
-      Math.abs(new Date(m.timestamp).getTime() - displayTime) < 120_000
-    ) {
-      return false;
-    }
-    return true;
-  });
-  return [...filtered, display];
+  const withoutTemp = prev.filter((m) => m.id !== tempId);
+  if (withoutTemp.some((m) => m.id === display.id)) return withoutTemp;
+  return [...withoutTemp, display];
 }
 
 export async function fetchAndMergeMessages(current: ApiMessage[], getMessages: () => Promise<{ messages?: ApiMessage[] }>): Promise<ApiMessage[]> {

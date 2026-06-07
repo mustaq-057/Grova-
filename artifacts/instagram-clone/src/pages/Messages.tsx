@@ -50,7 +50,7 @@ import {
   getHiddenMessageIds,
 } from "@/lib/hidden-messages";
 import { parsePresenceResponse, isPartnerActiveInChat } from "@/lib/presence-api";
-import { reconcilePendingOptimistics, replaceOptimisticMessage } from "@/lib/chat-sync";
+import { findOptimisticMatch, reconcilePendingOptimistics, replaceOptimisticMessage } from "@/lib/chat-sync";
 import { mergeMessagesIfChanged, messagesListSignature } from "@/lib/message-list-perf";
 import { downloadChatAsImage, downloadChatAsText } from "@/lib/chat-download";
 import { openLiveChannel } from "@/lib/sse-client";
@@ -234,7 +234,7 @@ export default function Messages() {
     stickToBottomRef.current = true;
     isNearBottomRef.current = true;
     setIsNearBottom(true);
-    scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
+    scrollChatToBottomAfterPaint(messagesContainerRef.current, bottomRef.current);
   }, []);
 
   const scrollToBottomForMedia = useCallback(() => {
@@ -405,7 +405,7 @@ export default function Messages() {
           applyMessageBatch(raw);
           const more = data.pagination?.hasMore ?? false;
           setHasMore(more);
-        } else {
+        } else if (!hadMessages) {
           setMessages((prev) => {
             const pending = prev.filter((m) => pendingOutgoingRef.current.has(m.id));
             messagesSigRef.current = pending.length ? messagesListSignature(pending) : "0";
@@ -581,10 +581,8 @@ export default function Messages() {
             if (msg.senderId === user?.id) {
               const optimisticIdx = prev.findIndex(
                 (m) =>
-                  m.senderId === user.id &&
-                  m.id !== msg.id &&
-                  m.type === msg.type &&
-                  Math.abs(new Date(m.timestamp).getTime() - new Date(msg.timestamp).getTime()) < 120_000,
+                  pendingOutgoingRef.current.has(m.id) &&
+                  findOptimisticMatch(m, [msg]) !== undefined,
               );
               if (optimisticIdx >= 0) {
                 pendingOutgoingRef.current.delete(prev[optimisticIdx]!.id);
@@ -983,7 +981,6 @@ export default function Messages() {
     const tailChanged = tailSig !== lastMessageTailRef.current;
     lastMessageTailRef.current = tailSig;
 
-    const isMedia = last?.type === "gif" || last?.type === "image" || last?.type === "video";
     const firstPaint = isInitialLoadRef.current;
     const isOwnLast = last?.senderId === user?.id;
 
@@ -994,15 +991,11 @@ export default function Messages() {
       (isNearBottomRef.current && tailChanged);
 
     if (shouldStick) {
-      if (isMedia || firstPaint) {
-        scrollChatToBottomAfterPaint(
-          messagesContainerRef.current,
-          bottomRef.current,
-          firstPaint,
-        );
-      } else {
-        scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
-      }
+      scrollChatToBottomAfterPaint(
+        messagesContainerRef.current,
+        bottomRef.current,
+        firstPaint || (isOwnLast && tailChanged),
+      );
       setHasNewMessages(false);
       stickToBottomRef.current = false;
     } else if (
