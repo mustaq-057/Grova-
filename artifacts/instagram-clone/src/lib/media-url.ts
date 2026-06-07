@@ -63,3 +63,7 @@ export function resolveChatVideoUrl(
     mimeType: mimeType || "video/mp4",
   });
 }
+
+export function resolveChatAudioUrl(url: string | undefined): string | undefined {
+  return resolveStorageMediaUrl(url, { fileName: "voice.webm", mimeType: "audio/webm" });
+}

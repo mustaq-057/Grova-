@@ -13,6 +13,13 @@ function cacheKey(userId: string): string {
   return `grova_chat_v${CACHE_VERSION}_${userId}`;
 }
 
+function keepUrlField(value?: string): string | undefined {
+  if (!value?.trim()) return undefined;
+  const v = value.trim();
+  if (v.startsWith("http") || v.startsWith("/api/") || v.startsWith("blob:")) return v;
+  return undefined;
+}
+
 /** Strip heavy blobs so sessionStorage stays small and fast to parse. */
 function slimMessage(m: ApiMessage): ApiMessage {
   return {
@@ -30,7 +37,13 @@ function slimMessage(m: ApiMessage): ApiMessage {
     replyToText: m.replyToText,
     replyToSenderId: m.replyToSenderId,
     gifUrl: m.gifUrl,
-    imageUrl: m.imageUrl,
+    imageUrl: keepUrlField(m.imageUrl),
+    imageData: keepUrlField(m.imageData),
+    audioData: keepUrlField(m.audioData),
+    fileData: keepUrlField(m.fileData),
+    fileType: m.fileType,
+    fileSize: m.fileSize,
+    location: m.location,
     seenByPartner: m.seenByPartner,
     readAt: m.readAt,
     pinned: m.pinned,

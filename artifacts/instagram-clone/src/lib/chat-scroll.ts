@@ -36,11 +36,9 @@ export function scrollChatToBottomAfterPaint(
   const run = () => scrollChatToBottom(container, bottomAnchor);
   run();
   requestAnimationFrame(run);
-  requestAnimationFrame(() => requestAnimationFrame(run));
   if (aggressive) {
     setTimeout(run, 0);
     setTimeout(run, 80);
-    setTimeout(run, 200);
   } else {
     setTimeout(run, 48);
   }

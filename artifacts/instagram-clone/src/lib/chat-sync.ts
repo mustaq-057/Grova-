@@ -43,6 +43,10 @@ export function findOptimisticMatch(
   );
 }
 
+export function isSameOutgoingMessage(a: ApiMessage, b: ApiMessage): boolean {
+  return Boolean(findOptimisticMatch(a, [b]));
+}
+
 /** Drop optimistic rows once the server has the real message, then merge fresh data. */
 export function reconcilePendingOptimistics(
   prev: ApiMessage[],

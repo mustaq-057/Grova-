@@ -2090,19 +2090,47 @@ export default function Messages() {
   }, []);
 
   const handleCroppedImage = useCallback(async (croppedDataUrl: string) => {
-    if (cropSendInFlightRef.current) return;
+    if (cropSendInFlightRef.current || !user) return;
     cropSendInFlightRef.current = true;
     dismissImageCrop();
+
+    const tempId = crypto.randomUUID();
+    const sticker = mediaModeSticker(mediaViewMode);
+    pendingOutgoingRef.current.add(tempId);
+    const optimistic = buildOptimisticMessage(
+      {
+        senderId: user.id,
+        type: "image",
+        imageUrl: croppedDataUrl,
+        companionSticker: sticker,
+      },
+      tempId,
+    );
+    setMessages((prev) => [...prev, optimistic]);
+    requestStickToBottom();
+
     try {
       const url = await uploadMediaToB2(croppedDataUrl, pendingImageType);
-      await sendMsg({ type: "image", imageUrl: url, companionSticker: mediaModeSticker(mediaViewMode) });
+      const outgoing = await prepareOutgoingMessage({
+        senderId: user.id,
+        type: "image",
+        imageUrl: url,
+        companionSticker: sticker,
+      });
+      const saved = await api.sendMessage(outgoing);
+      const [display] = await normalizeMessages([saved]);
+      pendingOutgoingRef.current.delete(tempId);
+      setMessages((prev) => replaceOptimisticMessage(prev, tempId, display, user.id));
+      requestStickToBottom();
     } catch (uploadError) {
       console.error("Failed to upload image:", uploadError);
-      alert(uploadError instanceof Error ? uploadError.message : "Image upload failed.");
+      pendingOutgoingRef.current.delete(tempId);
+      setMessages((prev) => prev.filter((m) => m.id !== tempId));
+      toast.error(uploadError instanceof Error ? uploadError.message : "Image upload failed.");
     } finally {
       cropSendInFlightRef.current = false;
     }
-  }, [pendingImageType, sendMsg, mediaModeSticker, mediaViewMode, dismissImageCrop]);
+  }, [pendingImageType, user, mediaModeSticker, mediaViewMode, dismissImageCrop, requestStickToBottom]);
 
   // Voice recording
   const startRecording = useCallback(async () => {
@@ -2606,7 +2634,9 @@ export default function Messages() {
         style={{ scrollBehavior: 'auto' }}
         onClick={(e) => {
           const t = e.target as HTMLElement;
-          if (t.closest("button, a, input, textarea, video, audio, [role='button']")) return;
+          if (t.closest("button, a, input, textarea, video, audio, img, [role='button']")) return;
+          if (!isNearBottomRef.current) return;
+          if (window.matchMedia("(max-width: 767px)").matches) return;
           messageInputRef.current?.focus();
         }}
       >

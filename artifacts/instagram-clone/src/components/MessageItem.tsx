@@ -17,7 +17,7 @@ import { getQuickReactions, onQuickReactionsChanged } from "@/lib/quick-reaction
 import { isReplyPhotoPlaceholder, parseLegacyReply, parseMediaViewMode, replyPreviewLabel } from "@/lib/message-utils";
 import { tryRefreshSession } from "@/lib/api";
 import { MessageText } from "@/lib/linkify";
-import { resolveChatImageUrl, resolveChatVideoUrl } from "@/lib/media-url";
+import { resolveChatImageUrl, resolveChatVideoUrl, resolveChatAudioUrl } from "@/lib/media-url";
 import { useEffect } from "react";
 
 function isEmojiOnlyText(text?: string): boolean {
@@ -116,6 +116,10 @@ export const MessageItem = memo(function MessageItem({
   const videoDisplaySrc = useMemo(
     () => resolveChatVideoUrl(msg.fileData, msg.text, msg.fileType),
     [msg.fileData, msg.text, msg.fileType],
+  );
+  const audioDisplaySrc = useMemo(
+    () => resolveChatAudioUrl(msg.audioData) ?? msg.audioData,
+    [msg.audioData],
   );
 
   useEffect(() => {
@@ -227,8 +231,8 @@ export const MessageItem = memo(function MessageItem({
     <>
       {msg.type === "audio" && !msg.audioData ? (
         <p className="text-sm text-muted-foreground italic px-1">Sending voice…</p>
-      ) : msg.type === "audio" && msg.audioData ? (
-        <AudioMessage audioData={msg.audioData} isMe={isMe} />
+      ) : msg.type === "audio" && audioDisplaySrc ? (
+        <AudioMessage audioData={audioDisplaySrc} isMe={isMe} />
       ) : isGif && msg.gifUrl ? (
         <img
           src={msg.gifUrl}
