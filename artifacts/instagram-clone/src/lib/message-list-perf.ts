@@ -1,7 +1,15 @@
 import type { ApiMessage } from "./api";
 
+function mediaUrlSig(url?: string): string {
+  if (!url) return "";
+  if (url.startsWith("blob:") || url.startsWith("data:")) return "local";
+  return url.length > 48 ? url.slice(-48) : url;
+}
+
 function messageRowSig(m: ApiMessage): string {
-  return `${m.id}:${m.timestamp}:${m.type}:${m.text?.length ?? 0}:${m.imageUrl ? 1 : 0}:${m.audioData ? 1 : 0}:${m.reaction ?? ""}:${m.deleted ? 1 : 0}:${m.seenByPartner ? 1 : 0}:${m.readAt ?? ""}:${m.read ? 1 : 0}`;
+  const img = mediaUrlSig(m.imageUrl ?? m.imageData);
+  const file = mediaUrlSig(m.fileData);
+  return `${m.id}:${m.timestamp}:${m.type}:${m.text?.length ?? 0}:${img}:${file}:${m.audioData ? 1 : 0}:${m.reaction ?? ""}:${m.deleted ? 1 : 0}:${m.seenByPartner ? 1 : 0}:${m.readAt ?? ""}:${m.read ? 1 : 0}`;
 }
 
 /** Cheap signature to skip redundant list updates after polling. */

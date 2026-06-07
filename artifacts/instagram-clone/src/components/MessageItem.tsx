@@ -50,7 +50,7 @@ export interface MessageItemProps {
   seenLabel?: string;
   onStartThread?: (msg: ApiMessage) => void;
   onReplyToThread?: (threadId: string) => void;
-  onMediaLoad?: () => void;
+  onMediaLoad?: (messageId: string) => void;
   onOpenMedia?: (msg: ApiMessage) => void;
   replySource?: ApiMessage;
   onJumpToMessage?: (messageId: string) => void;
@@ -123,9 +123,16 @@ export const MessageItem = memo(function MessageItem({
   );
 
   useEffect(() => {
-    setImageLoadFailed(false);
-    setImageRetry(0);
-  }, [msg.imageUrl, msg.imageData]);
+    const next = msg.imageUrl || msg.imageData || "";
+    const prev = imageDisplaySrc || "";
+    const localToRemote =
+      (prev.startsWith("blob:") || prev.startsWith("data:")) &&
+      next.startsWith("http");
+    if (!localToRemote) {
+      setImageLoadFailed(false);
+      setImageRetry(0);
+    }
+  }, [msg.imageUrl, msg.imageData, imageDisplaySrc]);
 
   const legacyReply = useMemo(
     () => (!msg.replyToText && msg.text ? parseLegacyReply(msg.text) : null),
@@ -239,7 +246,7 @@ export const MessageItem = memo(function MessageItem({
           alt="GIF"
           className="max-w-[min(280px,92vw)] max-h-[340px] w-auto h-auto object-contain rounded-2xl block"
           loading="lazy"
-          onLoad={onMediaLoad}
+          onLoad={() => onMediaLoad?.(msg.id)}
         />
       ) : isImage && (msg.imageUrl || msg.imageData || mediaLimit > 0) ? (
         isEphemeralMedia ? (
@@ -261,7 +268,7 @@ export const MessageItem = memo(function MessageItem({
             loading="lazy"
             decoding="async"
             referrerPolicy="no-referrer"
-            onLoad={onMediaLoad}
+            onLoad={() => onMediaLoad?.(msg.id)}
             onError={() => {
               if (imageRetry < 2) {
                 void tryRefreshSession().finally(() => {
@@ -461,10 +468,10 @@ export const MessageItem = memo(function MessageItem({
         {typeof msg.reaction === "string" && msg.reaction.trim() && (
           <button
             type="button"
-            onClick={() => handleReaction(msg.reaction!)}
+            onClick={openReactionPicker}
             className={`emoji-native text-[1.1rem] leading-none -mt-1 mb-0.5 z-10 ${isMe ? "mr-1" : "ml-1"}`}
-            title={`React with ${msg.reaction}`}
-            aria-label={`Reacted with ${msg.reaction}`}
+            title={`Reaction: ${msg.reaction}`}
+            aria-label={`Reaction: ${msg.reaction}`}
           >
             {msg.reaction}
           </button>

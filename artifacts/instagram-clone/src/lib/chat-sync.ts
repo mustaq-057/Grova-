@@ -1,6 +1,37 @@
 import type { ApiMessage } from "./api";
 import { normalizeMessages } from "./message-utils";
 
+export function tombstoneMessage(m: ApiMessage): ApiMessage {
+  return {
+    ...m,
+    deleted: true,
+    text: undefined,
+    audioData: undefined,
+    gifUrl: undefined,
+    imageData: undefined,
+    imageUrl: undefined,
+    fileData: undefined,
+  };
+}
+
+function pickMediaUrl(incoming?: string, prev?: string): string | undefined {
+  if (!incoming) return prev;
+  if (!prev) return incoming;
+  const prevLocal = prev.startsWith("blob:") || prev.startsWith("data:");
+  const incomingRemote = incoming.startsWith("http") || incoming.startsWith("/api/");
+  if (prevLocal && incomingRemote) return incoming;
+  return incoming;
+}
+
+/** Keep locally unsent rows tombstoned even if a stale poll returns full content. */
+export function enforceUnsentMessages(
+  messages: ApiMessage[],
+  unsentIds: ReadonlySet<string>,
+): ApiMessage[] {
+  if (unsentIds.size === 0) return messages;
+  return messages.map((m) => (unsentIds.has(m.id) ? tombstoneMessage(m) : m));
+}
+
 /** Merge server messages with local state (newest wins per id), sorted by time. */
 export function mergeMessagesById(existing: ApiMessage[], incoming: ApiMessage[]): ApiMessage[] {
   const map = new Map<string, ApiMessage>();
@@ -8,7 +39,12 @@ export function mergeMessagesById(existing: ApiMessage[], incoming: ApiMessage[]
   for (const m of incoming) {
     const prev = map.get(m.id);
     if (!prev) {
-      map.set(m.id, m);
+      map.set(m.id, m.deleted ? tombstoneMessage(m) : m);
+      continue;
+    }
+    const deleted = Boolean(prev.deleted || m.deleted);
+    if (deleted) {
+      map.set(m.id, tombstoneMessage({ ...prev, ...m }));
       continue;
     }
     const incomingText = m.text ?? "";
@@ -18,15 +54,16 @@ export function mergeMessagesById(existing: ApiMessage[], incoming: ApiMessage[]
     map.set(m.id, {
       ...m,
       text,
-      imageUrl: m.imageUrl ?? prev.imageUrl,
-      imageData: m.imageData ?? prev.imageData,
+      imageUrl: pickMediaUrl(m.imageUrl, prev.imageUrl),
+      imageData: pickMediaUrl(m.imageData, prev.imageData),
       audioData: m.audioData ?? prev.audioData,
-      fileData: m.fileData ?? prev.fileData,
+      fileData: pickMediaUrl(m.fileData, prev.fileData),
       fileType: m.fileType ?? prev.fileType,
       fileSize: m.fileSize ?? prev.fileSize,
       read: prev.read || m.read,
       readAt: prev.readAt ?? m.readAt,
       seenByPartner: m.seenByPartner || prev.seenByPartner,
+      reaction: m.reaction ?? prev.reaction,
     });
   }
   return Array.from(map.values()).sort(

@@ -16,7 +16,8 @@ function cacheKey(userId: string): string {
 function keepUrlField(value?: string): string | undefined {
   if (!value?.trim()) return undefined;
   const v = value.trim();
-  if (v.startsWith("http") || v.startsWith("/api/") || v.startsWith("blob:")) return v;
+  if (v.startsWith("blob:") || v.startsWith("data:")) return undefined;
+  if (v.startsWith("http") || v.startsWith("/api/")) return v;
   return undefined;
 }
 
