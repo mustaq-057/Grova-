@@ -166,6 +166,9 @@ export const MessageItem = memo(function MessageItem({
   const handleLike = useCallback(() => onLike(msg.id), [onLike, msg.id]);
   const handleReply = useCallback(() => onReply?.(msg), [onReply, msg]);
   const handleOpenMenu = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowReactions(false);
+    setShowReactionEmojiPicker(false);
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     onOpenMenu?.(msg, rect);
   }, [onOpenMenu, msg]);
@@ -408,7 +411,7 @@ export const MessageItem = memo(function MessageItem({
 
         {bubbleNode}
 
-        {msg.reaction && (
+        {typeof msg.reaction === "string" && msg.reaction.trim() && (
           <button
             type="button"
             onClick={() => handleReaction(msg.reaction!)}

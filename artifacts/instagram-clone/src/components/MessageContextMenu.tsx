@@ -1,6 +1,13 @@
 import { memo, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { Copy, Pin, CornerUpLeft, Trash2, Undo2, Pencil, Download } from "lucide-react";
 import type { ApiMessage } from "@/lib/api";
+
+function reactionLabel(reaction: unknown): string | null {
+  if (typeof reaction !== "string") return null;
+  const trimmed = reaction.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
 
 export type MessageMenuMode = "full" | "audio";
 
@@ -49,8 +56,10 @@ export const MessageContextMenu = memo(function MessageContextMenu({
     if (top + rect.height > window.innerHeight - 12) {
       top = Math.max(12, position.top - rect.height - 8);
     }
-    setCoords({ top, left });
-  }, [position]);
+    setCoords((prev) => (prev.top === top && prev.left === left ? prev : { top, left }));
+  }, [position.top, position.left]);
+
+  const removeReactionLabel = reactionLabel(msg.reaction);
 
   const item = (
     label: string,
@@ -73,20 +82,21 @@ export const MessageContextMenu = memo(function MessageContextMenu({
     </button>
   );
 
-  return (
+  const menu = (
     <>
-      <div className="fixed inset-0 z-40" onClick={onClose} />
+      <div className="fixed inset-0 z-[220]" onClick={onClose} aria-hidden />
       <div
         ref={ref}
-        className="fixed z-50 min-w-[200px] bg-[#262626] text-white rounded-xl py-2 shadow-2xl border border-white/10 max-h-[70vh] overflow-y-auto"
+        role="menu"
+        className="fixed z-[221] min-w-[200px] bg-[#262626] text-white rounded-xl py-2 shadow-2xl border border-white/10 max-h-[70vh] overflow-y-auto"
         style={{ top: coords.top, left: coords.left }}
       >
         {mode === "audio" ? (
           <>
             {onReply && item("Reply", <CornerUpLeft className="w-4 h-4" />, onReply)}
             {item("Pin to Memories", <Pin className="w-4 h-4" />, onPin)}
-            {msg.reaction && onRemoveReaction &&
-              item(`Remove ${msg.reaction}`, <Undo2 className="w-4 h-4" />, onRemoveReaction)}
+            {removeReactionLabel && onRemoveReaction &&
+              item(`Remove ${removeReactionLabel}`, <Undo2 className="w-4 h-4" />, onRemoveReaction)}
             {isMe && onUnsend && item("Unsend for everyone", <Undo2 className="w-4 h-4" />, onUnsend, true)}
             {onDeleteForMe && item("Delete for me only", <Trash2 className="w-4 h-4" />, onDeleteForMe)}
           </>
@@ -95,8 +105,8 @@ export const MessageContextMenu = memo(function MessageContextMenu({
             {onReply && item("Reply", <CornerUpLeft className="w-4 h-4" />, onReply)}
             {msg.text && onCopy && item("Copy", <Copy className="w-4 h-4" />, onCopy)}
             {item("Pin to Memories", <Pin className="w-4 h-4" />, onPin)}
-            {msg.reaction && onRemoveReaction &&
-              item(`Remove ${msg.reaction}`, <Undo2 className="w-4 h-4" />, onRemoveReaction)}
+            {removeReactionLabel && onRemoveReaction &&
+              item(`Remove ${removeReactionLabel}`, <Undo2 className="w-4 h-4" />, onRemoveReaction)}
             {onDownloadChat &&
               item("Download chat", <Download className="w-4 h-4" />, onDownloadChat)}
             {onDeleteForMe &&
@@ -108,4 +118,7 @@ export const MessageContextMenu = memo(function MessageContextMenu({
       </div>
     </>
   );
+
+  if (typeof document === "undefined") return null;
+  return createPortal(menu, document.body);
 });

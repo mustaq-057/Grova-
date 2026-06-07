@@ -721,8 +721,9 @@ export default function Messages() {
             reactions: { emoji: string; userId: string }[];
             byUserId?: string;
           };
-          const myReaction = d.reactions.find((r) => r.userId === user.id)?.emoji;
-          const partnerReaction = d.reactions.find((r) => r.userId === partnerId)?.emoji;
+          const list = Array.isArray(d.reactions) ? d.reactions : [];
+          const myReaction = list.find((r) => r.userId === user.id)?.emoji;
+          const partnerReaction = list.find((r) => r.userId === partnerId)?.emoji;
           setMessages((prev) => {
             const found = prev.find(m => m.id === d.messageId);
             if (!found) return prev;
@@ -2324,13 +2325,14 @@ export default function Messages() {
     });
     try {
       const { reactions } = await api.reactMessage(id, user.id, emoji);
+      const list = Array.isArray(reactions) ? reactions : [];
       setMessages((prev) => {
         const found = prev.find(m => m.id === id);
         if (!found) return prev;
         return prev.map((m) => {
           if (m.id !== id) return m;
-          const myReaction = reactions.find((r) => r.userId === user.id)?.emoji;
-          const partnerReaction = reactions.find((r) => r.userId === partnerId)?.emoji;
+          const myReaction = list.find((r) => r.userId === user.id)?.emoji;
+          const partnerReaction = list.find((r) => r.userId === partnerId)?.emoji;
           const displayReaction =
             m.senderId === user.id
               ? (partnerReaction ?? myReaction)
@@ -3036,8 +3038,8 @@ export default function Messages() {
             contextMenu.msg.senderId === user.id ? () => handleUnsend(contextMenu.msg.id) : undefined
           }
           onRemoveReaction={
-            contextMenu.msg.reaction
-              ? () => handleReact(contextMenu.msg.id, contextMenu.msg.reaction!)
+            typeof contextMenu.msg.reaction === "string" && contextMenu.msg.reaction.trim()
+              ? () => handleReact(contextMenu.msg.id, contextMenu.msg.reaction as string)
               : undefined
           }
           onEdit={
