@@ -102,6 +102,7 @@ import {
   readChatScrollAnchor,
   restoreScrollToAnchor,
   saveChatScrollAnchor,
+  shouldRestoreScrollAnchor,
 } from "@/lib/chat-scroll-anchor";
 import { resolveChatImageUrl, resolveChatVideoUrl } from "@/lib/media-url";
 import DoodleCanvas, { DOODLE_HEIGHT_STEP, DOODLE_MIN_HEIGHT } from "@/components/DoodleCanvas";
@@ -282,7 +283,11 @@ export default function Messages() {
   }, []);
 
   const handleMediaCommitted = useCallback(
-    (messageId: string, field: "imageUrl" | "imageData", remoteUrl: string) => {
+    (
+      messageId: string,
+      field: "imageUrl" | "imageData" | "fileData",
+      remoteUrl: string,
+    ) => {
       setMessages((prev) => commitRemoteMediaUrl(prev, messageId, field, remoteUrl));
     },
     [],
@@ -577,22 +582,28 @@ export default function Messages() {
     };
 
     void hydrateQuickReactions();
-    if (messages.length === 0) {
-      const cached = readChatCache(user.id);
-      const savedAnchor = readChatScrollAnchor(user.id);
-      if (savedAnchor) pendingScrollRestoreRef.current = savedAnchor;
-      if (cached && cached.length > 0) {
-        isInitialLoadRef.current = true;
-        if (!savedAnchor) stickToBottomRef.current = true;
-        setMessages(cached);
-        messagesSigRef.current = messagesListSignature(cached);
-      }
-    } else if (isNearBottomRef.current && !pendingScrollRestoreRef.current) {
+    const cached = messages.length === 0 ? readChatCache(user.id) : messages;
+    const tailIds = (cached ?? []).slice(-12).map((m) => m.id);
+    const savedAnchor = readChatScrollAnchor(user.id);
+    const restoreAnchor = shouldRestoreScrollAnchor(savedAnchor, tailIds);
+
+    if (restoreAnchor && savedAnchor) {
+      pendingScrollRestoreRef.current = savedAnchor;
+    } else {
+      pendingScrollRestoreRef.current = null;
+      scrollRestoreAttemptsRef.current = 0;
+      anchorResolveStartedRef.current = false;
+      clearChatScrollAnchor(user.id);
+      isNearBottomRef.current = true;
       stickToBottomRef.current = true;
     }
-    if (user.id) {
-      const saved = readChatScrollAnchor(user.id);
-      if (saved) pendingScrollRestoreRef.current = saved;
+
+    if (messages.length === 0 && cached && cached.length > 0) {
+      isInitialLoadRef.current = true;
+      setMessages(cached);
+      messagesSigRef.current = messagesListSignature(cached);
+    } else if (!restoreAnchor && isNearBottomRef.current) {
+      stickToBottomRef.current = true;
     }
     loadMessages();
 
@@ -1092,7 +1103,7 @@ export default function Messages() {
   // If refresh saved a scroll anchor to an older message, load that window first.
   useEffect(() => {
     if (!user) return;
-    const anchor = pendingScrollRestoreRef.current ?? readChatScrollAnchor(user.id);
+    const anchor = pendingScrollRestoreRef.current;
     if (!anchor || anchor.messageId === "__ratio__") return;
     pendingScrollRestoreRef.current = anchor;
     if (messages.some((m) => m.id === anchor.messageId)) return;
@@ -1131,6 +1142,11 @@ export default function Messages() {
 
     const firstPaint = isInitialLoadRef.current;
     const isOwnLast = last?.senderId === user?.id;
+
+    if (firstPaint && !pendingScrollRestoreRef.current) {
+      const container = messagesContainerRef.current;
+      if (container) scrollChatToBottom(container, bottomRef.current);
+    }
 
     const restoreAnchor = pendingScrollRestoreRef.current;
     if (restoreAnchor && messages.length > 0 && scrollRestoreAttemptsRef.current < 24) {
@@ -1171,6 +1187,13 @@ export default function Messages() {
         bottomRef.current,
         aggressive,
       );
+      if (firstPaint && !restoreAnchor) {
+        window.setTimeout(() => {
+          if (!pendingScrollRestoreRef.current && isNearBottomRef.current) {
+            scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
+          }
+        }, 120);
+      }
       setHasNewMessages(false);
       stickToBottomRef.current = false;
     } else if (
@@ -1654,19 +1677,18 @@ export default function Messages() {
           if (user?.id) writeChatCache(user.id, next);
           return next;
         });
-        requestAnimationFrame(() => {
-          if (localPreview) URL.revokeObjectURL(localPreview);
-        });
+        requestStickToBottom();
       } catch (err) {
         console.error("Failed to send ephemeral media:", err);
         pendingOutgoingRef.current.delete(tempId);
-        if (localPreview) URL.revokeObjectURL(localPreview);
         setMessages((prev) => prev.filter((m) => m.id !== tempId));
         setError("Message did not send. Check your connection and try again.");
         throw err;
+      } finally {
+        if (localPreview) URL.revokeObjectURL(localPreview);
       }
     },
-    [user, online],
+    [user, online, requestStickToBottom],
   );
 
   const openMediaMessage = useCallback(async (msg: ApiMessage) => {
@@ -2148,7 +2170,7 @@ export default function Messages() {
             tempId,
           );
           setMessages((prev) => [...prev, optimistic]);
-          scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
+          requestStickToBottom();
 
           try {
             const duration = await getVideoDurationSafe(normalized);
@@ -2181,16 +2203,16 @@ export default function Messages() {
               writeChatCache(user.id, next);
               return next;
             });
-            requestAnimationFrame(() => URL.revokeObjectURL(previewUrl));
             requestStickToBottom();
           } catch (videoErr) {
             pendingOutgoingRef.current.delete(tempId);
             setMessages((prev) => prev.filter((m) => m.id !== tempId));
-            URL.revokeObjectURL(previewUrl);
             toast.error(
               videoErr instanceof Error ? videoErr.message : "Failed to send video.",
               { duration: 4000 },
             );
+          } finally {
+            URL.revokeObjectURL(previewUrl);
           }
         } else {
           await uploadAndSendFile(normalized);
@@ -3058,7 +3080,7 @@ export default function Messages() {
           </div>
         ))}
 
-        <div ref={bottomRef} className="h-4 shrink-0" aria-hidden />
+        <div ref={bottomRef} className="h-8 shrink-0" aria-hidden />
       </div>
 
       <div className="chat-panel-bottom shrink-0 relative z-10">

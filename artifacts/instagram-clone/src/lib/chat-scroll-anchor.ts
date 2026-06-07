@@ -112,6 +112,21 @@ export function restoreScrollToAnchor(
   return false;
 }
 
+/** Only restore saved position when the user was reading history (not at the bottom). */
+export function shouldRestoreScrollAnchor(
+  anchor: ChatScrollAnchor | null,
+  tailMessageIds: string[],
+): boolean {
+  if (!anchor) return false;
+  if (anchor.messageId !== "__ratio__" && tailMessageIds.includes(anchor.messageId)) {
+    return false;
+  }
+  if (anchor.scrollRatio != null && anchor.scrollRatio >= 0.82) {
+    return false;
+  }
+  return true;
+}
+
 export function captureScrollAnchor(
   container: HTMLElement,
 ): { messageId: string; offsetPx: number; scrollRatio: number } | null {

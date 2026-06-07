@@ -51,7 +51,7 @@ export interface MessageItemProps {
   onStartThread?: (msg: ApiMessage) => void;
   onReplyToThread?: (threadId: string) => void;
   onMediaLoad?: (messageId: string) => void;
-  onMediaCommitted?: (messageId: string, field: "imageUrl" | "imageData", remoteUrl: string) => void;
+  onMediaCommitted?: (messageId: string, field: "imageUrl" | "imageData" | "fileData", remoteUrl: string) => void;
   onOpenMedia?: (msg: ApiMessage) => void;
   replySource?: ApiMessage;
   onJumpToMessage?: (messageId: string) => void;
@@ -345,16 +345,27 @@ export const MessageItem = memo(function MessageItem({
             sentAt={msg.timestamp}
             onOpen={() => onOpenMedia?.(msg)}
           />
+        ) : videoDisplaySrc?.startsWith("blob:") ? (
+          <div className="max-w-[min(280px,92vw)] min-h-[120px] px-4 py-6 rounded-2xl bg-[#262626] border border-white/10 text-sm text-white/70 text-center">
+            <video
+              src={videoDisplaySrc}
+              playsInline
+              muted
+              className="max-w-full max-h-[200px] mx-auto rounded-xl mb-2 object-contain"
+            />
+            <p className="text-xs text-muted-foreground italic">Sending video…</p>
+          </div>
         ) : videoDisplaySrc ? (
           <video
             src={videoDisplaySrc}
             controls
             playsInline
+            preload="metadata"
             className="max-w-[min(280px,92vw)] max-h-[340px] w-auto h-auto object-contain rounded-2xl block cursor-pointer"
             onClick={() => onOpenMedia?.(msg)}
           />
         ) : (
-          <p className="text-sm text-muted-foreground italic px-1">Video unavailable</p>
+          <p className="text-sm text-muted-foreground italic px-1">Sending video…</p>
         )
       ) : isFile && msg.fileData ? (
         <ChatFileBubble msg={msg} isMe={isMe} />

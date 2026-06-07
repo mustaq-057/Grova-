@@ -286,8 +286,8 @@
   min-height: 0;
   overflow-x: hidden;
   overflow-anchor: none;
-  scroll-padding-bottom: 1.5rem;
-  padding-bottom: 0.75rem;
+  scroll-padding-bottom: 2rem;
+  padding-bottom: 1.25rem;
 }
 .chat-message-row {
   /* Avoid content-visibility here — it underestimates height and breaks stick-to-bottom. */
@@ -332,8 +332,8 @@
   .chat-panel-messages {
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
-    padding-bottom: 0.5rem;
-    scroll-padding-bottom: 0.5rem;
+    padding-bottom: 1rem;
+    scroll-padding-bottom: 1.25rem;
   }
 }
 

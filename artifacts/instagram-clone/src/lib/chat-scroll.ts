@@ -1,9 +1,13 @@
 /** Instant scroll to latest message — no animated scroll through history. */
 export function scrollChatToBottom(
   container: HTMLElement | null,
-  _bottomAnchor?: HTMLElement | null,
+  bottomAnchor?: HTMLElement | null,
 ): void {
   if (!container) return;
+  if (bottomAnchor?.isConnected) {
+    bottomAnchor.scrollIntoView({ block: "end", inline: "nearest", behavior: "auto" });
+    return;
+  }
   container.scrollTop = container.scrollHeight;
 }
 

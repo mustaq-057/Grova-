@@ -33,13 +33,19 @@ function pickMediaUrl(incoming?: string, prev?: string): string | undefined {
 }
 
 function mergeOptimisticWithServer(optimistic: ApiMessage, server: ApiMessage): ApiMessage {
+  const remoteVideoReady =
+    server.type === "video" &&
+    isRemoteMediaUrl(server.fileData) &&
+    isLocalMediaUrl(optimistic.fileData);
   return {
     ...server,
     text: server.text ?? optimistic.text,
     gifUrl: server.gifUrl || optimistic.gifUrl,
     imageUrl: pickMediaUrl(server.imageUrl, optimistic.imageUrl),
     imageData: pickMediaUrl(server.imageData, optimistic.imageData),
-    fileData: pickMediaUrl(server.fileData, optimistic.fileData),
+    fileData: remoteVideoReady
+      ? server.fileData
+      : pickMediaUrl(server.fileData, optimistic.fileData),
     audioData: server.audioData ?? optimistic.audioData,
     fileType: server.fileType ?? optimistic.fileType,
     fileSize: server.fileSize ?? optimistic.fileSize,
@@ -129,10 +135,18 @@ function outgoingContentMatches(optimistic: ApiMessage, server: ApiMessage): boo
     return Boolean(optimistic.audioData && optimistic.audioData === server.audioData);
   }
   if (optimistic.type === "video") {
-    return (
-      (optimistic.fileData && optimistic.fileData === server.fileData) ||
+    if (optimistic.fileData && server.fileData && optimistic.fileData === server.fileData) {
+      return true;
+    }
+    if (
+      optimistic.fileSize != null &&
+      server.fileSize != null &&
+      optimistic.fileSize === server.fileSize &&
       (optimistic.text ?? "") === (server.text ?? "")
-    );
+    ) {
+      return true;
+    }
+    return false;
   }
   return (optimistic.text ?? "") === (server.text ?? "");
 }
@@ -160,7 +174,15 @@ export function findOptimisticMatch(
     }
     // Never guess blob uploads during poll merge — wait for send/SSE confirmation.
     if (hasLocalMediaPreview(optimistic)) {
-      return allowBlob && dt <= 15_000 && serverTime >= optTime - 5_000;
+      if (!allowBlob) return false;
+      if (optimistic.type === "video" || optimistic.type === "file") {
+        return (
+          dt <= 120_000 &&
+          serverTime >= optTime - 10_000 &&
+          outgoingContentMatches(optimistic, f)
+        );
+      }
+      return dt <= 15_000 && serverTime >= optTime - 5_000;
     }
     if (outgoingContentMatches(optimistic, f)) return dt <= 15_000;
     return dt <= 8_000 && serverTime >= optTime - 3_000;
@@ -236,7 +258,9 @@ export function commitRemoteMediaUrl(
   const row = prev[idx]!;
   if (!isRemoteMediaUrl(remoteUrl)) return prev;
   const hasLocal =
-    isLocalMediaUrl(row.imageUrl) || isLocalMediaUrl(row.imageData);
+    isLocalMediaUrl(row.imageUrl) ||
+    isLocalMediaUrl(row.imageData) ||
+    isLocalMediaUrl(row.fileData);
   if (!hasLocal) return prev;
   const next = [...prev];
   const patch: Partial<ApiMessage> = {};
@@ -244,6 +268,8 @@ export function commitRemoteMediaUrl(
     patch.imageUrl = remoteUrl;
     if (isLocalMediaUrl(row.imageData)) patch.imageData = undefined;
     if (isLocalMediaUrl(row.imageUrl) && field === "imageData") patch.imageUrl = remoteUrl;
+  } else if (field === "fileData") {
+    patch.fileData = remoteUrl;
   } else {
     patch[field] = remoteUrl;
   }
