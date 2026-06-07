@@ -12,3 +12,8 @@ export function getPostMediaUrls(post: ApiPost): string[] {
 export function postHasCarousel(post: ApiPost): boolean {
   return getPostMediaUrls(post).length > 1;
 }
+
+/** Total images in a user's grid (carousel-aware). */
+export function countPostImages(posts: ApiPost[]): number {
+  return posts.reduce((total, post) => total + getPostMediaUrls(post).length, 0);
+}

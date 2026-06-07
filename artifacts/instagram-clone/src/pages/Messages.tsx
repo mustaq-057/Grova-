@@ -1101,12 +1101,14 @@ export default function Messages() {
   }, []);
 
   const markedReadRef = useRef<Set<string>>(new Set());
+  const messagesForReadRef = useRef(messages);
+  messagesForReadRef.current = messages;
 
   const markPartnerMessagesRead = useCallback(() => {
     if (!user || !isReadReceiptsEnabled()) return;
     if (document.visibilityState !== "visible") return;
 
-    const unreadIds = messages
+    const unreadIds = messagesForReadRef.current
       .filter(
         (m) =>
           m.senderId === partnerId &&
@@ -1124,15 +1126,20 @@ export default function Messages() {
     });
     setMessages((prev) => {
       const unreadSet = new Set(unreadIds);
-      return prev.map((m) =>
-        unreadSet.has(m.id) ? { ...m, read: true, readAt: m.readAt ?? readAt } : m,
-      );
+      let changed = false;
+      const next = prev.map((m) => {
+        if (!unreadSet.has(m.id)) return m;
+        if (m.read && m.readAt) return m;
+        changed = true;
+        return { ...m, read: true, readAt: m.readAt ?? readAt };
+      });
+      return changed ? next : prev;
     });
-  }, [messages, user, partnerId]);
+  }, [user, partnerId]);
 
   useEffect(() => {
     markPartnerMessagesRead();
-  }, [markPartnerMessagesRead]);
+  }, [messages, markPartnerMessagesRead]);
 
   useEffect(() => {
     if (!user || !isReadReceiptsEnabled()) return;

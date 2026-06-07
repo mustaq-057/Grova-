@@ -154,14 +154,21 @@ router.post("/posts", rateLimiters.messages, authenticate, async (req, res) => {
     res.status(400).json({ error: "mediaUrl or mediaUrls required" });
     return;
   }
-  const countResult = await db.execute(
-    "SELECT COUNT(*)::int AS cnt FROM posts WHERE author_id = $1",
+  const rowsResult = await db.execute(
+    "SELECT media_url, media_urls FROM posts WHERE author_id = $1",
     [userId],
   );
-  const postCount = Number((countResult.rows[0] as { cnt?: number })?.cnt ?? 0);
-  if (postCount >= MAX_POSTS_PER_USER) {
+  let imageCount = 0;
+  for (const row of rowsResult.rows) {
+    imageCount += parsePostMedia(row as Record<string, unknown>).mediaUrls.length;
+  }
+  if (imageCount + urls.length > MAX_POSTS_PER_USER) {
+    const remaining = Math.max(0, MAX_POSTS_PER_USER - imageCount);
     res.status(400).json({
-      error: `Maximum ${MAX_POSTS_PER_USER} photos allowed. Delete one from your grid to add more.`,
+      error:
+        remaining === 0
+          ? `Maximum ${MAX_POSTS_PER_USER} photos allowed. Delete some from your grid to add more.`
+          : `You can only add ${remaining} more photo(s).`,
     });
     return;
   }

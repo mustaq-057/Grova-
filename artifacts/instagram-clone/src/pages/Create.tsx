@@ -7,8 +7,9 @@ import { savePost, getPosts, clearLegacyLocalMedia } from "@/lib/local-posts";
 import { uploadMedia } from "@/lib/media-upload";
 import { detectMediaByMagicBytes, isAcceptedGalleryImage, normalizeGalleryFile } from "@/lib/media-file";
 import { ImageCropModal } from "@/components/ImageCropModal";
+import { countPostImages } from "@/lib/post-media";
 
-const MAX_POSTS = 20;
+const MAX_PHOTOS = 20;
 const MAX_PHOTOS_PER_POST = 10;
 
 type QueuedPhoto = {
@@ -26,20 +27,20 @@ export default memo(function Create() {
   const [location, setLocationLabel] = useState("");
   const [step, setStep] = useState<"pick" | "review">("pick");
   const [sharing, setSharing] = useState(false);
-  const [postCount, setPostCount] = useState(0);
+  const [savedPhotoCount, setSavedPhotoCount] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const myId = user?.id ?? "me";
-  const draftingPost = queue.length > 0 ? 1 : 0;
-  const postsUsed = postCount + draftingPost;
-  const slotsLeft = Math.max(0, MAX_POSTS - postCount - draftingPost);
-  const canAddMoreToQueue = slotsLeft > 0 && queue.length < MAX_PHOTOS_PER_POST;
+  const photosUsed = savedPhotoCount + queue.length;
+  const slotsLeft = Math.max(0, MAX_PHOTOS - savedPhotoCount);
+  const canAddMore = photosUsed < MAX_PHOTOS;
+  const canAddMoreToQueue = canAddMore && queue.length < MAX_PHOTOS_PER_POST;
 
   useEffect(() => {
     if (!user) return;
     getPosts(user.id)
-      .then((posts) => setPostCount(posts.length))
-      .catch(() => setPostCount(0));
+      .then((posts) => setSavedPhotoCount(countPostImages(posts)))
+      .catch(() => setSavedPhotoCount(0));
   }, [user]);
 
   const addFiles = async (files: FileList | File[]) => {
@@ -64,16 +65,17 @@ export default memo(function Create() {
       alert("Only photos are supported.");
       return;
     }
-    if (postCount >= MAX_POSTS && queue.length === 0) {
-      alert(`You already have ${MAX_POSTS} posts. Delete some from your grid to add more.`);
+    const roomInGrid = MAX_PHOTOS - savedPhotoCount - queue.length;
+    if (roomInGrid <= 0) {
+      alert(`You already have ${MAX_PHOTOS} photos. Delete some from your grid to add more.`);
       return;
     }
-    const room = MAX_PHOTOS_PER_POST - queue.length;
-    if (room <= 0) {
+    const roomInPost = MAX_PHOTOS_PER_POST - queue.length;
+    if (roomInPost <= 0) {
       alert(`Up to ${MAX_PHOTOS_PER_POST} photos per post.`);
       return;
     }
-    const toAdd = list.slice(0, room);
+    const toAdd = list.slice(0, Math.min(roomInGrid, roomInPost));
     let added = 0;
     toAdd.forEach((file) => {
       const reader = new FileReader();
@@ -110,8 +112,8 @@ export default memo(function Create() {
 
   const shareAll = async () => {
     if (!user || queue.length === 0) return;
-    if (postCount >= MAX_POSTS) {
-      alert(`You already have ${MAX_POSTS} posts. Delete one from your grid to add more.`);
+    if (savedPhotoCount + queue.length > MAX_PHOTOS) {
+      alert(`You can only add ${slotsLeft} more photo(s).`);
       return;
     }
     setSharing(true);
@@ -170,8 +172,7 @@ export default memo(function Create() {
       </div>
 
       <p className="text-xs text-muted-foreground mb-4">
-        {postsUsed}/{MAX_POSTS} posts
-        {queue.length > 0 ? ` · ${queue.length} photo${queue.length === 1 ? "" : "s"} in this post` : ""}
+        Photos only · {photosUsed}/{MAX_PHOTOS}
         {queue.length > 0 ? " · tap a photo to crop" : ""}
       </p>
 
@@ -180,20 +181,20 @@ export default memo(function Create() {
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           className={`border-2 border-dashed rounded-2xl flex flex-col items-center justify-center gap-4 py-16 px-6 transition-all ${
-            postCount >= MAX_POSTS
+            !canAddMore
               ? "border-border opacity-60 cursor-not-allowed"
               : dragging
                 ? "border-primary bg-primary/10 scale-[1.01] cursor-pointer"
                 : "border-border hover:border-primary/40 hover:bg-secondary/20 cursor-pointer"
           }`}
           onDragOver={(e) => {
-            if (postCount >= MAX_POSTS) return;
+            if (!canAddMore) return;
             e.preventDefault();
             setDragging(true);
           }}
           onDragLeave={() => setDragging(false)}
-          onDrop={postCount < MAX_POSTS ? handleDrop : undefined}
-          onClick={() => postCount < MAX_POSTS && fileInputRef.current?.click()}
+          onDrop={canAddMore ? handleDrop : undefined}
+          onClick={() => canAddMore && fileInputRef.current?.click()}
           data-testid="upload-dropzone"
         >
           <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 to-pink-500/20 flex items-center justify-center">
@@ -201,11 +202,11 @@ export default memo(function Create() {
           </div>
           <div className="text-center">
             <p className="font-semibold text-base">
-              {postCount >= MAX_POSTS ? "Post limit reached" : "Add photos to your feed"}
+              {!canAddMore ? "Photo limit reached" : "Add photos to your feed"}
             </p>
             <p className="text-sm text-muted-foreground mt-1">Select one or many · crop each one</p>
           </div>
-          {postCount < MAX_POSTS && (
+          {canAddMore && (
             <button
               type="button"
               className="px-6 py-2.5 bg-primary text-primary-foreground text-sm font-semibold rounded-xl shadow-md"
