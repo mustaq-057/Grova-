@@ -279,33 +279,56 @@ export async function sniffVideoFile(file: File): Promise<boolean> {
 const CAMERA_PHOTO_NAME = /^(IMG_|DSC_|DCIM|PXL_|MVIMG_|photo_|image_|Screenshot)/i;
 
 export async function classifyMediaFile(file: File, hintType?: string): Promise<"image" | "video" | "other"> {
-  const type = mimeType(file, hintType);
+  const normalized = normalizeGalleryFile(file, hintType);
+  const type = mimeType(normalized, hintType);
   if (type.startsWith("video/")) return "video";
   if (type.startsWith("image/")) return "image";
-  if (isDocumentFile(file, hintType)) return "other";
+  if (isDocumentFile(normalized, hintType)) return "other";
 
-  const magic = await detectMediaByMagicBytes(file);
-  if (magic) return magic;
+  const magic = await detectMediaByMagicBytes(normalized);
+  if (magic === "video") return "video";
+  if (magic === "image") return "image";
+  if (isAcceptedGalleryImage(normalized)) return "image";
 
-  if (isVideoFile(file, hintType)) return "video";
-  if (isImageFile(file, hintType)) return "image";
+  if (isVideoFile(normalized, hintType)) return "video";
+  if (isImageFile(normalized, hintType)) return "image";
 
-  if (CAMERA_PHOTO_NAME.test(file.name)) {
-    const sniff = await detectMediaByMagicBytes(file);
-    if (sniff === "image") return "image";
+  if (CAMERA_PHOTO_NAME.test(normalized.name)) return "image";
+
+  // Pasted screen recordings often lack MIME/filename — prefer magic bytes, then video sniff.
+  const ambiguousName = !normalized.name || GENERIC_CLIPBOARD_NAME.test(normalized.name);
+  if (ambiguousName && normalized.size > 200 * 1024 && !isDocumentFile(normalized, hintType)) {
+    if (await sniffVideoFile(normalized)) return "video";
+    return "image";
   }
-
-  // Pasted screen recordings often lack MIME/filename — prefer fast magic bytes, then short sniff.
-  const ambiguousName = !file.name || GENERIC_CLIPBOARD_NAME.test(file.name);
-  if (ambiguousName && file.size > 200 * 1024 && !isDocumentFile(file, hintType)) {
-    const sniff = await detectMediaByMagicBytes(file);
-    if (sniff === "image") return "image";
-    return "video";
-  }
-  if (ambiguousName || file.size > 32_000) {
-    if (await sniffVideoFile(file)) return "video";
+  if (ambiguousName || normalized.size > 32_000) {
+    if (await sniffVideoFile(normalized)) return "video";
   }
   return "other";
+}
+
+/** Infer MIME/extension for camera/gallery picks that arrive as octet-stream with no name. */
+export async function resolveGalleryPick(file: File, hintType?: string): Promise<File> {
+  let normalized = normalizeGalleryFile(file, hintType);
+  const baseType = normalized.type?.split(";")[0]?.trim().toLowerCase() || "";
+  if (baseType && baseType !== "application/octet-stream") return normalized;
+
+  const magic = await detectMediaByMagicBytes(normalized);
+  if (magic === "image") {
+    const heic = isHeicOrHeif(normalized);
+    const mime = heic ? "image/heic" : "image/jpeg";
+    const ext = heic ? "heic" : "jpg";
+    const stem = normalized.name.replace(/\.[^.]+$/, "") || `photo-${Date.now()}`;
+    const name = /\.[a-z0-9]+$/i.test(normalized.name) ? normalized.name : `${stem}.${ext}`;
+    normalized = new File([normalized], name, { type: mime, lastModified: normalized.lastModified });
+    return normalized;
+  }
+  if (magic === "video") {
+    const stem = normalized.name.replace(/\.[^.]+$/, "") || `video-${Date.now()}`;
+    const name = /\.[a-z0-9]+$/i.test(normalized.name) ? normalized.name : `${stem}.mp4`;
+    return new File([normalized], name, { type: "video/mp4", lastModified: normalized.lastModified });
+  }
+  return normalized;
 }
 
 async function canBrowserDecodeImage(file: File): Promise<boolean> {
@@ -389,13 +412,22 @@ async function fileToJpegBlob(file: File, maxDim = 4096, quality = 0.88): Promis
 
 /** Normalize gallery/camera picks into a browser-friendly JPEG for upload. */
 export async function prepareImageForUpload(file: File, hintType?: string): Promise<File> {
-  const normalized = normalizeGalleryFile(file, hintType);
-  if (isHeicOrHeif(normalized)) return normalized;
+  const normalized = await resolveGalleryPick(file, hintType);
 
   const magic = await detectMediaByMagicBytes(normalized);
   if (magic === "video") throw new Error("That file is a video, not a photo.");
   if (magic !== "image" && !isAcceptedGalleryImage(normalized)) {
     throw new Error("Could not read photo. Try a different image.");
+  }
+
+  // HEIC from iPhone camera — upload raw; Cloudinary converts server-side.
+  if (isHeicOrHeif(normalized)) {
+    const baseName = normalized.name.replace(/\.[^.]+$/, "") || `photo-${Date.now()}`;
+    const name = /\.hei[cf]$/i.test(normalized.name) ? normalized.name : `${baseName}.heic`;
+    return new File([normalized], name, {
+      type: normalized.type || "image/heic",
+      lastModified: normalized.lastModified,
+    });
   }
 
   if (
@@ -406,9 +438,16 @@ export async function prepareImageForUpload(file: File, hintType?: string): Prom
     return normalized;
   }
 
-  const blob = await fileToJpegBlob(normalized);
-  const baseName = normalized.name.replace(/\.[^.]+$/, "") || `photo-${Date.now()}`;
-  return new File([blob], `${baseName}.jpg`, { type: "image/jpeg", lastModified: Date.now() });
+  try {
+    const blob = await fileToJpegBlob(normalized);
+    const baseName = normalized.name.replace(/\.[^.]+$/, "") || `photo-${Date.now()}`;
+    return new File([blob], `${baseName}.jpg`, { type: "image/jpeg", lastModified: Date.now() });
+  } catch {
+    const baseName = normalized.name.replace(/\.[^.]+$/, "") || `photo-${Date.now()}`;
+    const mime = normalized.type?.startsWith("image/") ? normalized.type : "image/jpeg";
+    const ext = mime.includes("png") ? "png" : "jpg";
+    return new File([normalized], `${baseName}.${ext}`, { type: mime, lastModified: normalized.lastModified });
+  }
 }
 
 export function guessVideoMime(file: File, hintType?: string): string {
