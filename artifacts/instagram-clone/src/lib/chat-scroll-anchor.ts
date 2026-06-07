@@ -3,6 +3,8 @@ const ANCHOR_PREFIX = "grova_chat_scroll_v1_";
 export type ChatScrollAnchor = {
   messageId: string;
   offsetPx: number;
+  /** 0..1 scroll position fallback when the anchor row is not mounted yet */
+  scrollRatio?: number;
   at: string;
 };
 
@@ -10,11 +12,28 @@ export function saveChatScrollAnchor(
   userId: string,
   messageId: string,
   offsetPx: number,
+  scrollRatio?: number,
 ): void {
   try {
     const payload: ChatScrollAnchor = {
       messageId,
       offsetPx,
+      scrollRatio,
+      at: new Date().toISOString(),
+    };
+    sessionStorage.setItem(`${ANCHOR_PREFIX}${userId}`, JSON.stringify(payload));
+  } catch {
+    /* quota or private mode */
+  }
+}
+
+export function saveChatScrollRatio(userId: string, scrollRatio: number): void {
+  try {
+    const existing = readChatScrollAnchor(userId);
+    const payload: ChatScrollAnchor = {
+      messageId: existing?.messageId ?? "__ratio__",
+      offsetPx: existing?.offsetPx ?? 0,
+      scrollRatio,
       at: new Date().toISOString(),
     };
     sessionStorage.setItem(`${ANCHOR_PREFIX}${userId}`, JSON.stringify(payload));
@@ -68,13 +87,43 @@ export function restoreScrollToAnchor(
   anchor: ChatScrollAnchor,
 ): boolean {
   if (!container) return false;
-  const el = container.querySelector(
-    `[data-testid="message-${anchor.messageId}"]`,
-  ) as HTMLElement | null;
-  if (!el) return false;
-  const containerRect = container.getBoundingClientRect();
-  const elRect = el.getBoundingClientRect();
-  const offsetTop = elRect.top - containerRect.top + container.scrollTop;
-  container.scrollTop = Math.max(0, offsetTop - anchor.offsetPx);
-  return true;
+
+  if (anchor.messageId && anchor.messageId !== "__ratio__") {
+    const el = container.querySelector(
+      `[data-testid="message-${anchor.messageId}"]`,
+    ) as HTMLElement | null;
+    if (el) {
+      const containerRect = container.getBoundingClientRect();
+      const elRect = el.getBoundingClientRect();
+      const offsetTop = elRect.top - containerRect.top + container.scrollTop;
+      container.scrollTop = Math.max(0, offsetTop - anchor.offsetPx);
+      return true;
+    }
+  }
+
+  if (anchor.scrollRatio != null && Number.isFinite(anchor.scrollRatio)) {
+    const max = container.scrollHeight - container.clientHeight;
+    if (max > 0) {
+      container.scrollTop = Math.round(anchor.scrollRatio * max);
+      return true;
+    }
+  }
+
+  return false;
+}
+
+export function captureScrollAnchor(
+  container: HTMLElement,
+): { messageId: string; offsetPx: number; scrollRatio: number } | null {
+  const { scrollHeight, scrollTop, clientHeight } = container;
+  const max = scrollHeight - clientHeight;
+  const scrollRatio = max > 0 ? scrollTop / max : 0;
+  const visible = findTopVisibleMessageId(container);
+  if (visible) {
+    return { ...visible, scrollRatio };
+  }
+  if (max > 0) {
+    return { messageId: "__ratio__", offsetPx: 0, scrollRatio };
+  }
+  return null;
 }

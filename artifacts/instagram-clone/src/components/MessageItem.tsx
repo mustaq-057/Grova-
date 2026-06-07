@@ -123,10 +123,7 @@ export const MessageItem = memo(function MessageItem({
 
   useEffect(() => {
     const remote = remoteImageSrc;
-    if (!remote) {
-      setDisplayImageSrc(undefined);
-      return;
-    }
+    if (!remote) return;
     if (remote.startsWith("blob:") || remote.startsWith("data:")) {
       setDisplayImageSrc(remote);
       return;
@@ -290,8 +287,9 @@ export const MessageItem = memo(function MessageItem({
         <img
           src={msg.gifUrl}
           alt="GIF"
-          className="max-w-[min(280px,92vw)] max-h-[340px] w-auto h-auto object-contain rounded-2xl block"
-          loading="lazy"
+          className="max-w-[min(280px,92vw)] max-h-[340px] min-h-[72px] w-auto h-auto object-contain rounded-2xl block bg-black/15"
+          loading="eager"
+          decoding="async"
           onLoad={() => onMediaLoad?.(msg.id)}
         />
       ) : isImage && (msg.imageUrl || msg.imageData || mediaLimit > 0) ? (
@@ -310,8 +308,8 @@ export const MessageItem = memo(function MessageItem({
           <img
             src={imageDisplaySrc}
             alt=""
-            className="max-w-[min(280px,92vw)] max-h-[340px] w-auto h-auto object-contain rounded-2xl block cursor-pointer bg-black/20"
-            loading="lazy"
+            className="max-w-[min(280px,92vw)] max-h-[340px] min-h-[72px] w-auto h-auto object-contain rounded-2xl block cursor-pointer bg-black/15"
+            loading="eager"
             decoding="async"
             referrerPolicy="no-referrer"
             onLoad={() => onMediaLoad?.(msg.id)}

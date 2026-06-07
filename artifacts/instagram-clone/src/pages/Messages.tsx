@@ -91,13 +91,14 @@ import { hydrateQuickReactions } from "@/lib/quick-reactions";
 import {
   scrollChatToBottom,
   scrollChatToBottomAfterPaint,
+  scrollChatToBottomSoft,
   scrollChatForComposerChange,
   scrollMessageIntoCenter,
 } from "@/lib/chat-scroll";
 import { readChatCache, readChatCacheForCurrentUser, writeChatCache } from "@/lib/chat-cache";
 import {
+  captureScrollAnchor,
   clearChatScrollAnchor,
-  findTopVisibleMessageId,
   readChatScrollAnchor,
   restoreScrollToAnchor,
   saveChatScrollAnchor,
@@ -252,6 +253,9 @@ export default function Messages() {
   const scrollAnchorSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingScrollRestoreRef = useRef<ReturnType<typeof readChatScrollAnchor>>(null);
   const scrollRestoreAttemptsRef = useRef(0);
+  const anchorResolveStartedRef = useRef(false);
+  const mediaScrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scrollPreserveRef = useRef<{ top: number; height: number } | null>(null);
 
   const partnerId = useMemo(() => user?.id === "me" ? "wife" : "me", [user?.id]);
   const theme = THEMES.find(t => t.id === chatThemeId) ?? THEMES[0]!;
@@ -260,19 +264,22 @@ export default function Messages() {
   const showPartnerTyping = isTyping;
 
   const requestStickToBottom = useCallback(() => {
-    if (isPrependingRef.current) return;
+    if (isPrependingRef.current || pendingScrollRestoreRef.current) return;
     stickToBottomRef.current = true;
     isNearBottomRef.current = true;
     setIsNearBottom(true);
-    scrollChatToBottomAfterPaint(messagesContainerRef.current, bottomRef.current);
+    scrollChatToBottomSoft(messagesContainerRef.current, bottomRef.current);
   }, []);
 
   const scrollToBottomForMedia = useCallback((messageId?: string) => {
     if (messageId && !recentTailIdsRef.current.has(messageId)) return;
-    if (isNearBottomRef.current || stickToBottomRef.current) {
-      requestStickToBottom();
-    }
-  }, [requestStickToBottom]);
+    if (!isNearBottomRef.current && !stickToBottomRef.current) return;
+    if (mediaScrollTimerRef.current) clearTimeout(mediaScrollTimerRef.current);
+    mediaScrollTimerRef.current = setTimeout(() => {
+      if (!isNearBottomRef.current && !stickToBottomRef.current) return;
+      scrollChatToBottomSoft(messagesContainerRef.current, bottomRef.current);
+    }, 150);
+  }, []);
 
   const handleMediaCommitted = useCallback(
     (messageId: string, field: "imageUrl" | "imageData", remoteUrl: string) => {
@@ -397,6 +404,14 @@ export default function Messages() {
 
   const applyMessageBatch = useCallback((raw: ApiMessage[]) => {
     if (raw.length === 0) return;
+    const container = messagesContainerRef.current;
+    const readingHistory = !isNearBottomRef.current && !stickToBottomRef.current && !pendingScrollRestoreRef.current;
+    if (readingHistory && container) {
+      scrollPreserveRef.current = {
+        top: container.scrollTop,
+        height: container.scrollHeight,
+      };
+    }
     void normalizeMessages(raw).then((fromServer) => {
       setMessages((prev) => {
         const merged = reconcilePendingOptimistics(prev, fromServer, pendingOutgoingRef.current);
@@ -406,8 +421,10 @@ export default function Messages() {
         if (user?.id) writeChatCache(user.id, next);
         return next;
       });
-      if (isNearBottomRef.current || isInitialLoadRef.current) {
+      if ((isNearBottomRef.current || isInitialLoadRef.current) && !pendingScrollRestoreRef.current) {
         stickToBottomRef.current = true;
+      } else if (readingHistory) {
+        stickToBottomRef.current = false;
       }
     });
   }, [user?.id]);
@@ -524,7 +541,7 @@ export default function Messages() {
           loadMoreMessages();
         }
       },
-      { rootMargin: '100px', threshold: 0.1 }
+      { rootMargin: '320px', threshold: 0.05 }
     );
 
     if (messagesStartRef.current) {
@@ -581,6 +598,14 @@ export default function Messages() {
 
     const pollSyncMessages = () => {
       if (!mounted) return;
+      const container = messagesContainerRef.current;
+      const readingHistory = !isNearBottomRef.current && !stickToBottomRef.current;
+      if (readingHistory && container) {
+        scrollPreserveRef.current = {
+          top: container.scrollTop,
+          height: container.scrollHeight,
+        };
+      }
       void api.getMessages().then(async (data) => {
         const raw = data.messages ?? [];
         if (raw.length === 0) return;
@@ -591,13 +616,18 @@ export default function Messages() {
           const guarded = enforceUnsentMessages(merged, unsentIdsRef.current);
           const preserved = preserveDroppedMessages(prev, guarded);
           const next = mergeMessagesIfChanged(prev, preserved, (_, m) => m);
-          if (!next) return prev;
+          if (!next) {
+            scrollPreserveRef.current = null;
+            return prev;
+          }
           messagesSigRef.current = messagesListSignature(next);
           if (user?.id) writeChatCache(user.id, next);
           return next;
         });
         setHasMore(fresh.length > 0 && (data.pagination?.hasMore ?? false));
-      }).catch(() => {});
+      }).catch(() => {
+        scrollPreserveRef.current = null;
+      });
     };
 
     // SSE (local) or polling (Vercel serverless)
@@ -1005,6 +1035,14 @@ export default function Messages() {
     if (!user) return;
 
     const syncFromServer = () => {
+      const container = messagesContainerRef.current;
+      const readingHistory = !isNearBottomRef.current && !stickToBottomRef.current;
+      if (readingHistory && container) {
+        scrollPreserveRef.current = {
+          top: container.scrollTop,
+          height: container.scrollHeight,
+        };
+      }
       void api.getMessages().then(async (data) => {
         const fresh = await normalizeMessages(data.messages ?? []);
         setMessages((prev) => {
@@ -1012,13 +1050,18 @@ export default function Messages() {
           const guarded = enforceUnsentMessages(merged, unsentIdsRef.current);
           const preserved = preserveDroppedMessages(prev, guarded);
           const next = mergeMessagesIfChanged(prev, preserved, (_, m) => m);
-          if (!next) return prev;
+          if (!next) {
+            scrollPreserveRef.current = null;
+            return prev;
+          }
           messagesSigRef.current = messagesListSignature(next);
           if (user?.id) writeChatCache(user.id, next);
           return next;
         });
         setHasMore(fresh.length > 0 && (data.pagination?.hasMore ?? false));
-      }).catch(() => {});
+      }).catch(() => {
+        scrollPreserveRef.current = null;
+      });
     };
 
     const onVisible = () => {
@@ -1046,6 +1089,35 @@ export default function Messages() {
     recentTailIdsRef.current = new Set(messages.slice(-6).map((m) => m.id));
   }, [messages]);
 
+  // If refresh saved a scroll anchor to an older message, load that window first.
+  useEffect(() => {
+    if (!user) return;
+    const anchor = pendingScrollRestoreRef.current ?? readChatScrollAnchor(user.id);
+    if (!anchor || anchor.messageId === "__ratio__") return;
+    pendingScrollRestoreRef.current = anchor;
+    if (messages.some((m) => m.id === anchor.messageId)) return;
+    if (anchorResolveStartedRef.current) return;
+    anchorResolveStartedRef.current = true;
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const data = await api.getMessageContext(anchor.messageId, 50);
+        const batch = await normalizeMessages(data.messages ?? []);
+        if (cancelled || batch.length === 0) return;
+        setMessages((prev) => mergeMessagesById(prev, batch));
+        setHasMore(Boolean(data.pagination?.hasMoreBefore));
+        scrollRestoreAttemptsRef.current = 0;
+      } catch {
+        /* ratio fallback in restoreScrollToAnchor */
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, messages.length]);
+
   // Stick to bottom: first load, own messages, decrypt height changes, reply bar, explicit requests
   useLayoutEffect(() => {
     if (messages.length === 0 || isPrependingRef.current) return;
@@ -1061,7 +1133,7 @@ export default function Messages() {
     const isOwnLast = last?.senderId === user?.id;
 
     const restoreAnchor = pendingScrollRestoreRef.current;
-    if (restoreAnchor && messages.length > 0 && scrollRestoreAttemptsRef.current < 8) {
+    if (restoreAnchor && messages.length > 0 && scrollRestoreAttemptsRef.current < 24) {
       const container = messagesContainerRef.current;
       const restored = restoreScrollToAnchor(container, restoreAnchor);
       scrollRestoreAttemptsRef.current += 1;
@@ -1074,19 +1146,30 @@ export default function Messages() {
       }
     }
 
+    const preserve = scrollPreserveRef.current;
+    if (preserve && !isNearBottomRef.current && !stickToBottomRef.current) {
+      const container = messagesContainerRef.current;
+      if (container) {
+        const diff = container.scrollHeight - preserve.height;
+        if (diff !== 0) container.scrollTop = preserve.top + diff;
+      }
+      scrollPreserveRef.current = null;
+    }
+
     const shouldStick =
       !isPrependingRef.current &&
       !pendingScrollRestoreRef.current &&
       (stickToBottomRef.current ||
         (firstPaint && !restoreAnchor) ||
-        (isOwnLast && tailChanged) ||
+        (isOwnLast && tailChanged && isNearBottomRef.current) ||
         (isNearBottomRef.current && tailChanged));
 
     if (shouldStick) {
+      const aggressive = Boolean(firstPaint && !restoreAnchor);
       scrollChatToBottomAfterPaint(
         messagesContainerRef.current,
         bottomRef.current,
-        (firstPaint && !restoreAnchor) || (isOwnLast && tailChanged),
+        aggressive,
       );
       setHasNewMessages(false);
       stickToBottomRef.current = false;
@@ -1172,8 +1255,10 @@ export default function Messages() {
         } else {
           const uid = userIdRef.current;
           if (uid) {
-            const anchor = findTopVisibleMessageId(container);
-            if (anchor) saveChatScrollAnchor(uid, anchor.messageId, anchor.offsetPx);
+            const captured = captureScrollAnchor(container);
+            if (captured) {
+              saveChatScrollAnchor(uid, captured.messageId, captured.offsetPx, captured.scrollRatio);
+            }
           }
         }
       }, 50);
@@ -1182,16 +1267,30 @@ export default function Messages() {
       scrollAnchorSaveRef.current = setTimeout(() => {
         const uid = userIdRef.current;
         if (!uid || isNearBottomRef.current) return;
-        const anchor = findTopVisibleMessageId(container);
-        if (anchor) saveChatScrollAnchor(uid, anchor.messageId, anchor.offsetPx);
-      }, 180);
+        const captured = captureScrollAnchor(container);
+        if (captured) {
+          saveChatScrollAnchor(uid, captured.messageId, captured.offsetPx, captured.scrollRatio);
+        }
+      }, 120);
+    };
+
+    const saveAnchorNow = () => {
+      const uid = userIdRef.current;
+      if (!uid || isNearBottomRef.current) return;
+      const captured = captureScrollAnchor(container);
+      if (captured) {
+        saveChatScrollAnchor(uid, captured.messageId, captured.offsetPx, captured.scrollRatio);
+      }
     };
 
     container.addEventListener('scroll', handleScroll);
+    window.addEventListener('beforeunload', saveAnchorNow);
     return () => {
       container.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('beforeunload', saveAnchorNow);
       if (debounceTimer) clearTimeout(debounceTimer);
       if (scrollAnchorSaveRef.current) clearTimeout(scrollAnchorSaveRef.current);
+      if (mediaScrollTimerRef.current) clearTimeout(mediaScrollTimerRef.current);
     };
   }, []);
 
@@ -1464,7 +1563,7 @@ export default function Messages() {
           tempId,
         ),
       ]);
-      scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
+      requestStickToBottom();
       try {
         const url = await uploadMediaFile(file, mime);
         const sticker =
@@ -1485,7 +1584,6 @@ export default function Messages() {
           return next;
         });
         requestAnimationFrame(() => URL.revokeObjectURL(localPreview));
-        requestStickToBottom();
       } catch (err) {
         URL.revokeObjectURL(localPreview);
         pendingOutgoingRef.current.delete(tempId);
@@ -1530,7 +1628,7 @@ export default function Messages() {
         tempId,
       );
       setMessages((prev) => [...prev, optimistic]);
-      scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
+      requestStickToBottom();
 
       try {
         const url = await uploadMediaFile(file, mime);
@@ -1559,7 +1657,6 @@ export default function Messages() {
         requestAnimationFrame(() => {
           if (localPreview) URL.revokeObjectURL(localPreview);
         });
-        requestStickToBottom();
       } catch (err) {
         console.error("Failed to send ephemeral media:", err);
         pendingOutgoingRef.current.delete(tempId);
