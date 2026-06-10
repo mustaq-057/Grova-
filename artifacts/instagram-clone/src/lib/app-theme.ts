@@ -3,19 +3,13 @@
 import { loadPersistedDarkMode, persistDarkMode } from "./couple-prefs-persist";
 
 export type AppThemeId =
-  | "grova"
-  | "rose-love"
-  | "ocean"
   | "midnight"
-  | "golden"
   | "sakura-fall"
   | "sara-lavender"
-  | "book-bouquet"
-  | "eternal-aurora";
+  | "moonlight-saga";
 
 const THEME_BACKGROUNDS: Partial<Record<AppThemeId, string>> = {
   "sara-lavender": "/themes/sara-lilies.jpg",
-  "book-bouquet": "/themes/book-bouquet.jpg",
 };
 
 export const APP_THEME_CHANGED = "grova-app-theme-changed";
@@ -28,116 +22,6 @@ export const APP_THEMES: {
   dark: Record<string, string>;
   light: Record<string, string>;
 }[] = [
-  {
-    id: "grova",
-    name: "Grova Classic",
-    description: "Warm espresso & amber",
-    swatch: "bg-amber-500",
-    dark: {
-      "--app-background": "24 8% 7%",
-      "--app-foreground": "35 18% 88%",
-      "--app-primary": "38 88% 55%",
-      "--app-card": "24 8% 10%",
-      "--app-secondary": "24 8% 14%",
-      "--app-border": "24 8% 15%",
-    },
-    light: {
-      "--app-background": "40 20% 98%",
-      "--app-foreground": "24 10% 12%",
-      "--app-primary": "32 95% 44%",
-      "--app-card": "0 0% 100%",
-      "--app-secondary": "40 15% 94%",
-      "--app-border": "30 10% 88%",
-    },
-  },
-  {
-    id: "rose-love",
-    name: "Rose Love",
-    description: "Soft pink for her ♥",
-    swatch: "bg-rose-500",
-    dark: {
-      "--app-background": "340 25% 8%",
-      "--app-foreground": "350 20% 92%",
-      "--app-primary": "350 75% 62%",
-      "--app-card": "340 22% 11%",
-      "--app-secondary": "340 18% 16%",
-      "--app-border": "340 15% 18%",
-    },
-    light: {
-      "--app-background": "350 40% 98%",
-      "--app-foreground": "340 30% 15%",
-      "--app-primary": "350 70% 52%",
-      "--app-card": "0 0% 100%",
-      "--app-secondary": "350 35% 95%",
-      "--app-border": "350 25% 90%",
-    },
-  },
-  {
-    id: "ocean",
-    name: "Ocean Breeze",
-    description: "Calm blue tones",
-    swatch: "bg-sky-500",
-    dark: {
-      "--app-background": "220 30% 7%",
-      "--app-foreground": "210 25% 90%",
-      "--app-primary": "200 90% 55%",
-      "--app-card": "220 28% 10%",
-      "--app-secondary": "220 22% 14%",
-      "--app-border": "220 20% 16%",
-    },
-    light: {
-      "--app-background": "210 40% 98%",
-      "--app-foreground": "220 30% 12%",
-      "--app-primary": "200 85% 45%",
-      "--app-card": "0 0% 100%",
-      "--app-secondary": "210 35% 95%",
-      "--app-border": "210 25% 88%",
-    },
-  },
-  {
-    id: "midnight",
-    name: "Midnight",
-    description: "Deep purple night",
-    swatch: "bg-violet-600",
-    dark: {
-      "--app-background": "260 30% 6%",
-      "--app-foreground": "260 15% 92%",
-      "--app-primary": "270 80% 65%",
-      "--app-card": "260 28% 9%",
-      "--app-secondary": "260 22% 13%",
-      "--app-border": "260 20% 15%",
-    },
-    light: {
-      "--app-background": "260 30% 98%",
-      "--app-foreground": "260 25% 12%",
-      "--app-primary": "270 70% 50%",
-      "--app-card": "0 0% 100%",
-      "--app-secondary": "260 25% 95%",
-      "--app-border": "260 20% 88%",
-    },
-  },
-  {
-    id: "golden",
-    name: "Golden Hour",
-    description: "Sunset warmth",
-    swatch: "bg-orange-500",
-    dark: {
-      "--app-background": "25 20% 7%",
-      "--app-foreground": "35 25% 90%",
-      "--app-primary": "28 95% 55%",
-      "--app-card": "25 18% 10%",
-      "--app-secondary": "25 15% 14%",
-      "--app-border": "25 12% 16%",
-    },
-    light: {
-      "--app-background": "40 50% 98%",
-      "--app-foreground": "25 30% 12%",
-      "--app-primary": "28 90% 48%",
-      "--app-card": "0 0% 100%",
-      "--app-secondary": "35 40% 94%",
-      "--app-border": "30 25% 88%",
-    },
-  },
   {
     id: "sara-lavender",
     name: "Sara",
@@ -158,28 +42,6 @@ export const APP_THEMES: {
       "--app-card": "0 0% 100%",
       "--app-secondary": "270 28% 94%",
       "--app-border": "270 22% 88%",
-    },
-  },
-  {
-    id: "book-bouquet",
-    name: "Book Bouquet",
-    description: "Book photo only · soft blooms ♡",
-    swatch: "bg-gradient-to-br from-rose-200 via-pink-100 to-amber-100",
-    dark: {
-      "--app-background": "25 14% 10%",
-      "--app-foreground": "30 15% 96%",
-      "--app-primary": "25 40% 75%",
-      "--app-card": "25 12% 14%",
-      "--app-secondary": "25 10% 17%",
-      "--app-border": "25 10% 24%",
-    },
-    light: {
-      "--app-background": "35 40% 97%",
-      "--app-foreground": "25 30% 18%",
-      "--app-primary": "25 45% 42%",
-      "--app-card": "0 0% 100%",
-      "--app-secondary": "30 28% 95%",
-      "--app-border": "30 18% 86%",
     },
   },
   {
@@ -205,30 +67,52 @@ export const APP_THEMES: {
     },
   },
   {
-    id: "eternal-aurora",
-    name: "Eternal Aurora",
-    description: "Northern lights of love ✨",
-    swatch: "bg-gradient-to-br from-violet-600 via-fuchsia-500 to-cyan-400",
+    id: "midnight",
+    name: "Midnight",
+    description: "Deep purple night",
+    swatch: "bg-violet-600",
     dark: {
-      "--app-background": "258 32% 7%",
-      "--app-foreground": "280 30% 96%",
-      "--app-primary": "292 85% 72%",
-      "--app-card": "260 28% 11%",
-      "--app-secondary": "262 24% 15%",
-      "--app-border": "265 20% 22%",
+      "--app-background": "260 30% 6%",
+      "--app-foreground": "260 15% 92%",
+      "--app-primary": "270 80% 65%",
+      "--app-card": "260 28% 9%",
+      "--app-secondary": "260 22% 13%",
+      "--app-border": "260 20% 15%",
     },
     light: {
-      "--app-background": "280 45% 98%",
-      "--app-foreground": "265 35% 18%",
-      "--app-primary": "285 70% 58%",
+      "--app-background": "260 30% 98%",
+      "--app-foreground": "260 25% 12%",
+      "--app-primary": "270 70% 50%",
       "--app-card": "0 0% 100%",
-      "--app-secondary": "285 40% 96%",
-      "--app-border": "280 25% 90%",
+      "--app-secondary": "260 25% 95%",
+      "--app-border": "260 20% 88%",
+    },
+  },
+  {
+    id: "moonlight-saga",
+    name: "Moonlight Saga",
+    description: "Mystical twilight romance 🌙",
+    swatch: "bg-gradient-to-br from-indigo-950 via-slate-900 to-blue-950",
+    dark: {
+      "--app-background": "225 35% 8%",
+      "--app-foreground": "210 20% 95%",
+      "--app-primary": "210 90% 70%",
+      "--app-card": "225 30% 12%",
+      "--app-secondary": "225 25% 16%",
+      "--app-border": "225 20% 22%",
+    },
+    light: {
+      "--app-background": "210 30% 96%",
+      "--app-foreground": "225 40% 16%",
+      "--app-primary": "215 85% 45%",
+      "--app-card": "0 0% 100%",
+      "--app-secondary": "210 25% 92%",
+      "--app-border": "210 18% 85%",
     },
   },
 ];
 
-let currentAppTheme: AppThemeId = "grova";
+let currentAppTheme: AppThemeId = "sara-lavender";
 let darkMode = true;
 
 export function getStoredAppTheme(): AppThemeId {
@@ -297,16 +181,12 @@ export function isSakuraFallTheme(themeId?: AppThemeId): boolean {
   return (themeId ?? getStoredAppTheme()) === "sakura-fall";
 }
 
-export function isEternalAuroraTheme(themeId?: AppThemeId): boolean {
-  return (themeId ?? getStoredAppTheme()) === "eternal-aurora";
+export function isMoonlightSagaTheme(themeId?: AppThemeId): boolean {
+  return (themeId ?? getStoredAppTheme()) === "moonlight-saga";
 }
 
 export function isSaraLavenderTheme(themeId?: AppThemeId): boolean {
   return (themeId ?? getStoredAppTheme()) === "sara-lavender";
-}
-
-export function isBookBouquetTheme(themeId?: AppThemeId): boolean {
-  return (themeId ?? getStoredAppTheme()) === "book-bouquet";
 }
 
 export function getThemeBackgroundUrl(themeId?: AppThemeId): string | null {
@@ -321,7 +201,6 @@ export function themeUsesPhotoBackground(themeId?: AppThemeId): boolean {
 /** Photo layer strength — kept low so nav/cards stay readable. */
 export function getThemeBackgroundOpacity(themeId?: AppThemeId): number {
   const id = themeId ?? getStoredAppTheme();
-  if (id === "book-bouquet") return 0.28;
   if (id === "sara-lavender") return 0.32;
   return 0.28;
 }
@@ -332,11 +211,6 @@ export function themeUsesPhotoScrim(themeId?: AppThemeId): boolean {
 
 /** Readable gradient over the photo (avoids invalid hsl(var(--background) / …) scrims). */
 export function getPhotoScrimGradient(themeId: AppThemeId, dark: boolean): string {
-  if (themeId === "book-bouquet") {
-    return dark
-      ? "linear-gradient(180deg, rgba(18,14,12,0.72) 0%, rgba(18,14,12,0.88) 55%, rgba(18,14,12,0.94) 100%)"
-      : "linear-gradient(180deg, rgba(255,252,248,0.72) 0%, rgba(255,252,248,0.88) 55%, rgba(255,252,248,0.94) 100%)";
-  }
   if (themeId === "sara-lavender") {
     return dark
       ? "linear-gradient(180deg, rgba(28,14,32,0.68) 0%, rgba(28,14,32,0.84) 55%, rgba(28,14,32,0.92) 100%)"
@@ -348,7 +222,7 @@ export function getPhotoScrimGradient(themeId: AppThemeId, dark: boolean): strin
 }
 
 export function applyAppTheme(themeId: AppThemeId) {
-  currentAppTheme = APP_THEMES.some((t) => t.id === themeId) ? themeId : "grova";
+  currentAppTheme = APP_THEMES.some((t) => t.id === themeId) ? themeId : "sara-lavender";
   const theme = APP_THEMES.find((t) => t.id === currentAppTheme) ?? APP_THEMES[0]!;
   const vars = darkMode ? theme.dark : theme.light;
   const root = document.documentElement;
@@ -366,6 +240,7 @@ export function applyAppTheme(themeId: AppThemeId) {
 
 /** Default chrome before Neon prefs load. */
 export function initAppearance() {
-  applyAppTheme("grova");
+  applyAppTheme("sara-lavender");
   applyColorMode(true);
 }
+

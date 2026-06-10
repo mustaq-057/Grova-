@@ -38,7 +38,7 @@ import { EditMessageBar } from "@/components/EditMessageBar";
 import { defaultAvatar } from "@/lib/avatars";
 import { AvatarImage } from "@/components/AvatarImage";
 import { saveMemoryFromMessage, removeMemory } from "@/lib/memories";
-import { getStoredAppTheme, isEternalAuroraTheme, type AppThemeId } from "@/lib/app-theme";
+import { getStoredAppTheme, isMoonlightSagaTheme, type AppThemeId } from "@/lib/app-theme";
 import { ChatAuroraLayer } from "@/components/ChatAuroraLayer";
 import {
   filterVisibleMessages,
@@ -2523,7 +2523,7 @@ export default function Messages() {
     return map;
   }, [messages]);
 
-  const showChatAurora = isEternalAuroraTheme(appThemeId);
+  const showChatAurora = isMoonlightSagaTheme(appThemeId);
 
   if (blocked) {
     return (

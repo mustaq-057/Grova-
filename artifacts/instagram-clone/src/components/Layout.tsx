@@ -21,7 +21,7 @@ import {
   APP_THEME_CHANGED,
   getStoredAppTheme,
   isSakuraFallTheme,
-  isEternalAuroraTheme,
+  isMoonlightSagaTheme,
   isSaraLavenderTheme,
   themeUsesPhotoBackground,
   type AppThemeId,
@@ -44,7 +44,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const isChat = location === "/chat";
   const showSakura = isSakuraFallTheme(appTheme);
-  const showAurora = isEternalAuroraTheme(appTheme);
+  const showAurora = isMoonlightSagaTheme(appTheme);
   const showSaraLavender = isSaraLavenderTheme(appTheme);
   const showThemeBg = themeUsesPhotoBackground(appTheme);
 

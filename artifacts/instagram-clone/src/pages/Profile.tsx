@@ -14,7 +14,7 @@ import { resolvePostMediaUrl } from "@/lib/media-url";
 import { getPostMediaUrls, postHasCarousel } from "@/lib/post-media";
 
 export default memo(function Profile() {
-  const { user, setUser, partner, refreshProfiles } = useAuth();
+  const { user, setUser, partner, refreshProfiles, trustedDevice } = useAuth();
   const [editing, setEditing] = useState(false);
   const [pendingName, setPendingName] = useState("");
   const [pendingBio, setPendingBio] = useState("");
@@ -22,8 +22,18 @@ export default memo(function Profile() {
   const [avatarZoom, setAvatarZoom] = useState(false);
   const [notifCount, setNotifCount] = useState(() => unreadCount());
   const [posts, setPosts] = useState<StoredPost[]>([]);
+  const [codes, setCodes] = useState<{ me: string; wife: string } | null>(null);
   const partnerId = user?.id === "me" ? "wife" : "me";
   const avatarCrop = useProfileAvatarCrop();
+
+  useEffect(() => {
+    if (trustedDevice) {
+      api.getProfileCodes()
+        .then(setCodes)
+        .catch(console.error);
+    }
+  }, [trustedDevice]);
+
 
   useEffect(() => {
     const refresh = () => setNotifCount(unreadCount());
@@ -207,6 +217,33 @@ export default memo(function Profile() {
           </>
         )}
       </div>
+
+      {trustedDevice && codes && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mt-2 mb-6 w-full max-w-sm mx-auto p-4 rounded-2xl border border-primary/25 bg-primary/5 backdrop-blur-sm shadow-sm flex flex-col items-center gap-3"
+        >
+          <div className="flex items-center gap-2 text-primary font-medium text-xs">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            Authorized Device
+          </div>
+          <div className="flex items-center justify-between w-full gap-4 px-2">
+            <div className="flex-1 flex flex-col items-center p-2 bg-background/60 rounded-xl border border-border/45">
+              <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">My Code</span>
+              <span className="font-mono text-sm font-semibold text-foreground mt-0.5">{codes[user.id]}</span>
+            </div>
+            <div className="flex-1 flex flex-col items-center p-2 bg-background/60 rounded-xl border border-border/45">
+              <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">{partner?.name || "Partner"}'s Code</span>
+              <span className="font-mono text-sm font-semibold text-foreground mt-0.5">{codes[partnerId]}</span>
+            </div>
+          </div>
+          <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
+            ✓ Autoentering enabled
+          </p>
+        </motion.div>
+      )}
+
 
       {posts.length > 0 && (
         <div className="border-t border-border px-1 pb-8">

@@ -616,6 +616,31 @@ router.get("/auth/primary-session", async (req, res) => {
   }
 });
 
+router.get("/auth/codes", async (req, res) => {
+  try {
+    const primaryFromCookie =
+      req && typeof (req as unknown as { cookies?: Record<string, string> }).cookies?.grova_primary === "string"
+        ? (req as unknown as { cookies: Record<string, string> }).cookies.grova_primary
+        : "";
+    const primaryToken = String(req.headers["x-primary-token"] || primaryFromCookie || "");
+    if (!primaryToken) {
+      res.status(401).json({ error: "Primary session missing" });
+      return;
+    }
+    const ok = await validateAndRenewPrimaryToken(req, primaryToken);
+    if (!ok) {
+      res.status(401).json({ error: "Primary session expired" });
+      return;
+    }
+    const meCode = await getProfileCode("me");
+    const wifeCode = await getProfileCode("wife");
+    res.json({ me: meCode, wife: wifeCode });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch codes" });
+  }
+});
+
+
 router.post("/auth/unlock", authenticate, validateBody({
   code: validators.stringOfLength(4, 50),
 }), async (req, res) => {
