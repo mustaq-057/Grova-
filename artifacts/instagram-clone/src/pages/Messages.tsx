@@ -2763,16 +2763,16 @@ export default function Messages() {
 
       <div className="chat-panel-top shrink-0 z-20 flex flex-col relative">
       {/* ── Header ── */}
-      <div className="chat-panel-header flex items-center gap-1.5 sm:gap-3 px-2 sm:px-4 py-1.5 sm:py-2.5 border-b shrink-0 text-white">
+      <div className="chat-panel-header flex items-center gap-1.5 sm:gap-2 px-1.5 sm:px-3 py-1 sm:py-1.5 border-b shrink-0 text-white">
         <div className="relative shrink-0">
-          <AvatarImage src={pAvatar} userId={partnerId} alt={pName} className="w-9 h-9 rounded-full object-cover" />
+          <AvatarImage src={pAvatar} userId={partnerId} alt={pName} className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover" />
           {presence.online && (
             <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-background" />
           )}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="font-semibold text-sm" data-testid="chat-partner-name">{pName}</p>
-          <p className={`text-xs flex items-center ${isTyping ? "text-primary" : presence.online ? "text-green-400" : "text-muted-foreground"}`}>
+          <p className="font-semibold text-[13px] sm:text-sm" data-testid="chat-partner-name">{pName}</p>
+          <p className={`text-[10px] sm:text-xs flex items-center ${isTyping ? "text-primary" : presence.online ? "text-green-400" : "text-muted-foreground"}`}>
             {showPartnerTyping ? (
               <>
                 <span>{partnerTypingLine(partnerId)}</span>

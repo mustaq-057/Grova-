@@ -421,7 +421,7 @@ export const MessageItem = memo(function MessageItem({
       </CuteMessageBubble>
     ) : (
       <div
-        className={`chat-bubble-text px-4 py-2.5 sm:px-5 sm:py-3 rounded-[24px] text-[16px] sm:text-[17px] leading-relaxed border-2 ${
+        className={`chat-bubble-text px-3 py-2 sm:px-4 sm:py-2.5 rounded-[20px] text-[13px] sm:text-[14px] leading-relaxed border-2 ${
           isMe ? "rounded-br-md text-white" : "rounded-bl-md text-white"
         }`}
         // eslint-disable-next-line react/style-prop-object
