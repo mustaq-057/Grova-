@@ -65,10 +65,11 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
 
   useImperativeHandle(ref, () => inputRef.current as HTMLInputElement);
 
+  // Avoid auto-focus on mobile — it pops the keyboard and causes scroll flicker.
   useEffect(() => {
-    if (inputRef.current && !openPicker) {
-      inputRef.current.focus();
-    }
+    if (!inputRef.current || openPicker) return;
+    const isMobile = window.matchMedia("(max-width: 767px)").matches;
+    if (!isMobile) inputRef.current.focus();
   }, [openPicker]);
 
   const submitMessage = useCallback(() => {
@@ -407,7 +408,7 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
       <input
         ref={fileInputRef}
         type="file"
-        accept="*/*"
+        accept="image/*,video/*,.pdf,.doc,.docx,.txt,audio/*"
         className="hidden"
         onChange={handleFileChange}
         aria-label="Upload any file"
@@ -469,15 +470,15 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
               aria-label="Chat styles"
             >
               <button type="button" onClick={toggleCuteFrog} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm hover:bg-secondary ${cuteMode === "frog" ? "bg-primary/15" : ""}`}>
-                <span className="text-xl">🐸</span>
+                <span className="emoji-native text-2xl leading-none">🐸</span>
                 <span>Frog mode</span>
               </button>
               <button type="button" onClick={toggleCatMode} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm hover:bg-secondary ${cuteMode === "cat" ? "bg-primary/15" : ""}`}>
-                <span className="text-xl">🐱</span>
+                <span className="emoji-native text-2xl leading-none">🐱</span>
                 <span>Cat mode</span>
               </button>
               <button type="button" onClick={togglePandaMode} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm hover:bg-secondary ${cuteMode === "panda" ? "bg-primary/15" : ""}`}>
-                <span className="text-xl">🐼</span>
+                <span className="emoji-native text-2xl leading-none">🐼</span>
                 <span>Panda mode</span>
               </button>
             </motion.div>

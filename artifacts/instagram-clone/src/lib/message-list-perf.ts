@@ -1,10 +1,21 @@
 import type { ApiMessage } from "./api";
 
+function mediaUrlSig(url?: string): string {
+  if (!url) return "";
+  if (url.startsWith("blob:") || url.startsWith("data:")) return "local";
+  return url.length > 48 ? url.slice(-48) : url;
+}
+
+function messageRowSig(m: ApiMessage): string {
+  const img = mediaUrlSig(m.imageUrl ?? m.imageData);
+  const file = mediaUrlSig(m.fileData);
+  return `${m.id}:${m.timestamp}:${m.type}:${m.text?.length ?? 0}:${img}:${file}:${m.audioData ? 1 : 0}:${m.reaction ?? ""}:${m.deleted ? 1 : 0}:${m.seenByPartner ? 1 : 0}:${m.readAt ?? ""}:${m.read ? 1 : 0}`;
+}
+
 /** Cheap signature to skip redundant list updates after polling. */
 export function messagesListSignature(msgs: ApiMessage[]): string {
   if (msgs.length === 0) return "0";
-  const tail = msgs.slice(-5);
-  return `${msgs.length}|${tail.map((m) => `${m.id}:${m.timestamp}:${m.type}:${m.text?.length ?? 0}:${m.reaction ?? ""}:${m.deleted ? 1 : 0}:${m.seenByPartner ? 1 : 0}:${m.readAt ?? ""}:${m.read ? 1 : 0}`).join("|")}`;
+  return `${msgs.length}|${msgs.map(messageRowSig).join("|")}`;
 }
 
 export function mergeMessagesIfChanged(

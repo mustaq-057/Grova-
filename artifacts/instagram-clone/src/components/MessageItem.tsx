@@ -17,7 +17,7 @@ import { getQuickReactions, onQuickReactionsChanged } from "@/lib/quick-reaction
 import { isReplyPhotoPlaceholder, parseLegacyReply, parseMediaViewMode, replyPreviewLabel } from "@/lib/message-utils";
 import { tryRefreshSession } from "@/lib/api";
 import { MessageText } from "@/lib/linkify";
-import { resolveChatImageUrl, resolveChatVideoUrl } from "@/lib/media-url";
+import { resolveChatImageUrl, resolveChatVideoUrl, resolveChatAudioUrl } from "@/lib/media-url";
 import { useEffect } from "react";
 
 function isEmojiOnlyText(text?: string): boolean {
@@ -50,7 +50,8 @@ export interface MessageItemProps {
   seenLabel?: string;
   onStartThread?: (msg: ApiMessage) => void;
   onReplyToThread?: (threadId: string) => void;
-  onMediaLoad?: () => void;
+  onMediaLoad?: (messageId: string) => void;
+  onMediaCommitted?: (messageId: string, field: "imageUrl" | "imageData" | "fileData", remoteUrl: string) => void;
   onOpenMedia?: (msg: ApiMessage) => void;
   replySource?: ApiMessage;
   onJumpToMessage?: (messageId: string) => void;
@@ -72,6 +73,7 @@ export const MessageItem = memo(function MessageItem({
   onStartThread,
   onReplyToThread,
   onMediaLoad,
+  onMediaCommitted,
   onOpenMedia,
   replySource,
   onJumpToMessage,
@@ -86,6 +88,11 @@ export const MessageItem = memo(function MessageItem({
   const [showReactionEmojiPicker, setShowReactionEmojiPicker] = useState(false);
   const [imageLoadFailed, setImageLoadFailed] = useState(false);
   const [imageRetry, setImageRetry] = useState(0);
+  const remoteImageSrc = useMemo(
+    () => resolveChatImageUrl(msg.imageUrl || msg.imageData),
+    [msg.imageUrl, msg.imageData],
+  );
+  const [displayImageSrc, setDisplayImageSrc] = useState<string | undefined>(remoteImageSrc);
   const reactBtnRef = useRef<HTMLButtonElement>(null);
   const bubbleWrapRef = useRef<HTMLDivElement>(null);
   const touchStartX = useRef(0);
@@ -108,20 +115,67 @@ export const MessageItem = memo(function MessageItem({
   const useCuteBubble = useMemo(() => isText && !isEmojiOnly && !isDua && msg.variant === "cute", [isText, isEmojiOnly, isDua, msg.variant]);
   const rtl = useMemo(() => hasArabic(msg.text), [msg.text]);
   const imageDisplaySrc = useMemo(() => {
-    const base = resolveChatImageUrl(msg.imageUrl || msg.imageData);
+    const base = displayImageSrc;
     if (!base || imageRetry === 0) return base;
     const sep = base.includes("?") ? "&" : "?";
     return `${base}${sep}_retry=${imageRetry}`;
-  }, [msg.imageUrl, msg.imageData, imageRetry]);
+  }, [displayImageSrc, imageRetry]);
+
+  useEffect(() => {
+    const remote = remoteImageSrc;
+    if (!remote) return;
+    if (remote.startsWith("blob:") || remote.startsWith("data:")) {
+      setDisplayImageSrc(remote);
+      return;
+    }
+    setDisplayImageSrc((current) => {
+      if (!current) return remote;
+      const currentIsLocal = current.startsWith("blob:") || current.startsWith("data:");
+      return currentIsLocal ? current : remote;
+    });
+  }, [remoteImageSrc]);
+
+  useEffect(() => {
+    const remote = remoteImageSrc;
+    if (!remote || remote.startsWith("blob:") || remote.startsWith("data:")) return;
+    const showingLocal =
+      displayImageSrc?.startsWith("blob:") || displayImageSrc?.startsWith("data:");
+    if (!showingLocal || displayImageSrc === remote) return;
+
+    let cancelled = false;
+    const img = new Image();
+    img.onload = () => {
+      if (cancelled) return;
+      setDisplayImageSrc(remote);
+      const field =
+        msg.imageUrl?.startsWith("blob:") || msg.imageUrl?.startsWith("data:")
+          ? "imageUrl"
+          : "imageData";
+      onMediaCommitted?.(msg.id, field, remote);
+    };
+    img.onerror = () => {
+      if (!cancelled) setDisplayImageSrc(remote);
+    };
+    img.src = remote;
+    return () => {
+      cancelled = true;
+    };
+  }, [remoteImageSrc, displayImageSrc, msg.id, msg.imageUrl, onMediaCommitted]);
   const videoDisplaySrc = useMemo(
     () => resolveChatVideoUrl(msg.fileData, msg.text, msg.fileType),
     [msg.fileData, msg.text, msg.fileType],
   );
+  const audioDisplaySrc = useMemo(
+    () => resolveChatAudioUrl(msg.audioData) ?? msg.audioData,
+    [msg.audioData],
+  );
 
   useEffect(() => {
-    setImageLoadFailed(false);
-    setImageRetry(0);
-  }, [msg.imageUrl, msg.imageData]);
+    if (!remoteImageSrc?.startsWith("http")) {
+      setImageLoadFailed(false);
+      setImageRetry(0);
+    }
+  }, [remoteImageSrc]);
 
   const legacyReply = useMemo(
     () => (!msg.replyToText && msg.text ? parseLegacyReply(msg.text) : null),
@@ -227,15 +281,16 @@ export const MessageItem = memo(function MessageItem({
     <>
       {msg.type === "audio" && !msg.audioData ? (
         <p className="text-sm text-muted-foreground italic px-1">Sending voice…</p>
-      ) : msg.type === "audio" && msg.audioData ? (
-        <AudioMessage audioData={msg.audioData} isMe={isMe} />
+      ) : msg.type === "audio" && audioDisplaySrc ? (
+        <AudioMessage audioData={audioDisplaySrc} isMe={isMe} />
       ) : isGif && msg.gifUrl ? (
         <img
           src={msg.gifUrl}
           alt="GIF"
-          className="max-w-[min(280px,92vw)] max-h-[340px] w-auto h-auto object-contain rounded-2xl block"
-          loading="lazy"
-          onLoad={onMediaLoad}
+          className="max-w-[min(280px,92vw)] max-h-[340px] min-h-[72px] w-auto h-auto object-contain rounded-2xl block bg-black/15"
+          loading="eager"
+          decoding="async"
+          onLoad={() => onMediaLoad?.(msg.id)}
         />
       ) : isImage && (msg.imageUrl || msg.imageData || mediaLimit > 0) ? (
         isEphemeralMedia ? (
@@ -253,11 +308,11 @@ export const MessageItem = memo(function MessageItem({
           <img
             src={imageDisplaySrc}
             alt=""
-            className="max-w-[min(280px,92vw)] max-h-[340px] w-auto h-auto object-contain rounded-2xl block cursor-pointer bg-black/20"
-            loading="lazy"
+            className="max-w-[min(280px,92vw)] max-h-[340px] min-h-[72px] w-auto h-auto object-contain rounded-2xl block cursor-pointer bg-black/15"
+            loading="eager"
             decoding="async"
             referrerPolicy="no-referrer"
-            onLoad={onMediaLoad}
+            onLoad={() => onMediaLoad?.(msg.id)}
             onError={() => {
               if (imageRetry < 2) {
                 void tryRefreshSession().finally(() => {
@@ -290,16 +345,27 @@ export const MessageItem = memo(function MessageItem({
             sentAt={msg.timestamp}
             onOpen={() => onOpenMedia?.(msg)}
           />
+        ) : videoDisplaySrc?.startsWith("blob:") ? (
+          <div className="max-w-[min(280px,92vw)] min-h-[120px] px-4 py-6 rounded-2xl bg-[#262626] border border-white/10 text-sm text-white/70 text-center">
+            <video
+              src={videoDisplaySrc}
+              playsInline
+              muted
+              className="max-w-full max-h-[200px] mx-auto rounded-xl mb-2 object-contain"
+            />
+            <p className="text-xs text-muted-foreground italic">Sending video…</p>
+          </div>
         ) : videoDisplaySrc ? (
           <video
             src={videoDisplaySrc}
             controls
             playsInline
+            preload="metadata"
             className="max-w-[min(280px,92vw)] max-h-[340px] w-auto h-auto object-contain rounded-2xl block cursor-pointer"
             onClick={() => onOpenMedia?.(msg)}
           />
         ) : (
-          <p className="text-sm text-muted-foreground italic px-1">Video unavailable</p>
+          <p className="text-sm text-muted-foreground italic px-1">Sending video…</p>
         )
       ) : isFile && msg.fileData ? (
         <ChatFileBubble msg={msg} isMe={isMe} />
@@ -457,10 +523,10 @@ export const MessageItem = memo(function MessageItem({
         {typeof msg.reaction === "string" && msg.reaction.trim() && (
           <button
             type="button"
-            onClick={() => handleReaction(msg.reaction!)}
+            onClick={openReactionPicker}
             className={`emoji-native text-[1.1rem] leading-none -mt-1 mb-0.5 z-10 ${isMe ? "mr-1" : "ml-1"}`}
-            title={`React with ${msg.reaction}`}
-            aria-label={`Reacted with ${msg.reaction}`}
+            title={`Reaction: ${msg.reaction}`}
+            aria-label={`Reaction: ${msg.reaction}`}
           >
             {msg.reaction}
           </button>

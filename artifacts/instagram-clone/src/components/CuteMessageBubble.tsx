@@ -35,7 +35,7 @@ export function CuteMessageBubble({
 }: Props) {
   const stickerEl = companionSticker ? (
     <span
-      className="emoji-native text-2xl shrink-0 mb-0.5 select-none drop-shadow-sm"
+      className="emoji-native text-2xl shrink-0 select-none drop-shadow-sm leading-none"
       aria-hidden
       title="Companion"
     >
@@ -46,7 +46,7 @@ export function CuteMessageBubble({
   if (!isMe) {
     const partner = getPartnerBubbleColors({ bubbleColor, bubbleBorder });
     return (
-      <div className={`relative flex items-end gap-1 max-w-full ${className}`}>
+      <div className={`relative flex items-end gap-1.5 max-w-full ${className}`}>
         {stickerEl}
         <div
           dir={dir}
@@ -63,9 +63,9 @@ export function CuteMessageBubble({
   }
 
   return (
-    <div className={`relative flex items-end gap-1 max-w-full ${className}`}>
+    <div className={`relative flex items-end gap-1.5 max-w-full ${className}`}>
       {stickerEl}
-      <div className="relative min-w-0">
+      <div className="relative min-w-0 flex-1">
         <div className="absolute -top-1.5 -right-1.5 z-10 pointer-events-none">
           <Heart className="w-4 h-4 fill-red-500 text-red-500 drop-shadow" aria-hidden />
         </div>

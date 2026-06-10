@@ -15,7 +15,7 @@ import {
 import { AvatarImage } from "@/components/AvatarImage";
 import { FallingFlowersOverlay } from "@/components/FallingFlowersOverlay";
 import { FallingNamesOverlay } from "@/components/FallingNamesOverlay";
-import { AuroraOverlay } from "@/components/AuroraOverlay";
+import { PremiumThemeOverlay } from "@/components/PremiumThemeOverlay";
 import { ThemeBackgroundOverlay } from "@/components/ThemeBackgroundOverlay";
 import {
   APP_THEME_CHANGED,
@@ -23,10 +23,14 @@ import {
   isSakuraFallTheme,
   isMoonlightSagaTheme,
   isSaraLavenderTheme,
+  isPremiumAnimatedTheme,
   themeUsesPhotoBackground,
   type AppThemeId,
 } from "@/lib/app-theme";
 import { MobileMenuGrid } from "./MobileMenuGrid";
+import { api } from "@/lib/api";
+import { writeChatCache } from "@/lib/chat-cache";
+import { normalizeMessages } from "@/lib/message-utils";
 
 type NavItem = {
   icon: typeof Home;
@@ -46,6 +50,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const showSakura = isSakuraFallTheme(appTheme);
   const showAurora = isMoonlightSagaTheme(appTheme);
   const showSaraLavender = isSaraLavenderTheme(appTheme);
+  const showPremiumScene = isPremiumAnimatedTheme(appTheme) && !isChat;
   const showThemeBg = themeUsesPhotoBackground(appTheme);
 
   useEffect(() => {
@@ -90,6 +95,25 @@ export function Layout({ children }: { children: React.ReactNode }) {
     if (location === "/chat") markChatOpened();
   }, [location]);
 
+  // Warm chat cache before opening /chat so messages paint instantly
+  useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+    void api
+      .getMessages({ limit: 80 })
+      .then(async (data) => {
+        if (cancelled) return;
+        const raw = data.messages ?? [];
+        if (raw.length === 0) return;
+        const normalized = await normalizeMessages(raw);
+        if (!cancelled) writeChatCache(user.id, normalized);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+
   const navItems: NavItem[] = [
     { icon: Home, label: "Home", href: "/" },
     { icon: MessageCircle, label: "Chat", href: "/chat", badge: chatBadge || undefined },
@@ -110,7 +134,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-[100dvh] app-chrome bg-background text-foreground overflow-hidden relative">
       {showThemeBg && <ThemeBackgroundOverlay themeId={appTheme} />}
-      {showAurora && <AuroraOverlay />}
+      {showPremiumScene && <PremiumThemeOverlay themeId={appTheme} />}
+      {showAurora && !showPremiumScene && <></>}
       {showSakura && <FallingFlowersOverlay />}
       {showSaraLavender && <FallingNamesOverlay />}
       {/* Desktop Sidebar */}

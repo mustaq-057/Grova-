@@ -24,12 +24,20 @@ export async function openLiveChannel(
   const url = `/api/sse?userId=${encodeURIComponent(userId)}`;
 
   try {
-    const probe = await fetch(url, { credentials: "include" });
+    const controller = new AbortController();
+    const probe = await fetch(url, { credentials: "include", signal: controller.signal });
     const contentType = probe.headers.get("content-type") ?? "";
     if (contentType.includes("application/json")) {
       const body = (await probe.json()) as { mode?: string; pollIntervalMs?: number };
       if (body.mode === "poll") {
         return startPollChannel(onPoll, body.pollIntervalMs ?? 1_000);
+      }
+    } else {
+      controller.abort();
+      try {
+        await probe.body?.cancel();
+      } catch {
+        /* ignore */
       }
     }
   } catch {

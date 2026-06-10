@@ -293,7 +293,7 @@ type SessionResponse = {
 
 export type AppNotification = {
   id: string;
-  type: "like" | "comment" | "story" | "dua" | "call" | "location" | "message";
+  type: "like" | "comment" | "story" | "dua" | "call" | "location" | "message" | "task";
   actorId?: string;
   fromName: string;
   text: string;
@@ -383,6 +383,13 @@ export const api = {
       pagination: { total: number; limit: number; offset: number; hasMore: boolean; nextCursor: string | null };
     }>(`/messages${suffix}`);
   },
+
+  getMessageContext: (messageId: string, radius = 30) =>
+    apiFetch<{
+      messages: ApiMessage[];
+      targetId: string;
+      pagination: { total: number; hasMoreBefore: boolean; hasMoreAfter: boolean };
+    }>(`/messages/context/${encodeURIComponent(messageId)}?radius=${radius}`),
 
   getUnreadChatCount: (since?: string) => {
     const q = since ? `?since=${encodeURIComponent(since)}` : "";

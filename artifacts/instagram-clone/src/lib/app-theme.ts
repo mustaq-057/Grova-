@@ -8,6 +8,17 @@ export type AppThemeId =
   | "sara-lavender"
   | "moonlight-saga";
 
+const PREMIUM_ANIMATED_THEMES: AppThemeId[] = ["moonlight-saga"];
+
+const RETIRED_THEME_ALIASES: Record<string, AppThemeId> = {
+  "eternal-aurora": "moonlight-saga",
+  "aurora-infinity": "moonlight-saga",
+  "ocean-aurora": "moonlight-saga",
+  "moonlit-blossom": "moonlight-saga",
+  "book-bouquet": "sara-lavender",
+  grova: "sara-lavender",
+};
+
 const THEME_BACKGROUNDS: Partial<Record<AppThemeId, string>> = {
   "sara-lavender": "/themes/sara-lilies.jpg",
 };
@@ -185,6 +196,16 @@ export function isMoonlightSagaTheme(themeId?: AppThemeId): boolean {
   return (themeId ?? getStoredAppTheme()) === "moonlight-saga";
 }
 
+export function isPremiumAnimatedTheme(themeId?: AppThemeId): boolean {
+  return PREMIUM_ANIMATED_THEMES.includes(themeId ?? getStoredAppTheme());
+}
+
+export function getPremiumChatThemeClass(themeId?: AppThemeId): string | null {
+  const id = themeId ?? getStoredAppTheme();
+  if (!PREMIUM_ANIMATED_THEMES.includes(id)) return null;
+  return `${id}-chat`;
+}
+
 export function isSaraLavenderTheme(themeId?: AppThemeId): boolean {
   return (themeId ?? getStoredAppTheme()) === "sara-lavender";
 }
@@ -222,7 +243,9 @@ export function getPhotoScrimGradient(themeId: AppThemeId, dark: boolean): strin
 }
 
 export function applyAppTheme(themeId: AppThemeId) {
-  currentAppTheme = APP_THEMES.some((t) => t.id === themeId) ? themeId : "sara-lavender";
+  // Redirect retired/aliased theme IDs to their successors
+  const resolved = (RETIRED_THEME_ALIASES[themeId as string] ?? themeId) as AppThemeId;
+  currentAppTheme = APP_THEMES.some((t) => t.id === resolved) ? resolved : "sara-lavender";
   const theme = APP_THEMES.find((t) => t.id === currentAppTheme) ?? APP_THEMES[0]!;
   const vars = darkMode ? theme.dark : theme.light;
   const root = document.documentElement;
@@ -243,4 +266,3 @@ export function initAppearance() {
   applyAppTheme("sara-lavender");
   applyColorMode(true);
 }
-

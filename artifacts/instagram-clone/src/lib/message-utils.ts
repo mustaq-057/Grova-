@@ -134,7 +134,10 @@ export function buildOptimisticMessage(
   const ephemeral = mediaViewMode === "once" || mediaViewMode === "twice";
 
   const keepLocalPreview =
-    Boolean(partial.fileData?.startsWith("blob:")) || Boolean(partial.imageUrl?.startsWith("blob:"));
+    Boolean(partial.fileData?.startsWith("blob:")) ||
+    Boolean(partial.imageUrl?.startsWith("blob:")) ||
+    Boolean(partial.imageUrl?.startsWith("data:")) ||
+    Boolean(partial.imageData?.startsWith("data:"));
 
   return {
     id,
@@ -143,7 +146,10 @@ export function buildOptimisticMessage(
     type: (partial.type as ApiMessage["type"]) ?? "text",
     audioData: partial.audioData,
     gifUrl: partial.gifUrl,
-    imageData: ephemeral && !keepLocalPreview ? undefined : partial.imageData,
+    imageData:
+      ephemeral && !keepLocalPreview
+        ? undefined
+        : partial.imageData ?? (partial.imageUrl?.startsWith("data:") ? partial.imageUrl : undefined),
     imageUrl: ephemeral && !keepLocalPreview ? undefined : partial.imageUrl,
     fileData: ephemeral && !keepLocalPreview ? undefined : partial.fileData,
     fileType: partial.fileType,

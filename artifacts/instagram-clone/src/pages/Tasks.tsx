@@ -8,12 +8,22 @@ import { useAuth } from "@/lib/auth";
 
 export default function Tasks() {
   const { user, partner } = useAuth();
-  const otherLabel = partner?.name?.split(" ")[0] ?? "Them";
+  const partnerId = user?.id === "me" ? "wife" : "me";
+  const mustaqLabel =
+    user?.id === "me"
+      ? (user.name?.split(" ")[0] ?? "Mustaq")
+      : (partner?.name?.split(" ")[0] ?? "Mustaq");
+  const saraLabel =
+    user?.id === "wife"
+      ? (user.name?.split(" ")[0] ?? "Sara")
+      : (partner?.name?.split(" ")[0] ?? "Sara");
+  const myAssignValue = user?.id === "me" ? "me" : "wife";
+  const partnerAssignValue = user?.id === "me" ? "wife" : "me";
   const [tasks, setTasks] = useState<ApiTask[]>([]);
   const { showLoading, finishLoading } = useFeatureLoading(tasks.length === 0);
   const [showAdd, setShowAdd] = useState(false);
   const [title, setTitle] = useState("");
-  const [assignedTo, setAssignedTo] = useState<"me" | "wife" | "both">("both");
+  const [assignedTo, setAssignedTo] = useState<string>("both");
   const [priority, setPriority] = useState<"low" | "medium" | "high">("medium");
   const [submitting, setSubmitting] = useState(false);
 
@@ -39,7 +49,7 @@ export default function Tasks() {
     try {
       const task = await api.addTask({
         title: title.trim(),
-        assignedTo,
+        assignedTo: assignedTo as "me" | "wife" | "both",
         priority,
         author: user.id,
       });
@@ -83,13 +93,13 @@ export default function Tasks() {
     }
   };
 
-  const getAssignedLabel = (assignedTo: string) => {
-    switch (assignedTo) {
-      case "me": return user?.id === "me" ? "You" : otherLabel;
-      case "wife": return user?.id === "wife" ? "You" : otherLabel;
-      case "both": return "Both";
-      default: return assignedTo;
-    }
+  const getAssignedLabel = (assignee: string) => {
+    if (assignee === "both") return "Both";
+    if (assignee === "me") return mustaqLabel;
+    if (assignee === "wife") return saraLabel;
+    if (assignee === user?.id) return user?.id === "me" ? mustaqLabel : saraLabel;
+    if (assignee === partnerId) return user?.id === "me" ? saraLabel : mustaqLabel;
+    return assignee;
   };
 
   const incompleteTasks = tasks.filter((t) => !t.completed);
@@ -150,8 +160,12 @@ export default function Tasks() {
                   data-testid="input-task-assigned"
                 >
                   <option value="both">Both</option>
-                  <option value="me">You</option>
-                  <option value="wife">{otherLabel}</option>
+                  <option value={myAssignValue}>
+                    {user?.id === "me" ? mustaqLabel : saraLabel} (You)
+                  </option>
+                  <option value={partnerAssignValue}>
+                    {user?.id === "me" ? saraLabel : mustaqLabel}
+                  </option>
                 </select>
               </div>
               <div>

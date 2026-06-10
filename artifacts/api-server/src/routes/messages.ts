@@ -201,6 +201,109 @@ router.get("/messages", optionalAuth, async (req, res) => {
   }
 });
 
+/** Fetch a window of messages around a target id — instant jump-to-reply. */
+router.get("/messages/context/:messageId", optionalAuth, async (req, res) => {
+  try {
+    const authenticatedUserId = (req as AuthenticatedRequest).user?.id ?? "me";
+    const partnerId = authenticatedUserId === "me" ? "wife" : "me";
+    const messageId = Array.isArray(req.params.messageId)
+      ? req.params.messageId[0]
+      : req.params.messageId;
+    const radius = Math.min(Math.max(parseInt(req.query.radius as string, 10) || 30, 10), 60);
+    const chatClearedAt = await getChatClearedAtForUser(authenticatedUserId);
+
+    const targetResult = await db.query(
+      `SELECT timestamp FROM messages
+       WHERE id = ? AND deleted = 0 AND (sender_id = ? OR sender_id = ?)
+       ${chatClearedAt ? "AND timestamp > ?" : ""}
+       LIMIT 1`,
+      chatClearedAt
+        ? [messageId, authenticatedUserId, partnerId, chatClearedAt]
+        : [messageId, authenticatedUserId, partnerId],
+    );
+    if (targetResult.rows.length === 0) {
+      res.status(404).json({ error: "Message not found" });
+      return;
+    }
+    const targetTs = String((targetResult.rows[0] as { timestamp: string }).timestamp);
+
+    const selectCols = `
+      SELECT m.*,
+             (SELECT emoji FROM message_reactions WHERE message_id = m.id AND user_id = ? ORDER BY timestamp DESC LIMIT 1) as my_reaction,
+             (SELECT emoji FROM message_reactions WHERE message_id = m.id AND user_id = ? ORDER BY timestamp DESC LIMIT 1) as partner_reaction,
+             (SELECT read_at FROM message_read_receipts WHERE message_id = m.id AND user_id = ? LIMIT 1) as partner_read_at,
+             (SELECT COUNT(*) FROM message_media_opens WHERE message_id = m.id AND user_id = ?) as viewer_media_open_count,
+             (SELECT MAX(opened_at) FROM message_media_opens WHERE message_id = m.id AND user_id = ?) as partner_media_opened_at
+      FROM messages m
+      WHERE m.deleted = 0 AND (m.sender_id = ? OR m.sender_id = ?)
+    `;
+    const baseParams: unknown[] = [
+      authenticatedUserId,
+      partnerId,
+      partnerId,
+      authenticatedUserId,
+      partnerId,
+      authenticatedUserId,
+      partnerId,
+    ];
+
+    let olderSql = `${selectCols}`;
+    const olderParams = [...baseParams];
+    if (chatClearedAt) {
+      olderSql += " AND m.timestamp > ?";
+      olderParams.push(chatClearedAt);
+    }
+    olderSql += " AND m.timestamp < ? ORDER BY m.timestamp DESC LIMIT ?";
+    olderParams.push(targetTs, radius);
+
+    let newerSql = `${selectCols}`;
+    const newerParams = [...baseParams];
+    if (chatClearedAt) {
+      newerSql += " AND m.timestamp > ?";
+      newerParams.push(chatClearedAt);
+    }
+    newerSql += " AND m.timestamp >= ? ORDER BY m.timestamp ASC LIMIT ?";
+    newerParams.push(targetTs, radius + 1);
+
+    const [olderResult, newerResult] = await Promise.all([
+      db.query(olderSql, olderParams),
+      db.query(newerSql, newerParams),
+    ]);
+
+    const older = olderResult.rows.map((row) => rowToMessage(row, authenticatedUserId)).reverse();
+    const newer = newerResult.rows.map((row) => rowToMessage(row, authenticatedUserId));
+    const merged = [...older, ...newer];
+    const byId = new Map<string, ReturnType<typeof rowToMessage>>();
+    for (const m of merged) byId.set(m.id, m);
+    const messages = Array.from(byId.values()).sort(
+      (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+    );
+
+    let countSql =
+      "SELECT COUNT(*) as total FROM messages WHERE deleted = 0 AND (sender_id = ? OR sender_id = ?)";
+    const countParams: unknown[] = [authenticatedUserId, partnerId];
+    if (chatClearedAt) {
+      countSql += " AND timestamp > ?";
+      countParams.push(chatClearedAt);
+    }
+    const countResult = await db.query(countSql, countParams);
+    const total = Number(countResult.rows[0]?.total || 0);
+
+    res.json({
+      messages,
+      targetId: messageId,
+      pagination: {
+        total,
+        hasMoreBefore: older.length >= radius,
+        hasMoreAfter: newer.length >= radius + 1,
+      },
+    });
+  } catch (err) {
+    console.error("Failed to fetch message context:", err);
+    res.status(500).json({ error: "Failed to fetch message context" });
+  }
+});
+
 router.get("/messages/unread-count", authenticate, async (req, res) => {
   try {
     const authenticatedUserId = (req as AuthenticatedRequest).user!.id;

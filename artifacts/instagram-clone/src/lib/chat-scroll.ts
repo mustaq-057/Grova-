@@ -1,9 +1,13 @@
 /** Instant scroll to latest message — no animated scroll through history. */
 export function scrollChatToBottom(
   container: HTMLElement | null,
-  _bottomAnchor?: HTMLElement | null,
+  bottomAnchor?: HTMLElement | null,
 ): void {
   if (!container) return;
+  if (bottomAnchor?.isConnected) {
+    bottomAnchor.scrollIntoView({ block: "end", inline: "nearest", behavior: "auto" });
+    return;
+  }
   container.scrollTop = container.scrollHeight;
 }
 
@@ -25,6 +29,16 @@ export function scrollMessageIntoCenter(
   });
 }
 
+/** One soft scroll — avoids the bounce from repeated scroll-to-bottom passes. */
+export function scrollChatToBottomSoft(
+  container: HTMLElement | null,
+  bottomAnchor?: HTMLElement | null,
+): void {
+  if (!container) return;
+  scrollChatToBottom(container, bottomAnchor);
+  requestAnimationFrame(() => scrollChatToBottom(container, bottomAnchor));
+}
+
 /** Repeat scroll across layout passes (images, replies, decrypt text expansion). */
 export function scrollChatToBottomAfterPaint(
   container: HTMLElement | null,
@@ -33,17 +47,16 @@ export function scrollChatToBottomAfterPaint(
 ): void {
   if (!container) return;
 
+  if (!aggressive) {
+    scrollChatToBottomSoft(container, bottomAnchor);
+    return;
+  }
+
   const run = () => scrollChatToBottom(container, bottomAnchor);
   run();
   requestAnimationFrame(run);
-  requestAnimationFrame(() => requestAnimationFrame(run));
-  if (aggressive) {
-    setTimeout(run, 0);
-    setTimeout(run, 80);
-    setTimeout(run, 200);
-  } else {
-    setTimeout(run, 48);
-  }
+  setTimeout(run, 0);
+  setTimeout(run, 80);
 }
 
 /** Keep pinned to bottom while composer grows (reply bar, edit bar). */

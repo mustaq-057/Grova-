@@ -10,7 +10,7 @@ import { MessageInput } from "@/components/MessageInput";
 import { InfoPanel } from "@/components/InfoPanel";
 import { Link } from "wouter";
 import type { GreetingTemplate } from "@/lib/greeting-messages";
-import { normalizeMessages, previewMessagesForDisplay, prepareOutgoingMessage, buildOptimisticMessage, buildSeenLabel, findLastSeenOutgoingId, messagePreview, replyPreviewLabel } from "@/lib/message-utils";
+import { normalizeMessages, prepareOutgoingMessage, buildOptimisticMessage, buildSeenLabel, findLastSeenOutgoingId, messagePreview, replyPreviewLabel } from "@/lib/message-utils";
 import { callStartedText, callEndedText, isCallLogMessage } from "@/lib/call-chat-log";
 import { usePresenceLabel } from "@/hooks/usePresenceLabel";
 import { groupByDay, shouldShowTimeGap } from "@/lib/message-helpers";
@@ -38,8 +38,9 @@ import { EditMessageBar } from "@/components/EditMessageBar";
 import { defaultAvatar } from "@/lib/avatars";
 import { AvatarImage } from "@/components/AvatarImage";
 import { saveMemoryFromMessage, removeMemory } from "@/lib/memories";
-import { getStoredAppTheme, isMoonlightSagaTheme, type AppThemeId } from "@/lib/app-theme";
+import { APP_THEME_CHANGED, getStoredAppTheme, isMoonlightSagaTheme, getPremiumChatThemeClass, isPremiumAnimatedTheme, type AppThemeId } from "@/lib/app-theme";
 import { ChatAuroraLayer } from "@/components/ChatAuroraLayer";
+import { ChatThemeLayer } from "@/components/ChatThemeLayer";
 import {
   filterVisibleMessages,
   hideMessageForUser,
@@ -50,7 +51,16 @@ import {
   getHiddenMessageIds,
 } from "@/lib/hidden-messages";
 import { parsePresenceResponse, isPartnerActiveInChat } from "@/lib/presence-api";
-import { mergeMessagesById } from "@/lib/chat-sync";
+import {
+  commitRemoteMediaUrl,
+  enforceUnsentMessages,
+  findOptimisticMatch,
+  mergeMessagesById,
+  preserveDroppedMessages,
+  reconcilePendingOptimistics,
+  replaceOptimisticMessage,
+  tombstoneMessage,
+} from "@/lib/chat-sync";
 import { mergeMessagesIfChanged, messagesListSignature } from "@/lib/message-list-perf";
 import { downloadChatAsImage, downloadChatAsText } from "@/lib/chat-download";
 import { openLiveChannel } from "@/lib/sse-client";
@@ -63,10 +73,11 @@ import {
   getVideoDurationSafe,
   guessVideoMime,
   isDocumentFile,
-  isHeicOrHeif,
   isVideoFile,
   normalizeGalleryFile,
   normalizePastedFile,
+  prepareImageForUpload,
+  resolveGalleryPick,
 } from "@/lib/media-file";
 import {
   addNotification,
@@ -81,10 +92,19 @@ import { hydrateQuickReactions } from "@/lib/quick-reactions";
 import {
   scrollChatToBottom,
   scrollChatToBottomAfterPaint,
+  scrollChatToBottomSoft,
   scrollChatForComposerChange,
   scrollMessageIntoCenter,
 } from "@/lib/chat-scroll";
-import { readChatCache, writeChatCache } from "@/lib/chat-cache";
+import { readChatCache, readChatCacheForCurrentUser, writeChatCache } from "@/lib/chat-cache";
+import {
+  captureScrollAnchor,
+  clearChatScrollAnchor,
+  readChatScrollAnchor,
+  restoreScrollToAnchor,
+  saveChatScrollAnchor,
+  shouldRestoreScrollAnchor,
+} from "@/lib/chat-scroll-anchor";
 import { resolveChatImageUrl, resolveChatVideoUrl } from "@/lib/media-url";
 import DoodleCanvas, { DOODLE_HEIGHT_STEP, DOODLE_MIN_HEIGHT } from "@/components/DoodleCanvas";
 import { ImageCropModal } from "@/components/ImageCropModal";
@@ -99,29 +119,6 @@ function finishToast(
   toast.dismiss(loadingId);
   if (result.type === "success") toast.success(result.message, { duration: 2500 });
   else if (result.type === "error") toast.error(result.message, { duration: 4000 });
-}
-
-/** Swap temp upload row for server row without duplicate blob + cloud videos. */
-function replaceOutgoingVideoMessage(
-  prev: ApiMessage[],
-  tempId: string,
-  display: ApiMessage,
-  senderId: string,
-): ApiMessage[] {
-  const displayTime = new Date(display.timestamp).getTime();
-  const filtered = prev.filter((m) => {
-    if (m.id === tempId || m.id === display.id) return false;
-    if (
-      m.senderId === senderId &&
-      m.type === "video" &&
-      m.fileData?.startsWith("blob:") &&
-      Math.abs(new Date(m.timestamp).getTime() - displayTime) < 120_000
-    ) {
-      return false;
-    }
-    return true;
-  });
-  return [...filtered, display];
 }
 
 function TypingDots() {
@@ -141,11 +138,17 @@ function TypingDots() {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 type CallState = { status: "outgoing" | "incoming" | "active"; type: "audio" | "video"; incomingOffer?: RTCSessionDescriptionInit } | null;
 
+function initialChatMessages(): ApiMessage[] {
+  return readChatCacheForCurrentUser();
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function Messages() {
   const { user, partner, chatThemeId, updateChatTheme, refreshCouplePrefs } = useAuth();
-  const [messages, setMessages] = useState<ApiMessage[]>([]);
-  const messagesSigRef = useRef("");
+  const [messages, setMessages] = useState<ApiMessage[]>(initialChatMessages);
+  const messagesSigRef = useRef(
+    messages.length ? messagesListSignature(messages) : "0",
+  );
   const [showInfo, setShowInfo] = useState(false);
   const [showThemes, setShowThemes] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -231,7 +234,7 @@ export default function Messages() {
   const sseRetryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingRequestsRef = useRef<Map<string, Promise<any>>>(new Map());
   const previousMessagesLengthRef = useRef(0);
-  const isInitialLoadRef = useRef(true);
+  const isInitialLoadRef = useRef(messages.length > 0);
   const stickToBottomRef = useRef(false);
   const lastMessageTailRef = useRef("");
   const hasMessagesRef = useRef(false);
@@ -246,6 +249,15 @@ export default function Messages() {
   const sendMsgRef = useRef<(partial: Partial<ApiMessage>) => Promise<void>>(async () => {});
   const userIdRef = useRef<string | undefined>(undefined);
   const prependScrollHeightRef = useRef<number | null>(null);
+  const isPrependingRef = useRef(false);
+  const unsentIdsRef = useRef<Set<string>>(new Set());
+  const recentTailIdsRef = useRef<Set<string>>(new Set());
+  const scrollAnchorSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingScrollRestoreRef = useRef<ReturnType<typeof readChatScrollAnchor>>(null);
+  const scrollRestoreAttemptsRef = useRef(0);
+  const anchorResolveStartedRef = useRef(false);
+  const mediaScrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scrollPreserveRef = useRef<{ top: number; height: number } | null>(null);
 
   const partnerId = useMemo(() => user?.id === "me" ? "wife" : "me", [user?.id]);
   const theme = THEMES.find(t => t.id === chatThemeId) ?? THEMES[0]!;
@@ -254,17 +266,33 @@ export default function Messages() {
   const showPartnerTyping = isTyping;
 
   const requestStickToBottom = useCallback(() => {
+    if (isPrependingRef.current || pendingScrollRestoreRef.current) return;
     stickToBottomRef.current = true;
     isNearBottomRef.current = true;
     setIsNearBottom(true);
-    scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
+    scrollChatToBottomSoft(messagesContainerRef.current, bottomRef.current);
   }, []);
 
-  const scrollToBottomForMedia = useCallback(() => {
-    if (isNearBottomRef.current || stickToBottomRef.current) {
-      requestStickToBottom();
-    }
-  }, [requestStickToBottom]);
+  const scrollToBottomForMedia = useCallback((messageId?: string) => {
+    if (messageId && !recentTailIdsRef.current.has(messageId)) return;
+    if (!isNearBottomRef.current && !stickToBottomRef.current) return;
+    if (mediaScrollTimerRef.current) clearTimeout(mediaScrollTimerRef.current);
+    mediaScrollTimerRef.current = setTimeout(() => {
+      if (!isNearBottomRef.current && !stickToBottomRef.current) return;
+      scrollChatToBottomSoft(messagesContainerRef.current, bottomRef.current);
+    }, 150);
+  }, []);
+
+  const handleMediaCommitted = useCallback(
+    (
+      messageId: string,
+      field: "imageUrl" | "imageData" | "fileData",
+      remoteUrl: string,
+    ) => {
+      setMessages((prev) => commitRemoteMediaUrl(prev, messageId, field, remoteUrl));
+    },
+    [],
+  );
 
   const highlightHandledRef = useRef<string | null>(null);
 
@@ -294,33 +322,23 @@ export default function Messages() {
 
     if (tryScroll()) return true;
 
-    let offset = messages.length;
-    let more = hasMore;
-    for (let attempt = 0; attempt < 40 && more; attempt += 1) {
-      const data = await api.getMessages({ offset });
-      const older = await normalizeMessages(data.messages || []);
-      if (older.length === 0) break;
+    try {
+      const data = await api.getMessageContext(messageId, 35);
+      const batch = await normalizeMessages(data.messages || []);
+      if (batch.length === 0) return false;
 
-      const container = messagesContainerRef.current;
-      prependScrollHeightRef.current = container?.scrollHeight ?? 0;
+      prependScrollHeightRef.current = null;
+      isPrependingRef.current = false;
 
-      setMessages((prev) => {
-        const existing = new Set(prev.map((m) => m.id));
-        const unique = older.filter((m) => !existing.has(m.id));
-        if (unique.length === 0) return prev;
-        return [...unique, ...prev];
-      });
-
-      offset += older.length;
-      more = data.pagination?.hasMore ?? false;
-      setHasMore(more);
+      setMessages((prev) => mergeMessagesById(prev, batch));
+      setHasMore(data.pagination?.hasMoreBefore ?? hasMore);
 
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-      await new Promise((r) => setTimeout(r, 32));
-      if (tryScroll()) return true;
+      return tryScroll();
+    } catch {
+      return false;
     }
-    return false;
-  }, [messages.length, hasMore]);
+  }, [hasMore]);
 
   const jumpToMessage = useCallback(
     (messageId: string) => {
@@ -392,29 +410,27 @@ export default function Messages() {
 
   const applyMessageBatch = useCallback((raw: ApiMessage[]) => {
     if (raw.length === 0) return;
-    const preview = previewMessagesForDisplay(raw);
-    setMessages((prev) => {
-      const pending = prev.filter((m) => pendingOutgoingRef.current.has(m.id));
-      const next = mergeMessagesById(preview, pending);
-      messagesSigRef.current = messagesListSignature(next);
-      if (user?.id) writeChatCache(user.id, next);
-      return next;
-    });
-    if (isNearBottomRef.current || isInitialLoadRef.current) {
-      stickToBottomRef.current = true;
+    const container = messagesContainerRef.current;
+    const readingHistory = !isNearBottomRef.current && !stickToBottomRef.current && !pendingScrollRestoreRef.current;
+    if (readingHistory && container) {
+      scrollPreserveRef.current = {
+        top: container.scrollTop,
+        height: container.scrollHeight,
+      };
     }
     void normalizeMessages(raw).then((fromServer) => {
-      startTransition(() => {
-        setMessages((prev) => {
-          const pending = prev.filter((m) => pendingOutgoingRef.current.has(m.id));
-          const next = mergeMessagesById(fromServer, pending);
-          messagesSigRef.current = messagesListSignature(next);
-          if (user?.id) writeChatCache(user.id, next);
-          return next;
-        });
+      setMessages((prev) => {
+        const merged = reconcilePendingOptimistics(prev, fromServer, pendingOutgoingRef.current);
+        const guarded = enforceUnsentMessages(merged, unsentIdsRef.current);
+        const next = preserveDroppedMessages(prev, guarded);
+        messagesSigRef.current = messagesListSignature(next);
+        if (user?.id) writeChatCache(user.id, next);
+        return next;
       });
-      if (isNearBottomRef.current || isInitialLoadRef.current) {
+      if ((isNearBottomRef.current || isInitialLoadRef.current) && !pendingScrollRestoreRef.current) {
         stickToBottomRef.current = true;
+      } else if (readingHistory) {
+        stickToBottomRef.current = false;
       }
     });
   }, [user?.id]);
@@ -435,16 +451,19 @@ export default function Messages() {
       void hydrateHiddenMessages(uid).then(() => setHiddenTick((t) => t + 1));
     }
 
-    const requestPromise = api.getMessages({ limit: 50 })
+    const requestPromise = api.getMessages({ limit: 80 })
       .then((data) => {
         const raw = data.messages || [];
         if (raw.length > 0) {
           applyMessageBatch(raw);
           const more = data.pagination?.hasMore ?? false;
           setHasMore(more);
-        } else {
-          setMessages([]);
-          messagesSigRef.current = "0";
+        } else if (!hadMessages) {
+          setMessages((prev) => {
+            const pending = prev.filter((m) => pendingOutgoingRef.current.has(m.id));
+            messagesSigRef.current = pending.length ? messagesListSignature(pending) : "0";
+            return pending;
+          });
           setHasMore(false);
         }
         return data;
@@ -477,13 +496,19 @@ export default function Messages() {
     const container = messagesContainerRef.current;
     // Store current scroll height before adding messages
     const scrollHeightBefore = container?.scrollHeight ?? 0;
-    
+
+    stickToBottomRef.current = false;
+    isNearBottomRef.current = false;
+    isPrependingRef.current = true;
+
     setLoadingMore(true);
     try {
       const data = await api.getMessages({ offset });
       const older = await normalizeMessages(data.messages || []);
       if (older.length === 0) {
         setHasMore(false);
+        isPrependingRef.current = false;
+        prependScrollHeightRef.current = null;
         return;
       }
       
@@ -502,6 +527,9 @@ export default function Messages() {
       // Don't set error state for load more failures, just log it
     } finally {
       setLoadingMore(false);
+      if (prependScrollHeightRef.current === null) {
+        isPrependingRef.current = false;
+      }
     }
   }, [loadingMore, hasMore, messages.length]);
 
@@ -509,11 +537,17 @@ export default function Messages() {
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && !loadingMore && hasMore && messages.length > 0) {
+        if (
+          entries[0].isIntersecting &&
+          !loadingMore &&
+          !isPrependingRef.current &&
+          hasMore &&
+          messages.length > 0
+        ) {
           loadMoreMessages();
         }
       },
-      { rootMargin: '100px', threshold: 0.1 }
+      { rootMargin: '320px', threshold: 0.05 }
     );
 
     if (messagesStartRef.current) {
@@ -549,47 +583,63 @@ export default function Messages() {
     };
 
     void hydrateQuickReactions();
-    const cached = readChatCache(user.id);
-    if (cached && cached.length > 0) {
-      isInitialLoadRef.current = true;
+    const cached = messages.length === 0 ? readChatCache(user.id) : messages;
+    const tailIds = (cached ?? []).slice(-12).map((m) => m.id);
+    const savedAnchor = readChatScrollAnchor(user.id);
+    const restoreAnchor = shouldRestoreScrollAnchor(savedAnchor, tailIds);
+
+    if (restoreAnchor && savedAnchor) {
+      pendingScrollRestoreRef.current = savedAnchor;
+    } else {
+      pendingScrollRestoreRef.current = null;
+      scrollRestoreAttemptsRef.current = 0;
+      anchorResolveStartedRef.current = false;
+      clearChatScrollAnchor(user.id);
+      isNearBottomRef.current = true;
       stickToBottomRef.current = true;
+    }
+
+    if (messages.length === 0 && cached && cached.length > 0) {
+      isInitialLoadRef.current = true;
       setMessages(cached);
       messagesSigRef.current = messagesListSignature(cached);
+    } else if (!restoreAnchor && isNearBottomRef.current) {
+      stickToBottomRef.current = true;
     }
     loadMessages();
 
     const pollSyncMessages = () => {
       if (!mounted) return;
+      const container = messagesContainerRef.current;
+      const readingHistory = !isNearBottomRef.current && !stickToBottomRef.current;
+      if (readingHistory && container) {
+        scrollPreserveRef.current = {
+          top: container.scrollTop,
+          height: container.scrollHeight,
+        };
+      }
       void api.getMessages().then(async (data) => {
         const raw = data.messages ?? [];
-        const preview = previewMessagesForDisplay(raw);
-        const mergePreview = (fresh: ApiMessage[]) => {
-          startTransition(() => {
-            setMessages((prev) => {
-              const cleaned = prev.filter((m) => {
-                if (!pendingOutgoingRef.current.has(m.id)) return true;
-                if (m.type !== "video" || !m.fileData?.startsWith("blob:")) return true;
-                const serverHasSame = fresh.some(
-                  (f) =>
-                    f.senderId === m.senderId &&
-                    f.type === "video" &&
-                    Math.abs(new Date(f.timestamp).getTime() - new Date(m.timestamp).getTime()) < 120_000,
-                );
-                if (serverHasSame) pendingOutgoingRef.current.delete(m.id);
-                return !serverHasSame;
-              });
-              const next = mergeMessagesIfChanged(cleaned, fresh, mergeMessagesById);
-              if (!next) return prev;
-              messagesSigRef.current = messagesListSignature(next);
-              return next;
-            });
-            setHasMore(fresh.length > 0 && (data.pagination?.hasMore ?? false));
-          });
-        };
-        if (raw.length > 0) mergePreview(preview);
+        if (raw.length === 0) return;
         const fresh = await normalizeMessages(raw);
-        mergePreview(fresh);
-      }).catch(() => {});
+        if (!mounted) return;
+        setMessages((prev) => {
+          const merged = reconcilePendingOptimistics(prev, fresh, pendingOutgoingRef.current);
+          const guarded = enforceUnsentMessages(merged, unsentIdsRef.current);
+          const preserved = preserveDroppedMessages(prev, guarded);
+          const next = mergeMessagesIfChanged(prev, preserved, (_, m) => m);
+          if (!next) {
+            scrollPreserveRef.current = null;
+            return prev;
+          }
+          messagesSigRef.current = messagesListSignature(next);
+          if (user?.id) writeChatCache(user.id, next);
+          return next;
+        });
+        setHasMore(fresh.length > 0 && (data.pagination?.hasMore ?? false));
+      }).catch(() => {
+        scrollPreserveRef.current = null;
+      });
     };
 
     // SSE (local) or polling (Vercel serverless)
@@ -620,50 +670,34 @@ export default function Messages() {
         if (!mounted) return;
         try {
           const raw = JSON.parse(e.data) as ApiMessage;
-          const [preview] = previewMessagesForDisplay([raw]);
+          const [msg] = await normalizeMessages([raw]);
+          if (!mounted) return;
 
-          const mergeIncoming = (prev: ApiMessage[], incoming: ApiMessage) => {
-            const existingIds = new Set(prev.map((m) => m.id));
-            if (existingIds.has(incoming.id)) {
-              return prev.map((m) => (m.id === incoming.id ? incoming : m));
+          setMessages((prev) => {
+            if (prev.some((m) => m.id === msg.id)) {
+              return prev.map((m) => (m.id === msg.id ? { ...m, ...msg, text: msg.text ?? m.text } : m));
             }
-            if (incoming.senderId === user?.id) {
+            if (msg.senderId === user?.id) {
               const optimisticIdx = prev.findIndex(
                 (m) =>
-                  m.senderId === user.id &&
-                  m.id !== incoming.id &&
-                  m.type === incoming.type &&
-                  Math.abs(
-                    new Date(m.timestamp).getTime() - new Date(incoming.timestamp).getTime(),
-                  ) < 120_000,
+                  pendingOutgoingRef.current.has(m.id) &&
+                  findOptimisticMatch(m, [msg], { allowBlobMatch: true }) !== undefined,
               );
               if (optimisticIdx >= 0) {
+                pendingOutgoingRef.current.delete(prev[optimisticIdx]!.id);
                 const next = [...prev];
-                next[optimisticIdx] = incoming;
+                next[optimisticIdx] = msg;
                 return next;
               }
             }
-            return [...prev, incoming];
-          };
-
-          setMessages((prev) => mergeIncoming(prev, preview));
-
-          if (preview.senderId === partnerId && !isNearBottomRef.current) {
-            setHasNewMessages(true);
-          } else if (isNearBottomRef.current) {
-            stickToBottomRef.current = true;
-            requestAnimationFrame(() => {
-              scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
-            });
-          }
-
-          const [msg] = await normalizeMessages([raw]);
-          if (!mounted) return;
-          startTransition(() => {
-            setMessages((prev) => mergeIncoming(prev, msg));
+            return [...prev, msg];
           });
-          if (msg.senderId !== partnerId && isNearBottomRef.current) {
+
+          if (msg.senderId === partnerId && !isNearBottomRef.current) {
+            setHasNewMessages(true);
+          } else {
             stickToBottomRef.current = true;
+            requestStickToBottom();
           }
         } catch (err) {
           console.error("Failed to handle new message:", err);
@@ -679,7 +713,19 @@ export default function Messages() {
           setMessages((prev) => {
             const found = prev.find(m => m.id === msg.id);
             if (!found) return prev;
-            return prev.map((m) => (m.id === msg.id ? msg : m));
+            return prev.map((m) =>
+              m.id === msg.id
+                ? {
+                    ...m,
+                    ...msg,
+                    deleted: m.deleted || msg.deleted,
+                    text: m.deleted ? undefined : (msg.text ?? m.text),
+                    reaction: m.reaction ?? msg.reaction,
+                    imageUrl: m.deleted ? undefined : (msg.imageUrl ?? m.imageUrl),
+                    imageData: m.deleted ? undefined : (msg.imageData ?? m.imageData),
+                  }
+                : m,
+            );
           });
         } catch (err) {
           console.error("Failed to handle message liked:", err);
@@ -776,7 +822,10 @@ export default function Messages() {
         }
       };
 
-      const handleMessagesCleared = () => { if (mounted) setMessages([]); };
+      const handleMessagesCleared = () => {
+        if (!mounted) return;
+        setMessages((prev) => prev.filter((m) => pendingOutgoingRef.current.has(m.id)));
+      };
 
       const pushCallSignal = (type: "answer" | "ice", data: unknown) => {
         callSignalSeq.current += 1;
@@ -991,18 +1040,40 @@ export default function Messages() {
         es = null;
       }
     };
-  }, [user, partnerId, loadMessages, refreshCouplePrefs]);
+  }, [user?.id, partnerId, loadMessages, refreshCouplePrefs]);
 
   // Keep chat in sync across tabs/devices (SSE can miss events while backgrounded)
   useEffect(() => {
     if (!user) return;
 
     const syncFromServer = () => {
+      const container = messagesContainerRef.current;
+      const readingHistory = !isNearBottomRef.current && !stickToBottomRef.current;
+      if (readingHistory && container) {
+        scrollPreserveRef.current = {
+          top: container.scrollTop,
+          height: container.scrollHeight,
+        };
+      }
       void api.getMessages().then(async (data) => {
         const fresh = await normalizeMessages(data.messages ?? []);
-        setMessages((prev) => mergeMessagesById(prev, fresh));
+        setMessages((prev) => {
+          const merged = reconcilePendingOptimistics(prev, fresh, pendingOutgoingRef.current);
+          const guarded = enforceUnsentMessages(merged, unsentIdsRef.current);
+          const preserved = preserveDroppedMessages(prev, guarded);
+          const next = mergeMessagesIfChanged(prev, preserved, (_, m) => m);
+          if (!next) {
+            scrollPreserveRef.current = null;
+            return prev;
+          }
+          messagesSigRef.current = messagesListSignature(next);
+          if (user?.id) writeChatCache(user.id, next);
+          return next;
+        });
         setHasMore(fresh.length > 0 && (data.pagination?.hasMore ?? false));
-      }).catch(() => {});
+      }).catch(() => {
+        scrollPreserveRef.current = null;
+      });
     };
 
     const onVisible = () => {
@@ -1012,17 +1083,56 @@ export default function Messages() {
     document.addEventListener("visibilitychange", onVisible);
     const interval = setInterval(() => {
       if (document.visibilityState === "visible") syncFromServer();
-    }, import.meta.env.PROD ? 8_000 : 180_000);
+    }, import.meta.env.PROD ? 15_000 : 180_000);
 
     return () => {
       document.removeEventListener("visibilitychange", onVisible);
       clearInterval(interval);
     };
-  }, [user]);
+  }, [user?.id]);
+
+  useEffect(() => {
+    const onTheme = () => setAppThemeId(getStoredAppTheme());
+    window.addEventListener(APP_THEME_CHANGED, onTheme);
+    return () => window.removeEventListener(APP_THEME_CHANGED, onTheme);
+  }, []);
+
+  useEffect(() => {
+    recentTailIdsRef.current = new Set(messages.slice(-6).map((m) => m.id));
+  }, [messages]);
+
+  // If refresh saved a scroll anchor to an older message, load that window first.
+  useEffect(() => {
+    if (!user) return;
+    const anchor = pendingScrollRestoreRef.current;
+    if (!anchor || anchor.messageId === "__ratio__") return;
+    pendingScrollRestoreRef.current = anchor;
+    if (messages.some((m) => m.id === anchor.messageId)) return;
+    if (anchorResolveStartedRef.current) return;
+    anchorResolveStartedRef.current = true;
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const data = await api.getMessageContext(anchor.messageId, 50);
+        const batch = await normalizeMessages(data.messages ?? []);
+        if (cancelled || batch.length === 0) return;
+        setMessages((prev) => mergeMessagesById(prev, batch));
+        setHasMore(Boolean(data.pagination?.hasMoreBefore));
+        scrollRestoreAttemptsRef.current = 0;
+      } catch {
+        /* ratio fallback in restoreScrollToAnchor */
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, messages.length]);
 
   // Stick to bottom: first load, own messages, decrypt height changes, reply bar, explicit requests
   useLayoutEffect(() => {
-    if (messages.length === 0) return;
+    if (messages.length === 0 || isPrependingRef.current) return;
 
     const last = messages[messages.length - 1];
     const tailSig = last
@@ -1031,23 +1141,59 @@ export default function Messages() {
     const tailChanged = tailSig !== lastMessageTailRef.current;
     lastMessageTailRef.current = tailSig;
 
-    const isMedia = last?.type === "gif" || last?.type === "image" || last?.type === "video";
     const firstPaint = isInitialLoadRef.current;
+    const isOwnLast = last?.senderId === user?.id;
+
+    if (firstPaint && !pendingScrollRestoreRef.current) {
+      const container = messagesContainerRef.current;
+      if (container) scrollChatToBottom(container, bottomRef.current);
+    }
+
+    const restoreAnchor = pendingScrollRestoreRef.current;
+    if (restoreAnchor && messages.length > 0 && scrollRestoreAttemptsRef.current < 24) {
+      const container = messagesContainerRef.current;
+      const restored = restoreScrollToAnchor(container, restoreAnchor);
+      scrollRestoreAttemptsRef.current += 1;
+      if (restored) {
+        pendingScrollRestoreRef.current = null;
+        isNearBottomRef.current = false;
+        stickToBottomRef.current = false;
+        isInitialLoadRef.current = false;
+        return;
+      }
+    }
+
+    const preserve = scrollPreserveRef.current;
+    if (preserve && !isNearBottomRef.current && !stickToBottomRef.current) {
+      const container = messagesContainerRef.current;
+      if (container) {
+        const diff = container.scrollHeight - preserve.height;
+        if (diff !== 0) container.scrollTop = preserve.top + diff;
+      }
+      scrollPreserveRef.current = null;
+    }
 
     const shouldStick =
-      stickToBottomRef.current ||
-      firstPaint ||
-      (isNearBottomRef.current && tailChanged);
+      !isPrependingRef.current &&
+      !pendingScrollRestoreRef.current &&
+      (stickToBottomRef.current ||
+        (firstPaint && !restoreAnchor) ||
+        (isOwnLast && tailChanged && isNearBottomRef.current) ||
+        (isNearBottomRef.current && tailChanged));
 
     if (shouldStick) {
-      if (isMedia || firstPaint) {
-        scrollChatToBottomAfterPaint(
-          messagesContainerRef.current,
-          bottomRef.current,
-          firstPaint,
-        );
-      } else {
-        scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
+      const aggressive = Boolean(firstPaint && !restoreAnchor);
+      scrollChatToBottomAfterPaint(
+        messagesContainerRef.current,
+        bottomRef.current,
+        aggressive,
+      );
+      if (firstPaint && !restoreAnchor) {
+        window.setTimeout(() => {
+          if (!pendingScrollRestoreRef.current && isNearBottomRef.current) {
+            scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
+          }
+        }, 120);
       }
       setHasNewMessages(false);
       stickToBottomRef.current = false;
@@ -1071,8 +1217,15 @@ export default function Messages() {
     prependScrollHeightRef.current = null;
     const container = messagesContainerRef.current;
     if (!container) return;
-    const diff = container.scrollHeight - before;
-    if (diff > 0) container.scrollTop = container.scrollTop + diff;
+    const restore = () => {
+      const diff = container.scrollHeight - before;
+      if (diff > 0) container.scrollTop = container.scrollTop + diff;
+    };
+    restore();
+    requestAnimationFrame(() => {
+      restore();
+      isPrependingRef.current = false;
+    });
   }, [messages]);
 
   // Jump to pinned memory from /chat?highlight=<messageId>
@@ -1120,14 +1273,48 @@ export default function Messages() {
       if (debounceTimer) clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => {
         setIsNearBottom(isNear);
-        if (isNear) setHasNewMessages(false);
+        if (isNear) {
+          setHasNewMessages(false);
+          if (userIdRef.current) clearChatScrollAnchor(userIdRef.current);
+        } else {
+          const uid = userIdRef.current;
+          if (uid) {
+            const captured = captureScrollAnchor(container);
+            if (captured) {
+              saveChatScrollAnchor(uid, captured.messageId, captured.offsetPx, captured.scrollRatio);
+            }
+          }
+        }
       }, 50);
+
+      if (scrollAnchorSaveRef.current) clearTimeout(scrollAnchorSaveRef.current);
+      scrollAnchorSaveRef.current = setTimeout(() => {
+        const uid = userIdRef.current;
+        if (!uid || isNearBottomRef.current) return;
+        const captured = captureScrollAnchor(container);
+        if (captured) {
+          saveChatScrollAnchor(uid, captured.messageId, captured.offsetPx, captured.scrollRatio);
+        }
+      }, 120);
+    };
+
+    const saveAnchorNow = () => {
+      const uid = userIdRef.current;
+      if (!uid || isNearBottomRef.current) return;
+      const captured = captureScrollAnchor(container);
+      if (captured) {
+        saveChatScrollAnchor(uid, captured.messageId, captured.offsetPx, captured.scrollRatio);
+      }
     };
 
     container.addEventListener('scroll', handleScroll);
+    window.addEventListener('beforeunload', saveAnchorNow);
     return () => {
       container.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('beforeunload', saveAnchorNow);
       if (debounceTimer) clearTimeout(debounceTimer);
+      if (scrollAnchorSaveRef.current) clearTimeout(scrollAnchorSaveRef.current);
+      if (mediaScrollTimerRef.current) clearTimeout(mediaScrollTimerRef.current);
     };
   }, []);
 
@@ -1197,31 +1384,6 @@ export default function Messages() {
     clearUnreadChatBadge();
     setUnreadChat(0);
   }, []);
-
-  useEffect(() => {
-    if (!user) return;
-    const onPartnerMessage = async (e: Event) => {
-      try {
-        const raw = (e as CustomEvent<ApiMessage>).detail;
-        const [msg] = await normalizeMessages([raw]);
-        if (msg.senderId !== partnerId) return;
-        setMessages((prev) => {
-          if (prev.some((m) => m.id === msg.id)) return prev;
-          return [...prev, msg];
-        });
-        if (isNearBottomRef.current) {
-          stickToBottomRef.current = true;
-          scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
-        } else {
-          setHasNewMessages(true);
-        }
-      } catch {
-        /* ignore */
-      }
-    };
-    window.addEventListener("grova-partner-message", onPartnerMessage);
-    return () => window.removeEventListener("grova-partner-message", onPartnerMessage);
-  }, [user, partnerId, pName, pAvatar]);
 
   useEffect(() => {
     if (!user) return;
@@ -1389,12 +1551,11 @@ export default function Messages() {
       const outgoing = await prepareOutgoingMessage({ senderId: user.id, ...partial });
       const saved = await api.sendMessage(outgoing);
       const [display] = await normalizeMessages([saved]);
-      pendingOutgoingRef.current.delete(tempId);
       setMessages((prev) => {
-        const found = prev.find(m => m.id === tempId);
-        if (!found) return prev;
-        const next = prev.map((m) => (m.id === tempId ? display : m));
-        if (user.id) writeChatCache(user.id, next);
+        const next = replaceOptimisticMessage(prev, tempId!, display, user.id);
+        pendingOutgoingRef.current.delete(tempId!);
+        messagesSigRef.current = messagesListSignature(next);
+        writeChatCache(user.id, next);
         return next;
       });
       requestStickToBottom();
@@ -1426,7 +1587,7 @@ export default function Messages() {
           tempId,
         ),
       ]);
-      scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
+      requestStickToBottom();
       try {
         const url = await uploadMediaFile(file, mime);
         const sticker =
@@ -1439,10 +1600,14 @@ export default function Messages() {
         });
         const saved = await api.sendMessage(outgoing);
         const [display] = await normalizeMessages([saved]);
-        URL.revokeObjectURL(localPreview);
-        pendingOutgoingRef.current.delete(tempId);
-        setMessages((prev) => prev.map((m) => (m.id === tempId ? display : m)));
-        scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
+        setMessages((prev) => {
+          const next = replaceOptimisticMessage(prev, tempId, display, user.id);
+          pendingOutgoingRef.current.delete(tempId);
+          messagesSigRef.current = messagesListSignature(next);
+          writeChatCache(user.id, next);
+          return next;
+        });
+        requestAnimationFrame(() => URL.revokeObjectURL(localPreview));
       } catch (err) {
         URL.revokeObjectURL(localPreview);
         pendingOutgoingRef.current.delete(tempId);
@@ -1487,7 +1652,7 @@ export default function Messages() {
         tempId,
       );
       setMessages((prev) => [...prev, optimistic]);
-      scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
+      requestStickToBottom();
 
       try {
         const url = await uploadMediaFile(file, mime);
@@ -1506,20 +1671,25 @@ export default function Messages() {
         });
         const saved = await api.sendMessage(outgoing);
         const [display] = await normalizeMessages([saved]);
-        if (localPreview) URL.revokeObjectURL(localPreview);
         pendingOutgoingRef.current.delete(tempId);
-        setMessages((prev) => prev.map((m) => (m.id === tempId ? display : m)));
-        scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
+        setMessages((prev) => {
+          const next = replaceOptimisticMessage(prev, tempId, display, user.id);
+          messagesSigRef.current = messagesListSignature(next);
+          if (user?.id) writeChatCache(user.id, next);
+          return next;
+        });
+        requestStickToBottom();
       } catch (err) {
         console.error("Failed to send ephemeral media:", err);
         pendingOutgoingRef.current.delete(tempId);
-        if (localPreview) URL.revokeObjectURL(localPreview);
         setMessages((prev) => prev.filter((m) => m.id !== tempId));
         setError("Message did not send. Check your connection and try again.");
         throw err;
+      } finally {
+        if (localPreview) URL.revokeObjectURL(localPreview);
       }
     },
-    [user, online],
+    [user, online, requestStickToBottom],
   );
 
   const openMediaMessage = useCallback(async (msg: ApiMessage) => {
@@ -1864,6 +2034,7 @@ export default function Messages() {
       if (!user) return;
 
       const tempId = crypto.randomUUID();
+      pendingOutgoingRef.current.add(tempId);
       const optimistic = buildOptimisticMessage(
         {
           senderId: user.id,
@@ -1889,10 +2060,12 @@ export default function Messages() {
         });
         const saved = await api.sendMessage(outgoing);
         const [display] = await normalizeMessages([saved]);
-        setMessages((prev) => prev.map((m) => (m.id === tempId ? display : m)));
+        pendingOutgoingRef.current.delete(tempId);
+        setMessages((prev) => replaceOptimisticMessage(prev, tempId, display, user.id));
         scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
       } catch (uploadError) {
         console.error("File upload failed:", uploadError);
+        pendingOutgoingRef.current.delete(tempId);
         setMessages((prev) => prev.filter((m) => m.id !== tempId));
         toast.error(
           uploadError instanceof Error
@@ -1920,7 +2093,7 @@ export default function Messages() {
       }, 90_000);
       const normalized = clipboardItemType
         ? normalizePastedFile(file, clipboardItemType)
-        : normalizeGalleryFile(file);
+        : await resolveGalleryPick(file);
       const toastId = `media-pick-${Date.now()}`;
       const quickDoc = isDocumentFile(normalized, clipboardItemType);
       const likelyVideo =
@@ -1965,13 +2138,14 @@ export default function Messages() {
 
       try {
         if (kind === "image") {
+          const prepared = await prepareImageForUpload(normalized, clipboardItemType);
           if (isEphemeral) {
-            await uploadAndSendEphemeralMedia(normalized, "image", mediaViewMode);
-          } else if (isHeicOrHeif(normalized)) {
-            await uploadAndSendGalleryImage(normalized);
+            await uploadAndSendEphemeralMedia(prepared, "image", mediaViewMode);
+          } else if (!clipboardItemType) {
+            await uploadAndSendGalleryImage(prepared);
           } else {
-            setPendingImageType(normalized.type || clipboardItemType || "image/jpeg");
-            setImageToCrop(URL.createObjectURL(normalized));
+            setPendingImageType(prepared.type || "image/jpeg");
+            setImageToCrop(URL.createObjectURL(prepared));
           }
         } else if (kind === "video") {
           const mime = guessVideoMime(normalized, clipboardItemType);
@@ -1997,7 +2171,7 @@ export default function Messages() {
             tempId,
           );
           setMessages((prev) => [...prev, optimistic]);
-          scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
+          requestStickToBottom();
 
           try {
             const duration = await getVideoDurationSafe(normalized);
@@ -2023,18 +2197,23 @@ export default function Messages() {
             });
             const saved = await api.sendMessage(outgoing);
             const [display] = await normalizeMessages([saved]);
-            URL.revokeObjectURL(previewUrl);
             pendingOutgoingRef.current.delete(tempId);
-            setMessages((prev) => replaceOutgoingVideoMessage(prev, tempId, display, user.id));
-            scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
+            setMessages((prev) => {
+              const next = replaceOptimisticMessage(prev, tempId, display, user.id);
+              messagesSigRef.current = messagesListSignature(next);
+              writeChatCache(user.id, next);
+              return next;
+            });
+            requestStickToBottom();
           } catch (videoErr) {
             pendingOutgoingRef.current.delete(tempId);
             setMessages((prev) => prev.filter((m) => m.id !== tempId));
-            URL.revokeObjectURL(previewUrl);
             toast.error(
               videoErr instanceof Error ? videoErr.message : "Failed to send video.",
               { duration: 4000 },
             );
+          } finally {
+            URL.revokeObjectURL(previewUrl);
           }
         } else {
           await uploadAndSendFile(normalized);
@@ -2130,19 +2309,47 @@ export default function Messages() {
   }, []);
 
   const handleCroppedImage = useCallback(async (croppedDataUrl: string) => {
-    if (cropSendInFlightRef.current) return;
+    if (cropSendInFlightRef.current || !user) return;
     cropSendInFlightRef.current = true;
     dismissImageCrop();
+
+    const tempId = crypto.randomUUID();
+    const sticker = mediaModeSticker(mediaViewMode);
+    pendingOutgoingRef.current.add(tempId);
+    const optimistic = buildOptimisticMessage(
+      {
+        senderId: user.id,
+        type: "image",
+        imageUrl: croppedDataUrl,
+        companionSticker: sticker,
+      },
+      tempId,
+    );
+    setMessages((prev) => [...prev, optimistic]);
+    requestStickToBottom();
+
     try {
       const url = await uploadMediaToB2(croppedDataUrl, pendingImageType);
-      await sendMsg({ type: "image", imageUrl: url, companionSticker: mediaModeSticker(mediaViewMode) });
+      const outgoing = await prepareOutgoingMessage({
+        senderId: user.id,
+        type: "image",
+        imageUrl: url,
+        companionSticker: sticker,
+      });
+      const saved = await api.sendMessage(outgoing);
+      const [display] = await normalizeMessages([saved]);
+      pendingOutgoingRef.current.delete(tempId);
+      setMessages((prev) => replaceOptimisticMessage(prev, tempId, display, user.id));
+      requestStickToBottom();
     } catch (uploadError) {
       console.error("Failed to upload image:", uploadError);
-      alert(uploadError instanceof Error ? uploadError.message : "Image upload failed.");
+      pendingOutgoingRef.current.delete(tempId);
+      setMessages((prev) => prev.filter((m) => m.id !== tempId));
+      toast.error(uploadError instanceof Error ? uploadError.message : "Image upload failed.");
     } finally {
       cropSendInFlightRef.current = false;
     }
-  }, [pendingImageType, sendMsg, mediaModeSticker, mediaViewMode, dismissImageCrop]);
+  }, [pendingImageType, user, mediaModeSticker, mediaViewMode, dismissImageCrop, requestStickToBottom]);
 
   // Voice recording
   const startRecording = useCallback(async () => {
@@ -2195,7 +2402,7 @@ export default function Messages() {
             const saved = await api.sendMessage(outgoing);
             const [display] = await normalizeMessages([saved]);
             pendingOutgoingRef.current.delete(tempId);
-            setMessages((prev) => prev.map((m) => (m.id === tempId ? display : m)));
+            setMessages((prev) => replaceOptimisticMessage(prev, tempId, display, senderId));
             scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
           } catch (err) {
             console.error("Voice upload failed:", err);
@@ -2354,9 +2561,12 @@ export default function Messages() {
     setMessages((prev) => {
       const msg = prev.find((m) => m.id === id);
       if (!msg) return prev;
-      previousReaction = msg?.reaction;
+      previousReaction = msg.reaction;
+      const nextReaction = msg.reaction === emoji ? undefined : emoji;
+      const displayReaction =
+        msg.senderId === user.id ? msg.reaction : nextReaction;
       return prev.map((m) =>
-        m.id === id ? { ...m, reaction: m.reaction === emoji ? undefined : emoji } : m,
+        m.id === id ? { ...m, reaction: displayReaction } : m,
       );
     });
     try {
@@ -2389,39 +2599,35 @@ export default function Messages() {
   const handleUnsend = useCallback(async (id: string) => {
     setContextMenu(null);
     let snapshot: ApiMessage | undefined;
+    unsentIdsRef.current.add(id);
     setMessages((prev) => {
       snapshot = prev.find((m) => m.id === id);
-      return prev.map((m) =>
-        m.id === id
-          ? {
-              ...m,
-              deleted: true,
-              text: undefined,
-              audioData: undefined,
-              fileData: undefined,
-              imageUrl: undefined,
-              imageData: undefined,
-              gifUrl: undefined,
-            }
-          : m,
-      );
+      const next = prev.map((m) => (m.id === id ? tombstoneMessage(m) : m));
+      if (user?.id) writeChatCache(user.id, next);
+      return next;
     });
     try {
-      const deleted = await api.deleteMessage(id);
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === id ? { ...m, ...deleted, deleted: true, text: undefined, audioData: undefined } : m,
-        ),
-      );
+      await api.deleteMessage(id);
+      setMessages((prev) => {
+        const next = prev.map((m) => (m.id === id ? tombstoneMessage(m) : m));
+        if (user?.id) writeChatCache(user.id, next);
+        return next;
+      });
+      window.setTimeout(() => unsentIdsRef.current.delete(id), 12_000);
     } catch (err) {
+      unsentIdsRef.current.delete(id);
       if (snapshot) {
-        setMessages((prev) => prev.map((m) => (m.id === id ? snapshot! : m)));
+        setMessages((prev) => {
+          const next = prev.map((m) => (m.id === id ? snapshot! : m));
+          if (user?.id) writeChatCache(user.id, next);
+          return next;
+        });
       } else if (err instanceof Error && /not found/i.test(err.message)) {
         setMessages((prev) => prev.filter((m) => m.id !== id));
       }
       toast.error(unsendErrorMessage(err));
     }
-  }, []);
+  }, [user?.id]);
 
   const handleDeleteForMe = useCallback(
     async (id: string) => {
@@ -2524,6 +2730,7 @@ export default function Messages() {
   }, [messages]);
 
   const showChatAurora = isMoonlightSagaTheme(appThemeId);
+  const premiumChatClass = getPremiumChatThemeClass(appThemeId);
 
   if (blocked) {
     return (
@@ -2550,9 +2757,9 @@ export default function Messages() {
         />
       )}
     <div
-      className={`chat-panel flex-1 min-w-0 h-full min-h-0 relative bg-black ${showChatAurora ? "eternal-aurora-chat" : ""}`}
+      className={`chat-panel flex-1 min-w-0 h-full min-h-0 relative bg-black ${premiumChatClass ?? ""}`}
     >
-      {showChatAurora && <ChatAuroraLayer />}
+      {isPremiumAnimatedTheme(appThemeId) && <ChatThemeLayer variant={appThemeId} />}
 
       <div className="chat-panel-top shrink-0 z-20 flex flex-col relative">
       {/* ── Header ── */}
@@ -2646,7 +2853,9 @@ export default function Messages() {
         style={{ scrollBehavior: 'auto' }}
         onClick={(e) => {
           const t = e.target as HTMLElement;
-          if (t.closest("button, a, input, textarea, video, audio, [role='button']")) return;
+          if (t.closest("button, a, input, textarea, video, audio, img, [role='button']")) return;
+          if (!isNearBottomRef.current) return;
+          if (window.matchMedia("(max-width: 767px)").matches) return;
           messageInputRef.current?.focus();
         }}
       >
@@ -2696,6 +2905,7 @@ export default function Messages() {
                   onStartThread={handleStartThread}
                   onReplyToThread={handleReplyToThread}
                   onMediaLoad={scrollToBottomForMedia}
+                  onMediaCommitted={handleMediaCommitted}
                   replySource={msg.replyToId ? messageById.get(msg.replyToId) : undefined}
                   onJumpToMessage={jumpToMessage}
                 />
@@ -2781,18 +2991,14 @@ export default function Messages() {
             )}
           </div>
         )}
-        {/* Profile header */}
-        <div className="flex flex-col items-center gap-2 py-3 md:py-8 mb-1 md:mb-2 shrink-0">
-          <AvatarImage src={pAvatar} userId={partnerId} alt={`Profile picture of ${pName}`} className="w-14 h-14 md:w-24 md:h-24 rounded-full object-cover" />
-          <p className="font-bold text-sm md:text-lg">{pName}</p>
-          <span className="text-[10px] md:text-xs bg-secondary/60 px-3 py-1 rounded-full text-muted-foreground">Just the two of you ♥</span>
-          {showPartnerTyping && (
-            <div className="flex items-center gap-1 text-xs text-primary mt-1">
-              <span>{partnerTypingLine(partnerId)}</span>
-              <TypingDots />
-            </div>
-          )}
-        </div>
+        {/* Profile header — only when chat is empty so scroll stays on messages */}
+        {visibleMessages.length <= 3 && (
+          <div className="flex flex-col items-center gap-2 py-3 md:py-6 mb-1 shrink-0">
+            <AvatarImage src={pAvatar} userId={partnerId} alt={`Profile picture of ${pName}`} className="w-14 h-14 md:w-20 md:h-20 rounded-full object-cover" />
+            <p className="font-bold text-sm md:text-base">{pName}</p>
+            <span className="text-[10px] md:text-xs bg-secondary/60 px-3 py-1 rounded-full text-muted-foreground">Just the two of you ♥</span>
+          </div>
+        )}
 
         {error && messages.length === 0 && visibleMessages.length === 0 && (
           <div
@@ -2866,6 +3072,7 @@ export default function Messages() {
                     onStartThread={handleStartThread}
                     onReplyToThread={handleReplyToThread}
                     onMediaLoad={scrollToBottomForMedia}
+                    onMediaCommitted={handleMediaCommitted}
                     replySource={msg.replyToId ? messageById.get(msg.replyToId) : undefined}
                     onJumpToMessage={jumpToMessage}
                   />
@@ -2875,7 +3082,7 @@ export default function Messages() {
           </div>
         ))}
 
-        <div ref={bottomRef} className="h-4 shrink-0" aria-hidden />
+        <div ref={bottomRef} className="h-8 shrink-0" aria-hidden />
       </div>
 
       <div className="chat-panel-bottom shrink-0 relative z-10">
@@ -2904,14 +3111,48 @@ export default function Messages() {
           canvasHeight={doodleHeight}
           onExpandCanvas={expandDoodleSpace}
           onClose={closeDoodlePanel}
-          onSend={async (imageData) => {
+          onSend={(imageData) => {
             closeDoodlePanel();
-            try {
-              const url = await uploadMediaToB2(imageData, "image/jpeg");
-              sendMsg({ type: "image", imageUrl: url, text: "✏️ Doodle" });
-            } catch (err) {
-              alert(err instanceof Error ? err.message : "Doodle upload failed — check CLOUDINARY_URL in .env");
-            }
+            if (!user) return;
+            const tempId = crypto.randomUUID();
+            pendingOutgoingRef.current.add(tempId);
+            setMessages((prev) => [
+              ...prev,
+              buildOptimisticMessage(
+                { senderId: user.id, type: "image", imageData: imageData, text: "✏️ Doodle" },
+                tempId,
+              ),
+            ]);
+            requestStickToBottom();
+            void (async () => {
+              try {
+                const outgoing = await prepareOutgoingMessage({
+                  senderId: user.id,
+                  type: "image",
+                  imageUrl: "",
+                  text: "✏️ Doodle",
+                });
+                const url = await uploadMediaToB2(imageData, "image/jpeg");
+                outgoing.imageUrl = url;
+                const saved = await api.sendMessage(outgoing);
+                const [display] = await normalizeMessages([saved]);
+                setMessages((prev) => {
+                  const next = replaceOptimisticMessage(prev, tempId, display, user.id);
+                  pendingOutgoingRef.current.delete(tempId);
+                  messagesSigRef.current = messagesListSignature(next);
+                  writeChatCache(user.id, next);
+                  return next;
+                });
+                requestStickToBottom();
+              } catch (err) {
+                pendingOutgoingRef.current.delete(tempId);
+                setMessages((prev) => prev.filter((m) => m.id !== tempId));
+                toast.error(
+                  err instanceof Error ? err.message : "Doodle upload failed — check CLOUDINARY_URL in .env",
+                  { duration: 4000 },
+                );
+              }
+            })();
           }}
         />
       )}
