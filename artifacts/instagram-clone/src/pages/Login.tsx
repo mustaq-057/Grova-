@@ -50,10 +50,6 @@ export default memo(function Login() {
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState<PickUser[]>(defaultPickUsers);
   const [serverOnline, setServerOnline] = useState<boolean | null>(null);
-  const [profileCodes, setProfileCodes] = useState<{ me: string; wife: string } | null>(null);
-  const [autoEntering, setAutoEntering] = useState(false);
-  /** Which profile already consumed the autoenter — the other must type manually. */
-  const autoEnteredForRef = useRef<"me" | "wife" | null>(null);
 
 
   useEffect(() => {
@@ -106,28 +102,6 @@ export default memo(function Login() {
       .catch(() => {});
   }, [authReady, trustedDevice]);
 
-  useEffect(() => {
-    if (trustedDevice) {
-      api.getProfileCodes()
-        .then(setProfileCodes)
-        .catch(console.error);
-    } else {
-      setProfileCodes(null);
-    }
-  }, [trustedDevice]);
-
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    if (autoEntering && code && selectedId && step === "code") {
-      timer = setTimeout(() => {
-        const fakeEvent = { preventDefault: () => {} } as React.FormEvent;
-        void handleLogin(fakeEvent);
-      }, 800);
-    }
-    return () => {
-      if (timer) clearTimeout(timer);
-    };
-  }, [autoEntering, code, selectedId, step]);
 
   const handlePrimaryLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -176,17 +150,7 @@ export default memo(function Login() {
     setSelectedId(id);
     setStep("code");
     setError("");
-    const matchedCode = profileCodes?.[id];
-    // Only autoenter if this profile hasn't been used yet AND the other profile didn't already autoenter
-    const canAutoEnter = matchedCode && (autoEnteredForRef.current === null || autoEnteredForRef.current === id);
-    if (canAutoEnter) {
-      setCode(matchedCode);
-      setAutoEntering(true);
-      autoEnteredForRef.current = id;
-    } else {
-      setCode("");
-      setAutoEntering(false);
-    }
+    setCode("");
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -354,7 +318,7 @@ export default memo(function Login() {
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
             <button
               type="button"
-              onClick={() => { setStep("pick"); setCode(""); setError(""); setAutoEntering(false); }}
+              onClick={() => { setStep("pick"); setCode(""); setError(""); }}
               className="text-sm text-muted-foreground hover:text-foreground mb-6 flex items-center gap-1"
             >
               ← Back
@@ -388,34 +352,24 @@ export default memo(function Login() {
                     value={code}
                     onChange={(e) => {
                       setCode(e.target.value);
-                      setAutoEntering(false);
                     }}
                     placeholder="Enter code"
                     className="w-full bg-secondary border border-border rounded-xl px-4 py-3 text-sm outline-none focus:border-primary transition-colors pr-10"
                     autoFocus
-                    disabled={autoEntering || loading}
+                    disabled={loading}
                     onCopy={(e) => e.preventDefault()}
                     onPaste={(e) => e.preventDefault()}
                     data-testid="input-couple-code"
                   />
-                  {!autoEntering && (
-                    <button
-                      type="button"
-                      onClick={() => setShowCode(s => !s)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-                    >
-                      {showCode ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowCode(s => !s)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                  >
+                    {showCode ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
-                {autoEntering ? (
-                  <p className="text-xs text-primary font-semibold mt-1.5 animate-pulse flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-primary animate-ping" />
-                    Autoentering...
-                  </p>
-                ) : (
-                  <p className="text-xs text-muted-foreground mt-1.5">Your personal code for this profile. Change yours anytime in Settings.</p>
-                )}
+                <p className="text-xs text-muted-foreground mt-1.5">Your personal code for this profile. Change yours anytime in Settings.</p>
               </div>
 
               {error && (
@@ -425,11 +379,11 @@ export default memo(function Login() {
               <motion.button
                 whileTap={{ scale: 0.97 }}
                 type="submit"
-                disabled={!code || loading || autoEntering}
+                disabled={!code || loading}
                 className="w-full py-3 bg-primary text-primary-foreground font-semibold rounded-xl disabled:opacity-50 transition-opacity"
                 data-testid="button-login"
               >
-                {autoEntering ? "Autoentering..." : loading ? "Checking..." : "Enter Grova ♥"}
+                {loading ? "Checking..." : "Enter Grova ♥"}
               </motion.button>
             </form>
           </motion.div>

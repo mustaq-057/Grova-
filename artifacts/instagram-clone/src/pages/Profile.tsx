@@ -238,9 +238,6 @@ export default memo(function Profile() {
               <span className="font-mono text-sm font-semibold text-foreground mt-0.5">{codes[partnerId]}</span>
             </div>
           </div>
-          <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
-            ✓ Autoentering enabled
-          </p>
         </motion.div>
       )}
 
