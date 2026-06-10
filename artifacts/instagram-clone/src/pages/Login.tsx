@@ -1,4 +1,4 @@
-import { useState, memo, useEffect } from "react";
+import { useState, memo, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { Eye, EyeOff, Lock, Mail } from "lucide-react";
 import { api } from "@/lib/api";
@@ -52,6 +52,8 @@ export default memo(function Login() {
   const [serverOnline, setServerOnline] = useState<boolean | null>(null);
   const [profileCodes, setProfileCodes] = useState<{ me: string; wife: string } | null>(null);
   const [autoEntering, setAutoEntering] = useState(false);
+  /** Which profile already consumed the autoenter — the other must type manually. */
+  const autoEnteredForRef = useRef<"me" | "wife" | null>(null);
 
 
   useEffect(() => {
@@ -175,9 +177,12 @@ export default memo(function Login() {
     setStep("code");
     setError("");
     const matchedCode = profileCodes?.[id];
-    if (matchedCode) {
+    // Only autoenter if this profile hasn't been used yet AND the other profile didn't already autoenter
+    const canAutoEnter = matchedCode && (autoEnteredForRef.current === null || autoEnteredForRef.current === id);
+    if (canAutoEnter) {
       setCode(matchedCode);
       setAutoEntering(true);
+      autoEnteredForRef.current = id;
     } else {
       setCode("");
       setAutoEntering(false);
