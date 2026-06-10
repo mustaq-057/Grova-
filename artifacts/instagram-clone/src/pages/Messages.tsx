@@ -2771,8 +2771,8 @@ export default function Messages() {
           )}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="font-semibold text-[13px] sm:text-sm" data-testid="chat-partner-name">{pName}</p>
-          <p className={`text-[10px] sm:text-xs flex items-center ${isTyping ? "text-primary" : presence.online ? "text-green-400" : "text-muted-foreground"}`}>
+          <p className="font-semibold text-sm" data-testid="chat-partner-name">{pName}</p>
+          <p className={`text-xs flex items-center ${isTyping ? "text-primary" : presence.online ? "text-green-400" : "text-muted-foreground"}`}>
             {showPartnerTyping ? (
               <>
                 <span>{partnerTypingLine(partnerId)}</span>
