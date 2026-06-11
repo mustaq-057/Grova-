@@ -1,11 +1,43 @@
 import { memo, useRef, useState, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
 import { createPortal } from "react-dom";
-import { Smile, Mic, Send, Sticker, Paperclip, X, MessageCircle, MapPin, PenTool, Zap, Plus, Image as ImageIcon, Camera, PlusCircle, Sparkles, FileText } from "lucide-react";
+import { Smile, Mic, Send, Sticker, Paperclip, X, MessageCircle, MapPin, PenTool, Zap, Plus, Image as ImageIcon, Camera, PlusCircle, Sparkles, FileText, Palette } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import EmojiPicker from "@/components/EmojiPicker";
 import StickerPicker from "@/components/StickerPicker";
 import GreetingPicker from "@/components/GreetingPicker";
 import { extractClipboardFiles, readClipboardFilesAsync } from "@/lib/media-file";
+
+const CustomLocationIcon = () => (
+  <svg viewBox="0 0 24 24" className="w-[26px] h-[26px] stroke-white fill-none stroke-[1.6] stroke-linecap-round stroke-linejoin-round">
+    <path d="M12 2C8.686 2 6 4.686 6 8c0 5.25 6 13 6 13s6-7.75 6-13c0-3.314-2.686-6-6-6z"/>
+    <circle cx="12" cy="8" r="2.2" stroke="none" fill="#fff"/>
+  </svg>
+);
+
+const CustomQuickChatIcon = () => (
+  <svg viewBox="0 0 24 24" className="w-[26px] h-[26px] stroke-white fill-none stroke-[1.6] stroke-linecap-round stroke-linejoin-round">
+    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+    <path d="M13 9l-2 3h3l-2 3" stroke="#fff" strokeWidth="1.6"/>
+  </svg>
+);
+
+const CustomDoodleIcon = () => (
+  <svg viewBox="0 0 24 24" className="w-[26px] h-[26px] stroke-white fill-none stroke-[1.6] stroke-linecap-round stroke-linejoin-round">
+    <path d="M17 3l4 4-1.5 1.5"/>
+    <path d="M13.5 6.5L17 3l4 4-3.5 3.5"/>
+    <path d="M13.5 6.5L5 15l-1.5 5 5-1.5 8.5-8.5"/>
+    <path d="M5 15c1 0 2 .5 2.5 1.5"/>
+  </svg>
+);
+
+const CustomPaletteIcon = () => (
+  <svg viewBox="0 0 24 24" className="w-[26px] h-[26px] stroke-white fill-none stroke-[1.6] stroke-linecap-round stroke-linejoin-round">
+    <path d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2c5.523 0 9 3.477 9 8 0 2.5-1.5 4-4 4h-1.5c-.8 0-1.5.7-1.5 1.5 0 .4.15.75.4 1.05.25.3.4.65.4 1 0 1.35-1.12 2.45-2.74 2.45z"/>
+    <circle cx="8.5" cy="12" r="1.2" fill="#fff" stroke="none"/>
+    <circle cx="15.5" cy="10" r="1.2" fill="#fff" stroke="none"/>
+    <circle cx="12" cy="7.5" r="1.2" fill="#fff" stroke="none"/>
+  </svg>
+);
 
 interface MessageInputProps {
   /** Called with trimmed text when user sends (input state stays inside this component for perf). */
@@ -275,7 +307,7 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
       onPaste={handlePaste}
       onClick={() => inputRef.current?.focus()}
       placeholder="Message..."
-      className={`flex-1 min-w-0 bg-transparent text-[15px] placeholder:text-muted-foreground/70 px-2 focus:outline-none text-foreground ${
+      className={`flex-1 min-w-0 bg-transparent text-[17px] placeholder-[#888] text-[#888] focus:outline-none border-none font-[inherit] ${
         disabled || recording ? "opacity-60 cursor-not-allowed" : ""
       }`}
       disabled={disabled || recording}
@@ -288,7 +320,7 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
       createPortal(
         <>
           <div
-            className="fixed inset-0 z-[200] bg-black/5"
+            className="fixed inset-0 z-[200] bg-transparent"
             onClick={() => setShowAttachmentMenu(false)}
             aria-hidden
           />
@@ -296,79 +328,64 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
             initial={{ opacity: 0, scale: 0.95, y: 10, transformOrigin: "bottom right" }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 10 }}
-            className="fixed z-[201] right-2 md:right-4 bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))] bg-[#1a1a1a] border border-border/20 rounded-[20px] py-3 px-2 shadow-2xl flex flex-col min-w-[220px]"
+            className="fixed z-[201] right-4 bottom-[85px] md:bottom-[max(85px,env(safe-area-inset-bottom))] bg-[#1c1c1c] rounded-[22px] py-[10px] shadow-[0_8px_40px_rgba(0,0,0,0.7)] flex flex-col min-w-[230px]"
             role="menu"
           >
             {onShareLocation && (
               <button
                 type="button"
                 onClick={handleShareLocation}
-                className="flex items-center gap-4 px-4 py-3 rounded-xl text-[15px] hover:bg-white/5 transition-colors w-full text-left text-white"
+                className="flex items-center gap-[20px] px-[24px] py-[15px] text-[17px] font-normal hover:bg-white/5 transition-colors w-full text-left text-white"
                 disabled={disabled || sharingLocation}
               >
-                <div className="text-white flex items-center justify-center shrink-0">
+                <div className="w-[28px] h-[28px] flex items-center justify-center shrink-0">
                   {sharingLocation ? (
-                    <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   ) : (
-                    <MapPin className="w-6 h-6" strokeWidth={1.5} />
+                    <CustomLocationIcon />
                   )}
                 </div>
-                <span className="font-medium tracking-wide">Location</span>
+                <span>Location</span>
               </button>
             )}
 
             <button
               type="button"
               onClick={toggleQuickReplies}
-              className="flex items-center gap-4 px-4 py-3 rounded-xl text-[15px] hover:bg-white/5 transition-colors w-full text-left text-white"
+              className="flex items-center gap-[20px] px-[24px] py-[15px] text-[17px] font-normal hover:bg-white/5 transition-colors w-full text-left text-white"
               disabled={disabled}
             >
-              <div className="text-white flex items-center justify-center shrink-0">
-                <MessageCircle className="w-6 h-6" strokeWidth={1.5} />
-                <Zap className="w-3 h-3 absolute mt-0.5 ml-0.5" strokeWidth={3} />
+              <div className="w-[28px] h-[28px] flex items-center justify-center shrink-0">
+                <CustomQuickChatIcon />
               </div>
-              <span className="font-medium tracking-wide">Quick Chat</span>
+              <span>Quick Chat</span>
             </button>
 
             <button
               type="button"
               onClick={openDoodle}
-              className="flex items-center gap-4 px-4 py-3 rounded-xl text-[15px] hover:bg-white/5 transition-colors w-full text-left text-white"
+              className="flex items-center gap-[20px] px-[24px] py-[15px] text-[17px] font-normal hover:bg-white/5 transition-colors w-full text-left text-white"
               disabled={disabled}
             >
-              <div className="text-white flex items-center justify-center shrink-0">
-                <PenTool className="w-6 h-6" strokeWidth={1.5} />
+              <div className="w-[28px] h-[28px] flex items-center justify-center shrink-0">
+                <CustomDoodleIcon />
               </div>
-              <span className="font-medium tracking-wide">Doodle</span>
+              <span>Doodle</span>
             </button>
 
             {onToggleCuteMode && (
               <button
                 type="button"
                 onClick={toggleCuteMenu}
-                className="flex items-center gap-4 px-4 py-3 rounded-xl text-[15px] hover:bg-white/5 transition-colors w-full text-left text-white"
+                className="flex items-center gap-[20px] px-[24px] py-[15px] text-[17px] font-normal hover:bg-white/5 transition-colors w-full text-left text-white"
                 disabled={disabled}
               >
-                <div className="text-white flex items-center justify-center shrink-0 relative">
-                   <Sparkles className="w-6 h-6" strokeWidth={1.5} />
+                <div className="w-[28px] h-[28px] flex items-center justify-center shrink-0">
+                  <CustomPaletteIcon />
                 </div>
-                <span className="font-medium tracking-wide">Smart Chat</span>
+                <span>Chat Styles</span>
               </button>
             )}
-
-            <div className="h-px bg-white/10 my-1 mx-4" />
-
-            <button
-              type="button"
-              onClick={handleImageClick}
-              className="flex items-center gap-4 px-4 py-3 rounded-xl text-[15px] hover:bg-white/5 transition-colors w-full text-left text-white"
-              disabled={disabled}
-            >
-              <div className="text-white flex items-center justify-center shrink-0">
-                <FileText className="w-6 h-6" strokeWidth={1.5} />
-              </div>
-              <span className="font-medium tracking-wide">File</span>
-            </button>
           </motion.div>
         </>,
         document.body,
@@ -376,7 +393,7 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
   );
 
   return (
-    <div className="chat-panel-input relative z-20 shrink-0 px-2 sm:px-4 pb-2 md:pb-3 pt-1.5 md:pt-2 border-t border-border/50 bg-background/95 backdrop-blur-sm">
+    <div className="chat-panel-input relative w-full max-w-[640px] mx-auto z-20 shrink-0 pb-5 pt-2">
       {replyPreview}
 
       <input
@@ -392,14 +409,14 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
         <GreetingPicker onSelect={handleGreetingSelect} onClose={() => setOpenPicker(null)} />
       )}
 
-      <div className="flex items-center gap-1.5 min-w-0 w-full bg-[#161616] dark:bg-[#161616] rounded-full p-1 border border-white/5">
+      <div className="flex items-center gap-[10px] bg-[#1a1a1a] rounded-[40px] py-[9px] pr-[14px] pl-[9px] mx-[14px]">
         <button
           type="button"
           onClick={() => { /* Camera logic if needed */ }}
-          className="w-[34px] h-[34px] rounded-full bg-[#3B82F6] hover:bg-blue-600 flex flex-shrink-0 items-center justify-center text-white shadow-sm ml-0.5"
+          className="w-[44px] h-[44px] rounded-full bg-[#5b5ef4] flex shrink-0 items-center justify-center text-white border-none"
           disabled={disabled}
         >
-          <Camera className="w-[18px] h-[18px] fill-current" />
+          <Camera className="w-[22px] h-[22px]" strokeWidth={1.8} />
         </button>
 
         {textInput}
@@ -409,40 +426,40 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
             {sendOrMic}
           </div>
         ) : (
-          <div className="flex items-center gap-0.5 pr-1 text-muted-foreground/80">
+          <div className="flex items-center gap-[2px]">
             <button
               type="button"
               onClick={onStartRecording}
-              className={`p-2 hover:text-white rounded-full transition-colors shrink-0 ${disabled ? iconBtnDisabled : ""}`}
+              className={`w-[38px] h-[38px] flex items-center justify-center rounded-full hover:bg-white/10 transition-colors text-[#ccc] border-none bg-transparent ${disabled ? iconBtnDisabled : ""}`}
               disabled={disabled}
             >
-              <Mic className="w-[22px] h-[22px]" strokeWidth={1.5} />
+              <Mic className="w-[24px] h-[24px]" strokeWidth={1.8} />
             </button>
             <button
               type="button"
               onClick={handleImageClick}
-              className={`p-2 hover:text-white rounded-full transition-colors shrink-0 ${disabled ? iconBtnDisabled : ""}`}
+              className={`w-[38px] h-[38px] flex items-center justify-center rounded-full hover:bg-white/10 transition-colors text-[#ccc] border-none bg-transparent ${disabled ? iconBtnDisabled : ""}`}
               disabled={disabled}
             >
-              <ImageIcon className="w-[22px] h-[22px]" strokeWidth={1.5} />
+              <ImageIcon className="w-[24px] h-[24px]" strokeWidth={1.8} />
             </button>
             <button
               type="button"
               onClick={toggleStickerPicker}
-              className={`p-2 hover:text-white rounded-full transition-colors shrink-0 ${disabled ? iconBtnDisabled : ""}`}
+              className={`w-[38px] h-[38px] flex items-center justify-center rounded-full hover:bg-white/10 transition-colors text-[#ccc] border-none bg-transparent ${disabled ? iconBtnDisabled : ""}`}
               disabled={disabled}
             >
-              <Sticker className="w-[22px] h-[22px]" strokeWidth={1.5} />
+              <Sticker className="w-[24px] h-[24px]" strokeWidth={1.8} />
             </button>
             
             <div className="relative shrink-0 flex items-center justify-center">
               <button
                 type="button"
                 onClick={() => setShowAttachmentMenu((s) => !s)}
-                className={`p-2 hover:text-white rounded-full transition-all text-white ${disabled ? iconBtnDisabled : ""}`}
+                className={`w-[38px] h-[38px] flex items-center justify-center rounded-full hover:bg-white/10 transition-colors text-[#ccc] border-none bg-transparent ${disabled ? iconBtnDisabled : ""}`}
                 disabled={disabled}
               >
-                <PlusCircle className={`w-[22px] h-[22px] transition-transform ${showAttachmentMenu ? "rotate-45" : ""}`} strokeWidth={1.5} />
+                <PlusCircle className={`w-[24px] h-[24px] transition-transform duration-[0.3s] ease-[cubic-bezier(0.34,1.56,0.64,1)] ${showAttachmentMenu ? "rotate-45" : ""}`} strokeWidth={1.8} />
               </button>
               {attachmentMenu}
             </div>
