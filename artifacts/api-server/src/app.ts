@@ -141,12 +141,12 @@ app.post(
   rateLimiters.upload,
   csrfProtection,
   authenticate,
-  express.raw({ type: () => true, limit: 60 * 1024 * 1024 }),
+  express.raw({ type: () => true, limit: 200 * 1024 * 1024 }),
   handleBinaryMediaUpload,
 );
 
-app.use(express.json({ limit: '40mb' }));
-app.use(express.urlencoded({ extended: true, limit: '40mb' }));
+app.use(express.json({ limit: '200mb' }));
+app.use(express.urlencoded({ extended: true, limit: '200mb' }));
 app.use("/api", blockSuspiciousBots);
 app.use("/api", sanitizeInput);
 app.use("/api", csrfProtection);

@@ -9,7 +9,7 @@ export type BubbleStyleId =
   | "excited-pepe" | "shouting"
   | "crying-cat" | "neon-robot" | "bubble-gum" | "crystal-skull" 
   | "golden-crown" | "fire-demon" | "ice-cube" | "space-helmet" 
-  | "toxic-slime" | "cloud-angel";
+  | "toxic-slime" | "cloud-angel" | "library" | "angry-model" | "islamic-serenity";
 
 interface BubbleStyleSelectorProps {
   show: boolean;
@@ -41,6 +41,9 @@ const BUBBLE_STYLES: { id: BubbleStyleId; label: string; }[] = [
   { id: "space-helmet", label: "Space Helmet" },
   { id: "toxic-slime", label: "Toxic Slime" },
   { id: "cloud-angel", label: "Cloud Angel" },
+  { id: "library", label: "Library" },
+  { id: "angry-model", label: "Angry Model" },
+  { id: "islamic-serenity", label: "Islamic Serenity" },
 ];
 
 export const BubbleStyleSelector = memo(function BubbleStyleSelector({

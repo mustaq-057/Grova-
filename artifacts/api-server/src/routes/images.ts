@@ -109,8 +109,8 @@ async function handleMediaUpload(
     const base64Data = data.replace(/^data:[^;]+;base64,/, "");
     const buffer = Buffer.from(base64Data, "base64");
 
-    if (buffer.length > 60 * 1024 * 1024) {
-      res.status(400).json({ error: "File too large (max 60MB)" });
+    if (buffer.length > 200 * 1024 * 1024) {
+      res.status(400).json({ error: "File too large (max 200MB)" });
       return;
     }
 
@@ -150,8 +150,8 @@ export async function handleBinaryMediaUpload(req: Request, res: Response): Prom
       res.status(400).json({ error: "Empty upload" });
       return;
     }
-    if (buffer.length > 60 * 1024 * 1024) {
-      res.status(400).json({ error: "File too large (max 60MB)" });
+    if (buffer.length > 200 * 1024 * 1024) {
+      res.status(400).json({ error: "File too large (max 200MB)" });
       return;
     }
 

@@ -1,5 +1,6 @@
 import { useEffect, useState, memo } from "react";
 import { Link, useLocation } from "wouter";
+import { useShowPresence } from "@/hooks/usePresenceLabel";
 import { Home, MessageCircle, PlusSquare, Settings, BookOpen, Heart, Bell, Calendar as CalendarIcon, Sparkles, ListTodo, Star, Shield, Menu } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAuth } from "@/lib/auth";
@@ -42,6 +43,7 @@ type NavItem = {
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { user } = useAuth();
+  const showPresence = useShowPresence();
   const [notifCount, setNotifCount] = useState(() => unreadCount());
   const [chatBadge, setChatBadge] = useState(() => getUnreadChatBadge());
   const [appTheme, setAppTheme] = useState<AppThemeId>(() => getStoredAppTheme());
@@ -152,7 +154,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <div className="hidden lg:flex items-center gap-3 px-3 py-2.5 bg-gradient-to-r from-secondary/50 to-secondary/30 rounded-xl border border-border/50 hover:border-primary/30 group cursor-pointer">
               <div className="relative">
                 <AvatarImage src={user.avatar} userId={user.id} alt={`Profile picture of ${user.name}`} className="w-8 h-8 rounded-full object-cover shrink-0 ring-2 ring-primary/20" />
-                <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-background" />
+                {showPresence && <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-background" />}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold truncate">{user.name}</p>

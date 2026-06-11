@@ -181,6 +181,54 @@ export default function Tasks() {
   const incompleteTasks = tasks.filter((t) => !t.completed);
   const completedTasks = tasks.filter((t) => t.completed);
 
+  const groupTasksByDate = (taskList: ApiTask[]) => {
+    const groups: Record<string, ApiTask[]> = {};
+    for (const t of taskList) {
+      const d = new Date(t.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+      if (!groups[d]) groups[d] = [];
+      groups[d].push(t);
+    }
+    return Object.entries(groups).sort((a, b) => new Date(b[0]).getTime() - new Date(a[0]).getTime());
+  };
+
+  const renderTaskItem = (task: ApiTask) => (
+    <motion.div
+      key={task.id}
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      className={`border rounded-2xl p-4 transition-colors ${task.completed ? "bg-card/30 border-border/50 opacity-60" : "bg-card/50 border-border hover:bg-card/70"}`}
+      data-testid={`task-${task.id}`}
+    >
+      <div className="flex items-start gap-3">
+        <button
+          onClick={() => handleToggleComplete(task.id, task.completed)}
+          className="mt-0.5 shrink-0"
+          data-testid={task.completed ? `button-uncomplete-task-${task.id}` : `button-complete-task-${task.id}`}
+        >
+          {task.completed ? <CheckCircle2 className="w-5 h-5 text-green-500" /> : <Circle className="w-5 h-5 text-muted-foreground" />}
+        </button>
+        <div className="flex-1 min-w-0">
+          <p className={`text-sm font-medium mb-1.5 ${task.completed ? "line-through text-muted-foreground" : ""}`}>{task.title}</p>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium border ${getPriorityColor(task.priority)}`}>
+              {task.priority}
+            </span>
+            <span className="text-[10px] text-muted-foreground">
+              Assigned to {getAssignedLabel(task.assignedTo)}
+            </span>
+          </div>
+        </div>
+        <button
+          onClick={() => handleDelete(task.id)}
+          className="shrink-0 text-muted-foreground/40 hover:text-destructive transition-colors p-1"
+          data-testid={`button-delete-task-${task.id}`}
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    </motion.div>
+  );
+
   return (
     <div className="max-w-[600px] mx-auto pb-20 md:pb-6">
       {/* Header */}
@@ -279,47 +327,13 @@ export default function Tasks() {
             {/* Incomplete Tasks */}
             {incompleteTasks.length > 0 && (
               <div>
-                <h3 className="text-sm font-semibold mb-3 text-muted-foreground">To Do ({incompleteTasks.length})</h3>
-                <div className="space-y-3">
-                  {incompleteTasks.map((task) => (
-                    <motion.div
-                      key={task.id}
-                      initial={{ opacity: 0, y: 4 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="bg-card/50 border border-border rounded-2xl p-4 hover:bg-card/70 transition-colors"
-                      data-testid={`task-${task.id}`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <button
-                          onClick={() => handleToggleComplete(task.id, task.completed)}
-                          className="mt-0.5 shrink-0"
-                          data-testid={`button-complete-task-${task.id}`}
-                        >
-                          <Circle className="w-5 h-5 text-muted-foreground" />
-                        </button>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium mb-1.5">{task.title}</p>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium border ${getPriorityColor(task.priority)}`}>
-                              {task.priority}
-                            </span>
-                            <span className="text-[10px] text-muted-foreground">
-                              Assigned to {getAssignedLabel(task.assignedTo)}
-                            </span>
-                            <span className="text-[10px] text-muted-foreground/60 ml-auto">
-                              {new Date(task.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                            </span>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => handleDelete(task.id)}
-                          className="shrink-0 text-muted-foreground/40 hover:text-destructive transition-colors p-1"
-                          data-testid={`button-delete-task-${task.id}`}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </motion.div>
+                <h3 className="text-sm font-semibold mb-4 text-muted-foreground">To Do ({incompleteTasks.length})</h3>
+                <div className="space-y-6">
+                  {groupTasksByDate(incompleteTasks).map(([date, dateTasks]) => (
+                    <div key={date} className="space-y-3">
+                      <h4 className="text-xs font-semibold text-muted-foreground/80 px-2 uppercase tracking-wider">{date}</h4>
+                      {dateTasks.map(renderTaskItem)}
+                    </div>
                   ))}
                 </div>
               </div>
@@ -327,48 +341,14 @@ export default function Tasks() {
 
             {/* Completed Tasks */}
             {completedTasks.length > 0 && (
-              <div>
-                <h3 className="text-sm font-semibold mb-3 text-muted-foreground">Completed ({completedTasks.length})</h3>
-                <div className="space-y-3">
-                  {completedTasks.map((task) => (
-                    <motion.div
-                      key={task.id}
-                      initial={{ opacity: 0, y: 4 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="bg-card/30 border border-border/50 rounded-2xl p-4 opacity-60"
-                      data-testid={`task-${task.id}`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <button
-                          onClick={() => handleToggleComplete(task.id, task.completed)}
-                          className="mt-0.5 shrink-0"
-                          data-testid={`button-uncomplete-task-${task.id}`}
-                        >
-                          <CheckCircle2 className="w-5 h-5 text-green-500" />
-                        </button>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium mb-1.5 line-through text-muted-foreground">{task.title}</p>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium border ${getPriorityColor(task.priority)}`}>
-                              {task.priority}
-                            </span>
-                            <span className="text-[10px] text-muted-foreground">
-                              Assigned to {getAssignedLabel(task.assignedTo)}
-                            </span>
-                            <span className="text-[10px] text-muted-foreground/60 ml-auto">
-                              {new Date(task.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                            </span>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => handleDelete(task.id)}
-                          className="shrink-0 text-muted-foreground/40 hover:text-destructive transition-colors p-1"
-                          data-testid={`button-delete-task-${task.id}`}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </motion.div>
+              <div className="pt-4 border-t border-border/50">
+                <h3 className="text-sm font-semibold mb-4 text-muted-foreground">Completed ({completedTasks.length})</h3>
+                <div className="space-y-6">
+                  {groupTasksByDate(completedTasks).map(([date, dateTasks]) => (
+                    <div key={date} className="space-y-3">
+                      <h4 className="text-xs font-semibold text-muted-foreground/80 px-2 uppercase tracking-wider">{date}</h4>
+                      {dateTasks.map(renderTaskItem)}
+                    </div>
                   ))}
                 </div>
               </div>

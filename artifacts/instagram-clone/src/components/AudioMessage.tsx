@@ -151,6 +151,15 @@ export function AudioMessage({
     };
   }, []);
 
+  useEffect(() => {
+    const audio = new Audio(audioData);
+    audio.onloadedmetadata = () => {
+      if (Number.isFinite(audio.duration)) setDuration(audio.duration);
+    };
+    // Preload metadata to get duration without playing
+    audio.preload = "metadata";
+  }, [audioData]);
+
   const bars = waveform.length > 0 ? waveform : STATIC_BARS;
   const barHeights = bars.map((a) => Math.max(3, Math.min(16, (typeof a === "number" ? a : 0.5) * 16)));
   const timeLabel = `${formatAudioTime(currentTime)} / ${formatAudioTime(duration)}`;

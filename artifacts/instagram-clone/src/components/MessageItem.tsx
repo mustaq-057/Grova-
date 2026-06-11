@@ -465,7 +465,7 @@ export const MessageItem = memo(function MessageItem({
     ) : (
       <div
         className={cn(
-          "chat-bubble-text px-3 py-2 sm:px-3.5 sm:py-2 text-[16px] sm:text-[17px] leading-relaxed border-2 relative",
+          "chat-bubble-text px-3 py-2 sm:px-3.5 sm:py-2 text-[16px] sm:text-[17px] leading-relaxed border-2 relative break-words whitespace-pre-wrap [overflow-wrap:anywhere]",
           customBubbleStyle ? `bubble-${customBubbleStyle}` : "bubble-default",
           !customBubbleStyle && (isMe ? "rounded-br-md text-white" : "rounded-bl-md text-white")
         )}
