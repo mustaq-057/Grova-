@@ -1,6 +1,6 @@
 import { memo, useRef, useState, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
 import { createPortal } from "react-dom";
-import { Smile, Mic, Send, Sticker, Paperclip, X, MessageCircle, MapPin, PenTool, Zap, Plus, Image as ImageIcon } from "lucide-react";
+import { Smile, Mic, Send, Sticker, Paperclip, X, MessageCircle, MapPin, PenTool, Zap, Plus, Image as ImageIcon, Camera, PlusCircle, Sparkles, FileText } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import EmojiPicker from "@/components/EmojiPicker";
 import StickerPicker from "@/components/StickerPicker";
@@ -275,7 +275,7 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
       onPaste={handlePaste}
       onClick={() => inputRef.current?.focus()}
       placeholder="Message..."
-      className={`w-full min-w-0 px-4 py-2.5 bg-secondary/50 border border-border/50 rounded-full text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/50 transition-all ${
+      className={`flex-1 min-w-0 bg-transparent text-[15px] placeholder:text-muted-foreground/70 px-2 focus:outline-none text-foreground ${
         disabled || recording ? "opacity-60 cursor-not-allowed" : ""
       }`}
       disabled={disabled || recording}
@@ -283,145 +283,96 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
     />
   );
 
-  const attachmentToolbar = (
-    <div className="relative shrink-0">
-      <button
-        type="button"
-        onClick={() => setShowAttachmentMenu((s) => !s)}
-        className={`p-2.5 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 text-foreground bg-secondary/80 hover:bg-secondary flex items-center justify-center ${disabled ? iconBtnDisabled : ""}`}
-        aria-label="Attachments"
-        disabled={disabled}
-      >
-        <Plus className={`w-5 h-5 transition-transform ${showAttachmentMenu ? "rotate-45" : ""}`} />
-      </button>
+  const attachmentMenu = (
+    showAttachmentMenu &&
+      createPortal(
+        <>
+          <div
+            className="fixed inset-0 z-[200] bg-black/5"
+            onClick={() => setShowAttachmentMenu(false)}
+            aria-hidden
+          />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 10, transformOrigin: "bottom right" }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 10 }}
+            className="fixed z-[201] right-2 md:right-4 bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))] bg-[#1a1a1a] border border-border/20 rounded-[20px] py-3 px-2 shadow-2xl flex flex-col min-w-[220px]"
+            role="menu"
+          >
+            {onShareLocation && (
+              <button
+                type="button"
+                onClick={handleShareLocation}
+                className="flex items-center gap-4 px-4 py-3 rounded-xl text-[15px] hover:bg-white/5 transition-colors w-full text-left text-white"
+                disabled={disabled || sharingLocation}
+              >
+                <div className="text-white flex items-center justify-center shrink-0">
+                  {sharingLocation ? (
+                    <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <MapPin className="w-6 h-6" strokeWidth={1.5} />
+                  )}
+                </div>
+                <span className="font-medium tracking-wide">Location</span>
+              </button>
+            )}
 
-      {showAttachmentMenu &&
-        createPortal(
-          <>
-            <div
-              className="fixed inset-0 z-[200] bg-black/5"
-              onClick={() => setShowAttachmentMenu(false)}
-              aria-hidden
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 10, transformOrigin: "bottom left" }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              className="fixed z-[201] left-2 md:left-4 bottom-[calc(5.5rem+env(safe-area-inset-bottom,0px))] md:bottom-[max(5.5rem,env(safe-area-inset-bottom))] bg-card/95 backdrop-blur-xl border border-border/60 rounded-2xl p-2 shadow-2xl flex flex-col gap-1 min-w-[200px]"
-              role="menu"
+            <button
+              type="button"
+              onClick={toggleQuickReplies}
+              className="flex items-center gap-4 px-4 py-3 rounded-xl text-[15px] hover:bg-white/5 transition-colors w-full text-left text-white"
+              disabled={disabled}
             >
-              {onMediaViewModeChange && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    onMediaViewModeChange(mediaViewMode === "keep" ? "once" : mediaViewMode === "once" ? "twice" : "keep");
-                  }}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm hover:bg-secondary/80 transition-colors w-full text-left"
-                  disabled={disabled}
-                >
-                  <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center shrink-0">
-                    <span className="text-[13px] font-bold text-foreground">{mediaViewMode === "keep" ? "K" : mediaViewMode === "once" ? "1" : "2"}</span>
-                  </div>
-                  <span className="font-medium">Media mode: {mediaViewMode === "keep" ? "Keep" : mediaViewMode === "once" ? "View once" : "View twice"}</span>
-                </button>
-              )}
+              <div className="text-white flex items-center justify-center shrink-0">
+                <MessageCircle className="w-6 h-6" strokeWidth={1.5} />
+                <Zap className="w-3 h-3 absolute mt-0.5 ml-0.5" strokeWidth={3} />
+              </div>
+              <span className="font-medium tracking-wide">Quick Chat</span>
+            </button>
 
+            <button
+              type="button"
+              onClick={openDoodle}
+              className="flex items-center gap-4 px-4 py-3 rounded-xl text-[15px] hover:bg-white/5 transition-colors w-full text-left text-white"
+              disabled={disabled}
+            >
+              <div className="text-white flex items-center justify-center shrink-0">
+                <PenTool className="w-6 h-6" strokeWidth={1.5} />
+              </div>
+              <span className="font-medium tracking-wide">Doodle</span>
+            </button>
+
+            {onToggleCuteMode && (
               <button
                 type="button"
-                onClick={handleImageClick}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm hover:bg-secondary/80 transition-colors w-full text-left"
+                onClick={toggleCuteMenu}
+                className="flex items-center gap-4 px-4 py-3 rounded-xl text-[15px] hover:bg-white/5 transition-colors w-full text-left text-white"
                 disabled={disabled}
               >
-                <div className="w-8 h-8 rounded-full bg-blue-500/10 text-blue-500 flex items-center justify-center shrink-0">
-                  <ImageIcon className="w-4 h-4" />
+                <div className="text-white flex items-center justify-center shrink-0 relative">
+                   <Sparkles className="w-6 h-6" strokeWidth={1.5} />
                 </div>
-                <span className="font-medium">Gallery / File</span>
+                <span className="font-medium tracking-wide">Smart Chat</span>
               </button>
+            )}
 
-              {onShareLocation && (
-                <button
-                  type="button"
-                  onClick={handleShareLocation}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm hover:bg-secondary/80 transition-colors w-full text-left"
-                  disabled={disabled || sharingLocation}
-                >
-                  <div className="w-8 h-8 rounded-full bg-green-500/10 text-green-500 flex items-center justify-center shrink-0">
-                    {sharingLocation ? (
-                      <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                    ) : (
-                      <MapPin className="w-4 h-4" />
-                    )}
-                  </div>
-                  <span className="font-medium">Location</span>
-                </button>
-              )}
+            <div className="h-px bg-white/10 my-1 mx-4" />
 
-              {onToggleCuteMode && (
-                <button
-                  type="button"
-                  onClick={toggleCuteMenu}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm hover:bg-secondary/80 transition-colors w-full text-left"
-                  disabled={disabled}
-                >
-                  <div className="w-8 h-8 rounded-full bg-purple-500/10 text-purple-500 flex items-center justify-center shrink-0">
-                    <MessageCircle className="w-4 h-4" />
-                  </div>
-                  <span className="font-medium">Chat Styles</span>
-                </button>
-              )}
-
-              <button
-                type="button"
-                onClick={toggleQuickReplies}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm hover:bg-secondary/80 transition-colors w-full text-left"
-                disabled={disabled}
-              >
-                <div className="w-8 h-8 rounded-full bg-yellow-500/10 text-yellow-500 flex items-center justify-center shrink-0">
-                  <Zap className="w-4 h-4" />
-                </div>
-                <span className="font-medium">Quick Replies</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={toggleEmojiPicker}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm hover:bg-secondary/80 transition-colors w-full text-left"
-                disabled={disabled}
-              >
-                <div className="w-8 h-8 rounded-full bg-orange-500/10 text-orange-500 flex items-center justify-center shrink-0">
-                  <Smile className="w-4 h-4" />
-                </div>
-                <span className="font-medium">Emoji</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={toggleStickerPicker}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm hover:bg-secondary/80 transition-colors w-full text-left"
-                disabled={disabled}
-              >
-                <div className="w-8 h-8 rounded-full bg-pink-500/10 text-pink-500 flex items-center justify-center shrink-0">
-                  <Sticker className="w-4 h-4" />
-                </div>
-                <span className="font-medium">Stickers & GIFs</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={openDoodle}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm hover:bg-secondary/80 transition-colors w-full text-left"
-                disabled={disabled}
-              >
-                <div className="w-8 h-8 rounded-full bg-cyan-500/10 text-cyan-500 flex items-center justify-center shrink-0">
-                  <PenTool className="w-4 h-4" />
-                </div>
-                <span className="font-medium">Doodle</span>
-              </button>
-            </motion.div>
-          </>,
-          document.body,
-        )}
-    </div>
+            <button
+              type="button"
+              onClick={handleImageClick}
+              className="flex items-center gap-4 px-4 py-3 rounded-xl text-[15px] hover:bg-white/5 transition-colors w-full text-left text-white"
+              disabled={disabled}
+            >
+              <div className="text-white flex items-center justify-center shrink-0">
+                <FileText className="w-6 h-6" strokeWidth={1.5} />
+              </div>
+              <span className="font-medium tracking-wide">File</span>
+            </button>
+          </motion.div>
+        </>,
+        document.body,
+      )
   );
 
   return (
@@ -441,10 +392,62 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
         <GreetingPicker onSelect={handleGreetingSelect} onClose={() => setOpenPicker(null)} />
       )}
 
-      <div className="flex items-center gap-2 min-w-0 w-full">
-        {attachmentToolbar}
-        <div className="flex-1 min-w-0">{textInput}</div>
-        {sendOrMic}
+      <div className="flex items-center gap-1.5 min-w-0 w-full bg-[#161616] dark:bg-[#161616] rounded-full p-1 border border-white/5">
+        <button
+          type="button"
+          onClick={() => { /* Camera logic if needed */ }}
+          className="w-[34px] h-[34px] rounded-full bg-[#3B82F6] hover:bg-blue-600 flex flex-shrink-0 items-center justify-center text-white shadow-sm ml-0.5"
+          disabled={disabled}
+        >
+          <Camera className="w-[18px] h-[18px] fill-current" />
+        </button>
+
+        {textInput}
+
+        {input.trim() || recording ? (
+          <div className="pr-1">
+            {sendOrMic}
+          </div>
+        ) : (
+          <div className="flex items-center gap-0.5 pr-1 text-muted-foreground/80">
+            <button
+              type="button"
+              onClick={onStartRecording}
+              className={`p-2 hover:text-white rounded-full transition-colors shrink-0 ${disabled ? iconBtnDisabled : ""}`}
+              disabled={disabled}
+            >
+              <Mic className="w-[22px] h-[22px]" strokeWidth={1.5} />
+            </button>
+            <button
+              type="button"
+              onClick={handleImageClick}
+              className={`p-2 hover:text-white rounded-full transition-colors shrink-0 ${disabled ? iconBtnDisabled : ""}`}
+              disabled={disabled}
+            >
+              <ImageIcon className="w-[22px] h-[22px]" strokeWidth={1.5} />
+            </button>
+            <button
+              type="button"
+              onClick={toggleStickerPicker}
+              className={`p-2 hover:text-white rounded-full transition-colors shrink-0 ${disabled ? iconBtnDisabled : ""}`}
+              disabled={disabled}
+            >
+              <Sticker className="w-[22px] h-[22px]" strokeWidth={1.5} />
+            </button>
+            
+            <div className="relative shrink-0 flex items-center justify-center">
+              <button
+                type="button"
+                onClick={() => setShowAttachmentMenu((s) => !s)}
+                className={`p-2 hover:text-white rounded-full transition-all text-white ${disabled ? iconBtnDisabled : ""}`}
+                disabled={disabled}
+              >
+                <PlusCircle className={`w-[22px] h-[22px] transition-transform ${showAttachmentMenu ? "rotate-45" : ""}`} strokeWidth={1.5} />
+              </button>
+              {attachmentMenu}
+            </div>
+          </div>
+        )}
       </div>
 
       {recording && (
