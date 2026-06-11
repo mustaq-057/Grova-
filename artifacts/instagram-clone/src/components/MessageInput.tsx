@@ -401,7 +401,7 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*,video/*,.pdf,.doc,.docx,.txt,audio/*"
+        accept="image/*,video/*"
         className="hidden"
         onChange={handleFileChange}
         aria-label="Upload any file"

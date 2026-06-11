@@ -2810,14 +2810,7 @@ export default function Messages() {
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-sm" data-testid="chat-partner-name">{pName}</p>
           <p className={`text-xs flex items-center ${isTyping ? "text-primary" : presence.online ? "text-green-400" : "text-muted-foreground"}`}>
-            {showPartnerTyping ? (
-              <>
-                <span>{partnerTypingLine(partnerId)}</span>
-                <TypingDots />
-              </>
-            ) : (
-              presence.label
-            )}
+            {presence.label}
           </p>
         </div>
         <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
@@ -2834,16 +2827,7 @@ export default function Messages() {
             )}
             <span className="text-xs text-muted-foreground">{presence.label}</span>
           </div>
-          <button 
-            onClick={() => setShowSearch(s => !s)} 
-            className={`p-1.5 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 active:scale-95 ${
-              showSearch ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground hover:bg-secondary"
-            }`} 
-            data-testid="button-search"
-            aria-label="Search messages"
-          >
-            <Search className="w-4 h-4" strokeWidth={1.5} />
-          </button>
+
           <div className="relative">
             <button 
               onClick={() => { setShowThemes(s => !s); setShowInfo(false); }} 
@@ -2955,79 +2939,7 @@ export default function Messages() {
             <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
           </div>
         )}
-        
-        {/* Search bar */}
-        {showSearch && (
-          <div className="mb-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <input
-                type="text"
-                placeholder="Search messages..."
-                value={searchQuery}
-                onChange={handleSearchChange}
-                className="w-full pl-10 pr-10 py-2 bg-secondary/50 rounded-full text-sm outline-none placeholder:text-muted-foreground"
-                data-testid="search-input"
-              />
-              {searchQuery && (
-                <button onClick={() => setSearchQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" title="Clear search">
-                  <X className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-            {searchQuery && (
-              <>
-                <p className="text-xs text-muted-foreground mt-2">
-                  Found {filteredMessages.length} message{filteredMessages.length !== 1 ? 's' : ''}
-                </p>
-                {/* Filter Controls */}
-                <div className="flex flex-wrap gap-2 mt-3">
-                  <select
-                    value={searchFilters.messageType}
-                    onChange={(e) => setSearchFilters(prev => ({ ...prev, messageType: e.target.value as any }))}
-                    className="px-3 py-1.5 bg-background border border-border rounded-full text-xs"
-                    title="Filter by message type"
-                  >
-                    <option value="all">All Types</option>
-                    <option value="text">Text</option>
-                    <option value="image">Images</option>
-                    <option value="sticker">Stickers</option>
-                    <option value="audio">Audio</option>
-                    <option value="gif">GIFs</option>
-                  </select>
-                  <select
-                    value={searchFilters.sender}
-                    onChange={(e) => setSearchFilters(prev => ({ ...prev, sender: e.target.value as any }))}
-                    className="px-3 py-1.5 bg-background border border-border rounded-full text-xs"
-                    title="Filter by sender"
-                  >
-                    <option value="all">All Senders</option>
-                    <option value="me">From Me</option>
-                    <option value="partner">From {pName}</option>
-                  </select>
-                  <button
-                    onClick={() => setSearchFilters(prev => ({ ...prev, hasReaction: !prev.hasReaction }))}
-                    className={`px-3 py-1.5 border rounded-full text-xs ${searchFilters.hasReaction ? 'bg-primary text-primary-foreground border-primary' : 'bg-background border-border'}`}
-                  >
-                    With Reactions
-                  </button>
-                  <button
-                    onClick={() => setSearchFilters(prev => ({ ...prev, isPinned: !prev.isPinned }))}
-                    className={`px-3 py-1.5 border rounded-full text-xs ${searchFilters.isPinned ? 'bg-primary text-primary-foreground border-primary' : 'bg-background border-border'}`}
-                  >
-                    Pinned Only
-                  </button>
-                  <button
-                    onClick={() => setSearchFilters({ messageType: "all", sender: "all", hasReaction: false, isPinned: false })}
-                    className="px-3 py-1.5 bg-secondary text-foreground rounded-full text-xs hover:bg-secondary/80"
-                  >
-                    Reset Filters
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        )}
+
         {/* Profile header — only when chat is empty so scroll stays on messages */}
         {visibleMessages.length <= 3 && (
           <div className="flex flex-col items-center gap-2 py-3 md:py-6 mb-1 shrink-0">
