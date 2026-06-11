@@ -1305,13 +1305,19 @@ export default function Messages() {
     prependScrollHeightRef.current = null;
     const container = messagesContainerRef.current;
     if (!container) return;
-    const restore = () => {
-      const diff = container.scrollHeight - before;
-      if (diff > 0) container.scrollTop = container.scrollTop + diff;
-    };
-    restore();
+    
+    let isRestored = false;
+    const diff = container.scrollHeight - before;
+    if (diff > 0) {
+      container.scrollTop += diff;
+      isRestored = true;
+    }
+    
     requestAnimationFrame(() => {
-      restore();
+      if (!isRestored) {
+        const nextDiff = container.scrollHeight - before;
+        if (nextDiff > 0) container.scrollTop += nextDiff;
+      }
       isPrependingRef.current = false;
     });
   }, [messages]);
