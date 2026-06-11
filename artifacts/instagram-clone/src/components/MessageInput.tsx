@@ -7,37 +7,10 @@ import StickerPicker from "@/components/StickerPicker";
 import GreetingPicker from "@/components/GreetingPicker";
 import { extractClipboardFiles, readClipboardFilesAsync } from "@/lib/media-file";
 
-const CustomLocationIcon = () => (
-  <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
-    <circle cx="12" cy="9" r="2.5" fill="#fff" stroke="none"/>
-  </svg>
-);
-
-const CustomQuickChatIcon = () => (
-  <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-    <path d="M13 8.5l-2 3.5h3l-2 3.5" strokeWidth="1.8"/>
-  </svg>
-);
-
-const CustomDoodleIcon = () => (
-  <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 20h9"/>
-    <path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
-  </svg>
-);
-
-const CustomPaletteIcon = () => (
-  <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="10"/>
-    <path d="M12 2a14.5 14.5 0 0 0 0 20 10 10 0 0 0 0-20" fill="rgba(255,255,255,0.15)" stroke="none"/>
-    <circle cx="8" cy="10" r="1.3" fill="#fff" stroke="none"/>
-    <circle cx="12" cy="7" r="1.3" fill="#fff" stroke="none"/>
-    <circle cx="16" cy="10" r="1.3" fill="#fff" stroke="none"/>
-    <circle cx="9" cy="14" r="1.3" fill="#fff" stroke="none"/>
-  </svg>
-);
+const CustomLocationIcon = () => <MapPin className="w-[26px] h-[26px] text-white" strokeWidth={1.6} />;
+const CustomQuickChatIcon = () => <Zap className="w-[26px] h-[26px] text-white" strokeWidth={1.6} />;
+const CustomDoodleIcon = () => <PenTool className="w-[26px] h-[26px] text-white" strokeWidth={1.6} />;
+const CustomPaletteIcon = () => <Palette className="w-[26px] h-[26px] text-white" strokeWidth={1.6} />;
 
 interface MessageInputProps {
   /** Called with trimmed text when user sends (input state stays inside this component for perf). */
@@ -50,7 +23,7 @@ interface MessageInputProps {
   onStickerSelect: (sticker: string) => void;
   onGifSelect: (gif: string) => void;
   onGreetingSelect: (greeting: unknown) => void;
-  onImageSelect: (file: File, clipboardItemType?: string) => void;
+  onImageSelect: (file: File | File[], clipboardItemType?: string) => void;
   onOpenCamera?: () => void;
   mediaViewMode?: "keep" | "once" | "twice";
   onMediaViewModeChange?: (mode: "keep" | "once" | "twice") => void;
@@ -166,16 +139,18 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
   }, []);
 
   const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const isVideo = file.type.startsWith("video/") || /\.(mp4|webm|mov|m4v|mkv|3gp)$/i.test(file.name);
-    const maxBytes = isVideo ? 60 * 1024 * 1024 : 25 * 1024 * 1024;
-    if (file.size > maxBytes) {
-      alert(isVideo ? "Video too large (max 60MB)." : "File too large (max 25MB).");
-      e.target.value = "";
-      return;
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    for (const file of files) {
+      const isVideo = file.type.startsWith("video/") || /\.(mp4|webm|mov|m4v|mkv|3gp)$/i.test(file.name);
+      const maxBytes = isVideo ? 60 * 1024 * 1024 : 25 * 1024 * 1024;
+      if (file.size > maxBytes) {
+        alert(isVideo ? "Video too large (max 60MB)." : "File too large (max 25MB).");
+        e.target.value = "";
+        return;
+      }
     }
-    onImageSelect(file, file.type || undefined);
+    onImageSelect(files, files.length === 1 ? files[0].type || undefined : undefined);
     e.target.value = "";
   }, [onImageSelect]);
 
@@ -401,6 +376,7 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
       <input
         ref={fileInputRef}
         type="file"
+        multiple
         accept="image/*,video/*"
         className="hidden"
         onChange={handleFileChange}

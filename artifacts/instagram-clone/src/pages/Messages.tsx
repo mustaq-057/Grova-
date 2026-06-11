@@ -2094,75 +2094,88 @@ export default function Messages() {
   );
 
   const handlePickedFile = useCallback(
-    async (file: File, clipboardItemType?: string) => {
-      if (!user || filePickInFlightRef.current) return;
+    async (fileInput: File | File[], clipboardItemType?: string) => {
+      const files = Array.isArray(fileInput) ? fileInput : [fileInput];
+      if (!user || filePickInFlightRef.current || files.length === 0) return;
       filePickInFlightRef.current = true;
       const unlockTimer = window.setTimeout(() => {
         filePickInFlightRef.current = false;
       }, 90_000);
-      const normalized = clipboardItemType
-        ? normalizePastedFile(file, clipboardItemType)
-        : await resolveGalleryPick(file);
-      const toastId = `media-pick-${Date.now()}`;
-      const quickDoc = isDocumentFile(normalized, clipboardItemType);
-      const likelyVideo =
-        clipboardItemType?.startsWith("video/") || isVideoFile(normalized, clipboardItemType);
 
-      let kind: "image" | "video" | "other";
-      try {
-        if (quickDoc) {
-          kind = "other";
-        } else if (likelyVideo) {
-          kind = "video";
-        } else if (clipboardItemType?.startsWith("image/")) {
-          kind = "image";
-        } else {
-          const magic = await detectMediaByMagicBytes(normalized);
-          if (magic === "video") kind = "video";
-          else if (magic === "image") kind = "image";
-          else kind = await classifyMediaFile(normalized, clipboardItemType);
+      const processSingleFile = async (file: File) => {
+        const normalized = clipboardItemType
+          ? normalizePastedFile(file, clipboardItemType)
+          : await resolveGalleryPick(file);
+        const toastId = `media-pick-${Date.now()}`;
+        const quickDoc = isDocumentFile(normalized, clipboardItemType);
+        const likelyVideo =
+          clipboardItemType?.startsWith("video/") || isVideoFile(normalized, clipboardItemType);
+
+        let kind: "image" | "video" | "other";
+        try {
+          if (quickDoc) {
+            kind = "other";
+          } else if (likelyVideo) {
+            kind = "video";
+          } else if (clipboardItemType?.startsWith("image/")) {
+            kind = "image";
+          } else {
+            const magic = await detectMediaByMagicBytes(normalized);
+            if (magic === "video") kind = "video";
+            else if (magic === "image") kind = "image";
+            else kind = await classifyMediaFile(normalized, clipboardItemType);
+          }
+          if (kind === "image") {
+            const magic = await detectMediaByMagicBytes(normalized);
+            if (magic === "video") kind = "video";
+          }
+        } catch {
+          finishToast(toastId, { type: "error", message: "Could not read pasted file." });
+          return;
         }
-        if (kind === "image") {
-          const magic = await detectMediaByMagicBytes(normalized);
-          if (magic === "video") kind = "video";
+
+        const MAX_FILE_SIZE =
+          kind === "video" ? 60 * 1024 * 1024 : kind === "image" ? 25 * 1024 * 1024 : 25 * 1024 * 1024;
+        if (normalized.size > MAX_FILE_SIZE) {
+          finishToast(toastId, {
+            type: "error",
+            message: kind === "video" ? "Video too large (max 60MB)." : "File too large (max 25MB).",
+          });
+          return;
         }
-      } catch {
-        finishToast(toastId, { type: "error", message: "Could not read pasted file." });
-        filePickInFlightRef.current = false;
-        return;
-      }
 
-      const MAX_FILE_SIZE =
-        kind === "video" ? 60 * 1024 * 1024 : kind === "image" ? 25 * 1024 * 1024 : 25 * 1024 * 1024;
-      if (normalized.size > MAX_FILE_SIZE) {
-        finishToast(toastId, {
-          type: "error",
-          message: kind === "video" ? "Video too large (max 60MB)." : "File too large (max 25MB).",
-        });
-        filePickInFlightRef.current = false;
-        return;
-      }
+        if (files.length === 1 && (kind === "image" || kind === "video")) {
+          setPendingMediaPreview({ file, clipboardItemType, kind, normalized });
+          return;
+        }
 
-      if (kind === "image" || kind === "video") {
-        setPendingMediaPreview({ file, clipboardItemType, kind, normalized });
-        filePickInFlightRef.current = false;
-        return;
-      }
+        try {
+          if (kind === "image") {
+            await uploadAndSendGalleryImage(normalized);
+          } else if (kind === "video") {
+            await uploadAndSendFile(normalized);
+          } else {
+            await uploadAndSendFile(normalized);
+          }
+        } catch (error) {
+          console.error("Failed to process file:", error);
+          finishToast(toastId, {
+            type: "error",
+            message: error instanceof Error ? error.message : "Failed to send media.",
+          });
+        }
+      };
 
       try {
-        await uploadAndSendFile(normalized);
-      } catch (error) {
-        console.error("Failed to process file:", error);
-        finishToast(toastId, {
-          type: "error",
-          message: error instanceof Error ? error.message : "Failed to send document.",
-        });
+        for (const f of files) {
+          await processSingleFile(f);
+        }
       } finally {
-        window.clearTimeout(unlockTimer);
         filePickInFlightRef.current = false;
+        clearTimeout(unlockTimer);
       }
     },
-    [uploadAndSendFile, user],
+    [user, uploadAndSendFile, uploadAndSendGalleryImage],
   );
 
   const processAndSendMedia = useCallback(

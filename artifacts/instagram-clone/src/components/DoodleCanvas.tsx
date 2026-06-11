@@ -12,16 +12,10 @@ interface DoodleCanvasProps {
 }
 
 const COLORS = [
-  "#000000",
-  "#ffffff",
-  "#ef4444",
-  "#f97316",
-  "#eab308",
-  "#22c55e",
-  "#3b82f6",
-  "#8b5cf6",
-  "#ec4899",
-  "#78716c",
+  "#ffffff", "#000000", "#ef4444", "#f97316", "#f59e0b", "#eab308",
+  "#84cc16", "#22c55e", "#10b981", "#14b8a6", "#06b6d4", "#0ea5e9",
+  "#3b82f6", "#6366f1", "#8b5cf6", "#a855f7", "#d946ef", "#ec4899",
+  "#f43f5e", "#fda4af", "#fdba74", "#fef08a", "#bbf7d0", "#bae6fd"
 ];
 
 const BRUSH_PRESETS = [4, 8, 12, 18, 26];
@@ -61,7 +55,7 @@ export default function DoodleCanvas({ onClose, onSend, canvasHeight, onExpandCa
   const [currentColor, setCurrentColor] = useState("#000000");
   const [brushSize, setBrushSize] = useState(8);
   const [canUndo, setCanUndo] = useState(false);
-  const [colorsOpen, setColorsOpen] = useState(true);
+  const [expandCount, setExpandCount] = useState(0);
 
   colorRef.current = currentColor;
   brushRef.current = brushSize;
@@ -184,12 +178,14 @@ export default function DoodleCanvas({ onClose, onSend, canvasHeight, onExpandCa
   };
 
   const handleExpandCanvas = useCallback(() => {
+    if (expandCount >= 3) return;
     const snap = canvasRef.current?.toDataURL("image/png");
+    setExpandCount(prev => prev + 1);
     onExpandCanvas();
     if (snap) {
       requestAnimationFrame(() => layoutCanvas(snap));
     }
-  }, [layoutCanvas, onExpandCanvas]);
+  }, [layoutCanvas, onExpandCanvas, expandCount]);
 
   const maybeExpandWhileDrawing = (y: number) => {
     const container = containerRef.current;
@@ -275,170 +271,107 @@ export default function DoodleCanvas({ onClose, onSend, canvasHeight, onExpandCa
     const octx = exportCanvas.getContext("2d");
     if (!octx) return;
 
-    octx.fillStyle = "#ffffff";
+    // Draw a black background instead of white
+    octx.fillStyle = "#000000";
     octx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
     octx.drawImage(canvas, 0, 0);
 
     onSend(exportCanvas.toDataURL("image/jpeg", 0.82));
-    onClose();
   };
 
   return (
     <div
-      className="border-t border-border/80 bg-background shrink-0 flex flex-col"
+      className="fixed inset-0 z-[200] bg-black flex flex-col"
       role="region"
-      aria-label="Doodle drawing area in chat"
+      aria-label="Doodle drawing area"
       data-testid="doodle-panel"
     >
-      <div className="flex items-center justify-between gap-2 px-2 py-1.5 bg-secondary/40 border-b border-border/50">
-        <p className="text-xs font-semibold text-foreground truncate">Draw in chat</p>
-        <div className="flex items-center gap-1 shrink-0">
-          <button
-            type="button"
-            onClick={handleExpandCanvas}
-            className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium bg-primary/15 text-primary hover:bg-primary/25"
-            title="Add more drawing space"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            More space
-          </button>
+      <div className="absolute inset-x-0 top-0 z-20 flex items-center justify-between px-4 py-4 bg-gradient-to-b from-black/60 to-transparent pointer-events-none">
+        <button
+          type="button"
+          onClick={onClose}
+          className="pointer-events-auto p-2.5 rounded-full bg-black/40 text-white backdrop-blur-md active:scale-95 transition-transform"
+          aria-label="Close"
+        >
+          <X className="w-6 h-6" strokeWidth={2.5} />
+        </button>
+        <div className="flex gap-4 pointer-events-auto">
           <button
             type="button"
             onClick={undo}
             disabled={!canUndo}
-            className="p-1.5 rounded-lg bg-secondary disabled:opacity-40"
+            className="p-2.5 rounded-full bg-black/40 text-white disabled:opacity-50 backdrop-blur-md active:scale-95 transition-transform"
             aria-label="Undo"
           >
-            <Undo className="w-4 h-4" />
+            <Undo className="w-6 h-6" strokeWidth={2.5} />
           </button>
           <button
             type="button"
             onClick={clearCanvas}
-            className="p-1.5 rounded-lg bg-destructive/15 text-destructive"
+            className="p-2.5 rounded-full bg-black/40 text-white backdrop-blur-md active:scale-95 transition-transform"
             aria-label="Clear"
           >
-            <Trash2 className="w-4 h-4" />
-          </button>
-          <button
-            type="button"
-            onClick={handleSend}
-            className="p-1.5 rounded-lg bg-primary text-primary-foreground"
-            aria-label="Send doodle"
-            data-testid="button-send-doodle"
-          >
-            <Send className="w-4 h-4" />
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1.5 rounded-lg bg-secondary"
-            aria-label="Close doodle"
-          >
-            <X className="w-4 h-4" />
+            <Trash2 className="w-6 h-6" strokeWidth={2.5} />
           </button>
         </div>
       </div>
 
-      <div className="flex min-h-0" style={{ height: Math.min(canvasHeight, typeof window !== "undefined" ? window.innerHeight * 0.55 : 480) }}>
-        {/* Left — color drawer */}
-        <aside
-          className={`shrink-0 flex flex-col border-r border-border/60 bg-card/95 transition-[width] duration-200 overflow-hidden ${
-            colorsOpen ? "w-[3.25rem] sm:w-14" : "w-9"
-          }`}
-        >
+      <div
+        ref={scrollRef}
+        className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden bg-transparent scrollbar-hide relative"
+      >
+        <div ref={containerRef} className="relative w-full min-h-[100dvh]">
+          <canvas
+            ref={canvasRef}
+            onPointerDown={startDrawing}
+            onPointerMove={draw}
+            onPointerUp={stopDrawing}
+            onPointerLeave={stopDrawing}
+            onPointerCancel={stopDrawing}
+            className="block w-full cursor-crosshair touch-none"
+            style={{ touchAction: "none" }}
+            data-testid="doodle-canvas"
+          />
+        </div>
+      </div>
+
+      <div className="absolute bottom-0 left-0 right-0 z-20 pb-6 pt-12 pointer-events-none bg-gradient-to-t from-black/80 via-black/40 to-transparent flex flex-col items-center gap-4">
+        {expandCount < 3 && (
+          <button
+            onClick={handleExpandCanvas}
+            className="pointer-events-auto px-5 py-2 rounded-full bg-white/10 border border-white/20 text-white text-[15px] font-medium backdrop-blur-xl active:scale-95 transition-transform shadow-[0_4px_20px_rgba(0,0,0,0.5)]"
+          >
+            Add space
+          </button>
+        )}
+        
+        <div className="w-full relative flex items-center pointer-events-auto">
+          <div className="flex-1 flex items-center gap-3 overflow-x-auto px-4 pb-2 scrollbar-hide shrink-0 snap-x">
+            {COLORS.map((color) => (
+              <button
+                key={color}
+                type="button"
+                onClick={() => setCurrentColor(color)}
+                className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full border-2 shrink-0 transition-transform snap-center shadow-lg ${
+                  currentColor === color
+                    ? "scale-110 ring-2 ring-white/50 border-white"
+                    : "border-transparent"
+                }`}
+                style={{ backgroundColor: color }}
+                aria-label={`Color ${color}`}
+              />
+            ))}
+          </div>
+          
           <button
             type="button"
-            onClick={() => setColorsOpen((o) => !o)}
-            className="p-2 border-b border-border/50 text-muted-foreground hover:text-foreground"
-            aria-label={colorsOpen ? "Collapse colors" : "Expand colors"}
+            onClick={handleSend}
+            className="absolute right-4 shrink-0 w-12 h-12 rounded-full bg-[#d91a92] flex items-center justify-center text-white shadow-[0_4px_20px_rgba(217,26,146,0.5)] active:scale-95 transition-transform"
+            aria-label="Send doodle"
           >
-            {colorsOpen ? <ChevronLeft className="w-4 h-4 mx-auto" /> : <ChevronRight className="w-4 h-4 mx-auto" />}
+            <Send className="w-5 h-5 ml-0.5" strokeWidth={2.5} />
           </button>
-          {colorsOpen && (
-            <div className="flex-1 overflow-y-auto py-2 px-1.5 flex flex-col items-center gap-1.5 scrollbar-hide">
-              {COLORS.map((color) => (
-                <button
-                  key={color}
-                  type="button"
-                  onClick={() => setCurrentColor(color)}
-                  className={`w-8 h-8 rounded-full border-2 shrink-0 transition-transform ${
-                    currentColor === color
-                      ? "border-primary scale-110 ring-2 ring-primary/30"
-                      : color === "#ffffff"
-                        ? "border-border"
-                        : "border-transparent"
-                  }`}
-                  style={{ backgroundColor: color }}
-                  aria-label={`Color ${color}`}
-                />
-              ))}
-            </div>
-          )}
-          {!colorsOpen && (
-            <button
-              type="button"
-              onClick={() => setColorsOpen(true)}
-              className="mx-auto mt-2 w-7 h-7 rounded-full border-2 border-primary"
-              style={{ backgroundColor: currentColor }}
-              aria-label="Open color drawer"
-            />
-          )}
-        </aside>
-
-        {/* Center — scrollable white drawing sheet */}
-        <div
-          ref={scrollRef}
-          className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden bg-white scrollbar-hide"
-        >
-          <div ref={containerRef} className="relative w-full">
-            <canvas
-              ref={canvasRef}
-              onPointerDown={startDrawing}
-              onPointerMove={draw}
-              onPointerUp={stopDrawing}
-              onPointerLeave={stopDrawing}
-              onPointerCancel={stopDrawing}
-              className="block w-full cursor-crosshair touch-none"
-              style={{ touchAction: "none" }}
-              data-testid="doodle-canvas"
-            />
-          </div>
         </div>
-
-        {/* Right — brush size */}
-        <aside className="w-[3.25rem] sm:w-14 shrink-0 flex flex-col items-center gap-2 py-2 px-1 border-l border-border/60 bg-card/95">
-          <span className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wide">Size</span>
-          {BRUSH_PRESETS.map((size) => (
-            <button
-              key={size}
-              type="button"
-              onClick={() => setBrushSize(size)}
-              className={`rounded-full border-2 flex items-center justify-center transition-all ${
-                brushSize === size ? "border-primary bg-primary/10" : "border-border bg-background"
-              }`}
-              style={{ width: Math.min(28, 10 + size), height: Math.min(28, 10 + size) }}
-              aria-label={`Brush size ${size}`}
-              title={`Size ${size}`}
-            >
-              <span
-                className="rounded-full bg-foreground"
-                style={{ width: Math.max(4, size / 2.5), height: Math.max(4, size / 2.5) }}
-              />
-            </button>
-          ))}
-          <div className="flex-1 flex flex-col items-center justify-center w-full px-0.5 min-h-[4rem]">
-            <span className="text-[10px] font-bold text-foreground mb-1">{brushSize}</span>
-            <input
-              type="range"
-              min={2}
-              max={36}
-              value={brushSize}
-              onChange={(e) => setBrushSize(Number(e.target.value))}
-              className="w-16 h-1 accent-primary -rotate-90 origin-center"
-              aria-label="Brush size slider"
-            />
-          </div>
-        </aside>
       </div>
     </div>
   );

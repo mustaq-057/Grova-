@@ -1,10 +1,86 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useFeatureLoading } from "@/hooks/useFeatureLoading";
-import { Plus, Trash2, CheckCircle2, Circle, ListTodo, X } from "lucide-react";
-import { motion } from "framer-motion";
+import { Plus, Trash2, CheckCircle2, Circle, ListTodo, X, ChevronDown } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { api, type ApiTask } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+
+function CustomSelect({
+  value,
+  onChange,
+  options,
+  label,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: { value: string; label: string }[];
+  label: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const selectedLabel = options.find((o) => o.value === value)?.label ?? value;
+
+  return (
+    <div className="relative">
+      <p className="text-xs text-muted-foreground mb-1">{label}</p>
+      <button
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        className="w-full flex items-center justify-between bg-secondary/50 border border-border/50 hover:border-primary/50 hover:bg-secondary/80 rounded-xl px-4 py-2.5 text-sm outline-none transition-colors"
+      >
+        <span className="truncate">{selectedLabel}</span>
+        <ChevronDown className="w-4 h-4 text-muted-foreground ml-2 shrink-0" />
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-40 bg-black/20"
+              onClick={() => setOpen(false)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: -10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: -10 }}
+              transition={{ duration: 0.15 }}
+              className="absolute left-0 right-0 top-full mt-2 z-50 bg-[#1c1c1c] border border-white/10 rounded-2xl shadow-2xl overflow-hidden py-1"
+            >
+              {options.map((opt, idx) => {
+                const isSelected = value === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => {
+                      onChange(opt.value);
+                      setOpen(false);
+                    }}
+                    className={`w-full flex items-center justify-between px-4 py-3.5 hover:bg-white/5 transition-colors ${
+                      idx !== options.length - 1 ? "border-b border-white/5" : ""
+                    }`}
+                  >
+                    <span className="text-[15px] font-medium text-white/90">{opt.label}</span>
+                    <div
+                      className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                        isSelected ? "border-[#5b5ef4]" : "border-white/30"
+                      }`}
+                    >
+                      {isSelected && <div className="w-2.5 h-2.5 bg-[#5b5ef4] rounded-full" />}
+                    </div>
+                  </button>
+                );
+              })}
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
 
 export default function Tasks() {
   const { user, partner } = useAuth();
@@ -150,37 +226,27 @@ export default function Tasks() {
               className="w-full bg-secondary border border-border rounded-xl px-4 py-2.5 text-sm outline-none focus:border-primary transition-colors"
               data-testid="input-task-title"
             />
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Assigned to</p>
-                <select
-                  value={assignedTo}
-                  onChange={(e) => setAssignedTo(e.target.value as any)}
-                  className="w-full bg-secondary border border-border rounded-xl px-4 py-2.5 text-sm outline-none focus:border-primary transition-colors"
-                  data-testid="input-task-assigned"
-                >
-                  <option value="both">Both</option>
-                  <option value={myAssignValue}>
-                    {user?.id === "me" ? mustaqLabel : saraLabel} (You)
-                  </option>
-                  <option value={partnerAssignValue}>
-                    {user?.id === "me" ? saraLabel : mustaqLabel}
-                  </option>
-                </select>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Priority</p>
-                <select
-                  value={priority}
-                  onChange={(e) => setPriority(e.target.value as any)}
-                  className="w-full bg-secondary border border-border rounded-xl px-4 py-2.5 text-sm outline-none focus:border-primary transition-colors"
-                  data-testid="input-task-priority"
-                >
-                  <option value="low">Low</option>
-                  <option value="medium">Medium</option>
-                  <option value="high">High</option>
-                </select>
-              </div>
+            <div className="grid grid-cols-2 gap-3 relative">
+              <CustomSelect
+                label="Assigned to"
+                value={assignedTo}
+                onChange={setAssignedTo}
+                options={[
+                  { value: "both", label: "Both" },
+                  { value: myAssignValue, label: `${user?.id === "me" ? mustaqLabel : saraLabel} (You)` },
+                  { value: partnerAssignValue, label: user?.id === "me" ? saraLabel : mustaqLabel },
+                ]}
+              />
+              <CustomSelect
+                label="Priority"
+                value={priority}
+                onChange={(v) => setPriority(v as "low" | "medium" | "high")}
+                options={[
+                  { value: "low", label: "Low" },
+                  { value: "medium", label: "Medium" },
+                  { value: "high", label: "High" },
+                ]}
+              />
             </div>
             <button
               type="submit"
@@ -232,13 +298,16 @@ export default function Tasks() {
                           <Circle className="w-5 h-5 text-muted-foreground" />
                         </button>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium mb-2">{task.title}</p>
+                          <p className="text-sm font-medium mb-1.5">{task.title}</p>
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium border ${getPriorityColor(task.priority)}`}>
                               {task.priority}
                             </span>
                             <span className="text-[10px] text-muted-foreground">
                               Assigned to {getAssignedLabel(task.assignedTo)}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground/60 ml-auto">
+                              {new Date(task.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                             </span>
                           </div>
                         </div>
@@ -278,13 +347,16 @@ export default function Tasks() {
                           <CheckCircle2 className="w-5 h-5 text-green-500" />
                         </button>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium mb-2 line-through text-muted-foreground">{task.title}</p>
+                          <p className="text-sm font-medium mb-1.5 line-through text-muted-foreground">{task.title}</p>
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium border ${getPriorityColor(task.priority)}`}>
                               {task.priority}
                             </span>
                             <span className="text-[10px] text-muted-foreground">
                               Assigned to {getAssignedLabel(task.assignedTo)}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground/60 ml-auto">
+                              {new Date(task.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                             </span>
                           </div>
                         </div>
