@@ -370,8 +370,27 @@ export default function Messages() {
     closeDoodlePanel();
     if (!user) return;
     const tempId = crypto.randomUUID();
+    
+    // Calculate absolute scroll position
+    const container = messagesContainerRef.current;
+    let absoluteX = data.canvasX;
+    let absoluteY = data.canvasY;
+    
+    if (container) {
+      const rect = container.getBoundingClientRect();
+      const style = window.getComputedStyle(container);
+      const paddingLeft = parseFloat(style.paddingLeft) || 0;
+      const paddingTop = parseFloat(style.paddingTop) || 0;
+      const borderLeft = parseFloat(style.borderLeftWidth) || 0;
+      const borderTop = parseFloat(style.borderTopWidth) || 0;
+      
+      absoluteX = data.canvasX - rect.left - paddingLeft - borderLeft;
+      absoluteY = data.canvasY - rect.top - paddingTop - borderTop + container.scrollTop;
+    }
+
     // Encode position metadata into the text field as JSON
-    const posText = JSON.stringify({ canvasX: data.canvasX, canvasY: data.canvasY, width: data.width, height: data.height });
+    const posText = JSON.stringify({ canvasX: absoluteX, canvasY: absoluteY, width: data.width, height: data.height });
+    
     pendingOutgoingRef.current.add(tempId);
     setMessages((prev) => [
       ...prev,
@@ -384,7 +403,9 @@ export default function Messages() {
 
     const attemptUpload = async (attempt = 0): Promise<string> => {
       try {
-        return await uploadMediaToB2(data.imageData, "image/png");
+        const res = await fetch(data.imageData);
+        const blob = await res.blob();
+        return await uploadMediaFile(blob, "image/png");
       } catch (err) {
         const raw = err instanceof Error ? err.message : "";
         const isNetwork = /fetch|network|failed to fetch|connection/i.test(raw);

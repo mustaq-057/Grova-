@@ -271,17 +271,32 @@ export const MessageItem = memo(function MessageItem({
     return <DeletedMessageNotice isMe={isMe} partnerName={partnerName} />;
   }
 
-  // ── Doodle: rendered inline as a chat-bubble image ──────────────────
+  // ── Doodle: rendered inline as an absolute overlay ──────────────────
   if (isDoodle) {
     const src = resolveChatImageUrl(msg.imageUrl || msg.imageData);
+    let pos = { canvasX: 0, canvasY: 0, width: 100, height: 100 };
+    try {
+      if (msg.text) pos = JSON.parse(msg.text);
+    } catch(e) {}
+
     return (
-      <DoodleMessageOverlay
-        msg={msg}
-        src={src}
-        pos={null}
-        isMe={isMe}
-        onOpenMenu={onOpenMenu}
-      />
+      <div 
+        className="absolute pointer-events-auto"
+        style={{
+           left: pos.canvasX,
+           top: pos.canvasY,
+           width: pos.width,
+           height: pos.height,
+           zIndex: 20,
+        }}
+      >
+        <DoodleMessageOverlay
+          msg={msg}
+          src={src}
+          isMe={isMe}
+          onUnsend={() => onUnsend?.(msg.id)}
+        />
+      </div>
     );
   }
 
@@ -608,58 +623,47 @@ export const MessageItem = memo(function MessageItem({
 interface DoodleOverlayProps {
   msg: ApiMessage;
   src: string | undefined;
-  pos: null;
   isMe: boolean;
-  onOpenMenu?: (msg: ApiMessage, rect: DOMRect) => void;
+  onUnsend?: () => void;
 }
 
 const DoodleMessageOverlay = memo(function DoodleMessageOverlay({
-  msg, src, isMe, onOpenMenu,
+  msg, src, isMe, onUnsend,
 }: DoodleOverlayProps) {
   const [showSheet, setShowSheet] = useState(false);
   const imgRef = useRef<HTMLImageElement>(null);
 
   return (
     <div
-      className={`group flex items-end gap-2 mb-1 min-w-0 max-w-full ${isMe ? "flex-row-reverse" : "flex-row"}`}
+      className="w-full h-full relative"
       data-testid={`message-${msg.id}`}
       role="listitem"
     >
-      <div className={`relative min-w-0 max-w-[min(88%,calc(100vw-3rem))]`}>
-        {/* Label */}
-        <p className={`text-[11px] text-white/45 font-medium mb-1 px-1 ${isMe ? "text-right" : "text-left"}`}>
-          🎨 Doodle
-        </p>
-
-        {src ? (
-          <button
-            type="button"
-            onClick={() => setShowSheet(true)}
-            className="block rounded-2xl overflow-hidden border border-white/10 bg-black/20 active:opacity-80 transition-opacity"
-            aria-label="Tap to manage doodle"
-          >
-            <img
-              ref={imgRef}
-              src={src}
-              alt="Doodle"
-              className="max-w-[min(240px,80vw)] h-auto block"
-              draggable={false}
-            />
-          </button>
-        ) : (
-          <div className="w-32 h-32 rounded-2xl bg-white/8 border border-white/10 animate-pulse" />
-        )}
-      </div>
+      {src ? (
+        <button
+          type="button"
+          onClick={() => setShowSheet(true)}
+          className="w-full h-full block active:opacity-80 transition-opacity"
+          aria-label="Tap to manage doodle"
+        >
+          <img
+            ref={imgRef}
+            src={src}
+            alt="Doodle"
+            className="w-full h-full object-contain drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]"
+            draggable={false}
+          />
+        </button>
+      ) : (
+        <div className="w-full h-full bg-white/10 animate-pulse rounded-2xl" />
+      )}
 
       {showSheet && (
         <DoodleSheet
           onClose={() => setShowSheet(false)}
           onUnsend={() => {
             setShowSheet(false);
-            if (onOpenMenu) {
-              const rect = imgRef.current?.getBoundingClientRect() ?? new DOMRect();
-              onOpenMenu(msg, rect);
-            }
+            onUnsend?.();
           }}
         />
       )}
