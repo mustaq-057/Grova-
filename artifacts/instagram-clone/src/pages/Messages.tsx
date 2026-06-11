@@ -1665,7 +1665,7 @@ export default function Messages() {
       setError("Message did not send. Check your connection and try again.");
       throw err;
     }
-  }, [user, online, requestStickToBottom, stopTyping]);
+  }, [user, online, requestStickToBottom, stopTyping, bubbleStyle]);
 
   sendMsgRef.current = sendMsg;
   userIdRef.current = user?.id;
