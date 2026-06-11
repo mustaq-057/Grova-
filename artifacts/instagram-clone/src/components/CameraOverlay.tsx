@@ -14,6 +14,7 @@ export function CameraOverlay({ onClose, onCapture }: CameraOverlayProps) {
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [facingMode, setFacingMode] = useState<"user" | "environment">("environment");
   const [flashOn, setFlashOn] = useState(false);
+  const [aspectRatio, setAspectRatio] = useState<"16:9" | "4:3" | "1:1">("16:9");
   const [error, setError] = useState<string | null>(null);
 
   const startCamera = useCallback(async (mode: "user" | "environment") => {
@@ -58,22 +59,45 @@ export function CameraOverlay({ onClose, onCapture }: CameraOverlayProps) {
     setFlashOn(!flashOn);
   };
 
+  const toggleRatio = () => {
+    setAspectRatio(prev => prev === "16:9" ? "4:3" : prev === "4:3" ? "1:1" : "16:9");
+  };
+
   const handleCapture = () => {
     if (!videoRef.current || !stream) return;
     const video = videoRef.current;
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+    const videoRatio = vw / vh;
+    
+    let targetRatio = 9 / 16;
+    if (aspectRatio === "4:3") targetRatio = 3 / 4;
+    if (aspectRatio === "1:1") targetRatio = 1;
+    if (vw > vh && targetRatio < 1) targetRatio = 1 / targetRatio; // Landscape fallback
+
+    let cw = vw;
+    let ch = vh;
+    if (videoRatio > targetRatio) {
+      cw = vh * targetRatio;
+    } else {
+      ch = vw / targetRatio;
+    }
+
     const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    canvas.width = cw;
+    canvas.height = ch;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     
-    // If front camera, we might want to flip the image horizontally
+    const sx = (vw - cw) / 2;
+    const sy = (vh - ch) / 2;
+
     if (facingMode === "user") {
-      ctx.translate(canvas.width, 0);
+      ctx.translate(cw, 0);
       ctx.scale(-1, 1);
     }
     
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    ctx.drawImage(video, sx, sy, cw, ch, 0, 0, cw, ch);
     
     canvas.toBlob((blob) => {
       if (!blob) return;
@@ -105,21 +129,29 @@ export function CameraOverlay({ onClose, onCapture }: CameraOverlayProps) {
             {flashOn ? <Zap className="w-7 h-7" /> : <ZapOff className="w-7 h-7" />}
           </button>
           
-          {/* Empty div for balancing flex layout */}
-          <div className="w-12" />
+          <button onClick={toggleRatio} className="h-8 px-3 flex items-center justify-center text-sm font-bold text-white bg-black/40 backdrop-blur-md rounded-full border border-white/20 transition-colors active:scale-95">
+            {aspectRatio}
+          </button>
         </div>
 
-        <div className="flex-1 relative overflow-hidden flex items-center justify-center bg-black">
+        <div className="flex-1 relative overflow-hidden flex items-center justify-center bg-black w-full">
           {error ? (
             <p className="text-white/50 text-center px-4">{error}</p>
           ) : (
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted
-              className={`min-w-full min-h-full object-cover ${facingMode === "user" ? "scale-x-[-1]" : ""}`}
-            />
+            <div 
+               className="relative w-full max-h-full flex items-center justify-center overflow-hidden transition-all duration-300"
+               style={{ 
+                 aspectRatio: aspectRatio === "16:9" ? "9/16" : aspectRatio === "4:3" ? "3/4" : "1/1",
+               }}
+            >
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className={`absolute inset-0 w-full h-full object-cover ${facingMode === "user" ? "scale-x-[-1]" : ""}`}
+              />
+            </div>
           )}
         </div>
 
