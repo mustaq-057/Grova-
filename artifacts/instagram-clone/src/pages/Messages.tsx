@@ -1857,7 +1857,6 @@ export default function Messages() {
       text,
       type: "text",
       ...replyMeta,
-      variant: "default" as const,
     });
   }, [sendMsg, replyTo, stopTyping]);
 
