@@ -249,7 +249,8 @@ export default function Messages() {
   const sseRetryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingRequestsRef = useRef<Map<string, Promise<any>>>(new Map());
   const previousMessagesLengthRef = useRef(0);
-  const isInitialLoadRef = useRef(messages.length > 0);
+  const isInitialLoadRef = useRef(true);
+  const initialLoadTimeRef = useRef(Date.now());
   const stickToBottomRef = useRef(false);
   const lastMessageTailRef = useRef("");
   const hasMessagesRef = useRef(false);
@@ -289,11 +290,12 @@ export default function Messages() {
   }, []);
 
   const scrollToBottomForMedia = useCallback((messageId?: string) => {
-    if (messageId && !recentTailIdsRef.current.has(messageId)) return;
-    if (!isNearBottomRef.current && !stickToBottomRef.current) return;
+    const isInitialWindow = Date.now() - initialLoadTimeRef.current < 2500;
+    if (messageId && !recentTailIdsRef.current.has(messageId) && !isInitialWindow) return;
+    if (!isNearBottomRef.current && !stickToBottomRef.current && !isInitialWindow) return;
     if (mediaScrollTimerRef.current) clearTimeout(mediaScrollTimerRef.current);
     mediaScrollTimerRef.current = setTimeout(() => {
-      if (!isNearBottomRef.current && !stickToBottomRef.current) return;
+      if (!isNearBottomRef.current && !stickToBottomRef.current && !isInitialWindow) return;
       scrollChatToBottomSoft(messagesContainerRef.current, bottomRef.current);
     }, 150);
   }, []);
@@ -1221,7 +1223,10 @@ export default function Messages() {
       setHasNewMessages(true);
     }
 
-    if (firstPaint) isInitialLoadRef.current = false;
+    if (firstPaint) {
+      isInitialLoadRef.current = false;
+      initialLoadTimeRef.current = Date.now();
+    }
     previousMessagesLengthRef.current = messages.length;
   }, [messages, user?.id, partnerId]);
 
