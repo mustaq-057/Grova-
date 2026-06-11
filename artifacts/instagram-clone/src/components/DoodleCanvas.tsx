@@ -187,19 +187,7 @@ export default function DoodleCanvas({ onClose, onSend, canvasHeight, onExpandCa
     }
   }, [layoutCanvas, onExpandCanvas, expandCount]);
 
-  const maybeExpandWhileDrawing = (y: number) => {
-    const container = containerRef.current;
-    if (!container) return;
-    const h = container.getBoundingClientRect().height;
-    if (y < h - 72) return;
-    const now = Date.now();
-    if (now - expandCooldownRef.current < 400) return;
-    expandCooldownRef.current = now;
-    handleExpandCanvas();
-    requestAnimationFrame(() => {
-      scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-    });
-  };
+
 
   const getPoint = (e: React.PointerEvent<HTMLCanvasElement>): Point => {
     const canvas = canvasRef.current;
@@ -229,7 +217,6 @@ export default function DoodleCanvas({ onClose, onSend, canvasHeight, onExpandCa
     if (!isDrawing) return;
 
     const { x, y } = getPoint(e);
-    maybeExpandWhileDrawing(y);
 
     const ctx = getCtx();
     const last = lastPointRef.current;

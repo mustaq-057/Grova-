@@ -64,7 +64,6 @@ export function CuteMessageBubble({
 
   return (
     <div className={`relative flex items-end gap-1.5 max-w-full ${className}`}>
-      {stickerEl}
       <div className="relative min-w-0 flex-1">
         <div className="absolute -top-1.5 -right-1.5 z-10 pointer-events-none">
           <Heart className="w-4 h-4 fill-red-500 text-red-500 drop-shadow" aria-hidden />
@@ -81,6 +80,7 @@ export function CuteMessageBubble({
           <span className="relative z-[1]">{children}</span>
         </div>
       </div>
+      {stickerEl}
     </div>
   );
 }

@@ -138,6 +138,12 @@ function TypingDots() {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+const MODE_STICKERS: Record<string, string> = {
+  frog: "🐸",
+  cat: "🐱",
+  panda: "🐼",
+};
 type CallState = { status: "outgoing" | "incoming" | "active"; type: "audio" | "video"; incomingOffer?: RTCSessionDescriptionInit } | null;
 
 function initialChatMessages(): ApiMessage[] {
@@ -1600,11 +1606,12 @@ export default function Messages() {
       try {
         const url = await uploadMediaFile(file, mime);
         const sticker =
-          mediaViewMode === "once" ? "__vm:once" : mediaViewMode === "twice" ? "__vm:twice" : undefined;
+          mediaViewMode === "once" ? "__vm:once" : mediaViewMode === "twice" ? "__vm:twice" : (cuteMode ? MODE_STICKERS[cuteMode] : undefined);
         const outgoing = await prepareOutgoingMessage({
           senderId: user.id,
           type: "image",
           imageUrl: url,
+          ...(cuteMode && !sticker ? { variant: "cute" } : {}),
           ...(sticker ? { companionSticker: sticker } : {}),
         });
         const saved = await api.sendMessage(outgoing);
@@ -1768,17 +1775,12 @@ export default function Messages() {
         }
       : {};
     setReplyTo(null);
-    const modeStickers: Record<string, string> = {
-      frog: "🐸",
-      cat: "🐱",
-      panda: "🐼",
-    };
     sendMsg({
       text,
       type: "text",
       ...replyMeta,
       ...(cuteMode
-        ? { variant: "cute" as const, companionSticker: modeStickers[cuteMode] || "🐸" }
+        ? { variant: "cute" as const, companionSticker: MODE_STICKERS[cuteMode] || "🐸" }
         : { variant: "default" as const }),
     });
   }, [sendMsg, cuteMode, replyTo, stopTyping]);
@@ -2100,9 +2102,13 @@ export default function Messages() {
   );
 
   const mediaModeSticker = useCallback(
-    (mode: "keep" | "once" | "twice"): string | undefined =>
-      mode === "once" ? "__vm:once" : mode === "twice" ? "__vm:twice" : undefined,
-    [],
+    (mode: "keep" | "once" | "twice"): string | undefined => {
+      if (mode === "once") return "__vm:once";
+      if (mode === "twice") return "__vm:twice";
+      if (cuteMode) return MODE_STICKERS[cuteMode];
+      return undefined;
+    },
+    [cuteMode],
   );
 
   const handlePickedFile = useCallback(
@@ -2147,11 +2153,11 @@ export default function Messages() {
         }
 
         const MAX_FILE_SIZE =
-          kind === "video" ? 60 * 1024 * 1024 : kind === "image" ? 25 * 1024 * 1024 : 25 * 1024 * 1024;
+          kind === "video" ? 20 * 1024 * 1024 : kind === "image" ? 25 * 1024 * 1024 : 25 * 1024 * 1024;
         if (normalized.size > MAX_FILE_SIZE) {
           finishToast(toastId, {
             type: "error",
-            message: kind === "video" ? "Video too large (max 60MB)." : "File too large (max 25MB).",
+            message: kind === "video" ? "Video too large (max 20MB)." : "File too large (max 25MB).",
           });
           return;
         }
@@ -2458,7 +2464,12 @@ export default function Messages() {
             const voiceFile = new File([blob], `voice-${Date.now()}.webm`, { type: voiceMime });
             const [url, outgoing] = await Promise.all([
               uploadMediaFile(voiceFile, voiceMime),
-              prepareOutgoingMessage({ senderId, type: "audio", audioData: "" }),
+              prepareOutgoingMessage({ 
+                senderId, 
+                type: "audio", 
+                audioData: "",
+                ...(cuteMode ? { variant: "cute", companionSticker: MODE_STICKERS[cuteMode] || "🐸" } : {})
+              }),
             ]);
             outgoing.audioData = url;
             const saved = await api.sendMessage(outgoing);
@@ -3298,10 +3309,10 @@ export default function Messages() {
               onEnded={() => {
                 if (mediaViewer.timed) setMediaViewer(null);
               }}
-              className="max-w-full max-h-full rounded-xl"
+              className="w-full h-full object-contain"
             />
           ) : (
-            <img src={mediaViewer.url} alt="" className="max-w-full max-h-full rounded-xl object-contain" />
+            <img src={mediaViewer.url} alt="Media Viewer" className="w-full h-full object-contain" />
           )}
         </div>
       )}
