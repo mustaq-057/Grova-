@@ -3,11 +3,11 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "./ui/sheet";
 import { cn } from "@/lib/utils";
 
 export type BubbleStyleId = 
-  | "cat-dog" | "facepalm" 
+  | "cat-dog" 
   | "heart-pepe" | "pig-shark" | "tongue-bear" | "doge" 
   | "frog-chick" | "hungry-dog" | "dino" | "dachshund" 
   | "excited-pepe" | "shouting"
-  | "crying-cat" | "neon-robot" | "bubble-gum" | "crystal-skull" 
+  | "bubble-gum" | "crystal-skull" 
   | "golden-crown" | "fire-demon" | "ice-cube" | "space-helmet" 
   | "toxic-slime" | "cloud-angel" | "library" | "angry-model" | "islamic-serenity";
 
@@ -20,7 +20,6 @@ interface BubbleStyleSelectorProps {
 
 const BUBBLE_STYLES: { id: BubbleStyleId; label: string; }[] = [
   { id: "cat-dog", label: "Cat dog" },
-  { id: "facepalm", label: "Facepalm" },
   { id: "heart-pepe", label: "Heart Pepe" },
   { id: "pig-shark", label: "Pig shark" },
   { id: "tongue-bear", label: "Tongue bear" },
@@ -31,8 +30,6 @@ const BUBBLE_STYLES: { id: BubbleStyleId; label: string; }[] = [
   { id: "dachshund", label: "Dachshund" },
   { id: "excited-pepe", label: "Excited Pepe" },
   { id: "shouting", label: "Shouting" },
-  { id: "crying-cat", label: "Crying Cat" },
-  { id: "neon-robot", label: "Neon Robot" },
   { id: "bubble-gum", label: "Bubble Gum" },
   { id: "crystal-skull", label: "Crystal Skull" },
   { id: "golden-crown", label: "Golden Crown" },
