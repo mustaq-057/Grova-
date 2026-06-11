@@ -66,6 +66,7 @@ export const MessageItem = memo(function MessageItem({
   theme,
   onLike,
   onReact,
+  onUnsend,
   onReply,
   onOpenMenu,
   prevMsg,
