@@ -9,7 +9,8 @@ export type BubbleStyleId =
   | "excited-pepe" | "shouting"
   | "bubble-gum" | "crystal-skull" 
   | "golden-crown" | "fire-demon" | "ice-cube" | "space-helmet" 
-  | "toxic-slime" | "cloud-angel" | "library" | "angry-model" | "islamic-serenity";
+  | "toxic-slime" | "cloud-angel" | "library" | "angry-model" | "islamic-serenity"
+  | "hijab-knife" | "hijab-skull" | "hijab-haram" | "hijab-sparkle" | "little-my";
 
 interface BubbleStyleSelectorProps {
   show: boolean;
@@ -41,6 +42,11 @@ const BUBBLE_STYLES: { id: BubbleStyleId; label: string; }[] = [
   { id: "library", label: "Library" },
   { id: "angry-model", label: "Angry Model" },
   { id: "islamic-serenity", label: "Islamic Serenity" },
+  { id: "hijab-knife", label: "Hijab Knife" },
+  { id: "hijab-skull", label: "Hijab Skull" },
+  { id: "hijab-haram", label: "Haram Bro" },
+  { id: "hijab-sparkle", label: "Hijab Sparkle" },
+  { id: "little-my", label: "Little My" },
 ];
 
 export const BubbleStyleSelector = memo(function BubbleStyleSelector({

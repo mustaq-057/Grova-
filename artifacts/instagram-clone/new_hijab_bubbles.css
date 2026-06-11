@@ -1,0 +1,185 @@
+
+/* hijab-knife */
+.bubble-icon.bubble-hijab-knife { background-image: url("/images/bubbles/hijab-1.png"); background-size: contain; background-repeat: no-repeat; background-position: center; }
+.bubble-hijab-knife {
+  background: #FEE2E2 !important;
+  color: #7F1D1D !important;
+  border: 1.5px solid #EF4444 !important;
+  border-radius: 16px 16px 16px 4px !important;
+  border-image-source: none !important;
+  border-image-slice: 100% !important;
+  padding: 10px 16px !important;
+}
+.bubble-hijab-knife::before {
+  content: "";
+  position: absolute;
+  left: -28px;
+  bottom: -10px;
+  width: 48px;
+  height: 48px;
+  background-image: url("/images/bubbles/hijab-1.png");
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: bottom left;
+  z-index: 10;
+}
+.bubble-hijab-knife { padding-left: 28px !important; }
+.flex-row-reverse .bubble-hijab-knife {
+  border-radius: 16px 16px 4px 16px !important;
+  padding-left: 16px !important;
+  padding-right: 28px !important;
+}
+.flex-row-reverse .bubble-hijab-knife::before {
+  left: auto;
+  right: -28px;
+  background-position: bottom right;
+  transform: scaleX(-1);
+}
+
+/* hijab-skull */
+.bubble-icon.bubble-hijab-skull { background-image: url("/images/bubbles/hijab-2.png"); background-size: contain; background-repeat: no-repeat; background-position: center; }
+.bubble-hijab-skull {
+  background: #FEF2F2 !important;
+  color: #450A0A !important;
+  border: 1.5px solid #B91C1C !important;
+  border-radius: 16px 16px 16px 4px !important;
+  border-image-source: none !important;
+  border-image-slice: 100% !important;
+  padding: 10px 16px !important;
+}
+.bubble-hijab-skull::before {
+  content: "";
+  position: absolute;
+  left: -28px;
+  bottom: -10px;
+  width: 48px;
+  height: 48px;
+  background-image: url("/images/bubbles/hijab-2.png");
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: bottom left;
+  z-index: 10;
+}
+.bubble-hijab-skull { padding-left: 28px !important; }
+.flex-row-reverse .bubble-hijab-skull {
+  border-radius: 16px 16px 4px 16px !important;
+  padding-left: 16px !important;
+  padding-right: 28px !important;
+}
+.flex-row-reverse .bubble-hijab-skull::before {
+  left: auto;
+  right: -28px;
+  background-position: bottom right;
+  transform: scaleX(-1);
+}
+
+/* hijab-haram */
+.bubble-icon.bubble-hijab-haram { background-image: url("/images/bubbles/hijab-3.png"); background-size: contain; background-repeat: no-repeat; background-position: center; }
+.bubble-hijab-haram {
+  background: #FFFBEB !important;
+  color: #78350F !important;
+  border: 1.5px solid #F59E0B !important;
+  border-radius: 16px 16px 16px 4px !important;
+  border-image-source: none !important;
+  border-image-slice: 100% !important;
+  padding: 10px 16px !important;
+}
+.bubble-hijab-haram::before {
+  content: "";
+  position: absolute;
+  left: -28px;
+  bottom: -10px;
+  width: 48px;
+  height: 48px;
+  background-image: url("/images/bubbles/hijab-3.png");
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: bottom left;
+  z-index: 10;
+}
+.bubble-hijab-haram { padding-left: 28px !important; }
+.flex-row-reverse .bubble-hijab-haram {
+  border-radius: 16px 16px 4px 16px !important;
+  padding-left: 16px !important;
+  padding-right: 28px !important;
+}
+.flex-row-reverse .bubble-hijab-haram::before {
+  left: auto;
+  right: -28px;
+  background-position: bottom right;
+  transform: scaleX(-1);
+}
+
+/* hijab-sparkle */
+.bubble-icon.bubble-hijab-sparkle { background-image: url("/images/bubbles/hijab-4.png"); background-size: contain; background-repeat: no-repeat; background-position: center; }
+.bubble-hijab-sparkle {
+  background: #FEFCE8 !important;
+  color: #713F12 !important;
+  border: 1.5px solid #EAB308 !important;
+  border-radius: 16px 16px 16px 4px !important;
+  border-image-source: none !important;
+  border-image-slice: 100% !important;
+  padding: 10px 16px !important;
+}
+.bubble-hijab-sparkle::before {
+  content: "";
+  position: absolute;
+  left: -28px;
+  bottom: -10px;
+  width: 48px;
+  height: 48px;
+  background-image: url("/images/bubbles/hijab-4.png");
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: bottom left;
+  z-index: 10;
+}
+.bubble-hijab-sparkle { padding-left: 28px !important; }
+.flex-row-reverse .bubble-hijab-sparkle {
+  border-radius: 16px 16px 4px 16px !important;
+  padding-left: 16px !important;
+  padding-right: 28px !important;
+}
+.flex-row-reverse .bubble-hijab-sparkle::before {
+  left: auto;
+  right: -28px;
+  background-position: bottom right;
+  transform: scaleX(-1);
+}
+
+/* little-my */
+.bubble-icon.bubble-little-my { background-image: url("/images/bubbles/little-my.png"); background-size: contain; background-repeat: no-repeat; background-position: center; }
+.bubble-little-my {
+  background: #FFF1F2 !important;
+  color: #881337 !important;
+  border: 1.5px solid #E11D48 !important;
+  border-radius: 16px 16px 16px 4px !important;
+  border-image-source: none !important;
+  border-image-slice: 100% !important;
+  padding: 10px 16px !important;
+}
+.bubble-little-my::before {
+  content: "";
+  position: absolute;
+  left: -28px;
+  bottom: -10px;
+  width: 48px;
+  height: 48px;
+  background-image: url("/images/bubbles/little-my.png");
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: bottom left;
+  z-index: 10;
+}
+.bubble-little-my { padding-left: 28px !important; }
+.flex-row-reverse .bubble-little-my {
+  border-radius: 16px 16px 4px 16px !important;
+  padding-left: 16px !important;
+  padding-right: 28px !important;
+}
+.flex-row-reverse .bubble-little-my::before {
+  left: auto;
+  right: -28px;
+  background-position: bottom right;
+  transform: scaleX(-1);
+}
