@@ -1,6 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap');
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "./styles/bubbles.css";
 @plugin "@tailwindcss/typography";
 
 @custom-variant dark (&:is(.dark *));
@@ -220,7 +221,7 @@
 
 @layer base {
   * {
-    @apply border-border;
+    border-color: var(--color-border);
   }
 
   html,
@@ -231,7 +232,11 @@
   }
 
   body {
-    @apply font-sans antialiased bg-background text-foreground;
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background-color: var(--color-background);
+    color: var(--color-foreground);
   }
 
   .scrollbar-hide {
@@ -854,8 +859,8 @@ html[data-photo-theme="true"] .app-chrome [class*="bg-card"] {
 }
 
 @layer utilities {
-  .no-default-hover-elevate {}
-  .no-default-active-elevate {}
+  .no-default-hover-elevate { /* no-op class */ }
+  .no-default-active-elevate { /* no-op class */ }
 
   .toggle-elevate::before,
   .toggle-elevate-2::before {
@@ -956,10 +961,10 @@ html[data-photo-theme="true"] .app-chrome [class*="bg-card"] {
   }
 
   /* Better readability on mobile */
-  h1 { @apply text-2xl; }
-  h2 { @apply text-xl; }
-  h3 { @apply text-lg; }
-  h4 { @apply text-base; }
+  h1 { font-size: 1.5rem; line-height: 2rem; }
+  h2 { font-size: 1.25rem; line-height: 1.75rem; }
+  h3 { font-size: 1.125rem; line-height: 1.75rem; }
+  h4 { font-size: 1rem; line-height: 1.5rem; }
 }
 
 /* Mobile gesture support */

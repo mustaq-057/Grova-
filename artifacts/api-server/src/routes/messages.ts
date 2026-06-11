@@ -108,7 +108,7 @@ function rowToMessage(
     liked: row.liked === 1 || row.liked === true,
     deleted: row.deleted === 1 || row.deleted === true,
     deletedAt: row.deleted_at ? String(row.deleted_at) : undefined,
-    variant: row.variant === "cute" || row.variant === "default" ? row.variant : undefined,
+    variant: row.variant ? String(row.variant) : undefined,
     companionSticker: row.companion_sticker ? String(row.companion_sticker) : undefined,
     reaction: displayReactionForViewer(row, viewerId),
     replyToId: row.reply_to_id ? String(row.reply_to_id) : undefined,

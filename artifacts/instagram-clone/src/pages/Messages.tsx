@@ -4,8 +4,7 @@ import { motion } from "framer-motion";
 import { api, type ApiMessage } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import CallScreen, { IncomingCallOverlay } from "@/components/CallScreen";
-import { MessageItem } from "@/components/MessageItem";
-import { ThemePicker } from "@/components/ThemePicker";
+import { BubbleStyleSelector, type BubbleStyleId } from "@/components/BubbleStyleSelector";
 import { MessageInput } from "@/components/MessageInput";
 import { InfoPanel } from "@/components/InfoPanel";
 import { Link } from "wouter";
@@ -18,7 +17,7 @@ import { isEncryptionReady } from "@/lib/crypto";
 import { isOnline } from "@/lib/offline";
 import { requestNotificationPermission, subscribeToPush, sendSubscriptionToServer } from "@/lib/notifications";
 
-import { THEMES } from "@/lib/themes";
+
 
 function unsendErrorMessage(err: unknown): string {
   if (!(err instanceof Error)) return "Could not unsend. Try again.";
@@ -42,7 +41,7 @@ import { AvatarImage } from "@/components/AvatarImage";
 import { saveMemoryFromMessage, removeMemory } from "@/lib/memories";
 import { APP_THEME_CHANGED, getStoredAppTheme, isMoonlightSagaTheme, getPremiumChatThemeClass, isPremiumAnimatedTheme, type AppThemeId } from "@/lib/app-theme";
 import { ChatAuroraLayer } from "@/components/ChatAuroraLayer";
-import { ChatThemeLayer } from "@/components/ChatThemeLayer";
+
 import {
   filterVisibleMessages,
   hideMessageForUser,
@@ -152,13 +151,19 @@ function initialChatMessages(): ApiMessage[] {
 
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function Messages() {
-  const { user, partner, chatThemeId, updateChatTheme, refreshCouplePrefs } = useAuth();
+  const { user, partner, refreshCouplePrefs } = useAuth();
   const [messages, setMessages] = useState<ApiMessage[]>(initialChatMessages);
   const messagesSigRef = useRef(
     messages.length ? messagesListSignature(messages) : "0",
   );
   const [showInfo, setShowInfo] = useState(false);
-  const [showThemes, setShowThemes] = useState(false);
+  const [showBubbleStyles, setShowBubbleStyles] = useState(false);
+  const [bubbleStyle, setBubbleStyle] = useState<BubbleStyleId>("default");
+
+  useEffect(() => {
+    const saved = localStorage.getItem("bubbleStyle") as BubbleStyleId | null;
+    if (saved) setBubbleStyle(saved);
+  }, []);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [blocked, setBlocked] = useState(() => isChatBlocked());
   const [recording, setRecording] = useState(false);
@@ -275,7 +280,7 @@ export default function Messages() {
   const scrollPreserveRef = useRef<{ top: number; height: number } | null>(null);
 
   const partnerId = useMemo(() => user?.id === "me" ? "wife" : "me", [user?.id]);
-  const theme = THEMES.find(t => t.id === chatThemeId) ?? THEMES[0]!;
+
   const presence = usePresenceLabel(partnerLastSeen);
   const partnerActive = isPartnerActiveInChat(partnerLastSeen);
   const showPartnerTyping = isTyping;
@@ -1514,10 +1519,11 @@ export default function Messages() {
     };
   }, [user]);
 
-  const setTheme = useCallback((id: string) => {
-    updateChatTheme(id);
-    setShowThemes(false);
-  }, [updateChatTheme]);
+  const saveBubbleStyle = useCallback((id: BubbleStyleId) => {
+    setBubbleStyle(id);
+    localStorage.setItem("bubbleStyle", id);
+    setShowBubbleStyles(false);
+  }, []);
 
   const fetchAllMessagesForExport = useCallback(async () => {
     const collected: ApiMessage[] = [];
@@ -1642,7 +1648,7 @@ export default function Messages() {
       });
       requestStickToBottom();
 
-      const outgoing = await prepareOutgoingMessage({ senderId: user.id, ...partial });
+      const outgoing = await prepareOutgoingMessage({ senderId: user.id, variant: bubbleStyle, ...partial });
       const saved = await api.sendMessage(outgoing);
       const [display] = await normalizeMessages([saved]);
       setMessages((prev) => {
@@ -2882,7 +2888,7 @@ export default function Messages() {
   }, [messages]);
 
   const showChatAurora = isMoonlightSagaTheme(appThemeId);
-  const premiumChatClass = getPremiumChatThemeClass(appThemeId);
+  const premiumChatClass = "";
 
   if (blocked) {
     return (
@@ -2911,7 +2917,7 @@ export default function Messages() {
     <div
       className={`chat-panel flex-1 min-w-0 h-full min-h-0 relative bg-black ${premiumChatClass ?? ""}`}
     >
-      {isPremiumAnimatedTheme(appThemeId) && <ChatThemeLayer variant={appThemeId} />}
+
 
       <div className="chat-panel-top shrink-0 z-20 flex flex-col relative">
       {/* ── Header ── */}
@@ -2945,8 +2951,8 @@ export default function Messages() {
 
           <div className="relative">
             <button 
-              onClick={() => { setShowThemes(s => !s); setShowInfo(false); }} 
-              className={`p-1.5 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 active:scale-95 ${showThemes ? "bg-primary/20 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-secondary"}`} 
+              onClick={() => { setShowBubbleStyles(s => !s); setShowInfo(false); }} 
+              className={`p-1.5 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 active:scale-95 ${showBubbleStyles ? "bg-primary/20 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-secondary"}`} 
               data-testid="button-themes"
               aria-label="Change theme"
             >
@@ -2970,7 +2976,7 @@ export default function Messages() {
             <Video className="w-4 h-4" strokeWidth={1.5} />
           </button>
           <button 
-            onClick={() => { setShowInfo(s => !s); setShowThemes(false); }}
+            onClick={() => { setShowInfo(s => !s); setShowBubbleStyles(false); }}
             className={`p-1.5 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 active:scale-95 ${showInfo ? "text-primary" : "text-muted-foreground hover:text-foreground hover:bg-secondary"}`} 
             data-testid="button-info"
             aria-label="Show chat info"
@@ -3122,7 +3128,7 @@ export default function Messages() {
                     myId={user?.id ?? "me"}
                     partnerName={pName}
                     partnerAvatar={pAvatar}
-                    theme={theme}
+                    theme="default"
                     onDelete={deleteMessage}
                     onLike={toggleLike}
                     onReact={handleReact}
@@ -3234,11 +3240,11 @@ export default function Messages() {
           api.updateCouplePrefs({ appTheme: themeId }).then(refreshCouplePrefs).catch(console.error);
         }}
       />
-      <ThemePicker
-        show={showThemes}
-        onClose={() => setShowThemes(false)}
-        currentThemeId={chatThemeId}
-        onThemeChange={setTheme}
+      <BubbleStyleSelector
+        show={showBubbleStyles}
+        onClose={() => setShowBubbleStyles(false)}
+        currentStyle={bubbleStyle}
+        onSelect={saveBubbleStyle}
       />
 
       {showCamera && (

@@ -114,7 +114,7 @@ export const MessageItem = memo(function MessageItem({
   const isCallLog = useMemo(() => isCallLogMessage(msg.text), [msg.text]);
   const isDua = useMemo(() => msg.type === "text" && msg.companionSticker === "🤲", [msg.type, msg.companionSticker]);
   const isText = useMemo(() => msg.type === "text" || msg.type === "heart", [msg.type]);
-  const useCuteBubble = useMemo(() => isText && !isEmojiOnly && !isDua && msg.variant === "cute", [isText, isEmojiOnly, isDua, msg.variant]);
+  const customBubbleStyle = useMemo(() => msg.variant && msg.variant !== "default" ? msg.variant : null, [msg.variant]);
   const rtl = useMemo(() => hasArabic(msg.text), [msg.text]);
   const imageDisplaySrc = useMemo(() => {
     const base = displayImageSrc;
@@ -204,7 +204,7 @@ export const MessageItem = memo(function MessageItem({
     return partnerName;
   }, [hasReply, msg.replyToSenderId, myId, partnerName]);
 
-  const bubbleStyle = isMe
+  const defaultBubbleStyle = isMe
     ? { backgroundColor: theme.bubbleColor, borderColor: theme.bubbleBorder }
     : { backgroundColor: partnerColors.fill, borderColor: partnerColors.border };
 
@@ -461,23 +461,14 @@ export const MessageItem = memo(function MessageItem({
       <DuaMessage msg={msg} isMe={isMe} />
     ) : isGif || isImage || isVideo || isFile || isLocation ? (
       <>{bubbleContent}</>
-    ) : useCuteBubble ? (
-      <CuteMessageBubble
-        isMe={isMe}
-        companionSticker={msg.companionSticker}
-        dir={rtl ? "rtl" : "ltr"}
-        bubbleColor={theme.bubbleColor}
-        bubbleBorder={theme.bubbleBorder}
-      >
-        {bubbleContent}
-      </CuteMessageBubble>
     ) : (
       <div
-        className={`chat-bubble-text px-3 py-2 sm:px-3.5 sm:py-2 rounded-[20px] text-[16px] sm:text-[17px] leading-relaxed border-2 ${
-          isMe ? "rounded-br-md text-white" : "rounded-bl-md text-white"
-        }`}
-        // eslint-disable-next-line react/style-prop-object
-        style={bubbleStyle}
+        className={cn(
+          "chat-bubble-text px-3 py-2 sm:px-3.5 sm:py-2 text-[16px] sm:text-[17px] leading-relaxed border-2 relative",
+          customBubbleStyle ? `bubble-${customBubbleStyle}` : "bubble-default",
+          !customBubbleStyle && (isMe ? "rounded-br-md text-white" : "rounded-bl-md text-white")
+        )}
+        style={customBubbleStyle ? undefined : defaultBubbleStyle}
       >
         {bubbleContent}
       </div>
