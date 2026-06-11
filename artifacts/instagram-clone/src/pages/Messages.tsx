@@ -3184,7 +3184,7 @@ export default function Messages() {
           ref={messageInputRef}
           onInputActivity={handleInputActivity}
           onSendMessage={sendText}
-
+          onOpenChatStyles={() => setShowBubbleStyles(true)}
           onShareLocation={handleShareLocation}
           sharingLocation={sharingLocation}
           replyPreview={
