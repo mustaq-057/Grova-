@@ -17,7 +17,6 @@ interface MessageInputProps {
   onSendMessage: (text: string) => void;
   onInputActivity?: (value: string) => void;
   onShareLocation?: () => void;
-  onOpenChatStyles?: () => void;
   sharingLocation?: boolean;
   onStickerSelect: (sticker: string) => void;
   onGifSelect: (gif: string) => void;
@@ -42,7 +41,6 @@ type OpenPicker = "emoji" | "sticker" | "greeting" | null;
 export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>(function MessageInput({
   onSendMessage,
   onInputActivity,
-  onOpenChatStyles,
   onShareLocation,
   sharingLocation = false,
   onStickerSelect,

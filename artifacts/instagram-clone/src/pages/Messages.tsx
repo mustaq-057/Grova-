@@ -4,7 +4,6 @@ import { motion } from "framer-motion";
 import { api, type ApiMessage } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import CallScreen, { IncomingCallOverlay } from "@/components/CallScreen";
-import { BubbleStyleSelector, type BubbleStyleId } from "@/components/BubbleStyleSelector";
 import { MessageItem } from "@/components/MessageItem";
 import { MessageInput } from "@/components/MessageInput";
 import { InfoPanel } from "@/components/InfoPanel";
@@ -154,13 +153,6 @@ export default function Messages() {
     messages.length ? messagesListSignature(messages) : "0",
   );
   const [showInfo, setShowInfo] = useState(false);
-  const [showBubbleStyles, setShowBubbleStyles] = useState(false);
-  const [bubbleStyle, setBubbleStyle] = useState<BubbleStyleId>("cat-dog");
-
-  useEffect(() => {
-    const saved = localStorage.getItem("bubbleStyle") as BubbleStyleId | null;
-    if (saved) setBubbleStyle(saved);
-  }, []);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [blocked, setBlocked] = useState(() => isChatBlocked());
   const [recording, setRecording] = useState(false);
@@ -1516,12 +1508,6 @@ export default function Messages() {
     };
   }, [user]);
 
-  const saveBubbleStyle = useCallback((id: BubbleStyleId) => {
-    setBubbleStyle(id);
-    localStorage.setItem("bubbleStyle", id);
-    setShowBubbleStyles(false);
-  }, []);
-
   const fetchAllMessagesForExport = useCallback(async () => {
     const collected: ApiMessage[] = [];
     const seen = new Set<string>();
@@ -1636,7 +1622,7 @@ export default function Messages() {
     try {
       tempId = crypto.randomUUID();
       pendingOutgoingRef.current.add(tempId);
-      const optimistic = buildOptimisticMessage({ senderId: user.id, variant: bubbleStyle as any, ...partial }, tempId);
+      const optimistic = buildOptimisticMessage({ senderId: user.id, ...partial }, tempId);
 
       setMessages((prev) => {
         const next = [...prev, optimistic];
@@ -1645,7 +1631,7 @@ export default function Messages() {
       });
       requestStickToBottom();
 
-      const outgoing = await prepareOutgoingMessage({ senderId: user.id, variant: bubbleStyle as any, ...partial });
+      const outgoing = await prepareOutgoingMessage({ senderId: user.id, ...partial });
       const saved = await api.sendMessage(outgoing);
       const [display] = await normalizeMessages([saved]);
       setMessages((prev) => {
@@ -1665,7 +1651,7 @@ export default function Messages() {
       setError("Message did not send. Check your connection and try again.");
       throw err;
     }
-  }, [user, online, requestStickToBottom, stopTyping, bubbleStyle]);
+  }, [user, online, requestStickToBottom, stopTyping]);
 
   sendMsgRef.current = sendMsg;
   userIdRef.current = user?.id;
@@ -3174,7 +3160,6 @@ export default function Messages() {
           ref={messageInputRef}
           onInputActivity={handleInputActivity}
           onSendMessage={sendText}
-          onOpenChatStyles={() => setShowBubbleStyles(true)}
           onShareLocation={handleShareLocation}
           sharingLocation={sharingLocation}
           replyPreview={
@@ -3216,12 +3201,6 @@ export default function Messages() {
           setAppThemeId(themeId);
           api.updateCouplePrefs({ appTheme: themeId }).then(refreshCouplePrefs).catch(console.error);
         }}
-      />
-      <BubbleStyleSelector
-        show={showBubbleStyles}
-        onClose={() => setShowBubbleStyles(false)}
-        currentStyle={bubbleStyle}
-        onSelect={saveBubbleStyle}
       />
 
       {showCamera && (
