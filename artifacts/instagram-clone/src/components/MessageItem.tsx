@@ -370,31 +370,52 @@ export const MessageItem = memo(function MessageItem({
       ) : isFile && msg.fileData ? (
         <ChatFileBubble msg={msg} isMe={isMe} />
       ) : isLocation ? (
-        <div className="flex items-center gap-3 p-4 bg-gradient-to-br from-primary/20 to-primary/10 rounded-2xl min-w-[220px] border border-primary/30 shadow-lg">
-          <div className="w-12 h-12 bg-primary/30 rounded-xl flex items-center justify-center shrink-0 ring-2 ring-primary/20">
-            <span className="text-2xl">📍</span>
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-white mb-1">Location shared</p>
-            {msg.location ? (
-              <p className="text-xs text-white/80 font-mono">
-                {msg.location.lat.toFixed(4)}, {msg.location.lng.toFixed(4)}
-              </p>
-            ) : null}
-          </div>
+        <div className="rounded-2xl overflow-hidden min-w-[220px] max-w-[280px] border border-white/10 shadow-lg">
           {msg.location && (
             <a
               href={`https://maps.google.com/?q=${msg.location.lat},${msg.location.lng}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="p-2.5 bg-white/20 text-white rounded-xl hover:bg-white/30 transition-colors shrink-0"
-              aria-label="Open in maps"
+              className="block"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-              </svg>
+              <img
+                src={`https://static-maps.yandex.ru/v1?ll=${msg.location.lng},${msg.location.lat}&z=15&size=400,200&l=map&pt=${msg.location.lng},${msg.location.lat},pm2rdm`}
+                alt="Map preview"
+                className="w-full h-[120px] object-cover bg-white/5"
+                loading="lazy"
+                onError={(e) => {
+                  // Fallback: hide broken image, show text only
+                  (e.target as HTMLImageElement).style.display = "none";
+                }}
+              />
             </a>
           )}
+          <div className="flex items-center gap-3 p-3 bg-gradient-to-br from-primary/20 to-primary/10">
+            <div className="w-10 h-10 bg-primary/30 rounded-xl flex items-center justify-center shrink-0 ring-2 ring-primary/20">
+              <span className="text-xl">📍</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-white">Location shared</p>
+              {msg.location && (
+                <p className="text-[11px] text-white/60 font-mono mt-0.5">
+                  {msg.location.lat.toFixed(5)}, {msg.location.lng.toFixed(5)}
+                </p>
+              )}
+            </div>
+            {msg.location && (
+              <a
+                href={`https://maps.google.com/?q=${msg.location.lat},${msg.location.lng}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-2 bg-white/15 text-white rounded-xl hover:bg-white/25 transition-colors shrink-0"
+                aria-label="Open in maps"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                </svg>
+              </a>
+            )}
+          </div>
         </div>
       ) : displayText ? (
         <MessageText text={displayText} />

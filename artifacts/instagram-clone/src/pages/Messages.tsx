@@ -1868,12 +1868,17 @@ export default function Messages() {
       toast.error("Geolocation is not supported in this browser");
       return;
     }
-    if (!window.isSecureContext) {
-      toast.error("Location only works on HTTPS or localhost. Open the app via http://localhost:5000");
+
+    // Only block on clearly insecure contexts (http:// non-localhost)
+    const proto = window.location?.protocol;
+    if (proto === "http:" && !window.location?.hostname?.match(/^(localhost|127\.0\.0\.1)$/)) {
+      toast.error("Location requires HTTPS. Open the app via a secure URL.");
       return;
     }
 
     setSharingLocation(true);
+    const toastId = "location-sharing";
+    toast.loading("Getting your location…", { id: toastId, duration: 30_000 });
 
     const sendFromPosition = async (position: GeolocationPosition) => {
       const location = {
@@ -1887,6 +1892,9 @@ export default function Messages() {
           location,
           text: "📍 Shared location",
         });
+        toast.success("Location shared!", { id: toastId, duration: 2000 });
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Failed to send location", { id: toastId, duration: 4000 });
       } finally {
         setSharingLocation(false);
       }
@@ -1894,46 +1902,50 @@ export default function Messages() {
 
     const geoErrorMessage = (error: GeolocationPositionError) =>
       error.code === 1
-        ? "Location permission denied. Allow location for this site in browser settings."
+        ? "Location permission denied. Allow location access in your browser settings."
         : error.code === 2
-          ? "Location unavailable. Turn on Windows location, or try again on Wi‑Fi."
+          ? "Location unavailable. Make sure location/GPS is turned on."
           : error.code === 3
             ? "Location request timed out. Try again."
             : "Could not get your location.";
 
-    // Desktop-friendly first (Wi‑Fi / IP). High-accuracy GPS often fails on PC (code 2).
-    const tryGetPosition = (
-      options: PositionOptions,
-      onFail?: (err: GeolocationPositionError) => void,
-    ) => {
-      navigator.geolocation.getCurrentPosition(
-        (position) => void sendFromPosition(position),
-        onFail ?? ((error) => {
-          toast.error(geoErrorMessage(error));
-          setSharingLocation(false);
-        }),
-        options,
-      );
+    const fail = (error: GeolocationPositionError) => {
+      toast.error(geoErrorMessage(error), { id: toastId, duration: 5000 });
+      setSharingLocation(false);
     };
 
-    tryGetPosition(
-      { enableHighAccuracy: false, timeout: 15000, maximumAge: 120_000 },
-      (firstError) => {
-        if (firstError.code === 1) {
-          toast.error(geoErrorMessage(firstError));
-          setSharingLocation(false);
-          return;
-        }
-        // Retry once with a fresh low-accuracy read (no GPS requirement)
-        tryGetPosition(
-          { enableHighAccuracy: false, timeout: 25_000, maximumAge: 0 },
-          (secondError) => {
-            toast.error(geoErrorMessage(secondError));
-            setSharingLocation(false);
-          },
-        );
-      },
-    );
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+    if (isMobile) {
+      // Mobile: try high accuracy first (triggers GPS prompt), fall back to low accuracy
+      navigator.geolocation.getCurrentPosition(
+        (position) => void sendFromPosition(position),
+        (firstError) => {
+          if (firstError.code === 1) { fail(firstError); return; }
+          // GPS failed — retry with low accuracy (cell/wifi)
+          navigator.geolocation.getCurrentPosition(
+            (position) => void sendFromPosition(position),
+            fail,
+            { enableHighAccuracy: false, timeout: 20_000, maximumAge: 60_000 },
+          );
+        },
+        { enableHighAccuracy: true, timeout: 15_000, maximumAge: 60_000 },
+      );
+    } else {
+      // Desktop: low accuracy first (IP/Wi-Fi), fall back to no-cache
+      navigator.geolocation.getCurrentPosition(
+        (position) => void sendFromPosition(position),
+        (firstError) => {
+          if (firstError.code === 1) { fail(firstError); return; }
+          navigator.geolocation.getCurrentPosition(
+            (position) => void sendFromPosition(position),
+            fail,
+            { enableHighAccuracy: false, timeout: 25_000, maximumAge: 0 },
+          );
+        },
+        { enableHighAccuracy: false, timeout: 15_000, maximumAge: 120_000 },
+      );
+    }
   }, [sendMsg]);
 
   const handleStartThread = useCallback((message: ApiMessage) => {
