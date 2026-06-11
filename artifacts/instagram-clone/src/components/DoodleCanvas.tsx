@@ -1,11 +1,9 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { X, Undo2, Trash2, Send, Eraser } from "lucide-react";
-
-// ─── Public types ─────────────────────────────────────────────────────────────
+import { X, Undo2, Trash2, Send, ChevronLeft, Maximize } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export interface DoodleData {
-  /** PNG data-URL of the cropped stroke area (transparent background) */
   imageData: string;
   canvasX: number;
   canvasY: number;
@@ -18,64 +16,67 @@ interface DoodleCanvasProps {
   onSend: (data: DoodleData) => void;
 }
 
-// ─── 24 Crayon colours ───────────────────────────────────────────────────────
-
 const COLORS = [
-  // Row 1 – reds / pinks / purples
-  "#FF2020", "#FF6B35", "#FFD700", "#ADFF2F",
-  // Row 2 – greens / teals
-  "#00E676", "#00BCD4", "#2979FF", "#7C4DFF",
-  // Row 3 – dark tones
-  "#FF4081", "#E040FB", "#F06292", "#FFAB40",
-  // Row 4 – pastels
-  "#80CBC4", "#80DEEA", "#B39DDB", "#FFF59D",
-  // Row 5 – naturals
-  "#A5D6A7", "#EF9A9A", "#BCAAA4", "#90A4AE",
-  // Row 6 – darks + neutrals
-  "#FF8A65", "#CE93D8", "#FFFFFF", "#000000",
+  "#000000", // Black
+  "#FFFFFF", // White
+  "#FF0040", // Red
+  "#FF6B00", // Orange
+  "#FFD700", // Yellow
+  "#00E676", // Green
+  "#0080FF", // Blue
+  "#9D00FF", // Purple
+  "#FF00FF", // Magenta
+  "#8B7355", // Brown/Grey
 ];
 
-const BRUSH_SIZES = [2, 5, 9, 14, 22];
+const SIZES = [2, 4, 8, 14, 22];
 
 type Point = { x: number; y: number };
 
-// ─── Component ────────────────────────────────────────────────────────────────
-
 export default function DoodleCanvas({ onClose, onSend }: DoodleCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [color, setColor] = useState("#FF2020");
-  const [brushSize, setBrushSize] = useState(5);
-  const [eraser, setEraser] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  
+  const [color, setColor] = useState("#000000");
+  const [brushSize, setBrushSize] = useState(8);
+  const [sliderValue, setSliderValue] = useState(50);
   const [canUndo, setCanUndo] = useState(false);
   const [hasStrokes, setHasStrokes] = useState(false);
   const [sending, setSending] = useState(false);
+  const [moreSpace, setMoreSpace] = useState(false);
 
   const isDrawingRef = useRef(false);
   const lastPtRef = useRef<Point | null>(null);
   const historyRef = useRef<string[]>([]);
-  const minXRef = useRef(Infinity);
-  const minYRef = useRef(Infinity);
-  const maxXRef = useRef(-Infinity);
-  const maxYRef = useRef(-Infinity);
 
-  // ── Canvas sizing ──────────────────────────────────────────────────────────
+  // Calculate actual brush size based on base size and slider (slider acts as multiplier 0.5x to 2x)
+  const actualBrushSize = brushSize * (sliderValue / 50);
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    const container = containerRef.current;
+    if (!canvas || !container) return;
 
     const resize = () => {
+      const rect = container.getBoundingClientRect();
       const ctx = canvas.getContext("2d")!;
       const snap = historyRef.current.length ? canvas.toDataURL("image/png") : null;
       const dpr = window.devicePixelRatio || 1;
-      canvas.width = window.innerWidth * dpr;
-      canvas.height = window.innerHeight * dpr;
-      canvas.style.width = `${window.innerWidth}px`;
-      canvas.style.height = `${window.innerHeight}px`;
+      
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      canvas.style.width = `${rect.width}px`;
+      canvas.style.height = `${rect.height}px`;
+      
       ctx.scale(dpr, dpr);
+      
+      // Fill white background
+      ctx.fillStyle = "#FFFFFF";
+      ctx.fillRect(0, 0, rect.width, rect.height);
+      
       if (snap) {
         const img = new Image();
-        img.onload = () => ctx.drawImage(img, 0, 0, window.innerWidth, window.innerHeight);
+        img.onload = () => ctx.drawImage(img, 0, 0, rect.width, rect.height);
         img.src = snap;
       }
     };
@@ -83,9 +84,7 @@ export default function DoodleCanvas({ onClose, onSend }: DoodleCanvasProps) {
     resize();
     window.addEventListener("resize", resize);
     return () => window.removeEventListener("resize", resize);
-  }, []);
-
-  // ── History ────────────────────────────────────────────────────────────────
+  }, [moreSpace]); // Re-run when canvas size changes
 
   const saveHistory = useCallback(() => {
     const canvas = canvasRef.current;
@@ -99,7 +98,11 @@ export default function DoodleCanvas({ onClose, onSend }: DoodleCanvasProps) {
     const ctx = canvas?.getContext("2d");
     if (!canvas || !ctx) return;
     const dpr = window.devicePixelRatio || 1;
-    ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+    
+    // Fill white
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fillRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+    
     if (snap) {
       const img = new Image();
       img.onload = () => ctx.drawImage(img, 0, 0, canvas.width / dpr, canvas.height / dpr);
@@ -121,38 +124,29 @@ export default function DoodleCanvas({ onClose, onSend }: DoodleCanvasProps) {
     const ctx = canvas?.getContext("2d");
     if (!canvas || !ctx) return;
     const dpr = window.devicePixelRatio || 1;
-    ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fillRect(0, 0, canvas.width / dpr, canvas.height / dpr);
     historyRef.current = [];
     setCanUndo(false);
     setHasStrokes(false);
-    minXRef.current = Infinity; minYRef.current = Infinity;
-    maxXRef.current = -Infinity; maxYRef.current = -Infinity;
   }, []);
 
-  // ── Drawing ────────────────────────────────────────────────────────────────
-
   const applyBrush = useCallback((ctx: CanvasRenderingContext2D) => {
-    if (eraser) {
-      ctx.globalCompositeOperation = "destination-out";
-      ctx.strokeStyle = "rgba(0,0,0,1)";
-      ctx.lineWidth = brushSize * 2.5;
-    } else {
-      ctx.globalCompositeOperation = "source-over";
-      ctx.strokeStyle = color;
-      ctx.lineWidth = brushSize;
-    }
+    ctx.globalCompositeOperation = "source-over";
+    ctx.strokeStyle = color;
+    ctx.lineWidth = actualBrushSize;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
-  }, [eraser, color, brushSize]);
+  }, [color, actualBrushSize]);
 
-  const expandBounds = (x: number, y: number, r: number) => {
-    minXRef.current = Math.min(minXRef.current, x - r);
-    minYRef.current = Math.min(minYRef.current, y - r);
-    maxXRef.current = Math.max(maxXRef.current, x + r);
-    maxYRef.current = Math.max(maxYRef.current, y + r);
+  const getPoint = (e: React.PointerEvent): Point => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return { x: 0, y: 0 };
+    return { 
+      x: e.clientX - rect.left, 
+      y: e.clientY - rect.top 
+    };
   };
-
-  const getPoint = (e: React.PointerEvent): Point => ({ x: e.clientX, y: e.clientY });
 
   const onPointerDown = useCallback((e: React.PointerEvent) => {
     e.preventDefault();
@@ -160,22 +154,20 @@ export default function DoodleCanvas({ onClose, onSend }: DoodleCanvasProps) {
     isDrawingRef.current = true;
     const pt = getPoint(e);
     lastPtRef.current = pt;
-    expandBounds(pt.x, pt.y, brushSize);
+    
     const ctx = canvasRef.current?.getContext("2d");
     if (!ctx) return;
     applyBrush(ctx);
     ctx.beginPath();
-    ctx.arc(pt.x, pt.y, brushSize / 2, 0, Math.PI * 2);
-    ctx.fillStyle = eraser ? "rgba(0,0,0,1)" : color;
-    ctx.globalCompositeOperation = eraser ? "destination-out" : "source-over";
+    ctx.arc(pt.x, pt.y, actualBrushSize / 2, 0, Math.PI * 2);
+    ctx.fillStyle = color;
     ctx.fill();
-  }, [brushSize, applyBrush, eraser, color]);
+  }, [actualBrushSize, applyBrush, color]);
 
   const onPointerMove = useCallback((e: React.PointerEvent) => {
     if (!isDrawingRef.current || !lastPtRef.current) return;
     e.preventDefault();
     const pt = getPoint(e);
-    expandBounds(pt.x, pt.y, brushSize);
     const ctx = canvasRef.current?.getContext("2d");
     if (!ctx) return;
     applyBrush(ctx);
@@ -184,7 +176,7 @@ export default function DoodleCanvas({ onClose, onSend }: DoodleCanvasProps) {
     ctx.lineTo(pt.x, pt.y);
     ctx.stroke();
     lastPtRef.current = pt;
-  }, [brushSize, applyBrush]);
+  }, [applyBrush]);
 
   const onPointerUp = useCallback(() => {
     if (!isDrawingRef.current) return;
@@ -194,201 +186,173 @@ export default function DoodleCanvas({ onClose, onSend }: DoodleCanvasProps) {
     setHasStrokes(true);
   }, [saveHistory]);
 
-  // ── Send ───────────────────────────────────────────────────────────────────
-
   const handleSend = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas || !hasStrokes || sending) return;
     setSending(true);
 
-    const PAD = 12;
-    const x = Math.max(0, Math.floor(minXRef.current - PAD));
-    const y = Math.max(0, Math.floor(minYRef.current - PAD));
-    const w = Math.min(window.innerWidth - x, Math.ceil(maxXRef.current - minXRef.current + PAD * 2));
-    const h = Math.min(window.innerHeight - y, Math.ceil(maxYRef.current - minYRef.current + PAD * 2));
-    if (w <= 0 || h <= 0) { onClose(); return; }
-
-    const dpr = window.devicePixelRatio || 1;
+    // Get the canvas drawing area minus white background
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    
+    // We send the whole canvas, but we make the white transparent
+    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imgData.data;
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i] === 255 && data[i+1] === 255 && data[i+2] === 255) {
+        data[i+3] = 0; // Make white pixels transparent
+      }
+    }
+    
+    // Create new canvas to put transparent image
     const exp = document.createElement("canvas");
-    exp.width = w * dpr;
-    exp.height = h * dpr;
+    exp.width = canvas.width;
+    exp.height = canvas.height;
     const oct = exp.getContext("2d")!;
-    oct.drawImage(canvas, x * dpr, y * dpr, w * dpr, h * dpr, 0, 0, w * dpr, h * dpr);
+    oct.putImageData(imgData, 0, 0);
 
-    onSend({ imageData: exp.toDataURL("image/png"), canvasX: x, canvasY: y, width: w, height: h });
-  }, [hasStrokes, sending, onSend, onClose]);
-
-  // ── Render ─────────────────────────────────────────────────────────────────
+    onSend({ 
+      imageData: exp.toDataURL("image/png"), 
+      canvasX: 0, 
+      canvasY: 0, 
+      width: canvas.clientWidth, 
+      height: canvas.clientHeight 
+    });
+  }, [hasStrokes, sending, onSend]);
 
   return createPortal(
-    <div
-      className="fixed inset-0 z-[600] overflow-hidden"
-      style={{ touchAction: "none" }}
-    >
-      {/* Transparent drawing canvas */}
-      <canvas
-        ref={canvasRef}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
-        className="absolute inset-0 touch-none"
-        style={{ cursor: eraser ? "cell" : "crosshair" }}
-      />
-
-      {/* ── Top bar ── */}
-      <div className="absolute top-0 inset-x-0 flex items-center justify-between px-3 py-3 bg-gradient-to-b from-black/65 to-transparent pointer-events-none"
-        style={{ paddingTop: "env(safe-area-inset-top, 12px)" }}>
-        <button
-          onClick={onClose}
-          className="pointer-events-auto w-10 h-10 rounded-full bg-black/55 backdrop-blur-md flex items-center justify-center text-white active:scale-95 transition-transform"
-          aria-label="Close doodle"
-        >
-          <X className="w-5 h-5" />
-        </button>
-
-        <p className="text-white/70 text-[13px] font-semibold tracking-wide select-none pointer-events-none">
-          ✏️ Doodle
-        </p>
-
-        <div className="flex gap-2 pointer-events-auto">
-          {/* Undo */}
-          <button
-            onClick={undo}
-            disabled={!canUndo}
-            className="w-10 h-10 rounded-full bg-black/55 backdrop-blur-md flex items-center justify-center text-white active:scale-95 transition-all disabled:opacity-35"
-            aria-label="Undo"
-          >
-            <Undo2 className="w-[18px] h-[18px]" />
+    <div className="fixed inset-0 z-[600] flex flex-col bg-[#0b101e] text-white overflow-hidden">
+      
+      {/* Top Header */}
+      <div className="flex items-center justify-between px-4 py-3 shrink-0 border-b border-white/5" style={{ paddingTop: "max(12px, env(safe-area-inset-top))" }}>
+        <div className="flex items-center gap-3">
+          <button onClick={onClose} className="p-1 hover:bg-white/10 rounded-full transition-colors">
+            <ChevronLeft className="w-6 h-6" />
           </button>
-          {/* Clear */}
-          <button
-            onClick={clear}
-            className="w-10 h-10 rounded-full bg-black/55 backdrop-blur-md flex items-center justify-center text-white active:scale-95 transition-transform"
-            aria-label="Clear canvas"
+          <span className="font-semibold text-[15px]">Draw in chat</span>
+        </div>
+        
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={() => setMoreSpace(!moreSpace)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0080FF]/15 text-[#0080FF] rounded-lg text-sm font-medium hover:bg-[#0080FF]/25 transition-colors"
           >
-            <Trash2 className="w-[16px] h-[16px]" />
+            <Maximize className="w-4 h-4" />
+            More space
+          </button>
+          
+          <button onClick={undo} disabled={!canUndo} className="p-2 hover:bg-white/10 rounded-full transition-colors disabled:opacity-30">
+            <Undo2 className="w-5 h-5" />
+          </button>
+          
+          <button onClick={clear} className="p-2 hover:bg-[#FF0040]/20 text-[#FF0040] rounded-full transition-colors">
+            <Trash2 className="w-5 h-5" />
+          </button>
+          
+          <button 
+            onClick={handleSend} 
+            disabled={!hasStrokes || sending}
+            className="w-9 h-9 flex items-center justify-center bg-[#0080FF] rounded-full text-white hover:bg-[#0066CC] transition-colors disabled:opacity-50 disabled:bg-[#0080FF]/50"
+          >
+            {sending ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Send className="w-4 h-4 ml-0.5" />}
+          </button>
+          
+          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors ml-1">
+            <X className="w-5 h-5" />
           </button>
         </div>
       </div>
 
-      {/* ── Bottom toolbar ── */}
-      <div
-        className="absolute bottom-0 inset-x-0 flex flex-col items-center gap-2 px-3 pt-3"
-        style={{
-          paddingBottom: "calc(env(safe-area-inset-bottom, 12px) + 10px)",
-          background: "linear-gradient(to top, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.4) 60%, transparent 100%)",
-        }}
-      >
-        {/* Brush size row */}
-        <div className="flex items-center gap-3 pointer-events-auto mb-0.5">
-          {BRUSH_SIZES.map(s => {
-            const active = brushSize === s && !eraser;
-            return (
+      {/* Main Content Area */}
+      <div className="flex flex-1 min-h-0 relative">
+        
+        {/* Left Sidebar (Colors) */}
+        <div className="w-[60px] shrink-0 flex flex-col items-center py-4 overflow-y-auto scrollbar-hide gap-4 border-r border-white/5">
+          {COLORS.map(c => (
+            <button
+              key={c}
+              onClick={() => setColor(c)}
+              className="relative rounded-full w-8 h-8 shrink-0 transition-transform hover:scale-110"
+              style={{ backgroundColor: c, border: c === "#000000" ? "1px solid rgba(255,255,255,0.2)" : "none" }}
+            >
+              {color === c && (
+                <div className="absolute -inset-[4px] rounded-full border-2 border-[#0080FF]" />
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* Canvas Area */}
+        <div className="flex-1 flex flex-col bg-[#161c2d] p-0 md:p-2">
+          <div 
+            ref={containerRef} 
+            className={cn(
+              "flex-1 bg-white shadow-lg overflow-hidden relative transition-all duration-300",
+              moreSpace ? "m-0 rounded-none" : "m-2 md:m-4 rounded-xl md:rounded-2xl"
+            )}
+          >
+            <canvas
+              ref={canvasRef}
+              onPointerDown={onPointerDown}
+              onPointerMove={onPointerMove}
+              onPointerUp={onPointerUp}
+              onPointerCancel={onPointerUp}
+              className="absolute inset-0 touch-none w-full h-full cursor-crosshair"
+            />
+          </div>
+        </div>
+
+        {/* Right Sidebar (Sizes & Opacity/Size Multiplier Slider) */}
+        <div className="w-[60px] shrink-0 flex flex-col items-center py-4 border-l border-white/5 bg-[#0b101e] z-10">
+          <div className="text-[10px] text-white/50 font-bold mb-4">SIZE</div>
+          <div className="flex flex-col items-center justify-between h-[200px] mb-8">
+            {SIZES.map(s => (
               <button
                 key={s}
-                onClick={() => { setBrushSize(s); setEraser(false); }}
-                className="flex items-center justify-center rounded-full transition-all active:scale-90"
-                style={{ width: s + 18, height: s + 18 }}
-                aria-label={`Brush size ${s}`}
+                onClick={() => setBrushSize(s)}
+                className="relative flex items-center justify-center w-8 h-8 rounded-full hover:bg-white/5"
               >
-                <span
-                  className="rounded-full block transition-all duration-150"
-                  style={{
-                    width: s,
-                    height: s,
-                    backgroundColor: eraser ? "#888" : color,
-                    boxShadow: active
-                      ? `0 0 0 2.5px #fff, 0 0 0 4.5px rgba(255,255,255,0.3), 0 0 12px ${color}80`
-                      : "0 0 0 1px rgba(255,255,255,0.25)",
-                    opacity: active ? 1 : 0.6,
-                    transform: active ? "scale(1.15)" : "scale(1)",
-                  }}
+                <div 
+                  className="rounded-full bg-white transition-all" 
+                  style={{ width: s, height: s }}
                 />
+                {brushSize === s && (
+                  <div className="absolute inset-0 rounded-full border-2 border-[#0080FF]" />
+                )}
               </button>
-            );
-          })}
-
-          {/* Eraser toggle */}
-          <button
-            onClick={() => setEraser(e => !e)}
-            className={`flex items-center gap-1.5 px-3 h-8 rounded-full text-[12px] font-semibold transition-all active:scale-95 ${
-              eraser
-                ? "bg-white text-black shadow-[0_2px_12px_rgba(255,255,255,0.35)]"
-                : "bg-white/20 text-white backdrop-blur-sm"
-            }`}
-            aria-label="Eraser"
-          >
-            <Eraser className="w-3.5 h-3.5" />
-            <span>Erase</span>
-          </button>
-        </div>
-
-        {/* Colour palette + send */}
-        <div className="flex items-center w-full max-w-[420px] gap-2 pointer-events-auto">
-          {/* Compact 24-colour grid */}
-          <div
-            className="flex-1 grid gap-[5px]"
-            style={{ gridTemplateColumns: "repeat(12, 1fr)" }}
-          >
-            {COLORS.map(c => {
-              const active = color === c && !eraser;
-              return (
-                <button
-                  key={c}
-                  onClick={() => { setColor(c); setEraser(false); }}
-                  className="rounded-full transition-all active:scale-90"
-                  style={{
-                    aspectRatio: "1",
-                    backgroundColor: c,
-                    boxShadow: active
-                      ? `0 0 0 2px #fff, 0 0 0 4px rgba(255,255,255,0.25), 0 0 10px ${c}90`
-                      : c === "#FFFFFF"
-                        ? "inset 0 0 0 1px rgba(0,0,0,0.3)"
-                        : c === "#000000"
-                          ? "inset 0 0 0 1px rgba(255,255,255,0.25)"
-                          : "none",
-                    transform: active ? "scale(1.25)" : "scale(1)",
-                  }}
-                  aria-label={`Color ${c}`}
-                />
-              );
-            })}
+            ))}
           </div>
 
-          {/* Send button */}
-          <button
-            onClick={handleSend}
-            disabled={!hasStrokes || sending}
-            className="shrink-0 w-12 h-12 rounded-full flex items-center justify-center text-white active:scale-95 transition-all disabled:opacity-35 disabled:scale-95"
-            style={{
-              background: hasStrokes && !sending
-                ? "linear-gradient(135deg, #f72585, #b5179e)"
-                : "rgba(255,255,255,0.15)",
-              boxShadow: hasStrokes && !sending
-                ? "0 4px 20px rgba(247,37,133,0.55), 0 0 0 1px rgba(247,37,133,0.3)"
-                : "none",
-            }}
-            aria-label="Send doodle"
-          >
-            {sending ? (
-              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            ) : (
-              <Send className="w-5 h-5 ml-0.5" strokeWidth={2.5} />
-            )}
-          </button>
+          <div className="flex-1 flex flex-col items-center w-full min-h-[100px] px-2 relative group">
+            {/* Slider track */}
+            <div className="absolute inset-y-0 w-1 bg-white/10 rounded-full overflow-hidden flex flex-col justify-end">
+              <div 
+                className="w-full bg-[#0080FF] transition-all duration-75" 
+                style={{ height: `${sliderValue}%` }} 
+              />
+            </div>
+            {/* Slider input */}
+            <input 
+              type="range" 
+              min="10" 
+              max="100" 
+              value={sliderValue}
+              onChange={(e) => setSliderValue(Number(e.target.value))}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-ns-resize"
+              style={{ writingMode: 'vertical-rl', direction: 'rtl' }}
+            />
+            {/* Slider thumb representation */}
+            <div 
+              className="absolute w-4 h-4 bg-[#0080FF] rounded-full shadow-lg pointer-events-none transition-all duration-75"
+              style={{ bottom: `calc(${sliderValue}% - 8px)` }}
+            >
+              <div className="absolute inset-x-0 h-[2px] top-1/2 -translate-y-1/2 -mx-1 bg-[#0080FF]" />
+            </div>
+          </div>
         </div>
-      </div>
 
-      {/* Hint overlay */}
-      {!hasStrokes && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <p className="text-white/45 text-sm font-medium bg-black/25 px-5 py-2.5 rounded-full backdrop-blur-sm select-none animate-pulse">
-            ✏️ Draw anywhere on the chat
-          </p>
-        </div>
-      )}
+      </div>
     </div>,
-    document.body,
+    document.body
   );
 }

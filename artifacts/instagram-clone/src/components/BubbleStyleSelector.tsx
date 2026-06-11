@@ -7,9 +7,9 @@ export type BubbleStyleId =
   | "heart-pepe" | "pig-shark" | "tongue-bear" | "doge" 
   | "frog-chick" | "hungry-dog" | "dino" | "dachshund" 
   | "excited-pepe" | "shouting"
-  | "crying-cat" | "buff-doge" | "sus-crewmate" | "pop-cat" 
-  | "cool-shiba" | "surprised-pika" | "angry-pepe" | "nyan-cat" 
-  | "smug-frog" | "giga-chad";
+  | "crying-cat" | "neon-robot" | "bubble-gum" | "crystal-skull" 
+  | "golden-crown" | "fire-demon" | "ice-cube" | "space-helmet" 
+  | "toxic-slime" | "cloud-angel";
 
 interface BubbleStyleSelectorProps {
   show: boolean;
@@ -32,15 +32,15 @@ const BUBBLE_STYLES: { id: BubbleStyleId; label: string; }[] = [
   { id: "excited-pepe", label: "Excited Pepe" },
   { id: "shouting", label: "Shouting" },
   { id: "crying-cat", label: "Crying Cat" },
-  { id: "buff-doge", label: "Buff Doge" },
-  { id: "sus-crewmate", label: "Sus Crewmate" },
-  { id: "pop-cat", label: "Pop Cat" },
-  { id: "cool-shiba", label: "Cool Shiba" },
-  { id: "surprised-pika", label: "Surprised Pika" },
-  { id: "angry-pepe", label: "Angry Pepe" },
-  { id: "nyan-cat", label: "Nyan Cat" },
-  { id: "smug-frog", label: "Smug Frog" },
-  { id: "giga-chad", label: "Giga Chad" },
+  { id: "neon-robot", label: "Neon Robot" },
+  { id: "bubble-gum", label: "Bubble Gum" },
+  { id: "crystal-skull", label: "Crystal Skull" },
+  { id: "golden-crown", label: "Golden Crown" },
+  { id: "fire-demon", label: "Fire Demon" },
+  { id: "ice-cube", label: "Ice Cube" },
+  { id: "space-helmet", label: "Space Helmet" },
+  { id: "toxic-slime", label: "Toxic Slime" },
+  { id: "cloud-angel", label: "Cloud Angel" },
 ];
 
 export const BubbleStyleSelector = memo(function BubbleStyleSelector({

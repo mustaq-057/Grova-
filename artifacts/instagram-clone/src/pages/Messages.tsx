@@ -1636,7 +1636,7 @@ export default function Messages() {
     try {
       tempId = crypto.randomUUID();
       pendingOutgoingRef.current.add(tempId);
-      const optimistic = buildOptimisticMessage({ senderId: user.id, ...partial }, tempId);
+      const optimistic = buildOptimisticMessage({ senderId: user.id, variant: bubbleStyle as any, ...partial }, tempId);
 
       setMessages((prev) => {
         const next = [...prev, optimistic];
