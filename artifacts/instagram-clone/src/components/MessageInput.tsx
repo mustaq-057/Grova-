@@ -1,7 +1,7 @@
 import { memo, useRef, useState, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
 import { createPortal } from "react-dom";
-import { Smile, Mic, Send, Sticker, Paperclip, X, MessageCircle, MapPin, PenTool, Zap } from "lucide-react";
-import { motion } from "framer-motion";
+import { Smile, Mic, Send, Sticker, Paperclip, X, MessageCircle, MapPin, PenTool, Zap, Plus, Image as ImageIcon } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import EmojiPicker from "@/components/EmojiPicker";
 import StickerPicker from "@/components/StickerPicker";
 import GreetingPicker from "@/components/GreetingPicker";
@@ -60,6 +60,7 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
   const [input, setInput] = useState("");
   const [openPicker, setOpenPicker] = useState<OpenPicker>(null);
   const [showCuteMenu, setShowCuteMenu] = useState(false);
+  const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -126,6 +127,7 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
   }, [setInput, onInputActivity]);
 
   const handleImageClick = useCallback(() => {
+    setShowAttachmentMenu(false);
     fileInputRef.current?.click();
   }, []);
 
@@ -146,11 +148,13 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
   const openDoodle = useCallback(() => {
     setOpenPicker(null);
     setShowCuteMenu(false);
+    setShowAttachmentMenu(false);
     onDoodleOpen?.();
   }, [onDoodleOpen]);
 
   const toggleCuteMenu = useCallback(() => {
     setShowCuteMenu((s) => !s);
+    setShowAttachmentMenu(false);
   }, []);
 
   const toggleCuteFrog = useCallback(() => {
@@ -170,16 +174,24 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
 
   const toggleEmojiPicker = useCallback(() => {
     setOpenPicker((p) => (p === "emoji" ? null : "emoji"));
+    setShowAttachmentMenu(false);
   }, []);
 
   const toggleStickerPicker = useCallback(() => {
     setOpenPicker((p) => (p === "sticker" ? null : "sticker"));
+    setShowAttachmentMenu(false);
   }, []);
 
   const toggleQuickReplies = useCallback(() => {
     setShowCuteMenu(false);
+    setShowAttachmentMenu(false);
     setOpenPicker((p) => (p === "greeting" ? null : "greeting"));
   }, []);
+
+  const handleShareLocation = useCallback(() => {
+    setShowAttachmentMenu(false);
+    onShareLocation?.();
+  }, [onShareLocation]);
 
   const handleEmojiSelect = useCallback((emoji: string) => {
     setInput((i) => i + emoji);
@@ -272,133 +284,144 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
   );
 
   const attachmentToolbar = (
-    <>
-      {onMediaViewModeChange && (
-        <button
-          type="button"
-          onClick={() => onMediaViewModeChange(mediaViewMode === "keep" ? "once" : mediaViewMode === "once" ? "twice" : "keep")}
-          className={disabled ? iconBtnDisabled : iconBtnIdle}
-          aria-label="Media view mode"
-          title={`Media mode: ${mediaViewMode === "keep" ? "Keep in chat" : mediaViewMode === "once" ? "View once" : "View twice"}`}
-          disabled={disabled}
-        >
-          <span className="text-[11px] font-bold">{mediaViewMode === "keep" ? "K" : mediaViewMode === "once" ? "1" : "2"}</span>
-        </button>
-      )}
-
+    <div className="relative shrink-0">
       <button
         type="button"
-        onClick={handleImageClick}
-        className={disabled ? iconBtnDisabled : iconBtnIdle}
-        aria-label="Attach file"
+        onClick={() => setShowAttachmentMenu((s) => !s)}
+        className={`p-2.5 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 text-foreground bg-secondary/80 hover:bg-secondary flex items-center justify-center ${disabled ? iconBtnDisabled : ""}`}
+        aria-label="Attachments"
         disabled={disabled}
       >
-        <Paperclip className="w-5 h-5" />
+        <Plus className={`w-5 h-5 transition-transform ${showAttachmentMenu ? "rotate-45" : ""}`} />
       </button>
 
-      {onShareLocation && (
-        <button
-          type="button"
-          onClick={onShareLocation}
-          className={disabled || sharingLocation ? iconBtnDisabled : iconBtnIdle}
-          aria-label="Share location"
-          disabled={disabled || sharingLocation}
-        >
-          {sharingLocation ? (
-            <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-          ) : (
-            <MapPin className="w-5 h-5" />
-          )}
-        </button>
-      )}
+      {showAttachmentMenu &&
+        createPortal(
+          <>
+            <div
+              className="fixed inset-0 z-[200] bg-black/5"
+              onClick={() => setShowAttachmentMenu(false)}
+              aria-hidden
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10, transformOrigin: "bottom left" }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="fixed z-[201] left-2 md:left-4 bottom-[calc(5.5rem+env(safe-area-inset-bottom,0px))] md:bottom-[max(5.5rem,env(safe-area-inset-bottom))] bg-card/95 backdrop-blur-xl border border-border/60 rounded-2xl p-2 shadow-2xl flex flex-col gap-1 min-w-[200px]"
+              role="menu"
+            >
+              {onMediaViewModeChange && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onMediaViewModeChange(mediaViewMode === "keep" ? "once" : mediaViewMode === "once" ? "twice" : "keep");
+                  }}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm hover:bg-secondary/80 transition-colors w-full text-left"
+                  disabled={disabled}
+                >
+                  <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center shrink-0">
+                    <span className="text-[13px] font-bold text-foreground">{mediaViewMode === "keep" ? "K" : mediaViewMode === "once" ? "1" : "2"}</span>
+                  </div>
+                  <span className="font-medium">Media mode: {mediaViewMode === "keep" ? "Keep" : mediaViewMode === "once" ? "View once" : "View twice"}</span>
+                </button>
+              )}
 
-      {onToggleCuteMode && (
-        <button
-          type="button"
-          onClick={toggleCuteMenu}
-          className={
-            showCuteMenu || cuteMode
-              ? `${iconBtn} bg-secondary text-foreground`
-              : disabled
-                ? iconBtnDisabled
-                : iconBtnIdle
-          }
-          title="Chat styles"
-          aria-expanded={showCuteMenu}
-          disabled={disabled}
-        >
-          <MessageCircle className="w-5 h-5" />
-        </button>
-      )}
+              <button
+                type="button"
+                onClick={handleImageClick}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm hover:bg-secondary/80 transition-colors w-full text-left"
+                disabled={disabled}
+              >
+                <div className="w-8 h-8 rounded-full bg-blue-500/10 text-blue-500 flex items-center justify-center shrink-0">
+                  <ImageIcon className="w-4 h-4" />
+                </div>
+                <span className="font-medium">Gallery / File</span>
+              </button>
 
-      <button
-        type="button"
-        onClick={toggleQuickReplies}
-        className={
-          openPicker === "greeting"
-            ? `${iconBtn} text-primary bg-primary/10`
-            : disabled
-              ? iconBtnDisabled
-              : iconBtnIdle
-        }
-        title="Quick replies"
-        aria-expanded={openPicker === "greeting"}
-        aria-label="Quick replies"
-        disabled={disabled}
-      >
-        <Zap className="w-5 h-5" />
-      </button>
+              {onShareLocation && (
+                <button
+                  type="button"
+                  onClick={handleShareLocation}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm hover:bg-secondary/80 transition-colors w-full text-left"
+                  disabled={disabled || sharingLocation}
+                >
+                  <div className="w-8 h-8 rounded-full bg-green-500/10 text-green-500 flex items-center justify-center shrink-0">
+                    {sharingLocation ? (
+                      <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <MapPin className="w-4 h-4" />
+                    )}
+                  </div>
+                  <span className="font-medium">Location</span>
+                </button>
+              )}
 
-      <button
-        type="button"
-        onClick={toggleEmojiPicker}
-        className={
-          openPicker === "emoji"
-            ? `${iconBtn} text-primary bg-primary/10`
-            : disabled
-              ? iconBtnDisabled
-              : iconBtnIdle
-        }
-        title="Emoji"
-        aria-expanded={openPicker === "emoji"}
-        disabled={disabled}
-      >
-        <Smile className="w-5 h-5" />
-      </button>
+              {onToggleCuteMode && (
+                <button
+                  type="button"
+                  onClick={toggleCuteMenu}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm hover:bg-secondary/80 transition-colors w-full text-left"
+                  disabled={disabled}
+                >
+                  <div className="w-8 h-8 rounded-full bg-purple-500/10 text-purple-500 flex items-center justify-center shrink-0">
+                    <MessageCircle className="w-4 h-4" />
+                  </div>
+                  <span className="font-medium">Chat Styles</span>
+                </button>
+              )}
 
-      <button
-        type="button"
-        onClick={toggleStickerPicker}
-        className={
-          openPicker === "sticker"
-            ? `${iconBtn} text-primary bg-primary/10`
-            : disabled
-              ? iconBtnDisabled
-              : iconBtnIdle
-        }
-        title="Stickers & GIFs"
-        aria-expanded={openPicker === "sticker"}
-        disabled={disabled}
-      >
-        <Sticker className="w-5 h-5" />
-      </button>
+              <button
+                type="button"
+                onClick={toggleQuickReplies}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm hover:bg-secondary/80 transition-colors w-full text-left"
+                disabled={disabled}
+              >
+                <div className="w-8 h-8 rounded-full bg-yellow-500/10 text-yellow-500 flex items-center justify-center shrink-0">
+                  <Zap className="w-4 h-4" />
+                </div>
+                <span className="font-medium">Quick Replies</span>
+              </button>
 
-      <button
-        type="button"
-        onClick={openDoodle}
-        className={
-          doodleActive
-            ? `${iconBtn} text-primary bg-primary/15`
-            : disabled
-              ? iconBtnDisabled
-              : iconBtnIdle
-        }
-        aria-label="Draw doodle — tap again for more space"
-        disabled={disabled}
-      >
-        <PenTool className="w-5 h-5" />
-      </button>
-    </>
+              <button
+                type="button"
+                onClick={toggleEmojiPicker}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm hover:bg-secondary/80 transition-colors w-full text-left"
+                disabled={disabled}
+              >
+                <div className="w-8 h-8 rounded-full bg-orange-500/10 text-orange-500 flex items-center justify-center shrink-0">
+                  <Smile className="w-4 h-4" />
+                </div>
+                <span className="font-medium">Emoji</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={toggleStickerPicker}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm hover:bg-secondary/80 transition-colors w-full text-left"
+                disabled={disabled}
+              >
+                <div className="w-8 h-8 rounded-full bg-pink-500/10 text-pink-500 flex items-center justify-center shrink-0">
+                  <Sticker className="w-4 h-4" />
+                </div>
+                <span className="font-medium">Stickers & GIFs</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={openDoodle}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm hover:bg-secondary/80 transition-colors w-full text-left"
+                disabled={disabled}
+              >
+                <div className="w-8 h-8 rounded-full bg-cyan-500/10 text-cyan-500 flex items-center justify-center shrink-0">
+                  <PenTool className="w-4 h-4" />
+                </div>
+                <span className="font-medium">Doodle</span>
+              </button>
+            </motion.div>
+          </>,
+          document.body,
+        )}
+    </div>
   );
 
   return (
@@ -418,19 +441,7 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
         <GreetingPicker onSelect={handleGreetingSelect} onClose={() => setOpenPicker(null)} />
       )}
 
-      {/* Mobile: message row + tool row (no quick-emoji strip) */}
-      <div className="flex flex-col gap-1.5 md:hidden">
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="flex-1 min-w-0">{textInput}</div>
-          {sendOrMic}
-        </div>
-        <div className="flex items-center gap-0.5 overflow-x-auto scrollbar-hide pb-0.5 -mx-0.5 px-0.5">
-          {attachmentToolbar}
-        </div>
-      </div>
-
-      {/* Desktop: single row */}
-      <div className="hidden md:flex items-center gap-2 min-w-0">
+      <div className="flex items-center gap-2 min-w-0 w-full">
         {attachmentToolbar}
         <div className="flex-1 min-w-0">{textInput}</div>
         {sendOrMic}
