@@ -32,6 +32,8 @@ function unsendErrorMessage(err: unknown): string {
 }
 import { ChatInbox } from "@/components/ChatInbox";
 import { AppThemeModal } from "@/components/AppThemeModal";
+import { CameraOverlay } from "@/components/CameraOverlay";
+import { PendingMediaPreview } from "@/components/PendingMediaPreview";
 import { MessageContextMenu } from "@/components/MessageContextMenu";
 import { ReplyPreview } from "@/components/ReplyPreview";
 import { EditMessageBar } from "@/components/EditMessageBar";
@@ -161,6 +163,13 @@ export default function Messages() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesStartRef = useRef<HTMLDivElement>(null);
   const [callState, setCallState] = useState<CallState>(null);
+  const [showCamera, setShowCamera] = useState(false);
+  const [pendingMediaPreview, setPendingMediaPreview] = useState<{
+    file: File;
+    clipboardItemType?: string;
+    kind: "image" | "video" | "other";
+    normalized: File;
+  } | null>(null);
   const [incomingCall, setIncomingCall] = useState<{
     type: "audio" | "video";
     offer?: RTCSessionDescriptionInit;
@@ -2123,8 +2132,6 @@ export default function Messages() {
         return;
       }
 
-      const isEphemeral = mediaViewMode === "once" || mediaViewMode === "twice";
-
       const MAX_FILE_SIZE =
         kind === "video" ? 60 * 1024 * 1024 : kind === "image" ? 25 * 1024 * 1024 : 25 * 1024 * 1024;
       if (normalized.size > MAX_FILE_SIZE) {
@@ -2136,11 +2143,44 @@ export default function Messages() {
         return;
       }
 
+      if (kind === "image" || kind === "video") {
+        setPendingMediaPreview({ file, clipboardItemType, kind, normalized });
+        filePickInFlightRef.current = false;
+        return;
+      }
+
+      try {
+        await uploadAndSendFile(normalized);
+      } catch (error) {
+        console.error("Failed to process file:", error);
+        finishToast(toastId, {
+          type: "error",
+          message: error instanceof Error ? error.message : "Failed to send document.",
+        });
+      } finally {
+        window.clearTimeout(unlockTimer);
+        filePickInFlightRef.current = false;
+      }
+    },
+    [uploadAndSendFile, user],
+  );
+
+  const processAndSendMedia = useCallback(
+    async (viewMode: "keep" | "once" | "twice") => {
+      if (!pendingMediaPreview || !user || filePickInFlightRef.current) return;
+      filePickInFlightRef.current = true;
+      setMediaViewMode(viewMode);
+      
+      const { clipboardItemType, kind, normalized } = pendingMediaPreview;
+      setPendingMediaPreview(null);
+      const isEphemeral = viewMode === "once" || viewMode === "twice";
+      const toastId = `media-send-${Date.now()}`;
+
       try {
         if (kind === "image") {
           const prepared = await prepareImageForUpload(normalized, clipboardItemType);
           if (isEphemeral) {
-            await uploadAndSendEphemeralMedia(prepared, "image", mediaViewMode);
+            await uploadAndSendEphemeralMedia(prepared, "image", viewMode);
           } else if (!clipboardItemType) {
             await uploadAndSendGalleryImage(prepared);
           } else {
@@ -2163,8 +2203,8 @@ export default function Messages() {
               fileSize: normalized.size,
               ...(isEphemeral
                 ? {
-                    companionSticker: mediaModeSticker(mediaViewMode),
-                    mediaViewMode,
+                    companionSticker: mediaModeSticker(viewMode),
+                    mediaViewMode: viewMode,
                   }
                 : {}),
             },
@@ -2185,7 +2225,7 @@ export default function Messages() {
 
             const url = await uploadMediaFile(normalized, mime);
 
-            const sticker = mediaModeSticker(mediaViewMode);
+            const sticker = mediaModeSticker(viewMode);
             const outgoing = await prepareOutgoingMessage({
               senderId: user.id,
               type: "video",
@@ -2215,21 +2255,18 @@ export default function Messages() {
           } finally {
             URL.revokeObjectURL(previewUrl);
           }
-        } else {
-          await uploadAndSendFile(normalized);
         }
       } catch (error) {
-        console.error("Failed to process file:", error);
+        console.error("Failed to process media:", error);
         finishToast(toastId, {
           type: "error",
-          message: error instanceof Error ? error.message : "Failed to send video. Try a shorter clip or check your connection.",
+          message: error instanceof Error ? error.message : "Failed to send media. Check your connection.",
         });
       } finally {
-        window.clearTimeout(unlockTimer);
         filePickInFlightRef.current = false;
       }
     },
-    [uploadAndSendFile, uploadAndSendGalleryImage, uploadAndSendEphemeralMedia, mediaViewMode, mediaModeSticker, user],
+    [uploadAndSendFile, uploadAndSendGalleryImage, uploadAndSendEphemeralMedia, mediaModeSticker, user, pendingMediaPreview],
   );
 
   const handleFileChange = useCallback(
@@ -3157,42 +3194,52 @@ export default function Messages() {
         />
       )}
 
-      {/* ── Input Bar ── */}
-      <MessageInput
-        ref={messageInputRef}
-        onInputActivity={handleInputActivity}
-        onSendMessage={sendText}
-        cuteMode={cuteMode}
-        onToggleCuteMode={toggleCuteMode}
-        onShareLocation={handleShareLocation}
-        sharingLocation={sharingLocation}
-        replyPreview={
-          replyTo && user ? (
-            <ReplyPreview
-              replyTo={replyTo}
-              myId={user.id}
-              partnerName={pName}
-              onCancel={() => setReplyTo(null)}
-            />
-          ) : undefined
-        }
-        onStickerSelect={sendSticker}
-        onGifSelect={sendGif}
-        onGreetingSelect={sendGreeting}
-        onImageSelect={(file, itemType) => {
-          void handlePickedFile(file, itemType);
-        }}
-        mediaViewMode={mediaViewMode}
-        onMediaViewModeChange={setMediaViewMode}
-        onDoodleOpen={openDoodlePanel}
-        doodleActive={doodleOpen}
-        onStartRecording={startRecording}
-        onCancelRecording={cancelRecording}
-        onSendRecording={sendVoiceRecording}
-        recording={recording}
-        recordingTime={recordingTime}
-        disabled={!online || blocked || editingMessage !== null}
-      />
+      {/* ── Input Bar or Media Preview ── */}
+      {pendingMediaPreview ? (
+        <PendingMediaPreview
+          file={pendingMediaPreview.normalized}
+          onCancel={() => setPendingMediaPreview(null)}
+          onSend={processAndSendMedia}
+          disabled={!online || blocked}
+        />
+      ) : (
+        <MessageInput
+          ref={messageInputRef}
+          onInputActivity={handleInputActivity}
+          onSendMessage={sendText}
+          cuteMode={cuteMode}
+          onToggleCuteMode={toggleCuteMode}
+          onShareLocation={handleShareLocation}
+          sharingLocation={sharingLocation}
+          replyPreview={
+            replyTo && user ? (
+              <ReplyPreview
+                replyTo={replyTo}
+                myId={user.id}
+                partnerName={pName}
+                onCancel={() => setReplyTo(null)}
+              />
+            ) : undefined
+          }
+          onStickerSelect={sendSticker}
+          onGifSelect={sendGif}
+          onGreetingSelect={sendGreeting}
+          onImageSelect={(file, itemType) => {
+            void handlePickedFile(file, itemType);
+          }}
+          onOpenCamera={() => setShowCamera(true)}
+          mediaViewMode={mediaViewMode}
+          onMediaViewModeChange={setMediaViewMode}
+          onDoodleOpen={openDoodlePanel}
+          doodleActive={doodleOpen}
+          onStartRecording={startRecording}
+          onCancelRecording={cancelRecording}
+          onSendRecording={sendVoiceRecording}
+          recording={recording}
+          recordingTime={recordingTime}
+          disabled={!online || blocked || editingMessage !== null}
+        />
+      )}
       </div>
 
       <AppThemeModal
@@ -3210,6 +3257,16 @@ export default function Messages() {
         currentThemeId={chatThemeId}
         onThemeChange={setTheme}
       />
+
+      {showCamera && (
+        <CameraOverlay
+          onClose={() => setShowCamera(false)}
+          onCapture={(file) => {
+            setShowCamera(false);
+            void handlePickedFile(file);
+          }}
+        />
+      )}
 
       {/* ── Info Panel ── */}
       <InfoPanel

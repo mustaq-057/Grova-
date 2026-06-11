@@ -51,6 +51,7 @@ interface MessageInputProps {
   onGifSelect: (gif: string) => void;
   onGreetingSelect: (greeting: unknown) => void;
   onImageSelect: (file: File, clipboardItemType?: string) => void;
+  onOpenCamera?: () => void;
   mediaViewMode?: "keep" | "once" | "twice";
   onMediaViewModeChange?: (mode: "keep" | "once" | "twice") => void;
   onDoodleOpen?: () => void;
@@ -77,6 +78,7 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
   onGifSelect,
   onGreetingSelect,
   onImageSelect,
+  onOpenCamera,
   mediaViewMode = "keep",
   onMediaViewModeChange,
   onDoodleOpen,
@@ -412,7 +414,7 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
       <div className="flex items-center gap-[8px] sm:gap-[10px] bg-[#1a1a1a] rounded-[40px] py-[7px] sm:py-[9px] pr-[8px] sm:pr-[14px] pl-[5px] sm:pl-[9px] mx-[4px] md:mx-auto md:w-full md:max-w-[800px]">
         <button
           type="button"
-          onClick={() => { /* Camera logic if needed */ }}
+          onClick={onOpenCamera}
           className="w-[38px] h-[38px] sm:w-[44px] sm:h-[44px] rounded-full bg-[#5b5ef4] hover:bg-[#4a4de3] active:scale-95 flex shrink-0 items-center justify-center text-white border-none transition-all"
           disabled={disabled}
         >
