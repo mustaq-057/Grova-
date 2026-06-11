@@ -2,7 +2,7 @@ import { useState, memo, useCallback, useMemo, useRef, useLayoutEffect } from "r
 import { createPortal } from "react-dom";
 import { Smile, MoreHorizontal, Trash2 } from "lucide-react";
 import { AudioMessage } from "@/components/AudioMessage";
-import { CuteMessageBubble } from "@/components/CuteMessageBubble";
+import { cn } from "@/lib/utils";
 import { ChatFileBubble } from "@/components/ChatFileBubble";
 import { DeletedMessageNotice } from "@/components/DeletedMessageNotice";
 import { DuaMessage } from "@/components/DuaMessage";
@@ -37,7 +37,7 @@ export interface MessageItemProps {
   myId: string;
   partnerName: string;
   partnerAvatar: string;
-  theme: { bubbleColor: string; bubbleBorder: string };
+
   onDelete: (id: string) => void;
   onLike: (id: string) => void;
   onReact?: (id: string, emoji: string) => void;
@@ -63,7 +63,7 @@ export const MessageItem = memo(function MessageItem({
   myId,
   partnerName,
   partnerAvatar,
-  theme,
+
   onLike,
   onReact,
   onUnsend,
@@ -101,7 +101,7 @@ export const MessageItem = memo(function MessageItem({
 
   useEffect(() => onQuickReactionsChanged(setQuickReactions), []);
 
-  const partnerColors = useMemo(() => getPartnerBubbleColors(theme), [theme]);
+
 
   const isEmojiOnly = useMemo(() => (msg.type === "text" || msg.type === "heart") && isEmojiOnlyText(msg.text), [msg.type, msg.text]);
   const isSticker = useMemo(() => msg.type === "sticker", [msg.type]);
@@ -205,8 +205,8 @@ export const MessageItem = memo(function MessageItem({
   }, [hasReply, msg.replyToSenderId, myId, partnerName]);
 
   const defaultBubbleStyle = isMe
-    ? { backgroundColor: theme.bubbleColor, borderColor: theme.bubbleBorder }
-    : { backgroundColor: partnerColors.fill, borderColor: partnerColors.border };
+    ? { backgroundColor: "var(--color-primary, #2563EB)", borderColor: "var(--color-primary, #2563EB)" }
+    : { backgroundColor: "var(--color-secondary, #374151)", borderColor: "var(--color-secondary, #374151)" };
 
   const openReactionPicker = useCallback(() => {
     const anchor = bubbleWrapRef.current;

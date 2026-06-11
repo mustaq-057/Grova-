@@ -5,6 +5,7 @@ import { api, type ApiMessage } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import CallScreen, { IncomingCallOverlay } from "@/components/CallScreen";
 import { BubbleStyleSelector, type BubbleStyleId } from "@/components/BubbleStyleSelector";
+import { MessageItem } from "@/components/MessageItem";
 import { MessageInput } from "@/components/MessageInput";
 import { InfoPanel } from "@/components/InfoPanel";
 import { Link } from "wouter";
@@ -1648,7 +1649,7 @@ export default function Messages() {
       });
       requestStickToBottom();
 
-      const outgoing = await prepareOutgoingMessage({ senderId: user.id, variant: bubbleStyle, ...partial });
+      const outgoing = await prepareOutgoingMessage({ senderId: user.id, variant: bubbleStyle as any, ...partial });
       const saved = await api.sendMessage(outgoing);
       const [display] = await normalizeMessages([saved]);
       setMessages((prev) => {
@@ -3032,8 +3033,8 @@ export default function Messages() {
                   isMe={isMe}
                   myId={user?.id ?? "me"}
                   partnerName={pName}
+
                   partnerAvatar={pAvatar}
-                  theme={theme}
                   onDelete={deleteMessage}
                   onLike={toggleLike}
                   onReact={handleReact}
@@ -3041,7 +3042,7 @@ export default function Messages() {
                   onPin={handlePin}
                   onReply={startReply}
                   onEdit={handleEdit}
-                  onOpenMenu={(m, rect) => setContextMenu({ msg: m, top: rect.bottom + 4, left: rect.left })}
+                  onOpenMenu={(m: ApiMessage, rect: DOMRect) => setContextMenu({ msg: m, top: rect.bottom + 4, left: rect.left })}
                   onOpenMedia={openMediaMessage}
                   seenLabel={buildSeenLabel(msg, isMe, lastSeenOutgoingId, partnerId)}
                   onStartThread={handleStartThread}
@@ -3128,14 +3129,13 @@ export default function Messages() {
                     myId={user?.id ?? "me"}
                     partnerName={pName}
                     partnerAvatar={pAvatar}
-                    theme="default"
                     onDelete={deleteMessage}
                     onLike={toggleLike}
                     onReact={handleReact}
                     onUnsend={handleUnsend}
                     onPin={handlePin}
                     onReply={startReply}
-                    onOpenMenu={(m, rect) => setContextMenu({ msg: m, top: rect.bottom + 4, left: rect.left })}
+                    onOpenMenu={(m: ApiMessage, rect: DOMRect) => setContextMenu({ msg: m, top: rect.bottom + 4, left: rect.left })}
                     onOpenMedia={openMediaMessage}
                     prevMsg={prevMsg}
                     seenLabel={buildSeenLabel(msg, isMe, lastSeenOutgoingId, partnerId)}
