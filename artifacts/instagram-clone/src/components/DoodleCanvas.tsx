@@ -1,365 +1,346 @@
 import { useRef, useState, useEffect, useCallback } from "react";
-import { X, Undo, Trash2, Send, ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { createPortal } from "react-dom";
+import { X, Undo, Trash2, Send, Eraser } from "lucide-react";
 
-export const DOODLE_HEIGHT_STEP = 320;
-export const DOODLE_MIN_HEIGHT = 280;
+// ─── Public types ────────────────────────────────────────────────────────────
+
+export interface DoodleData {
+  /** PNG data‑URL of the cropped stroke area (transparent background) */
+  imageData: string;
+  /** Cropped area's position/size relative to viewport at draw time */
+  canvasX: number;
+  canvasY: number;
+  width: number;
+  height: number;
+}
 
 interface DoodleCanvasProps {
   onClose: () => void;
-  onSend: (imageData: string) => void;
-  canvasHeight: number;
-  onExpandCanvas: () => void;
+  onSend: (data: DoodleData) => void;
 }
 
+// ─── Palette ─────────────────────────────────────────────────────────────────
+
 const COLORS = [
-  "#ffffff", "#000000", "#ef4444", "#f97316", "#f59e0b", "#eab308",
-  "#84cc16", "#22c55e", "#10b981", "#14b8a6", "#06b6d4", "#0ea5e9",
-  "#3b82f6", "#6366f1", "#8b5cf6", "#a855f7", "#d946ef", "#ec4899",
-  "#f43f5e", "#fda4af", "#fdba74", "#fef08a", "#bbf7d0", "#bae6fd"
+  "#ff2a00", "#ff8800", "#ffdd00", "#00cc55",
+  "#00aaff", "#6644ff", "#ff44cc", "#ffffff",
+  "#000000", "#888888",
 ];
 
-const BRUSH_PRESETS = [4, 8, 12, 18, 26];
+const BRUSH_SIZES = [3, 6, 10, 16, 24];
 
 type Point = { x: number; y: number };
 
-function applyBrush(ctx: CanvasRenderingContext2D, color: string, size: number) {
-  ctx.strokeStyle = color;
-  ctx.lineWidth = size;
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = "high";
-}
+// ─── Component ───────────────────────────────────────────────────────────────
 
-function clearDrawingSurface(ctx: CanvasRenderingContext2D, pixelW: number, pixelH: number) {
-  ctx.save();
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.clearRect(0, 0, pixelW, pixelH);
-  ctx.restore();
-}
-
-export default function DoodleCanvas({ onClose, onSend, canvasHeight, onExpandCanvas }: DoodleCanvasProps) {
+export default function DoodleCanvas({ onClose, onSend }: DoodleCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const lastPointRef = useRef<Point | null>(null);
-  const colorRef = useRef("#000000");
-  const brushRef = useRef(8);
-  const historyRef = useRef<string[]>([]);
-  const historyIndexRef = useRef(0);
-  const expandCooldownRef = useRef(0);
-  const canvasHeightRef = useRef(canvasHeight);
-  canvasHeightRef.current = canvasHeight;
-
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [currentColor, setCurrentColor] = useState("#000000");
-  const [brushSize, setBrushSize] = useState(8);
+  const [color, setColor] = useState("#ff2a00");
+  const [brushSize, setBrushSize] = useState(6);
+  const [eraser, setEraser] = useState(false);
   const [canUndo, setCanUndo] = useState(false);
-  const [expandCount, setExpandCount] = useState(0);
+  const [hasStrokes, setHasStrokes] = useState(false);
 
-  colorRef.current = currentColor;
-  brushRef.current = brushSize;
+  const isDrawingRef = useRef(false);
+  const lastPtRef = useRef<Point | null>(null);
+  const historyRef = useRef<string[]>([]);
+  // bounding box of all drawn pixels (in CSS px)
+  const minXRef = useRef(Infinity);
+  const minYRef = useRef(Infinity);
+  const maxXRef = useRef(-Infinity);
+  const maxYRef = useRef(-Infinity);
 
-  const getCtx = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return null;
-    return canvas.getContext("2d", { alpha: true });
-  };
+  // ── Set up canvas to cover full viewport ────────────────────────────────
 
-  const layoutCanvas = useCallback((preserveSnapshot?: string) => {
-    const canvas = canvasRef.current;
-    const container = containerRef.current;
-    if (!canvas || !container) return;
-
-    const ctx = canvas.getContext("2d", { alpha: true });
-    if (!ctx) return;
-
-    const dpr = Math.min(window.devicePixelRatio || 1, 3);
-    const cssW = Math.max(1, Math.floor(container.clientWidth));
-    const cssH = Math.max(DOODLE_MIN_HEIGHT, canvasHeightRef.current);
-
-    container.style.minHeight = `${cssH}px`;
-    container.style.height = `${cssH}px`;
-
-    canvas.style.width = `${cssW}px`;
-    canvas.style.height = `${cssH}px`;
-    canvas.width = Math.floor(cssW * dpr);
-    canvas.height = Math.floor(cssH * dpr);
-
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    applyBrush(ctx, colorRef.current, brushRef.current);
-
-    if (preserveSnapshot) {
-      const img = new Image();
-      img.onload = () => {
-        clearDrawingSurface(ctx, canvas.width, canvas.height);
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        applyBrush(ctx, colorRef.current, brushRef.current);
-        const drawH = (img.height / img.width) * cssW;
-        ctx.drawImage(img, 0, 0, cssW, drawH);
-      };
-      img.src = preserveSnapshot;
-    } else {
-      clearDrawingSurface(ctx, canvas.width, canvas.height);
-    }
-  }, []);
-
-  const pushHistory = useCallback(() => {
+  useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const snap = canvas.toDataURL("image/png");
-    const next = historyRef.current.slice(0, historyIndexRef.current + 1);
-    next.push(snap);
-    historyRef.current = next;
-    historyIndexRef.current = next.length - 1;
-    setCanUndo(historyIndexRef.current > 0);
+
+    const resize = () => {
+      const ctx = canvas.getContext("2d")!;
+      const snap = historyRef.current.length
+        ? canvas.toDataURL("image/png")
+        : null;
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = window.innerWidth * dpr;
+      canvas.height = window.innerHeight * dpr;
+      canvas.style.width = `${window.innerWidth}px`;
+      canvas.style.height = `${window.innerHeight}px`;
+      ctx.scale(dpr, dpr);
+      if (snap) {
+        const img = new Image();
+        img.onload = () => ctx.drawImage(img, 0, 0, window.innerWidth, window.innerHeight);
+        img.src = snap;
+      }
+    };
+
+    resize();
+    window.addEventListener("resize", resize);
+    return () => window.removeEventListener("resize", resize);
   }, []);
 
-  useEffect(() => {
-    const snap = canvasRef.current?.toDataURL("image/png");
-    layoutCanvas(snap);
-  }, [canvasHeight, layoutCanvas]);
+  // ── History ─────────────────────────────────────────────────────────────
 
-  useEffect(() => {
-    layoutCanvas();
-    pushHistory();
-
-    const container = containerRef.current;
-    if (!container) return;
-
-    const ro = new ResizeObserver(() => {
-      const snap = canvasRef.current?.toDataURL("image/png");
-      layoutCanvas(snap);
-    });
-    ro.observe(container);
-
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-
-    return () => {
-      ro.disconnect();
-      window.removeEventListener("keydown", onKey);
-    };
-    // Mount once — do not depend on layoutCanvas or height changes wipe the drawing
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onClose]);
-
-  const restoreSnapshot = (index: number) => {
+  const saveHistory = useCallback(() => {
     const canvas = canvasRef.current;
-    const ctx = getCtx();
-    const snap = historyRef.current[index];
-    if (!canvas || !ctx || !snap) return;
+    if (!canvas) return;
+    historyRef.current.push(canvas.toDataURL("image/png"));
+    setCanUndo(true);
+  }, []);
 
-    const img = new Image();
-    img.onload = () => {
-      const dpr = Math.min(window.devicePixelRatio || 1, 3);
-      const cssW = canvas.width / dpr;
-      const cssH = canvas.height / dpr;
-      clearDrawingSurface(ctx, canvas.width, canvas.height);
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      applyBrush(ctx, colorRef.current, brushRef.current);
-      ctx.drawImage(img, 0, 0, cssW, cssH);
-    };
-    img.src = snap;
-  };
-
-  const undo = () => {
-    if (historyIndexRef.current <= 0) return;
-    historyIndexRef.current -= 1;
-    restoreSnapshot(historyIndexRef.current);
-    setCanUndo(historyIndexRef.current > 0);
-  };
-
-  const clearCanvas = () => {
-    layoutCanvas();
-    pushHistory();
-  };
-
-  const handleExpandCanvas = useCallback(() => {
-    if (expandCount >= 3) return;
-    const snap = canvasRef.current?.toDataURL("image/png");
-    setExpandCount(prev => prev + 1);
-    onExpandCanvas();
+  const restoreCanvas = useCallback((snap: string | undefined) => {
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext("2d");
+    if (!canvas || !ctx) return;
+    const dpr = window.devicePixelRatio || 1;
+    ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
     if (snap) {
-      requestAnimationFrame(() => layoutCanvas(snap));
+      const img = new Image();
+      img.onload = () => ctx.drawImage(img, 0, 0, canvas.width / dpr, canvas.height / dpr);
+      img.src = snap;
     }
-  }, [layoutCanvas, onExpandCanvas, expandCount]);
+  }, []);
 
+  const undo = useCallback(() => {
+    if (!historyRef.current.length) return;
+    historyRef.current.pop();
+    const prev = historyRef.current[historyRef.current.length - 1];
+    restoreCanvas(prev);
+    setCanUndo(historyRef.current.length > 0);
+    if (!historyRef.current.length) setHasStrokes(false);
+  }, [restoreCanvas]);
 
-
-  const getPoint = (e: React.PointerEvent<HTMLCanvasElement>): Point => {
+  const clear = useCallback(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return { x: 0, y: 0 };
-    const rect = canvas.getBoundingClientRect();
-    return {
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
-    };
+    const ctx = canvas?.getContext("2d");
+    if (!canvas || !ctx) return;
+    const dpr = window.devicePixelRatio || 1;
+    ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+    historyRef.current = [];
+    setCanUndo(false);
+    setHasStrokes(false);
+    minXRef.current = Infinity; minYRef.current = Infinity;
+    maxXRef.current = -Infinity; maxYRef.current = -Infinity;
+  }, []);
+
+  // ── Drawing helpers ─────────────────────────────────────────────────────
+
+  const applyBrush = useCallback((ctx: CanvasRenderingContext2D) => {
+    if (eraser) {
+      ctx.globalCompositeOperation = "destination-out";
+      ctx.strokeStyle = "rgba(0,0,0,1)";
+      ctx.lineWidth = brushSize * 2.5;
+    } else {
+      ctx.globalCompositeOperation = "source-over";
+      ctx.strokeStyle = color;
+      ctx.lineWidth = brushSize;
+    }
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+  }, [eraser, color, brushSize]);
+
+  const expandBounds = (x: number, y: number, r: number) => {
+    minXRef.current = Math.min(minXRef.current, x - r);
+    minYRef.current = Math.min(minYRef.current, y - r);
+    maxXRef.current = Math.max(maxXRef.current, x + r);
+    maxYRef.current = Math.max(maxYRef.current, y + r);
   };
 
-  const startDrawing = (e: React.PointerEvent<HTMLCanvasElement>) => {
+  const getPoint = (e: React.PointerEvent): Point => ({
+    x: e.clientX, y: e.clientY,
+  });
+
+  // ── Pointer events ──────────────────────────────────────────────────────
+
+  const onPointerDown = useCallback((e: React.PointerEvent) => {
     e.preventDefault();
     canvasRef.current?.setPointerCapture(e.pointerId);
-    setIsDrawing(true);
-    const { x, y } = getPoint(e);
-    const ctx = getCtx();
+    isDrawingRef.current = true;
+    const pt = getPoint(e);
+    lastPtRef.current = pt;
+    expandBounds(pt.x, pt.y, brushSize);
+
+    const ctx = canvasRef.current?.getContext("2d");
     if (!ctx) return;
-    applyBrush(ctx, colorRef.current, brushRef.current);
+    applyBrush(ctx);
     ctx.beginPath();
-    ctx.moveTo(x, y);
-    lastPointRef.current = { x, y };
-  };
+    ctx.arc(pt.x, pt.y, brushSize / 2, 0, Math.PI * 2);
+    ctx.fillStyle = eraser ? "rgba(0,0,0,1)" : color;
+    ctx.globalCompositeOperation = eraser ? "destination-out" : "source-over";
+    ctx.fill();
+  }, [brushSize, applyBrush, eraser, color]);
 
-  const draw = (e: React.PointerEvent<HTMLCanvasElement>) => {
+  const onPointerMove = useCallback((e: React.PointerEvent) => {
+    if (!isDrawingRef.current || !lastPtRef.current) return;
     e.preventDefault();
-    if (!isDrawing) return;
+    const pt = getPoint(e);
+    expandBounds(pt.x, pt.y, brushSize);
 
-    const { x, y } = getPoint(e);
-
-    const ctx = getCtx();
-    const last = lastPointRef.current;
-    if (!ctx || !last) return;
-
-    applyBrush(ctx, colorRef.current, brushRef.current);
-
-    const midX = (last.x + x) / 2;
-    const midY = (last.y + y) / 2;
-    ctx.quadraticCurveTo(last.x, last.y, midX, midY);
+    const ctx = canvasRef.current?.getContext("2d");
+    if (!ctx) return;
+    applyBrush(ctx);
+    ctx.beginPath();
+    ctx.moveTo(lastPtRef.current.x, lastPtRef.current.y);
+    ctx.lineTo(pt.x, pt.y);
     ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(midX, midY);
+    lastPtRef.current = pt;
+  }, [brushSize, applyBrush]);
 
-    lastPointRef.current = { x, y };
-  };
+  const onPointerUp = useCallback(() => {
+    if (!isDrawingRef.current) return;
+    isDrawingRef.current = false;
+    lastPtRef.current = null;
+    saveHistory();
+    setHasStrokes(true);
+  }, [saveHistory]);
 
-  const stopDrawing = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!isDrawing) return;
-    e.preventDefault();
-    try {
-      canvasRef.current?.releasePointerCapture(e.pointerId);
-    } catch {
-      /* ignore */
-    }
-    setIsDrawing(false);
-    lastPointRef.current = null;
-    getCtx()?.closePath();
-    pushHistory();
-  };
+  // ── Send ─────────────────────────────────────────────────────────────────
 
-  const handleSend = () => {
+  const handleSend = useCallback(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas || !hasStrokes) return;
 
-    const exportCanvas = document.createElement("canvas");
-    exportCanvas.width = canvas.width;
-    exportCanvas.height = canvas.height;
-    const octx = exportCanvas.getContext("2d");
-    if (!octx) return;
+    const PAD = 12;
+    const x = Math.max(0, Math.floor(minXRef.current - PAD));
+    const y = Math.max(0, Math.floor(minYRef.current - PAD));
+    const w = Math.min(window.innerWidth - x, Math.ceil(maxXRef.current - minXRef.current + PAD * 2));
+    const h = Math.min(window.innerHeight - y, Math.ceil(maxYRef.current - minYRef.current + PAD * 2));
+    if (w <= 0 || h <= 0) { onClose(); return; }
 
-    // Draw a black background instead of white
-    octx.fillStyle = "#000000";
-    octx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
-    octx.drawImage(canvas, 0, 0);
+    const dpr = window.devicePixelRatio || 1;
+    const exp = document.createElement("canvas");
+    exp.width = w * dpr;
+    exp.height = h * dpr;
+    const oct = exp.getContext("2d")!;
+    oct.drawImage(canvas, x * dpr, y * dpr, w * dpr, h * dpr, 0, 0, w * dpr, h * dpr);
 
-    onSend(exportCanvas.toDataURL("image/jpeg", 0.82));
-  };
+    onSend({ imageData: exp.toDataURL("image/png"), canvasX: x, canvasY: y, width: w, height: h });
+  }, [hasStrokes, onSend, onClose]);
 
-  return (
+  // ── UI ───────────────────────────────────────────────────────────────────
+
+  return createPortal(
     <div
-      className="fixed inset-0 z-[200] bg-black flex flex-col"
-      role="region"
-      aria-label="Doodle drawing area"
-      data-testid="doodle-panel"
+      className="fixed inset-0 z-[600] overflow-hidden"
+      style={{ touchAction: "none" }}
     >
-      <div className="absolute inset-x-0 top-0 z-20 flex items-center justify-between px-4 py-4 bg-gradient-to-b from-black/60 to-transparent pointer-events-none">
+      {/* Transparent canvas — the chat is VISIBLE through it */}
+      <canvas
+        ref={canvasRef}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        className="absolute inset-0 touch-none"
+        style={{ cursor: eraser ? "cell" : "crosshair" }}
+      />
+
+      {/* ── Top bar ── */}
+      <div className="absolute top-0 inset-x-0 flex items-center justify-between px-4 py-3 bg-gradient-to-b from-black/60 to-transparent pointer-events-none">
         <button
-          type="button"
           onClick={onClose}
-          className="pointer-events-auto p-2.5 rounded-full bg-black/40 text-white backdrop-blur-md active:scale-95 transition-transform"
-          aria-label="Close"
+          className="pointer-events-auto w-10 h-10 rounded-full bg-black/50 backdrop-blur-md flex items-center justify-center text-white active:scale-95 transition-transform"
+          aria-label="Close doodle"
         >
-          <X className="w-6 h-6" strokeWidth={2.5} />
+          <X className="w-5 h-5" />
         </button>
-        <div className="flex gap-4 pointer-events-auto">
+
+        <div className="flex gap-3 pointer-events-auto">
           <button
-            type="button"
             onClick={undo}
             disabled={!canUndo}
-            className="p-2.5 rounded-full bg-black/40 text-white disabled:opacity-50 backdrop-blur-md active:scale-95 transition-transform"
+            className="w-10 h-10 rounded-full bg-black/50 backdrop-blur-md flex items-center justify-center text-white active:scale-95 transition-transform disabled:opacity-40"
             aria-label="Undo"
           >
-            <Undo className="w-6 h-6" strokeWidth={2.5} />
+            <Undo className="w-4 h-4" />
           </button>
           <button
-            type="button"
-            onClick={clearCanvas}
-            className="p-2.5 rounded-full bg-black/40 text-white backdrop-blur-md active:scale-95 transition-transform"
+            onClick={clear}
+            className="w-10 h-10 rounded-full bg-black/50 backdrop-blur-md flex items-center justify-center text-white active:scale-95 transition-transform"
             aria-label="Clear"
           >
-            <Trash2 className="w-6 h-6" strokeWidth={2.5} />
+            <Trash2 className="w-4 h-4" />
           </button>
         </div>
       </div>
 
-      <div
-        ref={scrollRef}
-        className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden bg-transparent scrollbar-hide relative"
-      >
-        <div ref={containerRef} className="relative w-full min-h-[100dvh]">
-          <canvas
-            ref={canvasRef}
-            onPointerDown={startDrawing}
-            onPointerMove={draw}
-            onPointerUp={stopDrawing}
-            onPointerLeave={stopDrawing}
-            onPointerCancel={stopDrawing}
-            className="block w-full cursor-crosshair touch-none"
-            style={{ touchAction: "none" }}
-            data-testid="doodle-canvas"
-          />
-        </div>
-      </div>
+      {/* ── Bottom toolbar ── */}
+      <div className="absolute bottom-0 inset-x-0 flex flex-col items-center gap-3 pb-[env(safe-area-inset-bottom,16px)] px-4 pt-2 bg-gradient-to-t from-black/70 to-transparent pointer-events-none">
 
-      <div className="absolute bottom-0 left-0 right-0 z-20 pb-6 pt-12 pointer-events-none bg-gradient-to-t from-black/80 via-black/40 to-transparent flex flex-col items-center gap-4">
-        {expandCount < 3 && (
+        {/* Brush-size row */}
+        <div className="flex items-center gap-5 pointer-events-auto">
+          {BRUSH_SIZES.map(s => (
+            <button
+              key={s}
+              onClick={() => { setBrushSize(s); setEraser(false); }}
+              className="flex items-center justify-center rounded-full transition-all active:scale-95"
+              style={{ width: s + 14, height: s + 14 }}
+              aria-label={`Brush size ${s}`}
+            >
+              <span
+                className="rounded-full bg-white block transition-all"
+                style={{
+                  width: s,
+                  height: s,
+                  boxShadow: brushSize === s && !eraser ? "0 0 0 2.5px #fff, 0 0 0 4.5px rgba(255,255,255,0.35)" : "none",
+                  opacity: brushSize === s && !eraser ? 1 : 0.55,
+                }}
+              />
+            </button>
+          ))}
           <button
-            onClick={handleExpandCanvas}
-            className="pointer-events-auto px-5 py-2 rounded-full bg-white/10 border border-white/20 text-white text-[15px] font-medium backdrop-blur-xl active:scale-95 transition-transform shadow-[0_4px_20px_rgba(0,0,0,0.5)]"
+            onClick={() => setEraser(e => !e)}
+            className={`flex items-center gap-1.5 px-3 h-9 rounded-full text-[13px] font-semibold transition-all active:scale-95 ${eraser ? "bg-white text-black" : "bg-white/20 text-white"}`}
+            aria-label="Eraser"
           >
-            Add space
+            <Eraser className="w-4 h-4" />
+            <span>Erase</span>
           </button>
-        )}
-        
-        <div className="w-full relative flex items-center pointer-events-auto">
-          <div className="flex-1 flex items-center gap-3 overflow-x-auto px-4 pb-2 scrollbar-hide shrink-0 snap-x">
-            {COLORS.map((color) => (
+        </div>
+
+        {/* Color row + Send */}
+        <div className="flex items-center w-full max-w-md gap-2 pointer-events-auto">
+          {/* Scrollable colors */}
+          <div className="flex-1 flex items-center gap-2.5 overflow-x-auto scrollbar-hide pl-1 pr-2 py-1">
+            {COLORS.map(c => (
               <button
-                key={color}
-                type="button"
-                onClick={() => setCurrentColor(color)}
-                className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full border-2 shrink-0 transition-transform snap-center shadow-lg ${
-                  currentColor === color
-                    ? "scale-110 ring-2 ring-white/50 border-white"
-                    : "border-transparent"
-                }`}
-                style={{ backgroundColor: color }}
-                aria-label={`Color ${color}`}
+                key={c}
+                onClick={() => { setColor(c); setEraser(false); }}
+                className="shrink-0 rounded-full transition-all active:scale-95"
+                style={{
+                  backgroundColor: c,
+                  width: color === c && !eraser ? 34 : 28,
+                  height: color === c && !eraser ? 34 : 28,
+                  boxShadow: color === c && !eraser
+                    ? "0 0 0 2.5px #fff, 0 0 0 5px rgba(255,255,255,0.25)"
+                    : c === "#ffffff" ? "inset 0 0 0 1.5px rgba(0,0,0,0.25)" : "none",
+                }}
+                aria-label={`Color ${c}`}
               />
             ))}
           </div>
-          
+
+          {/* Send button */}
           <button
-            type="button"
             onClick={handleSend}
-            className="absolute right-4 shrink-0 w-12 h-12 rounded-full bg-[#d91a92] flex items-center justify-center text-white shadow-[0_4px_20px_rgba(217,26,146,0.5)] active:scale-95 transition-transform"
+            disabled={!hasStrokes}
+            className="shrink-0 w-12 h-12 rounded-full bg-[#d91a92] flex items-center justify-center text-white shadow-[0_4px_20px_rgba(217,26,146,0.5)] active:scale-95 transition-all disabled:opacity-40 disabled:scale-95"
             aria-label="Send doodle"
           >
             <Send className="w-5 h-5 ml-0.5" strokeWidth={2.5} />
           </button>
         </div>
       </div>
-    </div>
+
+      {/* Hint */}
+      {!hasStrokes && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <p className="text-white/40 text-sm font-medium bg-black/20 px-4 py-2 rounded-full backdrop-blur-sm select-none">
+            ✏️ Draw anywhere on the chat
+          </p>
+        </div>
+      )}
+    </div>,
+    document.body,
   );
 }

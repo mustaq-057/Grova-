@@ -108,7 +108,7 @@ import {
   shouldRestoreScrollAnchor,
 } from "@/lib/chat-scroll-anchor";
 import { resolveChatImageUrl, resolveChatVideoUrl } from "@/lib/media-url";
-import DoodleCanvas, { DOODLE_HEIGHT_STEP, DOODLE_MIN_HEIGHT } from "@/components/DoodleCanvas";
+import DoodleCanvas, { type DoodleData } from "@/components/DoodleCanvas";
 import { ImageCropModal } from "@/components/ImageCropModal";
 import { partnerTypingLine } from "@/lib/partner-words";
 import { toast } from "sonner";
@@ -210,7 +210,6 @@ export default function Messages() {
   const [sharingLocation, setSharingLocation] = useState(false);
   const [imageToCrop, setImageToCrop] = useState<string | null>(null);
   const [doodleOpen, setDoodleOpen] = useState(false);
-  const [doodleHeight, setDoodleHeight] = useState(0);
   const [pendingImageType, setPendingImageType] = useState("image/jpeg");
   const [mediaViewMode, setMediaViewMode] = useState<"keep" | "once" | "twice">("keep");
   const [mediaViewer, setMediaViewer] = useState<{
@@ -364,21 +363,50 @@ export default function Messages() {
     [scrollToHighlightedMessage],
   );
 
-  const expandDoodleSpace = useCallback(() => {
-    setDoodleHeight((h) => h + DOODLE_HEIGHT_STEP);
-  }, []);
+  const openDoodlePanel = useCallback(() => setDoodleOpen(true), []);
+  const closeDoodlePanel = useCallback(() => setDoodleOpen(false), []);
 
-  const openDoodlePanel = useCallback(() => {
-    setDoodleOpen(true);
-    setDoodleHeight((h) => (h > 0 ? h + DOODLE_HEIGHT_STEP : DOODLE_MIN_HEIGHT));
-    requestAnimationFrame(() => {
-      scrollChatToBottomAfterPaint(messagesContainerRef.current, bottomRef.current);
-    });
-  }, []);
-
-  const closeDoodlePanel = useCallback(() => {
-    setDoodleOpen(false);
-  }, []);
+  const handleDoodleSend = useCallback((data: DoodleData) => {
+    closeDoodlePanel();
+    if (!user) return;
+    const tempId = crypto.randomUUID();
+    // Encode position metadata into the text field as JSON
+    const posText = JSON.stringify({ canvasX: data.canvasX, canvasY: data.canvasY, width: data.width, height: data.height });
+    pendingOutgoingRef.current.add(tempId);
+    setMessages((prev) => [
+      ...prev,
+      buildOptimisticMessage(
+        { senderId: user.id, type: "doodle", imageData: data.imageData, text: posText },
+        tempId,
+      ),
+    ]);
+    requestStickToBottom();
+    void (async () => {
+      try {
+        const url = await uploadMediaToB2(data.imageData, "image/png");
+        const outgoing = await prepareOutgoingMessage({
+          senderId: user.id,
+          type: "doodle",
+          imageUrl: url,
+          text: posText,
+        });
+        const saved = await api.sendMessage(outgoing);
+        const [display] = await normalizeMessages([saved]);
+        setMessages((prev) => {
+          const next = replaceOptimisticMessage(prev, tempId, display, user.id);
+          pendingOutgoingRef.current.delete(tempId);
+          messagesSigRef.current = messagesListSignature(next);
+          writeChatCache(user.id, next);
+          return next;
+        });
+        requestStickToBottom();
+      } catch (err) {
+        pendingOutgoingRef.current.delete(tempId);
+        setMessages((prev) => prev.filter((m) => m.id !== tempId));
+        toast.error(err instanceof Error ? err.message : "Doodle upload failed.", { duration: 4000 });
+      }
+    })();
+  }, [closeDoodlePanel, user, requestStickToBottom]);
 
   // Define partner info early to avoid hoisting issues
   const pAvatar = partner?.avatar || partnerAvatar || defaultAvatar(partnerId);
@@ -3098,52 +3126,8 @@ export default function Messages() {
 
       {doodleOpen && (
         <DoodleCanvas
-          canvasHeight={doodleHeight}
-          onExpandCanvas={expandDoodleSpace}
           onClose={closeDoodlePanel}
-          onSend={(imageData) => {
-            closeDoodlePanel();
-            if (!user) return;
-            const tempId = crypto.randomUUID();
-            pendingOutgoingRef.current.add(tempId);
-            setMessages((prev) => [
-              ...prev,
-              buildOptimisticMessage(
-                { senderId: user.id, type: "image", imageData: imageData, text: "✏️ Doodle" },
-                tempId,
-              ),
-            ]);
-            requestStickToBottom();
-            void (async () => {
-              try {
-                const outgoing = await prepareOutgoingMessage({
-                  senderId: user.id,
-                  type: "image",
-                  imageUrl: "",
-                  text: "✏️ Doodle",
-                });
-                const url = await uploadMediaToB2(imageData, "image/jpeg");
-                outgoing.imageUrl = url;
-                const saved = await api.sendMessage(outgoing);
-                const [display] = await normalizeMessages([saved]);
-                setMessages((prev) => {
-                  const next = replaceOptimisticMessage(prev, tempId, display, user.id);
-                  pendingOutgoingRef.current.delete(tempId);
-                  messagesSigRef.current = messagesListSignature(next);
-                  writeChatCache(user.id, next);
-                  return next;
-                });
-                requestStickToBottom();
-              } catch (err) {
-                pendingOutgoingRef.current.delete(tempId);
-                setMessages((prev) => prev.filter((m) => m.id !== tempId));
-                toast.error(
-                  err instanceof Error ? err.message : "Doodle upload failed — check CLOUDINARY_URL in .env",
-                  { duration: 4000 },
-                );
-              }
-            })();
-          }}
+          onSend={handleDoodleSend}
         />
       )}
 

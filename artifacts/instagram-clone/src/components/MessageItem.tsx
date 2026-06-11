@@ -1,6 +1,6 @@
 import { useState, memo, useCallback, useMemo, useRef, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
-import { Smile, MoreHorizontal } from "lucide-react";
+import { Smile, MoreHorizontal, Trash2 } from "lucide-react";
 import { AudioMessage } from "@/components/AudioMessage";
 import { CuteMessageBubble } from "@/components/CuteMessageBubble";
 import { ChatFileBubble } from "@/components/ChatFileBubble";
@@ -106,6 +106,7 @@ export const MessageItem = memo(function MessageItem({
   const isSticker = useMemo(() => msg.type === "sticker", [msg.type]);
   const isGif = useMemo(() => msg.type === "gif", [msg.type]);
   const isImage = useMemo(() => msg.type === "image", [msg.type]);
+  const isDoodle = useMemo(() => msg.type === "doodle", [msg.type]);
   const isFile = useMemo(() => msg.type === "file", [msg.type]);
   const isVideo = useMemo(() => msg.type === "video", [msg.type]);
   const isLocation = useMemo(() => msg.type === "location", [msg.type]);
@@ -268,6 +269,21 @@ export const MessageItem = memo(function MessageItem({
 
   if (msg.deleted) {
     return <DeletedMessageNotice isMe={isMe} partnerName={partnerName} />;
+  }
+
+  // ── Doodle: rendered as a fixed-position transparent overlay ──────────
+  if (isDoodle) {
+    let pos: { canvasX: number; canvasY: number; width: number; height: number } | null = null;
+    try { if (msg.text) pos = JSON.parse(msg.text); } catch { /* noop */ }
+
+    const src = resolveChatImageUrl(msg.imageUrl || msg.imageData);
+    return <DoodleMessageOverlay
+      msg={msg}
+      src={src}
+      pos={pos}
+      isMe={isMe}
+      onOpenMenu={onOpenMenu}
+    />;
   }
 
   const viewMode = msg.mediaViewMode ?? parseMediaViewMode(msg.companionSticker);
@@ -587,3 +603,137 @@ export const MessageItem = memo(function MessageItem({
     </div>
   );
 });
+
+// ─── Doodle overlay component ────────────────────────────────────────────────
+
+interface DoodleOverlayProps {
+  msg: ApiMessage;
+  src: string | undefined;
+  pos: { canvasX: number; canvasY: number; width: number; height: number } | null;
+  isMe: boolean;
+  onOpenMenu?: (msg: ApiMessage, rect: DOMRect) => void;
+}
+
+const DoodleMessageOverlay = memo(function DoodleMessageOverlay({
+  msg, src, pos, isMe, onOpenMenu,
+}: DoodleOverlayProps) {
+  const [showSheet, setShowSheet] = useState(false);
+  const imgRef = useRef<HTMLImageElement>(null);
+
+  // Fallback: if no position stored show as a normal image bubble
+  if (!pos || !src) {
+    return (
+      <div
+        className={`group flex items-end gap-2 mb-1 min-w-0 max-w-full ${isMe ? "flex-row-reverse" : "flex-row"}`}
+        data-testid={`message-${msg.id}`}
+        role="listitem"
+      >
+        <div className={`relative min-w-0 max-w-[min(92%,calc(100vw-2.5rem))]`}>
+          {src ? (
+            <img
+              src={src}
+              alt="Doodle"
+              className="max-w-[min(260px,88vw)] h-auto rounded-2xl block cursor-pointer"
+              onClick={() => setShowSheet(true)}
+            />
+          ) : (
+            <div className="w-24 h-24 rounded-2xl bg-white/10 animate-pulse" />
+          )}
+        </div>
+        {showSheet && onOpenMenu && (
+          <DoodleSheet onClose={() => setShowSheet(false)} onUnsend={() => {
+            setShowSheet(false);
+            const rect = imgRef.current?.getBoundingClientRect() ?? new DOMRect();
+            onOpenMenu(msg, rect);
+          }} />
+        )}
+      </div>
+    );
+  }
+
+  // Positioned doodle — floats exactly where it was drawn
+  const style: React.CSSProperties = {
+    position: "fixed",
+    left: pos.canvasX,
+    top: pos.canvasY,
+    width: pos.width,
+    height: pos.height,
+    zIndex: 50,
+    pointerEvents: "auto",
+  };
+
+  return (
+    <>
+      <div
+        style={style}
+        data-testid={`message-${msg.id}`}
+        role="listitem"
+        onClick={() => setShowSheet(true)}
+        className="cursor-pointer select-none"
+        title="Tap to manage doodle"
+      >
+        {src ? (
+          <img
+            ref={imgRef}
+            src={src}
+            alt="Doodle"
+            draggable={false}
+            className="w-full h-full object-contain drop-shadow-lg"
+            style={{ imageRendering: "pixelated" }}
+          />
+        ) : (
+          <div className="w-full h-full rounded-xl bg-white/5 border border-white/10 animate-pulse" />
+        )}
+      </div>
+
+      {showSheet && (
+        <DoodleSheet
+          onClose={() => setShowSheet(false)}
+          onUnsend={() => {
+            setShowSheet(false);
+            const rect = imgRef.current?.getBoundingClientRect() ?? new DOMRect();
+            onOpenMenu?.(msg, rect);
+          }}
+        />
+      )}
+    </>
+  );
+});
+
+// ─── Unsend bottom sheet ─────────────────────────────────────────────────────
+
+function DoodleSheet({ onClose, onUnsend }: { onClose: () => void; onUnsend: () => void }) {
+  return createPortal(
+    <>
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 z-[700] bg-black/40 backdrop-blur-[2px]"
+        onClick={onClose}
+      />
+      {/* Sheet */}
+      <div className="fixed bottom-0 inset-x-0 z-[701] pb-[env(safe-area-inset-bottom,16px)]">
+        <div className="mx-3 mb-3 bg-[#1c1c1e] rounded-[18px] overflow-hidden shadow-2xl">
+          <div className="px-4 py-3 border-b border-white/8 text-center">
+            <p className="text-[13px] text-white/50 font-medium">Doodle</p>
+          </div>
+          <button
+            onClick={onUnsend}
+            className="w-full flex items-center gap-3 px-5 py-4 text-[17px] text-red-400 font-medium hover:bg-white/5 transition-colors active:bg-white/10"
+          >
+            <Trash2 className="w-5 h-5" />
+            <span>Unsend</span>
+          </button>
+        </div>
+        <div className="mx-3 bg-[#1c1c1e] rounded-[18px] overflow-hidden shadow-2xl">
+          <button
+            onClick={onClose}
+            className="w-full py-4 text-[17px] text-primary font-semibold hover:bg-white/5 transition-colors active:bg-white/10"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </>,
+    document.body,
+  );
+}
