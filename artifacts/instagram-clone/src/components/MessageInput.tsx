@@ -8,34 +8,34 @@ import GreetingPicker from "@/components/GreetingPicker";
 import { extractClipboardFiles, readClipboardFilesAsync } from "@/lib/media-file";
 
 const CustomLocationIcon = () => (
-  <svg viewBox="0 0 24 24" className="w-[26px] h-[26px] stroke-white fill-none stroke-[1.6] stroke-linecap-round stroke-linejoin-round">
-    <path d="M12 2C8.686 2 6 4.686 6 8c0 5.25 6 13 6 13s6-7.75 6-13c0-3.314-2.686-6-6-6z"/>
-    <circle cx="12" cy="8" r="2.2" stroke="none" fill="#fff"/>
+  <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
+    <circle cx="12" cy="9" r="2.5" fill="#fff" stroke="none"/>
   </svg>
 );
 
 const CustomQuickChatIcon = () => (
-  <svg viewBox="0 0 24 24" className="w-[26px] h-[26px] stroke-white fill-none stroke-[1.6] stroke-linecap-round stroke-linejoin-round">
+  <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-    <path d="M13 9l-2 3h3l-2 3" stroke="#fff" strokeWidth="1.6"/>
+    <path d="M13 8.5l-2 3.5h3l-2 3.5" strokeWidth="1.8"/>
   </svg>
 );
 
 const CustomDoodleIcon = () => (
-  <svg viewBox="0 0 24 24" className="w-[26px] h-[26px] stroke-white fill-none stroke-[1.6] stroke-linecap-round stroke-linejoin-round">
-    <path d="M17 3l4 4-1.5 1.5"/>
-    <path d="M13.5 6.5L17 3l4 4-3.5 3.5"/>
-    <path d="M13.5 6.5L5 15l-1.5 5 5-1.5 8.5-8.5"/>
-    <path d="M5 15c1 0 2 .5 2.5 1.5"/>
+  <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 20h9"/>
+    <path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
   </svg>
 );
 
 const CustomPaletteIcon = () => (
-  <svg viewBox="0 0 24 24" className="w-[26px] h-[26px] stroke-white fill-none stroke-[1.6] stroke-linecap-round stroke-linejoin-round">
-    <path d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2c5.523 0 9 3.477 9 8 0 2.5-1.5 4-4 4h-1.5c-.8 0-1.5.7-1.5 1.5 0 .4.15.75.4 1.05.25.3.4.65.4 1 0 1.35-1.12 2.45-2.74 2.45z"/>
-    <circle cx="8.5" cy="12" r="1.2" fill="#fff" stroke="none"/>
-    <circle cx="15.5" cy="10" r="1.2" fill="#fff" stroke="none"/>
-    <circle cx="12" cy="7.5" r="1.2" fill="#fff" stroke="none"/>
+  <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10"/>
+    <path d="M12 2a14.5 14.5 0 0 0 0 20 10 10 0 0 0 0-20" fill="rgba(255,255,255,0.15)" stroke="none"/>
+    <circle cx="8" cy="10" r="1.3" fill="#fff" stroke="none"/>
+    <circle cx="12" cy="7" r="1.3" fill="#fff" stroke="none"/>
+    <circle cx="16" cy="10" r="1.3" fill="#fff" stroke="none"/>
+    <circle cx="9" cy="14" r="1.3" fill="#fff" stroke="none"/>
   </svg>
 );
 
@@ -328,7 +328,7 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
             initial={{ opacity: 0, scale: 0.95, y: 10, transformOrigin: "bottom right" }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 10 }}
-            className="fixed z-[201] right-4 bottom-[85px] md:bottom-[max(85px,env(safe-area-inset-bottom))] bg-[#1c1c1c] rounded-[22px] py-[10px] shadow-[0_8px_40px_rgba(0,0,0,0.7)] flex flex-col min-w-[230px]"
+            className="fixed z-[201] right-3 sm:right-4 bottom-[calc(8rem+env(safe-area-inset-bottom,0px))] md:bottom-[5.5rem] bg-[#1c1c1c] rounded-[22px] py-[10px] shadow-[0_8px_40px_rgba(0,0,0,0.7)] flex flex-col min-w-[210px] sm:min-w-[230px]"
             role="menu"
           >
             {onShareLocation && (
@@ -393,7 +393,7 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
   );
 
   return (
-    <div className="chat-panel-input relative w-full max-w-[640px] mx-auto z-20 shrink-0 pb-5 pt-2">
+    <div className="chat-panel-input relative w-full z-20 shrink-0 px-0 pt-1.5 pb-1">
       {replyPreview}
 
       <input
@@ -409,14 +409,14 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
         <GreetingPicker onSelect={handleGreetingSelect} onClose={() => setOpenPicker(null)} />
       )}
 
-      <div className="flex items-center gap-[10px] bg-[#1a1a1a] rounded-[40px] py-[9px] pr-[14px] pl-[9px] mx-[14px]">
+      <div className="flex items-center gap-[8px] sm:gap-[10px] bg-[#1a1a1a] rounded-[40px] py-[7px] sm:py-[9px] pr-[10px] sm:pr-[14px] pl-[7px] sm:pl-[9px] mx-[10px] sm:mx-[14px]">
         <button
           type="button"
           onClick={() => { /* Camera logic if needed */ }}
-          className="w-[44px] h-[44px] rounded-full bg-[#5b5ef4] flex shrink-0 items-center justify-center text-white border-none"
+          className="w-[38px] h-[38px] sm:w-[44px] sm:h-[44px] rounded-full bg-[#5b5ef4] hover:bg-[#4a4de3] active:scale-95 flex shrink-0 items-center justify-center text-white border-none transition-all"
           disabled={disabled}
         >
-          <Camera className="w-[22px] h-[22px]" strokeWidth={1.8} />
+          <Camera className="w-[20px] h-[20px] sm:w-[22px] sm:h-[22px]" strokeWidth={1.8} />
         </button>
 
         {textInput}
@@ -426,40 +426,40 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
             {sendOrMic}
           </div>
         ) : (
-          <div className="flex items-center gap-[2px]">
+          <div className="flex items-center gap-0 sm:gap-[2px] shrink-0">
             <button
               type="button"
               onClick={onStartRecording}
-              className={`w-[38px] h-[38px] flex items-center justify-center rounded-full hover:bg-white/10 transition-colors text-[#ccc] border-none bg-transparent ${disabled ? iconBtnDisabled : ""}`}
+              className={`w-[34px] h-[34px] sm:w-[38px] sm:h-[38px] flex items-center justify-center rounded-full hover:bg-white/10 active:scale-95 transition-all text-[#ccc] border-none bg-transparent ${disabled ? iconBtnDisabled : ""}`}
               disabled={disabled}
             >
-              <Mic className="w-[24px] h-[24px]" strokeWidth={1.8} />
+              <Mic className="w-[22px] h-[22px] sm:w-[24px] sm:h-[24px]" strokeWidth={1.8} />
             </button>
             <button
               type="button"
               onClick={handleImageClick}
-              className={`w-[38px] h-[38px] flex items-center justify-center rounded-full hover:bg-white/10 transition-colors text-[#ccc] border-none bg-transparent ${disabled ? iconBtnDisabled : ""}`}
+              className={`w-[34px] h-[34px] sm:w-[38px] sm:h-[38px] flex items-center justify-center rounded-full hover:bg-white/10 active:scale-95 transition-all text-[#ccc] border-none bg-transparent ${disabled ? iconBtnDisabled : ""}`}
               disabled={disabled}
             >
-              <ImageIcon className="w-[24px] h-[24px]" strokeWidth={1.8} />
+              <ImageIcon className="w-[22px] h-[22px] sm:w-[24px] sm:h-[24px]" strokeWidth={1.8} />
             </button>
             <button
               type="button"
               onClick={toggleStickerPicker}
-              className={`w-[38px] h-[38px] flex items-center justify-center rounded-full hover:bg-white/10 transition-colors text-[#ccc] border-none bg-transparent ${disabled ? iconBtnDisabled : ""}`}
+              className={`w-[34px] h-[34px] sm:w-[38px] sm:h-[38px] flex items-center justify-center rounded-full hover:bg-white/10 active:scale-95 transition-all text-[#ccc] border-none bg-transparent ${disabled ? iconBtnDisabled : ""}`}
               disabled={disabled}
             >
-              <Sticker className="w-[24px] h-[24px]" strokeWidth={1.8} />
+              <Sticker className="w-[22px] h-[22px] sm:w-[24px] sm:h-[24px]" strokeWidth={1.8} />
             </button>
             
             <div className="relative shrink-0 flex items-center justify-center">
               <button
                 type="button"
                 onClick={() => setShowAttachmentMenu((s) => !s)}
-                className={`w-[38px] h-[38px] flex items-center justify-center rounded-full hover:bg-white/10 transition-colors text-[#ccc] border-none bg-transparent ${disabled ? iconBtnDisabled : ""}`}
+                className={`w-[34px] h-[34px] sm:w-[38px] sm:h-[38px] flex items-center justify-center rounded-full hover:bg-white/10 active:scale-95 transition-all text-[#ccc] border-none bg-transparent ${disabled ? iconBtnDisabled : ""}`}
                 disabled={disabled}
               >
-                <PlusCircle className={`w-[24px] h-[24px] transition-transform duration-[0.3s] ease-[cubic-bezier(0.34,1.56,0.64,1)] ${showAttachmentMenu ? "rotate-45" : ""}`} strokeWidth={1.8} />
+                <PlusCircle className={`w-[22px] h-[22px] sm:w-[24px] sm:h-[24px] transition-transform duration-[0.3s] ease-[cubic-bezier(0.34,1.56,0.64,1)] ${showAttachmentMenu ? "rotate-45" : ""}`} strokeWidth={1.8} />
               </button>
               {attachmentMenu}
             </div>
@@ -496,7 +496,7 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
             <motion.div
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
-              className="fixed z-[201] left-3 right-3 bottom-[calc(5.5rem+env(safe-area-inset-bottom,0px))] md:bottom-[max(5.5rem,env(safe-area-inset-bottom))] bg-card border border-border rounded-2xl p-2 shadow-xl flex flex-col gap-1"
+              className="fixed z-[201] left-3 right-3 bottom-[calc(8rem+env(safe-area-inset-bottom,0px))] md:bottom-[5.5rem] bg-[#1c1c1c] border border-white/10 rounded-2xl p-2 shadow-xl flex flex-col gap-1"
               role="dialog"
               aria-label="Chat styles"
             >
