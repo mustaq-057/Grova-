@@ -6,7 +6,10 @@ export type BubbleStyleId =
   | "cat-dog" | "facepalm" 
   | "heart-pepe" | "pig-shark" | "tongue-bear" | "doge" 
   | "frog-chick" | "hungry-dog" | "dino" | "dachshund" 
-  | "excited-pepe" | "shouting";
+  | "excited-pepe" | "shouting"
+  | "crying-cat" | "buff-doge" | "sus-crewmate" | "pop-cat" 
+  | "cool-shiba" | "surprised-pika" | "angry-pepe" | "nyan-cat" 
+  | "smug-frog" | "giga-chad";
 
 interface BubbleStyleSelectorProps {
   show: boolean;
@@ -28,6 +31,16 @@ const BUBBLE_STYLES: { id: BubbleStyleId; label: string; }[] = [
   { id: "dachshund", label: "Dachshund" },
   { id: "excited-pepe", label: "Excited Pepe" },
   { id: "shouting", label: "Shouting" },
+  { id: "crying-cat", label: "Crying Cat" },
+  { id: "buff-doge", label: "Buff Doge" },
+  { id: "sus-crewmate", label: "Sus Crewmate" },
+  { id: "pop-cat", label: "Pop Cat" },
+  { id: "cool-shiba", label: "Cool Shiba" },
+  { id: "surprised-pika", label: "Surprised Pika" },
+  { id: "angry-pepe", label: "Angry Pepe" },
+  { id: "nyan-cat", label: "Nyan Cat" },
+  { id: "smug-frog", label: "Smug Frog" },
+  { id: "giga-chad", label: "Giga Chad" },
 ];
 
 export const BubbleStyleSelector = memo(function BubbleStyleSelector({

@@ -1,6 +1,7 @@
 import { useState, memo, useCallback, useMemo, useRef, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import { Smile, MoreHorizontal, Trash2 } from "lucide-react";
+import { motion } from "framer-motion";
 import { AudioMessage } from "@/components/AudioMessage";
 import { cn } from "@/lib/utils";
 import { ChatFileBubble } from "@/components/ChatFileBubble";
@@ -485,7 +486,10 @@ export const MessageItem = memo(function MessageItem({
   }
 
   return (
-    <div
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95, y: 15 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      transition={{ type: "spring", stiffness: 400, damping: 28 }}
       className={`group flex items-end gap-2 mb-1 min-w-0 max-w-full ${isMe ? "flex-row-reverse" : "flex-row"}`}
       data-testid={`message-${msg.id}`}
       onMouseEnter={() => setHovered(true)}
@@ -606,7 +610,7 @@ export const MessageItem = memo(function MessageItem({
           </p>
         )}
       </div>
-    </div>
+    </motion.div>
   );
 });
 
