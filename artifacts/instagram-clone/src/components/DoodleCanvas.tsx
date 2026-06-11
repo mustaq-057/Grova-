@@ -1,13 +1,12 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { X, Undo, Trash2, Send, Eraser } from "lucide-react";
+import { X, Undo2, Trash2, Send, Eraser } from "lucide-react";
 
-// ─── Public types ────────────────────────────────────────────────────────────
+// ─── Public types ─────────────────────────────────────────────────────────────
 
 export interface DoodleData {
-  /** PNG data‑URL of the cropped stroke area (transparent background) */
+  /** PNG data-URL of the cropped stroke area (transparent background) */
   imageData: string;
-  /** Cropped area's position/size relative to viewport at draw time */
   canvasX: number;
   canvasY: number;
   width: number;
@@ -19,38 +18,47 @@ interface DoodleCanvasProps {
   onSend: (data: DoodleData) => void;
 }
 
-// ─── Palette ─────────────────────────────────────────────────────────────────
+// ─── 24 Crayon colours ───────────────────────────────────────────────────────
 
 const COLORS = [
-  "#ff2a00", "#ff8800", "#ffdd00", "#00cc55",
-  "#00aaff", "#6644ff", "#ff44cc", "#ffffff",
-  "#000000", "#888888",
+  // Row 1 – reds / pinks / purples
+  "#FF2020", "#FF6B35", "#FFD700", "#ADFF2F",
+  // Row 2 – greens / teals
+  "#00E676", "#00BCD4", "#2979FF", "#7C4DFF",
+  // Row 3 – dark tones
+  "#FF4081", "#E040FB", "#F06292", "#FFAB40",
+  // Row 4 – pastels
+  "#80CBC4", "#80DEEA", "#B39DDB", "#FFF59D",
+  // Row 5 – naturals
+  "#A5D6A7", "#EF9A9A", "#BCAAA4", "#90A4AE",
+  // Row 6 – darks + neutrals
+  "#FF8A65", "#CE93D8", "#FFFFFF", "#000000",
 ];
 
-const BRUSH_SIZES = [3, 6, 10, 16, 24];
+const BRUSH_SIZES = [2, 5, 9, 14, 22];
 
 type Point = { x: number; y: number };
 
-// ─── Component ───────────────────────────────────────────────────────────────
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function DoodleCanvas({ onClose, onSend }: DoodleCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [color, setColor] = useState("#ff2a00");
-  const [brushSize, setBrushSize] = useState(6);
+  const [color, setColor] = useState("#FF2020");
+  const [brushSize, setBrushSize] = useState(5);
   const [eraser, setEraser] = useState(false);
   const [canUndo, setCanUndo] = useState(false);
   const [hasStrokes, setHasStrokes] = useState(false);
+  const [sending, setSending] = useState(false);
 
   const isDrawingRef = useRef(false);
   const lastPtRef = useRef<Point | null>(null);
   const historyRef = useRef<string[]>([]);
-  // bounding box of all drawn pixels (in CSS px)
   const minXRef = useRef(Infinity);
   const minYRef = useRef(Infinity);
   const maxXRef = useRef(-Infinity);
   const maxYRef = useRef(-Infinity);
 
-  // ── Set up canvas to cover full viewport ────────────────────────────────
+  // ── Canvas sizing ──────────────────────────────────────────────────────────
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -58,9 +66,7 @@ export default function DoodleCanvas({ onClose, onSend }: DoodleCanvasProps) {
 
     const resize = () => {
       const ctx = canvas.getContext("2d")!;
-      const snap = historyRef.current.length
-        ? canvas.toDataURL("image/png")
-        : null;
+      const snap = historyRef.current.length ? canvas.toDataURL("image/png") : null;
       const dpr = window.devicePixelRatio || 1;
       canvas.width = window.innerWidth * dpr;
       canvas.height = window.innerHeight * dpr;
@@ -79,7 +85,7 @@ export default function DoodleCanvas({ onClose, onSend }: DoodleCanvasProps) {
     return () => window.removeEventListener("resize", resize);
   }, []);
 
-  // ── History ─────────────────────────────────────────────────────────────
+  // ── History ────────────────────────────────────────────────────────────────
 
   const saveHistory = useCallback(() => {
     const canvas = canvasRef.current;
@@ -123,7 +129,7 @@ export default function DoodleCanvas({ onClose, onSend }: DoodleCanvasProps) {
     maxXRef.current = -Infinity; maxYRef.current = -Infinity;
   }, []);
 
-  // ── Drawing helpers ─────────────────────────────────────────────────────
+  // ── Drawing ────────────────────────────────────────────────────────────────
 
   const applyBrush = useCallback((ctx: CanvasRenderingContext2D) => {
     if (eraser) {
@@ -146,11 +152,7 @@ export default function DoodleCanvas({ onClose, onSend }: DoodleCanvasProps) {
     maxYRef.current = Math.max(maxYRef.current, y + r);
   };
 
-  const getPoint = (e: React.PointerEvent): Point => ({
-    x: e.clientX, y: e.clientY,
-  });
-
-  // ── Pointer events ──────────────────────────────────────────────────────
+  const getPoint = (e: React.PointerEvent): Point => ({ x: e.clientX, y: e.clientY });
 
   const onPointerDown = useCallback((e: React.PointerEvent) => {
     e.preventDefault();
@@ -159,7 +161,6 @@ export default function DoodleCanvas({ onClose, onSend }: DoodleCanvasProps) {
     const pt = getPoint(e);
     lastPtRef.current = pt;
     expandBounds(pt.x, pt.y, brushSize);
-
     const ctx = canvasRef.current?.getContext("2d");
     if (!ctx) return;
     applyBrush(ctx);
@@ -175,7 +176,6 @@ export default function DoodleCanvas({ onClose, onSend }: DoodleCanvasProps) {
     e.preventDefault();
     const pt = getPoint(e);
     expandBounds(pt.x, pt.y, brushSize);
-
     const ctx = canvasRef.current?.getContext("2d");
     if (!ctx) return;
     applyBrush(ctx);
@@ -194,11 +194,12 @@ export default function DoodleCanvas({ onClose, onSend }: DoodleCanvasProps) {
     setHasStrokes(true);
   }, [saveHistory]);
 
-  // ── Send ─────────────────────────────────────────────────────────────────
+  // ── Send ───────────────────────────────────────────────────────────────────
 
   const handleSend = useCallback(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !hasStrokes) return;
+    if (!canvas || !hasStrokes || sending) return;
+    setSending(true);
 
     const PAD = 12;
     const x = Math.max(0, Math.floor(minXRef.current - PAD));
@@ -215,16 +216,16 @@ export default function DoodleCanvas({ onClose, onSend }: DoodleCanvasProps) {
     oct.drawImage(canvas, x * dpr, y * dpr, w * dpr, h * dpr, 0, 0, w * dpr, h * dpr);
 
     onSend({ imageData: exp.toDataURL("image/png"), canvasX: x, canvasY: y, width: w, height: h });
-  }, [hasStrokes, onSend, onClose]);
+  }, [hasStrokes, sending, onSend, onClose]);
 
-  // ── UI ───────────────────────────────────────────────────────────────────
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   return createPortal(
     <div
       className="fixed inset-0 z-[600] overflow-hidden"
       style={{ touchAction: "none" }}
     >
-      {/* Transparent canvas — the chat is VISIBLE through it */}
+      {/* Transparent drawing canvas */}
       <canvas
         ref={canvasRef}
         onPointerDown={onPointerDown}
@@ -236,106 +237,153 @@ export default function DoodleCanvas({ onClose, onSend }: DoodleCanvasProps) {
       />
 
       {/* ── Top bar ── */}
-      <div className="absolute top-0 inset-x-0 flex items-center justify-between px-4 py-3 bg-gradient-to-b from-black/60 to-transparent pointer-events-none">
+      <div className="absolute top-0 inset-x-0 flex items-center justify-between px-3 py-3 bg-gradient-to-b from-black/65 to-transparent pointer-events-none"
+        style={{ paddingTop: "env(safe-area-inset-top, 12px)" }}>
         <button
           onClick={onClose}
-          className="pointer-events-auto w-10 h-10 rounded-full bg-black/50 backdrop-blur-md flex items-center justify-center text-white active:scale-95 transition-transform"
+          className="pointer-events-auto w-10 h-10 rounded-full bg-black/55 backdrop-blur-md flex items-center justify-center text-white active:scale-95 transition-transform"
           aria-label="Close doodle"
         >
           <X className="w-5 h-5" />
         </button>
 
-        <div className="flex gap-3 pointer-events-auto">
+        <p className="text-white/70 text-[13px] font-semibold tracking-wide select-none pointer-events-none">
+          ✏️ Doodle
+        </p>
+
+        <div className="flex gap-2 pointer-events-auto">
+          {/* Undo */}
           <button
             onClick={undo}
             disabled={!canUndo}
-            className="w-10 h-10 rounded-full bg-black/50 backdrop-blur-md flex items-center justify-center text-white active:scale-95 transition-transform disabled:opacity-40"
+            className="w-10 h-10 rounded-full bg-black/55 backdrop-blur-md flex items-center justify-center text-white active:scale-95 transition-all disabled:opacity-35"
             aria-label="Undo"
           >
-            <Undo className="w-4 h-4" />
+            <Undo2 className="w-[18px] h-[18px]" />
           </button>
+          {/* Clear */}
           <button
             onClick={clear}
-            className="w-10 h-10 rounded-full bg-black/50 backdrop-blur-md flex items-center justify-center text-white active:scale-95 transition-transform"
-            aria-label="Clear"
+            className="w-10 h-10 rounded-full bg-black/55 backdrop-blur-md flex items-center justify-center text-white active:scale-95 transition-transform"
+            aria-label="Clear canvas"
           >
-            <Trash2 className="w-4 h-4" />
+            <Trash2 className="w-[16px] h-[16px]" />
           </button>
         </div>
       </div>
 
       {/* ── Bottom toolbar ── */}
-      <div className="absolute bottom-0 inset-x-0 flex flex-col items-center gap-3 pb-[env(safe-area-inset-bottom,16px)] px-4 pt-2 bg-gradient-to-t from-black/70 to-transparent pointer-events-none">
+      <div
+        className="absolute bottom-0 inset-x-0 flex flex-col items-center gap-2 px-3 pt-3"
+        style={{
+          paddingBottom: "calc(env(safe-area-inset-bottom, 12px) + 10px)",
+          background: "linear-gradient(to top, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.4) 60%, transparent 100%)",
+        }}
+      >
+        {/* Brush size row */}
+        <div className="flex items-center gap-3 pointer-events-auto mb-0.5">
+          {BRUSH_SIZES.map(s => {
+            const active = brushSize === s && !eraser;
+            return (
+              <button
+                key={s}
+                onClick={() => { setBrushSize(s); setEraser(false); }}
+                className="flex items-center justify-center rounded-full transition-all active:scale-90"
+                style={{ width: s + 18, height: s + 18 }}
+                aria-label={`Brush size ${s}`}
+              >
+                <span
+                  className="rounded-full block transition-all duration-150"
+                  style={{
+                    width: s,
+                    height: s,
+                    backgroundColor: eraser ? "#888" : color,
+                    boxShadow: active
+                      ? `0 0 0 2.5px #fff, 0 0 0 4.5px rgba(255,255,255,0.3), 0 0 12px ${color}80`
+                      : "0 0 0 1px rgba(255,255,255,0.25)",
+                    opacity: active ? 1 : 0.6,
+                    transform: active ? "scale(1.15)" : "scale(1)",
+                  }}
+                />
+              </button>
+            );
+          })}
 
-        {/* Brush-size row */}
-        <div className="flex items-center gap-5 pointer-events-auto">
-          {BRUSH_SIZES.map(s => (
-            <button
-              key={s}
-              onClick={() => { setBrushSize(s); setEraser(false); }}
-              className="flex items-center justify-center rounded-full transition-all active:scale-95"
-              style={{ width: s + 14, height: s + 14 }}
-              aria-label={`Brush size ${s}`}
-            >
-              <span
-                className="rounded-full bg-white block transition-all"
-                style={{
-                  width: s,
-                  height: s,
-                  boxShadow: brushSize === s && !eraser ? "0 0 0 2.5px #fff, 0 0 0 4.5px rgba(255,255,255,0.35)" : "none",
-                  opacity: brushSize === s && !eraser ? 1 : 0.55,
-                }}
-              />
-            </button>
-          ))}
+          {/* Eraser toggle */}
           <button
             onClick={() => setEraser(e => !e)}
-            className={`flex items-center gap-1.5 px-3 h-9 rounded-full text-[13px] font-semibold transition-all active:scale-95 ${eraser ? "bg-white text-black" : "bg-white/20 text-white"}`}
+            className={`flex items-center gap-1.5 px-3 h-8 rounded-full text-[12px] font-semibold transition-all active:scale-95 ${
+              eraser
+                ? "bg-white text-black shadow-[0_2px_12px_rgba(255,255,255,0.35)]"
+                : "bg-white/20 text-white backdrop-blur-sm"
+            }`}
             aria-label="Eraser"
           >
-            <Eraser className="w-4 h-4" />
+            <Eraser className="w-3.5 h-3.5" />
             <span>Erase</span>
           </button>
         </div>
 
-        {/* Color row + Send */}
-        <div className="flex items-center w-full max-w-md gap-2 pointer-events-auto">
-          {/* Scrollable colors */}
-          <div className="flex-1 flex items-center gap-2.5 overflow-x-auto scrollbar-hide pl-1 pr-2 py-1">
-            {COLORS.map(c => (
-              <button
-                key={c}
-                onClick={() => { setColor(c); setEraser(false); }}
-                className="shrink-0 rounded-full transition-all active:scale-95"
-                style={{
-                  backgroundColor: c,
-                  width: color === c && !eraser ? 34 : 28,
-                  height: color === c && !eraser ? 34 : 28,
-                  boxShadow: color === c && !eraser
-                    ? "0 0 0 2.5px #fff, 0 0 0 5px rgba(255,255,255,0.25)"
-                    : c === "#ffffff" ? "inset 0 0 0 1.5px rgba(0,0,0,0.25)" : "none",
-                }}
-                aria-label={`Color ${c}`}
-              />
-            ))}
+        {/* Colour palette + send */}
+        <div className="flex items-center w-full max-w-[420px] gap-2 pointer-events-auto">
+          {/* Compact 24-colour grid */}
+          <div
+            className="flex-1 grid gap-[5px]"
+            style={{ gridTemplateColumns: "repeat(12, 1fr)" }}
+          >
+            {COLORS.map(c => {
+              const active = color === c && !eraser;
+              return (
+                <button
+                  key={c}
+                  onClick={() => { setColor(c); setEraser(false); }}
+                  className="rounded-full transition-all active:scale-90"
+                  style={{
+                    aspectRatio: "1",
+                    backgroundColor: c,
+                    boxShadow: active
+                      ? `0 0 0 2px #fff, 0 0 0 4px rgba(255,255,255,0.25), 0 0 10px ${c}90`
+                      : c === "#FFFFFF"
+                        ? "inset 0 0 0 1px rgba(0,0,0,0.3)"
+                        : c === "#000000"
+                          ? "inset 0 0 0 1px rgba(255,255,255,0.25)"
+                          : "none",
+                    transform: active ? "scale(1.25)" : "scale(1)",
+                  }}
+                  aria-label={`Color ${c}`}
+                />
+              );
+            })}
           </div>
 
           {/* Send button */}
           <button
             onClick={handleSend}
-            disabled={!hasStrokes}
-            className="shrink-0 w-12 h-12 rounded-full bg-[#d91a92] flex items-center justify-center text-white shadow-[0_4px_20px_rgba(217,26,146,0.5)] active:scale-95 transition-all disabled:opacity-40 disabled:scale-95"
+            disabled={!hasStrokes || sending}
+            className="shrink-0 w-12 h-12 rounded-full flex items-center justify-center text-white active:scale-95 transition-all disabled:opacity-35 disabled:scale-95"
+            style={{
+              background: hasStrokes && !sending
+                ? "linear-gradient(135deg, #f72585, #b5179e)"
+                : "rgba(255,255,255,0.15)",
+              boxShadow: hasStrokes && !sending
+                ? "0 4px 20px rgba(247,37,133,0.55), 0 0 0 1px rgba(247,37,133,0.3)"
+                : "none",
+            }}
             aria-label="Send doodle"
           >
-            <Send className="w-5 h-5 ml-0.5" strokeWidth={2.5} />
+            {sending ? (
+              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <Send className="w-5 h-5 ml-0.5" strokeWidth={2.5} />
+            )}
           </button>
         </div>
       </div>
 
-      {/* Hint */}
+      {/* Hint overlay */}
       {!hasStrokes && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <p className="text-white/40 text-sm font-medium bg-black/20 px-4 py-2 rounded-full backdrop-blur-sm select-none">
+          <p className="text-white/45 text-sm font-medium bg-black/25 px-5 py-2.5 rounded-full backdrop-blur-sm select-none animate-pulse">
             ✏️ Draw anywhere on the chat
           </p>
         </div>

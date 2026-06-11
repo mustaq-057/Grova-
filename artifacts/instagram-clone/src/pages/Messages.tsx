@@ -381,9 +381,24 @@ export default function Messages() {
       ),
     ]);
     requestStickToBottom();
+
+    const attemptUpload = async (attempt = 0): Promise<string> => {
+      try {
+        return await uploadMediaToB2(data.imageData, "image/png");
+      } catch (err) {
+        const raw = err instanceof Error ? err.message : "";
+        const isNetwork = /fetch|network|failed to fetch|connection/i.test(raw);
+        if (isNetwork && attempt < 2) {
+          await new Promise((r) => setTimeout(r, 1200 * (attempt + 1)));
+          return attemptUpload(attempt + 1);
+        }
+        throw err;
+      }
+    };
+
     void (async () => {
       try {
-        const url = await uploadMediaToB2(data.imageData, "image/png");
+        const url = await attemptUpload();
         const outgoing = await prepareOutgoingMessage({
           senderId: user.id,
           type: "doodle",
@@ -403,7 +418,11 @@ export default function Messages() {
       } catch (err) {
         pendingOutgoingRef.current.delete(tempId);
         setMessages((prev) => prev.filter((m) => m.id !== tempId));
-        toast.error(err instanceof Error ? err.message : "Doodle upload failed.", { duration: 4000 });
+        const raw = err instanceof Error ? err.message : "";
+        const friendly = /fetch|network|failed to fetch|connection|timed out/i.test(raw)
+          ? "Doodle couldn't send — check your connection and try again."
+          : raw || "Doodle upload failed. Please try again.";
+        toast.error(friendly, { duration: 5000 });
       }
     })();
   }, [closeDoodlePanel, user, requestStickToBottom]);
