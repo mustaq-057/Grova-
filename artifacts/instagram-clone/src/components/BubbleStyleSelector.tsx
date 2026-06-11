@@ -3,6 +3,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "./ui/sheet";
 import { cn } from "@/lib/utils";
 
 export type BubbleStyleId = 
+  | "default"
   | "cat-dog" 
   | "heart-pepe" | "pig-shark" | "tongue-bear" | "doge" 
   | "frog-chick" | "hungry-dog" | "dino" | "dachshund" 
@@ -20,6 +21,7 @@ interface BubbleStyleSelectorProps {
 }
 
 const BUBBLE_STYLES: { id: BubbleStyleId; label: string; }[] = [
+  { id: "default", label: "Default" },
   { id: "cat-dog", label: "Cat dog" },
   { id: "heart-pepe", label: "Heart Pepe" },
   { id: "pig-shark", label: "Pig shark" },
@@ -83,8 +85,20 @@ export const BubbleStyleSelector = memo(function BubbleStyleSelector({
             The bubble applies to all chats. It only affects messages you send after saving.
           </p>
 
+          <button
+            onClick={() => onSelect("default")}
+            className={cn(
+              "w-full max-w-sm mb-8 py-3 rounded-xl font-semibold transition-colors border",
+              currentStyle === "default" || !currentStyle
+                ? "bg-primary text-primary-foreground border-primary" 
+                : "bg-secondary/50 hover:bg-secondary border-border"
+            )}
+          >
+            Reset to Plain Text (Default)
+          </button>
+
           <div className="grid grid-cols-3 gap-y-8 gap-x-4 w-full max-w-sm">
-            {BUBBLE_STYLES.map((style) => (
+            {BUBBLE_STYLES.filter(s => s.id !== "default").map((style) => (
               <button
                 key={style.id}
                 onClick={() => onSelect(style.id)}
