@@ -2937,16 +2937,7 @@ export default function Messages() {
             <span className="text-xs text-muted-foreground">{presence.label}</span>
           </div>
 
-          <div className="relative">
-            <button 
-              onClick={() => { setShowBubbleStyles(s => !s); setShowInfo(false); }} 
-              className={`p-1.5 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 active:scale-95 ${showBubbleStyles ? "bg-primary/20 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-secondary"}`} 
-              data-testid="button-themes"
-              aria-label="Change theme"
-            >
-              <Palette className="w-4 h-4" strokeWidth={1.5} />
-            </button>
-          </div>
+
           <button 
             onClick={() => startCall("audio")} 
             className="hidden sm:inline-flex p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 active:scale-95" 

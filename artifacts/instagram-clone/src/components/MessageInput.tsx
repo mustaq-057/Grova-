@@ -325,22 +325,7 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
               <span>Doodle</span>
             </button>
 
-            {onOpenChatStyles && (
-              <button
-                type="button"
-                onClick={() => {
-                  setShowAttachmentMenu(false);
-                  onOpenChatStyles();
-                }}
-                className="flex items-center gap-[20px] px-[24px] py-[15px] text-[17px] font-normal hover:bg-white/5 transition-colors w-full text-left text-white"
-                disabled={disabled}
-              >
-                <div className="w-[28px] h-[28px] flex items-center justify-center shrink-0">
-                  <CustomPaletteIcon />
-                </div>
-                <span>Chat Styles</span>
-              </button>
-            )}
+
 
           </motion.div>
         </>,
