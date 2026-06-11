@@ -89,7 +89,7 @@ import {
   clearUnreadChatBadge,
 } from "@/lib/notifications-feed";
 import { isReadReceiptsEnabled, isShowPresenceEnabled, areNotificationsEnabled } from "@/lib/couple-sync";
-import { isChatBlocked, setChatBlocked, getCuteMode, setCuteMode } from "@/lib/client-memory";
+import { isChatBlocked, setChatBlocked } from "@/lib/client-memory";
 import { hydrateQuickReactions } from "@/lib/quick-reactions";
 import {
   scrollChatToBottom,
@@ -139,11 +139,7 @@ function TypingDots() {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const MODE_STICKERS: Record<string, string> = {
-  frog: "🐸",
-  cat: "🐱",
-  panda: "🐼",
-};
+
 type CallState = { status: "outgoing" | "incoming" | "active"; type: "audio" | "video"; incomingOffer?: RTCSessionDescriptionInit } | null;
 
 function initialChatMessages(): ApiMessage[] {
@@ -159,7 +155,7 @@ export default function Messages() {
   );
   const [showInfo, setShowInfo] = useState(false);
   const [showBubbleStyles, setShowBubbleStyles] = useState(false);
-  const [bubbleStyle, setBubbleStyle] = useState<BubbleStyleId>("default");
+  const [bubbleStyle, setBubbleStyle] = useState<BubbleStyleId>("cat-dog");
 
   useEffect(() => {
     const saved = localStorage.getItem("bubbleStyle") as BubbleStyleId | null;
@@ -231,7 +227,7 @@ export default function Messages() {
   const [showThreadPanel, setShowThreadPanel] = useState(false);
   const [hiddenTick, setHiddenTick] = useState(0);
   const [contextMenu, setContextMenu] = useState<{ msg: ApiMessage; top: number; left: number } | null>(null);
-  const [cuteMode, setCuteModeState] = useState<string | null>(() => getCuteMode());
+
   const [notifCount, setNotifCount] = useState(() => unreadCount());
   const [unreadChat, setUnreadChat] = useState(0);
   const [isNearBottom, setIsNearBottom] = useState(true);
@@ -1692,12 +1688,11 @@ export default function Messages() {
       try {
         const url = await uploadMediaFile(file, mime);
         const sticker =
-          mediaViewMode === "once" ? "__vm:once" : mediaViewMode === "twice" ? "__vm:twice" : (cuteMode ? MODE_STICKERS[cuteMode] : undefined);
+          mediaViewMode === "once" ? "__vm:once" : mediaViewMode === "twice" ? "__vm:twice" : undefined;
         const outgoing = await prepareOutgoingMessage({
           senderId: user.id,
           type: "image",
           imageUrl: url,
-          ...(cuteMode && !sticker ? { variant: "cute" } : {}),
           ...(sticker ? { companionSticker: sticker } : {}),
         });
         const saved = await api.sendMessage(outgoing);
@@ -1844,10 +1839,7 @@ export default function Messages() {
     }
   }, []);
 
-  const toggleCuteMode = useCallback((mode: string | null) => {
-    setCuteMode(mode);
-    setCuteModeState(mode);
-  }, []);
+
 
   const sendText = useCallback((rawText: string) => {
     const text = rawText.trim();
@@ -1865,11 +1857,9 @@ export default function Messages() {
       text,
       type: "text",
       ...replyMeta,
-      ...(cuteMode
-        ? { variant: "cute" as const, companionSticker: MODE_STICKERS[cuteMode] || "🐸" }
-        : { variant: "default" as const }),
+      variant: "default" as const,
     });
-  }, [sendMsg, cuteMode, replyTo, stopTyping]);
+  }, [sendMsg, replyTo, stopTyping]);
 
   // Debounced search handler
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -2191,10 +2181,9 @@ export default function Messages() {
     (mode: "keep" | "once" | "twice"): string | undefined => {
       if (mode === "once") return "__vm:once";
       if (mode === "twice") return "__vm:twice";
-      if (cuteMode) return MODE_STICKERS[cuteMode];
       return undefined;
     },
-    [cuteMode],
+    [],
   );
 
   const handlePickedFile = useCallback(
@@ -2554,7 +2543,6 @@ export default function Messages() {
                 senderId, 
                 type: "audio", 
                 audioData: "",
-                ...(cuteMode ? { variant: "cute", companionSticker: MODE_STICKERS[cuteMode] || "🐸" } : {})
               }),
             ]);
             outgoing.audioData = url;
@@ -3196,8 +3184,7 @@ export default function Messages() {
           ref={messageInputRef}
           onInputActivity={handleInputActivity}
           onSendMessage={sendText}
-          cuteMode={cuteMode}
-          onToggleCuteMode={toggleCuteMode}
+
           onShareLocation={handleShareLocation}
           sharingLocation={sharingLocation}
           replyPreview={

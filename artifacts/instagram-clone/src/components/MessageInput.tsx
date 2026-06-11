@@ -16,8 +16,6 @@ interface MessageInputProps {
   /** Called with trimmed text when user sends (input state stays inside this component for perf). */
   onSendMessage: (text: string) => void;
   onInputActivity?: (value: string) => void;
-  cuteMode?: string | null;
-  onToggleCuteMode?: (mode: string | null) => void;
   onShareLocation?: () => void;
   sharingLocation?: boolean;
   onStickerSelect: (sticker: string) => void;
@@ -43,8 +41,6 @@ type OpenPicker = "emoji" | "sticker" | "greeting" | null;
 export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>(function MessageInput({
   onSendMessage,
   onInputActivity,
-  cuteMode = null,
-  onToggleCuteMode,
   onShareLocation,
   sharingLocation = false,
   onStickerSelect,
@@ -66,7 +62,6 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
 }, ref) {
   const [input, setInput] = useState("");
   const [openPicker, setOpenPicker] = useState<OpenPicker>(null);
-  const [showCuteMenu, setShowCuteMenu] = useState(false);
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -156,30 +151,9 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
 
   const openDoodle = useCallback(() => {
     setOpenPicker(null);
-    setShowCuteMenu(false);
     setShowAttachmentMenu(false);
     onDoodleOpen?.();
   }, [onDoodleOpen]);
-
-  const toggleCuteMenu = useCallback(() => {
-    setShowCuteMenu((s) => !s);
-    setShowAttachmentMenu(false);
-  }, []);
-
-  const toggleCuteFrog = useCallback(() => {
-    onToggleCuteMode?.(cuteMode === "frog" ? null : "frog");
-    setShowCuteMenu(false);
-  }, [onToggleCuteMode, cuteMode]);
-
-  const toggleCatMode = useCallback(() => {
-    onToggleCuteMode?.(cuteMode === "cat" ? null : "cat");
-    setShowCuteMenu(false);
-  }, [onToggleCuteMode, cuteMode]);
-
-  const togglePandaMode = useCallback(() => {
-    onToggleCuteMode?.(cuteMode === "panda" ? null : "panda");
-    setShowCuteMenu(false);
-  }, [onToggleCuteMode, cuteMode]);
 
   const toggleEmojiPicker = useCallback(() => {
     setOpenPicker((p) => (p === "emoji" ? null : "emoji"));
@@ -192,7 +166,6 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
   }, []);
 
   const toggleQuickReplies = useCallback(() => {
-    setShowCuteMenu(false);
     setShowAttachmentMenu(false);
     setOpenPicker((p) => (p === "greeting" ? null : "greeting"));
   }, []);
@@ -350,19 +323,7 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
               <span>Doodle</span>
             </button>
 
-            {onToggleCuteMode && (
-              <button
-                type="button"
-                onClick={toggleCuteMenu}
-                className="flex items-center gap-[20px] px-[24px] py-[15px] text-[17px] font-normal hover:bg-white/5 transition-colors w-full text-left text-white"
-                disabled={disabled}
-              >
-                <div className="w-[28px] h-[28px] flex items-center justify-center shrink-0">
-                  <CustomPaletteIcon />
-                </div>
-                <span>Chat Styles</span>
-              </button>
-            )}
+
           </motion.div>
         </>,
         document.body,
@@ -467,33 +428,7 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
         />
       )}
 
-      {showCuteMenu && onToggleCuteMode &&
-        createPortal(
-          <>
-            <div className="fixed inset-0 z-[200] bg-black/40" onClick={() => setShowCuteMenu(false)} aria-hidden />
-            <motion.div
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="fixed z-[201] left-3 right-3 bottom-[calc(8rem+env(safe-area-inset-bottom,0px))] md:bottom-[5.5rem] bg-[#1c1c1c] border border-white/10 rounded-2xl p-2 shadow-xl flex flex-col gap-1"
-              role="dialog"
-              aria-label="Chat styles"
-            >
-              <button type="button" onClick={toggleCuteFrog} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm hover:bg-secondary ${cuteMode === "frog" ? "bg-primary/15" : ""}`}>
-                <span className="emoji-native text-2xl leading-none">🐸</span>
-                <span>Frog mode</span>
-              </button>
-              <button type="button" onClick={toggleCatMode} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm hover:bg-secondary ${cuteMode === "cat" ? "bg-primary/15" : ""}`}>
-                <span className="emoji-native text-2xl leading-none">🐱</span>
-                <span>Cat mode</span>
-              </button>
-              <button type="button" onClick={togglePandaMode} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm hover:bg-secondary ${cuteMode === "panda" ? "bg-primary/15" : ""}`}>
-                <span className="emoji-native text-2xl leading-none">🐼</span>
-                <span>Panda mode</span>
-              </button>
-            </motion.div>
-          </>,
-          document.body,
-        )}
+
     </div>
   );
 }));

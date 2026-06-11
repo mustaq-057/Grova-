@@ -3,7 +3,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "./ui/sheet";
 import { cn } from "@/lib/utils";
 
 export type BubbleStyleId = 
-  | "default" | "capybara" | "frog" | "cat-dog" | "facepalm" 
+  | "cat-dog" | "facepalm" 
   | "heart-pepe" | "pig-shark" | "tongue-bear" | "doge" 
   | "frog-chick" | "hungry-dog" | "dino" | "dachshund" 
   | "excited-pepe" | "shouting";
@@ -16,9 +16,6 @@ interface BubbleStyleSelectorProps {
 }
 
 const BUBBLE_STYLES: { id: BubbleStyleId; label: string; }[] = [
-  { id: "default", label: "Default" },
-  { id: "capybara", label: "Capybara" },
-  { id: "frog", label: "Frog" },
   { id: "cat-dog", label: "Cat dog" },
   { id: "facepalm", label: "Facepalm" },
   { id: "heart-pepe", label: "Heart Pepe" },
