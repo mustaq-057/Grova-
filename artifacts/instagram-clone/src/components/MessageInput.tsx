@@ -307,7 +307,7 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
       onPaste={handlePaste}
       onClick={() => inputRef.current?.focus()}
       placeholder="Message..."
-      className={`flex-1 min-w-0 bg-transparent text-[17px] placeholder-[#888] text-[#888] focus:outline-none border-none font-[inherit] ${
+      className={`flex-1 w-0 min-w-0 bg-transparent text-[17px] placeholder-[#888] text-[#888] focus:outline-none border-none font-[inherit] ${
         disabled || recording ? "opacity-60 cursor-not-allowed" : ""
       }`}
       disabled={disabled || recording}
@@ -409,7 +409,7 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
         <GreetingPicker onSelect={handleGreetingSelect} onClose={() => setOpenPicker(null)} />
       )}
 
-      <div className="flex items-center gap-[8px] sm:gap-[10px] bg-[#1a1a1a] rounded-[40px] py-[7px] sm:py-[9px] pr-[10px] sm:pr-[14px] pl-[7px] sm:pl-[9px] mx-[10px] sm:mx-[14px]">
+      <div className="flex items-center gap-[8px] sm:gap-[10px] bg-[#1a1a1a] rounded-[40px] py-[7px] sm:py-[9px] pr-[10px] sm:pr-[14px] pl-[7px] sm:pl-[9px] mx-[10px] md:mx-auto md:w-full md:max-w-[800px]">
         <button
           type="button"
           onClick={() => { /* Camera logic if needed */ }}
