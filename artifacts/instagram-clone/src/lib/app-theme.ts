@@ -32,74 +32,74 @@ export const APP_THEMES: {
   dark: Record<string, string>;
   light: Record<string, string>;
 }[] = [
-  {
-    id: "sara-lavender",
-    name: "Sara",
-    description: "Sara falls · lavender photo ♡",
-    swatch: "bg-gradient-to-br from-pink-300 via-fuchsia-200 to-violet-300",
-    dark: {
-      "--app-background": "270 22% 9%",
-      "--app-foreground": "0 0% 98%",
-      "--app-primary": "330 75% 78%",
-      "--app-card": "270 20% 13%",
-      "--app-secondary": "270 18% 16%",
-      "--app-border": "270 14% 22%",
+    {
+      id: "sara-lavender",
+      name: "Sara",
+      description: "Sara falls · lavender photo ♡",
+      swatch: "bg-gradient-to-br from-pink-300 via-fuchsia-200 to-violet-300",
+      dark: {
+        "--app-background": "270 22% 9%",
+        "--app-foreground": "0 0% 98%",
+        "--app-primary": "330 75% 78%",
+        "--app-card": "270 20% 13%",
+        "--app-secondary": "270 18% 16%",
+        "--app-border": "270 14% 22%",
+      },
+      light: {
+        "--app-background": "270 35% 97%",
+        "--app-foreground": "270 25% 16%",
+        "--app-primary": "330 65% 52%",
+        "--app-card": "0 0% 100%",
+        "--app-secondary": "270 28% 94%",
+        "--app-border": "270 22% 88%",
+      },
     },
-    light: {
-      "--app-background": "270 35% 97%",
-      "--app-foreground": "270 25% 16%",
-      "--app-primary": "330 65% 52%",
-      "--app-card": "0 0% 100%",
-      "--app-secondary": "270 28% 94%",
-      "--app-border": "270 22% 88%",
+    {
+      id: "sakura-fall",
+      name: "Sakura Fall",
+      description: "3D cherry blossoms ♡",
+      swatch: "bg-gradient-to-br from-pink-200 via-rose-300 to-pink-400",
+      dark: {
+        "--app-background": "330 22% 9%",
+        "--app-foreground": "350 30% 94%",
+        "--app-primary": "350 70% 75%",
+        "--app-card": "330 20% 12%",
+        "--app-secondary": "330 18% 16%",
+        "--app-border": "330 15% 20%",
+      },
+      light: {
+        "--app-background": "350 50% 97%",
+        "--app-foreground": "340 28% 22%",
+        "--app-primary": "350 65% 68%",
+        "--app-card": "350 45% 99%",
+        "--app-secondary": "350 40% 95%",
+        "--app-border": "350 30% 90%",
+      },
     },
-  },
-  {
-    id: "sakura-fall",
-    name: "Sakura Fall",
-    description: "3D cherry blossoms ♡",
-    swatch: "bg-gradient-to-br from-pink-200 via-rose-300 to-pink-400",
-    dark: {
-      "--app-background": "330 22% 9%",
-      "--app-foreground": "350 30% 94%",
-      "--app-primary": "350 70% 75%",
-      "--app-card": "330 20% 12%",
-      "--app-secondary": "330 18% 16%",
-      "--app-border": "330 15% 20%",
-    },
-    light: {
-      "--app-background": "350 50% 97%",
-      "--app-foreground": "340 28% 22%",
-      "--app-primary": "350 65% 68%",
-      "--app-card": "350 45% 99%",
-      "--app-secondary": "350 40% 95%",
-      "--app-border": "350 30% 90%",
-    },
-  },
 
-  {
-    id: "moonlight-saga",
-    name: "Moonlight Saga",
-    description: "Mystical twilight romance 🌙",
-    swatch: "bg-gradient-to-br from-indigo-950 via-slate-900 to-blue-950",
-    dark: {
-      "--app-background": "225 35% 8%",
-      "--app-foreground": "210 20% 95%",
-      "--app-primary": "210 90% 70%",
-      "--app-card": "225 30% 12%",
-      "--app-secondary": "225 25% 16%",
-      "--app-border": "225 20% 22%",
+    {
+      id: "moonlight-saga",
+      name: "Moonlight Saga",
+      description: "Mystical twilight romance 🌙",
+      swatch: "bg-gradient-to-br from-indigo-950 via-slate-900 to-blue-950",
+      dark: {
+        "--app-background": "225 35% 8%",
+        "--app-foreground": "210 20% 95%",
+        "--app-primary": "210 90% 70%",
+        "--app-card": "225 30% 12%",
+        "--app-secondary": "225 25% 16%",
+        "--app-border": "225 20% 22%",
+      },
+      light: {
+        "--app-background": "210 30% 96%",
+        "--app-foreground": "225 40% 16%",
+        "--app-primary": "215 85% 45%",
+        "--app-card": "0 0% 100%",
+        "--app-secondary": "210 25% 92%",
+        "--app-border": "210 18% 85%",
+      },
     },
-    light: {
-      "--app-background": "210 30% 96%",
-      "--app-foreground": "225 40% 16%",
-      "--app-primary": "215 85% 45%",
-      "--app-card": "0 0% 100%",
-      "--app-secondary": "210 25% 92%",
-      "--app-border": "210 18% 85%",
-    },
-  },
-];
+  ];
 
 let currentAppTheme: AppThemeId = "sara-lavender";
 let darkMode = true;

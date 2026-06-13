@@ -277,7 +277,7 @@ export const MessageItem = memo(function MessageItem({
   const mediaLimit = viewMode === "once" ? 1 : viewMode === "twice" ? 2 : 0;
   const mediaOpenedCount = msg.mediaOpenCount ?? 0;
   const mediaRemaining = Math.max(0, mediaLimit - mediaOpenedCount);
-  const isEphemeralMedia = mediaLimit > 0 && (isImage || isVideo);
+  const showEphemeralBubble = mediaLimit > 0 && (isImage || isVideo);
   const mediaWasOpened = Boolean(msg.mediaOpenedAt);
 
   const bubbleContent = (
@@ -296,7 +296,7 @@ export const MessageItem = memo(function MessageItem({
           onLoad={() => onMediaLoad?.(msg.id)}
         />
       ) : isImage && (msg.imageUrl || msg.imageData || mediaLimit > 0) ? (
-        isEphemeralMedia ? (
+        showEphemeralBubble ? (
           <EphemeralMediaBubble
             kind="photo"
             viewMode={viewMode as "once" | "twice"}
@@ -340,7 +340,7 @@ export const MessageItem = memo(function MessageItem({
           </button>
         )
       ) : isVideo && (msg.fileData || mediaLimit > 0) ? (
-        isEphemeralMedia ? (
+        showEphemeralBubble ? (
           <EphemeralMediaBubble
             kind="video"
             viewMode={viewMode as "once" | "twice"}

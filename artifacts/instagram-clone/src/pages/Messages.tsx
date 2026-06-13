@@ -1,4 +1,4 @@
-import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, startTransition } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, startTransition, type ReactElement } from "react";
 import { Info, Heart, Mic, X, Trash2, Ban, Phone, Video, WifiOff, Wifi, Search, AlertCircle, Palette, MessageCircle, Shield } from "lucide-react";
 import { motion } from "framer-motion";
 import { api, type ApiMessage } from "@/lib/api";
@@ -3146,7 +3146,7 @@ export default function Messages() {
               ) : null}
               {(() => {
                 const arr = group.msgs.filter((msg: ApiMessage) => !msg.pinned);
-                const nodes: JSX.Element[] = [];
+                const nodes: ReactElement[] = [];
                 let i = 0;
                 while (i < arr.length) {
                   const { stack, skip } = collectImageStack(arr, i);
