@@ -1,7 +1,6 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { X, Undo2, Eraser, Send, ChevronLeft } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { X, Undo2, Trash2, Send, ChevronLeft } from "lucide-react";
 
 export interface DoodleData {
   imageData: string;
@@ -17,28 +16,59 @@ interface DoodleCanvasProps {
 }
 
 const COLORS = [
-  "#1a1a2e",
+  "#000000",
   "#FFFFFF",
-  "#FF4D8D",
-  "#FF6B6B",
-  "#FFB347",
-  "#FFE066",
-  "#4ECDC4",
-  "#45B7D1",
-  "#9B59B6",
+  "#FF0040",
+  "#FF6B00",
+  "#FFD700",
+  "#00E676",
+  "#0080FF",
+  "#9D00FF",
+  "#FF00FF",
+  "#8B7355",
   "#E84393",
+  "#4ECDC4",
+  "#FFB347",
+  "#1a1a2e",
+  "#95A5A6",
+  "#2ECC71",
+  "#FF69B4",
+  "#00CED1",
 ];
 
-const SIZES = [3, 6, 12, 20];
+const SIZES = [2, 4, 8, 14, 22];
 
 type Point = { x: number; y: number };
+
+function roundRectPath(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number,
+) {
+  const radius = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y);
+  ctx.lineTo(x + w - radius, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
+  ctx.lineTo(x + w, y + h - radius);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
+  ctx.lineTo(x + radius, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
+  ctx.lineTo(x, y + radius);
+  ctx.quadraticCurveTo(x, y, x + radius, y);
+  ctx.closePath();
+}
 
 export default function DoodleCanvas({ onClose, onSend, onError }: DoodleCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const [color, setColor] = useState("#1a1a2e");
-  const [brushSize, setBrushSize] = useState(6);
+  const [color, setColor] = useState("#000000");
+  const [brushSize, setBrushSize] = useState(8);
+  const [sliderValue, setSliderValue] = useState(50);
   const [canUndo, setCanUndo] = useState(false);
   const [hasStrokes, setHasStrokes] = useState(false);
   const [sending, setSending] = useState(false);
@@ -47,6 +77,8 @@ export default function DoodleCanvas({ onClose, onSend, onError }: DoodleCanvasP
   const lastPtRef = useRef<Point | null>(null);
   const historyRef = useRef<string[]>([]);
   const exportGenRef = useRef(0);
+
+  const actualBrushSize = brushSize * (sliderValue / 50);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -136,10 +168,10 @@ export default function DoodleCanvas({ onClose, onSend, onError }: DoodleCanvasP
     ctx.globalCompositeOperation = "source-over";
     ctx.strokeStyle = color;
     ctx.fillStyle = color;
-    ctx.lineWidth = brushSize;
+    ctx.lineWidth = actualBrushSize;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
-  }, [color, brushSize]);
+  }, [color, actualBrushSize]);
 
   const getPoint = (e: React.PointerEvent): Point => {
     const rect = canvasRef.current?.getBoundingClientRect();
@@ -161,9 +193,9 @@ export default function DoodleCanvas({ onClose, onSend, onError }: DoodleCanvasP
     if (!ctx) return;
     applyBrush(ctx);
     ctx.beginPath();
-    ctx.arc(pt.x, pt.y, brushSize / 2, 0, Math.PI * 2);
+    ctx.arc(pt.x, pt.y, actualBrushSize / 2, 0, Math.PI * 2);
     ctx.fill();
-  }, [brushSize, applyBrush]);
+  }, [actualBrushSize, applyBrush]);
 
   const onPointerMove = useCallback((e: React.PointerEvent) => {
     if (!isDrawingRef.current || !lastPtRef.current) return;
@@ -304,6 +336,7 @@ export default function DoodleCanvas({ onClose, onSend, onError }: DoodleCanvasP
         fctx.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, cssW, cssH);
 
         const crop = cropToContent(fullCanvas, cssW, cssH);
+        const cornerRadius = Math.min(24, crop.w * 0.12, crop.h * 0.12);
 
         const exportCanvas = document.createElement("canvas");
         exportCanvas.width = crop.w;
@@ -313,9 +346,14 @@ export default function DoodleCanvas({ onClose, onSend, onError }: DoodleCanvasP
           fail("Could not prepare your doodle. Please try again.");
           return;
         }
+
+        ectx.save();
+        roundRectPath(ectx, 0, 0, crop.w, crop.h, cornerRadius);
+        ectx.clip();
         ectx.fillStyle = "#FFFFFF";
         ectx.fillRect(0, 0, crop.w, crop.h);
         ectx.drawImage(fullCanvas, crop.x, crop.y, crop.w, crop.h, 0, 0, crop.w, crop.h);
+        ectx.restore();
 
         const blobTimeout = setTimeout(() => {
           fail("Doodle export took too long. Try again with a simpler drawing.");
@@ -375,106 +413,133 @@ export default function DoodleCanvas({ onClose, onSend, onError }: DoodleCanvasP
         <button
           onClick={handleSend}
           disabled={!hasStrokes || sending}
-          className="flex items-center gap-1.5 px-4 py-2 bg-primary rounded-full text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-40"
+          className="w-9 h-9 flex items-center justify-center bg-primary rounded-full text-white hover:bg-primary/90 transition-colors disabled:opacity-50"
+          aria-label="Send doodle"
         >
           {sending ? (
             <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
           ) : (
-            <>
-              <Send className="w-4 h-4" />
-              Send
-            </>
+            <Send className="w-4 h-4 ml-0.5" />
           )}
         </button>
       </div>
 
-      <div
-        ref={containerRef}
-        className="flex-1 min-h-0 relative bg-[#161c2d] m-3 rounded-2xl overflow-hidden"
-      >
-        <canvas
-          ref={canvasRef}
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerCancel={onPointerUp}
-          className="absolute inset-0 touch-none w-full h-full cursor-crosshair bg-white"
-        />
-        {!hasStrokes && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <p className="text-muted-foreground/50 text-sm font-medium">Draw something cute ✨</p>
-          </div>
-        )}
-      </div>
-
-      <div
-        className="shrink-0 border-t border-white/5 bg-[#0b101e] px-4 pt-3"
-        style={{ paddingBottom: "max(16px, env(safe-area-inset-bottom))" }}
-      >
-        <div className="flex items-center gap-2 mb-3 overflow-x-auto scrollbar-hide pb-1">
+      <div className="flex flex-1 min-h-0">
+        <div className="w-[56px] sm:w-[60px] shrink-0 flex flex-col items-center py-3 overflow-y-auto scrollbar-hide gap-3 border-r border-white/5">
           {COLORS.map((c) => (
             <button
               key={c}
               onClick={() => setColor(c)}
-              className={cn(
-                "relative rounded-full w-9 h-9 shrink-0 transition-transform hover:scale-110",
-                color === c && "ring-2 ring-primary ring-offset-2 ring-offset-[#0b101e]",
-              )}
+              className="relative rounded-full w-8 h-8 shrink-0 transition-transform hover:scale-110"
               style={{
                 backgroundColor: c,
-                border: c === "#FFFFFF" ? "1px solid rgba(255,255,255,0.3)" : "none",
+                border: c === "#FFFFFF" || c === "#000000" ? "1px solid rgba(255,255,255,0.25)" : "none",
               }}
               aria-label={`Color ${c}`}
-            />
+            >
+              {color === c && (
+                <div className="absolute -inset-[3px] rounded-full border-2 border-primary" />
+              )}
+            </button>
           ))}
         </div>
 
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
+        <div className="flex-1 flex flex-col bg-[#161c2d] min-w-0">
+          <div
+            ref={containerRef}
+            className="flex-1 m-2 sm:m-3 rounded-2xl overflow-hidden bg-white shadow-lg relative"
+          >
+            <canvas
+              ref={canvasRef}
+              onPointerDown={onPointerDown}
+              onPointerMove={onPointerMove}
+              onPointerUp={onPointerUp}
+              onPointerCancel={onPointerUp}
+              className="absolute inset-0 touch-none w-full h-full cursor-crosshair"
+            />
+            {!hasStrokes && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <p className="text-black/30 text-sm font-medium">Draw something cute ✨</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="w-[56px] sm:w-[60px] shrink-0 flex flex-col items-center py-3 border-l border-white/5">
+          <div className="text-[10px] text-white/50 font-bold mb-3">SIZE</div>
+          <div className="flex flex-col items-center gap-3 mb-4">
             {SIZES.map((s) => (
               <button
                 key={s}
                 onClick={() => setBrushSize(s)}
-                className={cn(
-                  "flex items-center justify-center w-9 h-9 rounded-full transition-colors",
-                  brushSize === s ? "bg-primary/25 ring-1 ring-primary" : "hover:bg-white/10",
-                )}
+                className="relative flex items-center justify-center w-8 h-8 rounded-full hover:bg-white/5"
                 aria-label={`Brush size ${s}`}
               >
                 <div
-                  className="rounded-full bg-white"
-                  style={{ width: Math.min(s, 16), height: Math.min(s, 16) }}
+                  className="rounded-full bg-white transition-all"
+                  style={{ width: Math.min(s, 14), height: Math.min(s, 14) }}
                 />
+                {brushSize === s && (
+                  <div className="absolute inset-0 rounded-full border-2 border-primary" />
+                )}
               </button>
             ))}
           </div>
 
-          <div className="flex items-center gap-1">
-            <button
-              onClick={undo}
-              disabled={!canUndo}
-              className="p-2.5 hover:bg-white/10 rounded-full transition-colors disabled:opacity-30"
-              aria-label="Undo"
-            >
-              <Undo2 className="w-5 h-5" />
-            </button>
-            <button
-              onClick={clear}
-              disabled={!hasStrokes}
-              className="p-2.5 hover:bg-white/10 rounded-full transition-colors disabled:opacity-30"
-              aria-label="Clear canvas"
-            >
-              <Eraser className="w-5 h-5" />
-            </button>
-            <button
-              onClick={onClose}
-              className="p-2.5 hover:bg-white/10 rounded-full transition-colors"
-              aria-label="Cancel"
-            >
-              <X className="w-5 h-5" />
-            </button>
+          <div className="flex-1 flex flex-col items-center w-full min-h-[80px] px-2 relative">
+            <div className="absolute inset-y-0 w-1 bg-white/10 rounded-full overflow-hidden flex flex-col justify-end">
+              <div
+                className="w-full bg-primary transition-all duration-75"
+                style={{ height: `${sliderValue}%` }}
+              />
+            </div>
+            <input
+              type="range"
+              min="10"
+              max="100"
+              value={sliderValue}
+              onChange={(e) => setSliderValue(Number(e.target.value))}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-ns-resize"
+              style={{ writingMode: "vertical-rl", direction: "rtl" }}
+              aria-label="Brush size multiplier"
+            />
+            <div
+              className="absolute w-3.5 h-3.5 bg-primary rounded-full shadow-lg pointer-events-none transition-all duration-75"
+              style={{ bottom: `calc(${sliderValue}% - 7px)` }}
+            />
           </div>
         </div>
+      </div>
+
+      <div
+        className="shrink-0 border-t border-white/5 bg-[#0b101e] px-4 py-3 flex items-center justify-between"
+        style={{ paddingBottom: "max(12px, env(safe-area-inset-bottom))" }}
+      >
+        <div className="flex items-center gap-1">
+          <button
+            onClick={undo}
+            disabled={!canUndo}
+            className="p-2.5 hover:bg-white/10 rounded-full transition-colors disabled:opacity-30"
+            aria-label="Undo"
+          >
+            <Undo2 className="w-5 h-5" />
+          </button>
+          <button
+            onClick={clear}
+            disabled={!hasStrokes}
+            className="p-2.5 hover:bg-destructive/20 text-destructive rounded-full transition-colors disabled:opacity-30"
+            aria-label="Clear canvas"
+          >
+            <Trash2 className="w-5 h-5" />
+          </button>
+        </div>
+        <button
+          onClick={onClose}
+          className="p-2.5 hover:bg-white/10 rounded-full transition-colors"
+          aria-label="Cancel"
+        >
+          <X className="w-5 h-5" />
+        </button>
       </div>
     </div>,
     document.body,

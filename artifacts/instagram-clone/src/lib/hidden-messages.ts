@@ -1,4 +1,4 @@
-import { api } from "./api";
+import { api, type ApiMessage } from "./api";
 
 const CLEARED_AT_STORAGE_PREFIX = "grova_chat_cleared_v1_";
 const HIDDEN_IDS_STORAGE_PREFIX = "grova_hidden_msgs_v1_";
@@ -75,7 +75,10 @@ export function getHiddenMessageIds(userId: string): Set<string> {
 }
 
 export function getChatClearedAt(userId: string): string | null {
-  return clearedAtByUser.get(userId) ?? readPersistedClearedAt(userId);
+  if (clearedAtByUser.has(userId)) return clearedAtByUser.get(userId) ?? null;
+  const persisted = readPersistedClearedAt(userId);
+  clearedAtByUser.set(userId, persisted);
+  return persisted;
 }
 
 export async function clearChatForUser(userId: string): Promise<string> {
@@ -111,7 +114,7 @@ export function removeHiddenMessageId(userId: string, messageId: string): void {
 }
 
 function isAfterClear(userId: string, msg: { timestamp?: string }): boolean {
-  const chatClearedAt = clearedAtByUser.get(userId);
+  const chatClearedAt = getChatClearedAt(userId);
   if (!chatClearedAt || !msg.timestamp) return true;
   const msgMs = new Date(msg.timestamp).getTime();
   const clearMs = new Date(chatClearedAt).getTime();
@@ -125,4 +128,8 @@ export function filterVisibleMessages<T extends { id: string; timestamp?: string
 ): T[] {
   const hidden = getHiddenMessageIds(userId);
   return msgs.filter((m) => !hidden.has(m.id) && isAfterClear(userId, m));
+}
+
+export function filterMessagesForCache(userId: string, msgs: ApiMessage[]): ApiMessage[] {
+  return filterVisibleMessages(userId, msgs);
 }

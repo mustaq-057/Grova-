@@ -143,28 +143,29 @@ export default memo(function Home() {
               transition={{ delay: 0.2, duration: 0.3 }}
               className="relative flex items-center justify-center gap-5 sm:gap-7 mt-8 mb-6 w-full max-w-[340px] mx-auto cursor-pointer active:scale-[0.98] transition-transform"
             >
-              {/* Wavy connection line — passes through the heart center */}
-              <div className="absolute inset-x-2 sm:inset-x-0 top-1/2 -translate-y-1/2 z-[8] pointer-events-none">
-                <svg viewBox="0 0 300 28" className="w-full h-7" preserveAspectRatio="none" aria-hidden>
+              {/* Wavy connection line — curves through the heart center */}
+              <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 z-[8] pointer-events-none">
+                <svg viewBox="0 0 320 36" className="w-full h-9" preserveAspectRatio="none" aria-hidden>
                   <path
-                    d="M 0,16 Q 75,6 150,14 T 300,12"
+                    d="M 0,22 C 45,6 75,32 110,14 S 175,4 210,20 S 265,34 320,12"
                     fill="none"
-                    className="stroke-primary/25"
-                    strokeWidth="12"
-                    filter="blur(6px)"
+                    className="stroke-primary/20"
+                    strokeWidth="14"
+                    filter="blur(8px)"
                   />
                   <path
-                    d="M 0,16 Q 75,6 150,14 T 300,12"
+                    d="M 0,22 C 45,6 75,32 110,14 S 175,4 210,20 S 265,34 320,12"
                     fill="none"
-                    className="stroke-primary/60"
-                    strokeWidth="3"
-                    filter="blur(1px)"
+                    className="stroke-primary/50"
+                    strokeWidth="5"
+                    filter="blur(2px)"
                   />
                   <path
-                    d="M 0,16 Q 75,6 150,14 T 300,12"
+                    d="M 0,22 C 45,6 75,32 110,14 S 175,4 210,20 S 265,34 320,12"
                     fill="none"
                     className="stroke-primary"
-                    strokeWidth="2"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
                   />
                 </svg>
               </div>

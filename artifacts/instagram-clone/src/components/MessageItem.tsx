@@ -274,65 +274,6 @@ export const MessageItem = memo(function MessageItem({
     return <DeletedMessageNotice isMe={isMe} partnerName={partnerName} />;
   }
 
-  // ── Doodle: rendered as regular message bubble ──────────────────
-  if (isDoodle) {
-    const src = resolveChatImageUrl(msg.imageUrl || msg.imageData);
-    let pos = { canvasX: 0, canvasY: 0, width: 200, height: 200 };
-    try {
-      if (msg.text) pos = JSON.parse(msg.text);
-    } catch(e) {}
-
-    return (
-      <motion.div
-        data-testid={`message-${msg.id}`}
-        initial={{ opacity: 0, scale: 0.8 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.8 }}
-        transition={{ type: "spring", stiffness: 200, damping: 20 }}
-        className={cn(
-          "group flex gap-2 items-end mb-3 transition-all duration-200",
-          isMe ? "justify-end" : "justify-start",
-        )}
-      >
-        {!isMe && partnerAvatar && (
-          <img
-            src={partnerAvatar}
-            alt={partnerName}
-            className="w-6 h-6 rounded-full object-cover shrink-0 mt-2"
-          />
-        )}
-
-        <div
-          className={cn(
-            "relative group/bubble max-w-[min(320px,85vw)]",
-            isMe && "flex flex-col items-end",
-          )}
-        >
-          <DoodleMessageBubble
-            msg={msg}
-            src={src}
-            isMe={isMe}
-            onUnsend={() => onUnsend?.(msg.id)}
-            doodleWidth={Math.max(120, Math.min(280, pos.width))}
-            doodleHeight={Math.max(120, Math.min(280, pos.height))}
-          />
-
-          {isMe && seenLabel && (
-            <p
-              className={`text-[11px] mt-0.5 pr-1 font-medium transition-all duration-300 ${
-                seenLabel === "Just seen"
-                  ? "text-primary animate-pulse"
-                  : "text-muted-foreground/80"
-              }`}
-            >
-              {seenLabel}
-            </p>
-          )}
-        </div>
-      </motion.div>
-    );
-  }
-
   const viewMode = msg.mediaViewMode ?? parseMediaViewMode(msg.companionSticker);
   const mediaLimit = viewMode === "once" ? 1 : viewMode === "twice" ? 2 : 0;
   const mediaOpenedCount = msg.mediaOpenCount ?? 0;
@@ -370,8 +311,11 @@ export const MessageItem = memo(function MessageItem({
         ) : imageDisplaySrc && !imageLoadFailed ? (
           <img
             src={imageDisplaySrc}
-            alt=""
-            className="max-w-[min(280px,92vw)] max-h-[340px] min-h-[72px] w-auto h-auto object-contain rounded-2xl block cursor-pointer bg-black/15"
+            alt={isDoodle ? "Doodle" : ""}
+            className={cn(
+              "max-w-[min(280px,92vw)] max-h-[340px] min-h-[72px] w-auto h-auto object-contain rounded-2xl block cursor-pointer bg-black/15",
+              isDoodle && "shadow-sm",
+            )}
             loading="eager"
             decoding="async"
             referrerPolicy="no-referrer"

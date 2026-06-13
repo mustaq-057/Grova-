@@ -53,6 +53,7 @@ import {
   applyHiddenMessageId,
   getHiddenMessageIds,
   removeHiddenMessageId,
+  filterMessagesForCache,
 } from "@/lib/hidden-messages";
 import { parsePresenceResponse, isPartnerActiveInChat } from "@/lib/presence-api";
 import {
@@ -504,7 +505,7 @@ export default function Messages() {
         );
         const next = preserveDroppedMessages(prev, guarded, { keepIds });
         messagesSigRef.current = messagesListSignature(next);
-        if (user?.id) writeChatCache(user.id, next);
+        if (user?.id) writeChatCache(user.id, filterMessagesForCache(user.id, next));
         return next;
       });
       if ((isNearBottomRef.current || isInitialLoadRef.current) && !pendingScrollRestoreRef.current && !initialUnreadHandledRef.current) {
@@ -716,7 +717,7 @@ export default function Messages() {
             return prev;
           }
           messagesSigRef.current = messagesListSignature(next);
-          if (user?.id) writeChatCache(user.id, next);
+          if (user?.id) writeChatCache(user.id, filterMessagesForCache(user.id, next));
           return next;
         });
         setHasMore(fresh.length > 0 && (data.pagination?.hasMore ?? false));
@@ -1159,7 +1160,7 @@ export default function Messages() {
             return prev;
           }
           messagesSigRef.current = messagesListSignature(next);
-          if (user?.id) writeChatCache(user.id, next);
+          if (user?.id) writeChatCache(user.id, filterMessagesForCache(user.id, next));
           return next;
         });
         setHasMore(fresh.length > 0 && (data.pagination?.hasMore ?? false));
@@ -1778,7 +1779,7 @@ export default function Messages() {
         setMessages((prev) => {
           const next = replaceOptimisticMessage(prev, tempId, display, user.id);
           messagesSigRef.current = messagesListSignature(next);
-          if (user?.id) writeChatCache(user.id, next);
+          if (user?.id) writeChatCache(user.id, filterMessagesForCache(user.id, next));
           return next;
         });
         requestStickToBottom();
@@ -2784,7 +2785,7 @@ export default function Messages() {
       await api.deleteMessage(id);
       setMessages((prev) => {
         const next = prev.map((m) => (m.id === id ? tombstoneMessage(m) : m));
-        if (user?.id) writeChatCache(user.id, next);
+        if (user?.id) writeChatCache(user.id, filterMessagesForCache(user.id, next));
         return next;
       });
       window.setTimeout(() => unsentIdsRef.current.delete(id), 12_000);
@@ -2793,7 +2794,7 @@ export default function Messages() {
       if (snapshot) {
         setMessages((prev) => {
           const next = prev.map((m) => (m.id === id ? snapshot! : m));
-          if (user?.id) writeChatCache(user.id, next);
+          if (user?.id) writeChatCache(user.id, filterMessagesForCache(user.id, next));
           return next;
         });
       } else if (err instanceof Error && /not found/i.test(err.message)) {
@@ -2806,17 +2807,24 @@ export default function Messages() {
   const handleDeleteForMe = useCallback(
     async (id: string) => {
       if (!user) return;
+      setContextMenu(null);
       applyHiddenMessageId(user.id, id);
       setHiddenTick((t) => t + 1);
+      setMessages((prev) => {
+        const next = prev.filter((m) => m.id !== id);
+        writeChatCache(user.id, filterMessagesForCache(user.id, next));
+        return next;
+      });
       try {
         await hideMessageForUser(user.id, id);
       } catch {
         removeHiddenMessageId(user.id, id);
         setHiddenTick((t) => t + 1);
+        void loadMessages();
         window.alert("Could not hide message — check your connection.");
       }
     },
-    [user],
+    [user, loadMessages],
   );
 
   const handlePin = useCallback(async (id: string) => {
