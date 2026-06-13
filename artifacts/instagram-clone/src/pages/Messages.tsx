@@ -159,7 +159,6 @@ export default function Messages() {
     messages.length ? messagesListSignature(messages) : "0",
   );
   const [showInfo, setShowInfo] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [blocked, setBlocked] = useState(() => isChatBlocked());
   const [recording, setRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
@@ -1619,25 +1618,6 @@ export default function Messages() {
     return Date.now() - new Date(msg.timestamp).getTime() < 60 * 60 * 1000;
   }, [user?.id]);
 
-  const exportData = async () => {
-    if (!user) return;
-    try {
-      const response = await fetch(`/api/export/${user.id}`);
-      const data = await response.json();
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `grova-export-${user.id}-${new Date().toISOString().split('T')[0]}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error("Failed to export data:", err);
-    }
-  };
-
   // Drop legacy local chat cache — all messages live in Neon only
   useEffect(() => {
     try {
@@ -2077,27 +2057,6 @@ export default function Messages() {
   const getThreadMessages = useCallback((threadId: string) => {
     return messages.filter(msg => msg.threadId === threadId || msg.id === threadId);
   }, [messages]);
-
-  const exportChatHistory = useCallback(async () => {
-    if (!user) return;
-    const toastId = "chat-export-info";
-    try {
-      toast.loading("Preparing export…", { id: toastId });
-      const all = await fetchAllMessagesForExport();
-      const visible = filterVisibleMessages(user.id, all);
-      if (visible.length === 0) {
-        finishToast(toastId, { type: "error", message: "No messages to export" });
-        return;
-      }
-      downloadChatAsText(visible, user.id, user.name, pName);
-      finishToast(toastId, { type: "success", message: `Exported ${visible.length} messages as .txt` });
-    } catch (err) {
-      finishToast(toastId, {
-        type: "error",
-        message: err instanceof Error ? err.message : "Could not export chat.",
-      });
-    }
-  }, [user, pName, fetchAllMessagesForExport]);
 
   const deleteMessage = useCallback(async (id: string) => {
     try {
@@ -2750,25 +2709,6 @@ export default function Messages() {
     endCallRef.current = endCall;
   }, [endCall]);
 
-  const handleDeleteChat = useCallback(async () => {
-    if (!user) return;
-    setShowDeleteConfirm(false);
-    setShowInfo(false);
-    setMessages([]);
-    setHasMore(false);
-    setLoadingMore(false);
-    setHasNewMessages(false);
-    setError(null);
-    setHiddenTick((t) => t + 1);
-    try {
-      await clearChatForUser(user.id);
-    } catch (err) {
-      console.error("Failed to clear chat:", err);
-      window.alert("Could not clear chat on the server. Try again.");
-      void loadMessages();
-    }
-  }, [user, loadMessages]);
-
   const toggleLike = useCallback(async (id: string) => {
     try { await api.likeMessage(id); } catch { /**/ }
   }, []);
@@ -3331,28 +3271,9 @@ export default function Messages() {
               return next;
             });
           }}
-          onClearChat={() => setShowDeleteConfirm(true)}
-          onExportChat={exportChatHistory}
           onAudioCall={() => startCall("audio")}
           onVideoCall={() => startCall("video")}
         />
-
-        {/* ── Delete confirm ── */}
-        {showDeleteConfirm && (
-          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-6">
-            <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-xs" data-testid="delete-confirm">
-              <Trash2 className="w-8 h-8 text-destructive mx-auto mb-3" />
-              <h3 className="font-bold text-center mb-1">Clear chat for you?</h3>
-              <p className="text-sm text-muted-foreground text-center mb-5">
-                Messages disappear on your account only. {pName} will still see the full chat.
-              </p>
-              <div className="flex gap-2">
-                <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 py-2.5 bg-secondary rounded-xl text-sm font-semibold" data-testid="button-cancel-delete">Cancel</button>
-                <button onClick={handleDeleteChat} className="flex-1 py-2.5 bg-destructive text-white rounded-xl text-sm font-semibold" data-testid="button-confirm-delete">Delete</button>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* ── Incoming call banner ── */}
         {incomingCall && (

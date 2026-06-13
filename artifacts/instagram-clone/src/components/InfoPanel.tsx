@@ -15,8 +15,6 @@ interface InfoPanelProps {
   online: boolean;
   blocked: boolean;
   onToggleBlock: () => void;
-  onClearChat: () => void;
-  onExportChat: () => void;
   onAudioCall: () => void;
   onVideoCall: () => void;
 }
@@ -30,8 +28,6 @@ export const InfoPanel = memo(function InfoPanel({
   online,
   blocked,
   onToggleBlock,
-  onClearChat,
-  onExportChat,
   onAudioCall,
   onVideoCall,
 }: InfoPanelProps) {
@@ -114,14 +110,6 @@ export const InfoPanel = memo(function InfoPanel({
               >
                 <Ban className="w-5 h-5" />
                 <span className="font-medium">{blocked ? "Unblock" : "Block"}</span>
-              </button>
-              <button
-                onClick={onClearChat}
-                className="w-full flex items-center gap-3 p-3 rounded-xl text-destructive hover:bg-destructive/10 transition-all focus:outline-none focus:ring-2 focus:ring-destructive/50 focus:ring-offset-1 active:scale-95"
-                aria-label="Clear chat history"
-              >
-                <Trash2 className="w-5 h-5" />
-                <span className="font-medium">Clear Chat (for you)</span>
               </button>
 
             </div>
