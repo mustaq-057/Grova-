@@ -170,6 +170,7 @@ export type ApiMessage = {
   mediaViewMode?: "keep" | "once" | "twice";
   mediaOpenCount?: number;
   mediaOpenedAt?: string;
+  clientUniqueId?: string;
 };
 
 export type ApiDua = {

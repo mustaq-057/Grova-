@@ -141,6 +141,7 @@ export function buildOptimisticMessage(
 
   return {
     id,
+    clientUniqueId: id,
     senderId: partial.senderId,
     text: partial.text,
     type: (partial.type as ApiMessage["type"]) ?? "text",

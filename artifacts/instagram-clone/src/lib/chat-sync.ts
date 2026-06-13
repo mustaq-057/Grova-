@@ -41,6 +41,7 @@ function mergeOptimisticWithServer(optimistic: ApiMessage, server: ApiMessage): 
   const hasRemoteImage = isRemoteMediaUrl(imageUrl) || isRemoteMediaUrl(server.imageUrl);
   return {
     ...server,
+    clientUniqueId: optimistic.clientUniqueId || optimistic.id,
     text: server.text ?? optimistic.text,
     gifUrl: server.gifUrl || optimistic.gifUrl,
     imageUrl,
@@ -219,6 +220,7 @@ export function reconcilePendingOptimistics(
     if (!pendingIds.has(m.id)) return true;
     const match = findOptimisticMatch(m, fresh);
     if (match) {
+      match.clientUniqueId = m.clientUniqueId || m.id;
       pendingIds.delete(m.id);
       return false;
     }

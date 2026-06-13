@@ -3024,7 +3024,7 @@ export default function Messages() {
                 const isMe = msg.senderId === user?.id;
                 return (
                   <MessageItem
-                    key={msg.id}
+                    key={msg.clientUniqueId || msg.id}
                     msg={msg}
                     isMe={isMe}
                     myId={user?.id ?? "me"}
@@ -3115,7 +3115,7 @@ export default function Messages() {
                   const prevMsg = arr[i - 1];
                   const timeGap = shouldShowTimeGap(prevMsg, msg, user?.id);
                   return (
-                    <div key={msg.id} className="chat-message-row">
+                    <div key={msg.clientUniqueId || msg.id} className="chat-message-row">
                       {timeGap && (
                         <p className="text-center text-[10px] text-muted-foreground/60 my-3 font-medium">{timeGap}</p>
                       )}
