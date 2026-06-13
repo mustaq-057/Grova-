@@ -339,8 +339,48 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
               <div className="w-[28px] h-[28px] flex items-center justify-center shrink-0">
                 <FileIcon className="w-[24px] h-[24px] text-white opacity-80" strokeWidth={1.5} />
               </div>
-              <span>Files</span>
+              <span>File</span>
             </button>
+
+            {onShareLocation && (
+              <button
+                type="button"
+                onClick={handleShareLocation}
+                className="flex items-center gap-[20px] px-[24px] py-[15px] text-[17px] font-normal hover:bg-white/5 transition-colors w-full text-left text-white"
+                disabled={disabled}
+              >
+                <div className="w-[28px] h-[28px] flex items-center justify-center shrink-0">
+                  <CustomLocationIcon />
+                </div>
+                <span>Location</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={toggleQuickReplies}
+              className="flex items-center gap-[20px] px-[24px] py-[15px] text-[17px] font-normal hover:bg-white/5 transition-colors w-full text-left text-white"
+              disabled={disabled}
+            >
+              <div className="w-[28px] h-[28px] flex items-center justify-center shrink-0">
+                <CustomQuickChatIcon />
+              </div>
+              <span>Quick Chat</span>
+            </button>
+
+            {onDoodleOpen && (
+              <button
+                type="button"
+                onClick={openDoodle}
+                className="flex items-center gap-[20px] px-[24px] py-[15px] text-[17px] font-normal hover:bg-white/5 transition-colors w-full text-left text-white"
+                disabled={disabled}
+              >
+                <div className="w-[28px] h-[28px] flex items-center justify-center shrink-0">
+                  <CustomDoodleIcon />
+                </div>
+                <span>Doodle</span>
+              </button>
+            )}
 
 
 
@@ -379,6 +419,18 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
       )}
 
       <div className="flex items-center gap-[8px] sm:gap-[10px] bg-[#1a1a1a] rounded-[40px] py-[7px] sm:py-[9px] pr-[8px] sm:pr-[14px] pl-[5px] sm:pl-[9px] mx-[4px] md:mx-auto md:w-full md:max-w-[800px]">
+        {/* eslint-disable-next-line */}
+        <button
+          type="button"
+          onClick={onOpenCamera}
+          className="w-[38px] h-[38px] sm:w-[44px] sm:h-[44px] rounded-full active:scale-95 flex shrink-0 items-center justify-center text-white border-none transition-all hover:brightness-90"
+          style={{ backgroundColor: theme.bubbleColor }}
+          disabled={disabled}
+          aria-label="Take photo with camera"
+        >
+          <Camera className="w-[20px] h-[20px] sm:w-[22px] sm:h-[22px]" strokeWidth={1.8} />
+        </button>
+
         {textInput}
 
         {input.trim() || recording ? (
