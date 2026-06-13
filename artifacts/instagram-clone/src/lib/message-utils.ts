@@ -232,6 +232,7 @@ export function messagePreview(msg: ApiMessage): string {
 
 /** Short label for reply composer and quoted blocks. */
 export function replyPreviewLabel(msg: ApiMessage): string {
+  if (msg.type === "doodle") return "Doodle";
   if (msg.text?.trim()) return msg.text.slice(0, 280);
   if (isEphemeralMedia(msg)) {
     const mode = msg.mediaViewMode ?? parseMediaViewMode(msg.companionSticker);

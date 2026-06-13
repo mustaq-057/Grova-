@@ -3007,10 +3007,7 @@ export default function Messages() {
     return filtered;
   }, [visibleMessages, searchQuery, searchFilters, user?.id]);
 
-  // Memoize pinned messages to avoid filtering on every render
-  const pinnedMessages = useMemo(() => {
-    return visibleMessages.filter((m) => m.pinned);
-  }, [visibleMessages]);
+
 
   // Memoize grouped messages to avoid regrouping on every render
   const groupedMessages = useMemo(() => {
@@ -3160,44 +3157,7 @@ export default function Messages() {
           {/* Load more indicator at top */}
           <div ref={messagesStartRef} className="h-2" />
 
-          {/* Pinned messages section */}
-          {pinnedMessages.length > 0 && (
-            <div className="mb-4 px-2">
-              <p className="text-[10px] text-muted-foreground/60 uppercase tracking-wider mb-2 font-semibold px-2">Pinned</p>
-              {pinnedMessages.map(msg => {
-                const isMe = msg.senderId === user?.id;
-                return (
-                  <MessageItem
-                    key={msg.clientUniqueId || msg.id}
-                    msg={msg}
-                    isMe={isMe}
-                    myId={user?.id ?? "me"}
-                    partnerName={pName}
 
-                    partnerAvatar={pAvatar}
-                    onDelete={deleteMessage}
-                    onLike={toggleLike}
-                    onReact={handleReact}
-                    onUnsend={handleUnsend}
-                    onPin={handlePin}
-                    onReply={startReply}
-                    onEdit={handleEdit}
-                    onOpenMenu={(m: ApiMessage, rect: DOMRect) => setContextMenu({ msg: m, top: rect.bottom + 4, left: rect.left })}
-                    onOpenMedia={openMediaMessage}
-                    seenLabel={buildSeenLabel(msg, isMe, lastSeenOutgoingId, partnerId)}
-                    onStartThread={handleStartThread}
-                    onReplyToThread={handleReplyToThread}
-                    onMediaLoad={scrollToBottomForMedia}
-                    onMediaCommitted={handleMediaCommitted}
-                    replySource={msg.replyToId ? messageById.get(msg.replyToId) : undefined}
-                    onJumpToMessage={jumpToMessage}
-                    animateEntrance={chatAnimationsEnabled}
-                    openingMedia={openingMediaId === msg.id}
-                  />
-                );
-              })}
-            </div>
-          )}
           {loadingMore && messages.length > 0 && (
             <div className="flex justify-center py-2">
               <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
