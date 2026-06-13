@@ -191,13 +191,22 @@ export default function DoodleCanvas({ onClose, onSend }: DoodleCanvasProps) {
     if (!canvas || !hasStrokes || sending) return;
     setSending(true);
 
-    // Get the canvas drawing area minus white background
+    // Downscale from DPR-scaled canvas to CSS pixel size for a reasonable file size.
+    // On a 3x phone a 400px canvas is 1200px internally → huge PNG. Export at 1x CSS size.
+    const cssW = canvas.clientWidth;
+    const cssH = canvas.clientHeight;
+    const exportCanvas = document.createElement("canvas");
+    exportCanvas.width = cssW;
+    exportCanvas.height = cssH;
+    const ectx = exportCanvas.getContext("2d")!;
+    ectx.drawImage(canvas, 0, 0, cssW, cssH);
+
     onSend({ 
-      imageData: canvas.toDataURL("image/png"), 
+      imageData: exportCanvas.toDataURL("image/png"), 
       canvasX: 0, 
       canvasY: 0, 
-      width: canvas.clientWidth, 
-      height: canvas.clientHeight 
+      width: cssW, 
+      height: cssH 
     });
   }, [hasStrokes, sending, onSend]);
 

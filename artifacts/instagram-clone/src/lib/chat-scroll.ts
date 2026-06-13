@@ -43,20 +43,12 @@ export function scrollChatToBottomSoft(
 export function scrollChatToBottomAfterPaint(
   container: HTMLElement | null,
   bottomAnchor?: HTMLElement | null,
-  aggressive = false,
+  _aggressive = false,
 ): void {
   if (!container) return;
-
-  if (!aggressive) {
-    scrollChatToBottomSoft(container, bottomAnchor);
-    return;
-  }
-
-  const run = () => scrollChatToBottom(container, bottomAnchor);
-  run();
-  requestAnimationFrame(run);
-  setTimeout(run, 0);
-  setTimeout(run, 80);
+  // Always use a single soft scroll — the aggressive multi-pass approach
+  // causes a visible "jump up then bounce down" glitch on first load.
+  scrollChatToBottomSoft(container, bottomAnchor);
 }
 
 /** Keep pinned to bottom while composer grows (reply bar, edit bar). */

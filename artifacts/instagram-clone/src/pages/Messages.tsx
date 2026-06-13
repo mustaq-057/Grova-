@@ -87,6 +87,7 @@ import {
   NOTIFY_CHANGED,
   hydrateNotifications,
   clearUnreadChatBadge,
+  getChatOpenedAt,
 } from "@/lib/notifications-feed";
 import { isReadReceiptsEnabled, isShowPresenceEnabled, areNotificationsEnabled, getCachedChatTheme } from "@/lib/couple-sync";
 import { isChatBlocked, setChatBlocked } from "@/lib/client-memory";
@@ -269,6 +270,8 @@ export default function Messages() {
   const anchorResolveStartedRef = useRef(false);
   const mediaScrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrollPreserveRef = useRef<{ top: number; height: number } | null>(null);
+  /** Tracks whether we already scrolled to the first unread message on initial load */
+  const initialUnreadHandledRef = useRef(false);
 
   const partnerId = useMemo(() => user?.id === "me" ? "wife" : "me", [user?.id]);
 
@@ -402,8 +405,8 @@ export default function Messages() {
         return await uploadMediaToB2(data.imageData, "image/png");
       } catch (err) {
         const raw = err instanceof Error ? err.message : "";
-        const isNetwork = /fetch|network|failed to fetch|connection/i.test(raw);
-        if (isNetwork && attempt < 2) {
+        const isRetryable = /timed out|502|503|504/i.test(raw);
+        if (isRetryable && attempt < 2) {
           await new Promise((r) => setTimeout(r, 1200 * (attempt + 1)));
           return attemptUpload(attempt + 1);
         }
@@ -434,10 +437,7 @@ export default function Messages() {
         pendingOutgoingRef.current.delete(tempId);
         setMessages((prev) => prev.filter((m) => m.id !== tempId));
         const raw = err instanceof Error ? err.message : "";
-        const friendly = /fetch|network|failed to fetch|connection|timed out/i.test(raw)
-          ? "Doodle couldn't send — check your connection and try again."
-          : raw || "Doodle upload failed. Please try again.";
-        toast.error(friendly, { duration: 5000 });
+        toast.error(raw || "Doodle upload failed. Please try again.", { duration: 5000 });
       }
     })();
   }, [closeDoodlePanel, user, requestStickToBottom]);
@@ -506,7 +506,7 @@ export default function Messages() {
         if (user?.id) writeChatCache(user.id, next);
         return next;
       });
-      if ((isNearBottomRef.current || isInitialLoadRef.current) && !pendingScrollRestoreRef.current) {
+      if ((isNearBottomRef.current || isInitialLoadRef.current) && !pendingScrollRestoreRef.current && !initialUnreadHandledRef.current) {
         stickToBottomRef.current = true;
       } else if (readingHistory) {
         stickToBottomRef.current = false;
@@ -1223,9 +1223,39 @@ export default function Messages() {
     const firstPaint = isInitialLoadRef.current;
     const isOwnLast = last?.senderId === user?.id;
 
-    if (firstPaint && !pendingScrollRestoreRef.current) {
+    if (firstPaint && !pendingScrollRestoreRef.current && !initialUnreadHandledRef.current) {
       const container = messagesContainerRef.current;
-      if (container) scrollChatToBottom(container, bottomRef.current);
+      if (container) {
+        // Detect unread partner messages since user last opened chat
+        const chatOpenedAt = getChatOpenedAt();
+        const unreadPartnerMsgs = chatOpenedAt
+          ? messages.filter(
+              (m) =>
+                m.senderId === partnerId &&
+                new Date(m.timestamp).getTime() > new Date(chatOpenedAt).getTime(),
+            )
+          : [];
+
+        if (unreadPartnerMsgs.length >= 2) {
+          // Scroll to the first unread message and show "New messages" toggle
+          initialUnreadHandledRef.current = true;
+          const firstUnreadId = unreadPartnerMsgs[0]!.id;
+          const el = container.querySelector(`[data-testid="message-${firstUnreadId}"]`) as HTMLElement | null;
+          const row = el?.closest(".chat-message-row") as HTMLElement | null;
+          if (row) {
+            scrollMessageIntoCenter(container, row, "auto");
+            isNearBottomRef.current = false;
+            stickToBottomRef.current = false;
+            setIsNearBottom(false);
+            setHasNewMessages(true);
+          } else {
+            // Fallback: scroll to bottom
+            scrollChatToBottom(container, bottomRef.current);
+          }
+        } else {
+          scrollChatToBottom(container, bottomRef.current);
+        }
+      }
     }
 
     const restoreAnchor = pendingScrollRestoreRef.current;
@@ -1255,25 +1285,18 @@ export default function Messages() {
     const shouldStick =
       !isPrependingRef.current &&
       !pendingScrollRestoreRef.current &&
+      !initialUnreadHandledRef.current &&
       (stickToBottomRef.current ||
         (firstPaint && !restoreAnchor) ||
         (isOwnLast && tailChanged && isNearBottomRef.current) ||
         (isNearBottomRef.current && tailChanged));
 
     if (shouldStick) {
-      const aggressive = Boolean(firstPaint && !restoreAnchor);
       scrollChatToBottomAfterPaint(
         messagesContainerRef.current,
         bottomRef.current,
-        aggressive,
+        false,
       );
-      if (firstPaint && !restoreAnchor) {
-        window.setTimeout(() => {
-          if (!pendingScrollRestoreRef.current && isNearBottomRef.current) {
-            scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
-          }
-        }, 120);
-      }
       setHasNewMessages(false);
       stickToBottomRef.current = false;
     } else if (
@@ -1363,6 +1386,7 @@ export default function Messages() {
         setIsNearBottom(isNear);
         if (isNear) {
           setHasNewMessages(false);
+          initialUnreadHandledRef.current = false;
           if (userIdRef.current) clearChatScrollAnchor(userIdRef.current);
         } else {
           const uid = userIdRef.current;
@@ -2978,6 +3002,7 @@ export default function Messages() {
             <div className="flex justify-center mb-2 sticky top-0 z-10">
               <button
                 onClick={() => {
+                  initialUnreadHandledRef.current = false;
                   scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
                   setHasNewMessages(false);
                 }}
