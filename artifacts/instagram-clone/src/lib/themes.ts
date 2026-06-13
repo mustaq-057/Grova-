@@ -73,6 +73,7 @@ export const THEMES: ChatTheme[] = [
   { id: "magenta", name: "Magenta", bubbleColor: "#ec4899", bubbleBorder: "#fbcfe8", swatch: "bg-pink-500" },
   { id: "teal2", name: "Teal", bubbleColor: "#14b8a6", bubbleBorder: "#99f6e4", swatch: "bg-teal-500" },
   { id: "cyan2", name: "Cyan", bubbleColor: "#06b6d4", bubbleBorder: "#a5f3fc", swatch: "bg-cyan-500" },
+  { id: "creamy", name: "Creamy", bubbleColor: "#E0D1BE", bubbleBorder: "#DDD0BE", swatch: "bg-amber-200" },
   { id: "moonlight-saga", name: "Moonlight Saga", bubbleColor: "#1e293b", bubbleBorder: "#64748b", swatch: "bg-slate-700" },
 ];
 
