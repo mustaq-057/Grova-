@@ -1,5 +1,5 @@
 import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, startTransition } from "react";
-import { Info, Heart, Mic, X, Trash2, Ban, Phone, Video, WifiOff, Wifi, Search, AlertCircle, FileText, MessageCircle, Shield } from "lucide-react";
+import { Info, Heart, Mic, X, Trash2, Ban, Phone, Video, WifiOff, Wifi, Search, AlertCircle, Palette, MessageCircle, Shield } from "lucide-react";
 import { motion } from "framer-motion";
 import { api, type ApiMessage } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -159,6 +159,7 @@ export default function Messages() {
     messages.length ? messagesListSignature(messages) : "0",
   );
   const [showInfo, setShowInfo] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [blocked, setBlocked] = useState(() => isChatBlocked());
   const [recording, setRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
@@ -2709,6 +2710,25 @@ export default function Messages() {
     endCallRef.current = endCall;
   }, [endCall]);
 
+  const handleDeleteChat = useCallback(async () => {
+    if (!user) return;
+    setShowDeleteConfirm(false);
+    setShowInfo(false);
+    setMessages([]);
+    setHasMore(false);
+    setLoadingMore(false);
+    setHasNewMessages(false);
+    setError(null);
+    setHiddenTick((t) => t + 1);
+    try {
+      await clearChatForUser(user.id);
+    } catch (err) {
+      console.error("Failed to clear chat:", err);
+      window.alert("Could not clear chat on the server. Try again.");
+      void loadMessages();
+    }
+  }, [user, loadMessages]);
+
   const toggleLike = useCallback(async (id: string) => {
     try { await api.likeMessage(id); } catch { /**/ }
   }, []);
@@ -2951,11 +2971,11 @@ export default function Messages() {
 
 
               <button
-                onClick={() => document.getElementById('generic-file-upload')?.click()}
+                onClick={() => setShowBubbleColors(true)}
                 className={`p-1.5 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 active:scale-95 text-muted-foreground hover:text-foreground hover:bg-secondary`}
-                aria-label="Attach File"
+                aria-label="Chat Colors"
               >
-                <FileText className="w-4 h-4" strokeWidth={1.5} />
+                <Palette className="w-4 h-4" strokeWidth={1.5} />
               </button>
               <button
                 onClick={() => startCall("audio")}
@@ -3271,9 +3291,27 @@ export default function Messages() {
               return next;
             });
           }}
+          onClearChat={() => setShowDeleteConfirm(true)}
           onAudioCall={() => startCall("audio")}
           onVideoCall={() => startCall("video")}
         />
+
+        {/* ── Delete confirm ── */}
+        {showDeleteConfirm && (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-6">
+            <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-xs" data-testid="delete-confirm">
+              <Trash2 className="w-8 h-8 text-destructive mx-auto mb-3" />
+              <h3 className="font-bold text-center mb-1">Clear chat for you?</h3>
+              <p className="text-sm text-muted-foreground text-center mb-5">
+                Messages disappear on your account only. {pName} will still see the full chat.
+              </p>
+              <div className="flex gap-2">
+                <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 py-2.5 bg-secondary rounded-xl text-sm font-semibold" data-testid="button-cancel-delete">Cancel</button>
+                <button onClick={handleDeleteChat} className="flex-1 py-2.5 bg-destructive text-white rounded-xl text-sm font-semibold" data-testid="button-confirm-delete">Delete</button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ── Incoming call banner ── */}
         {incomingCall && (

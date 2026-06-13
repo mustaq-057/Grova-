@@ -153,11 +153,19 @@ export function AudioMessage({
 
   useEffect(() => {
     const audio = new Audio(audioData);
-    audio.onloadedmetadata = () => {
-      if (Number.isFinite(audio.duration)) setDuration(audio.duration);
-    };
-    // Preload metadata to get duration without playing
     audio.preload = "metadata";
+    audio.onloadedmetadata = () => {
+      if (audio.duration === Infinity) {
+        audio.currentTime = 1e101;
+        audio.ontimeupdate = () => {
+          audio.ontimeupdate = null;
+          if (audio.duration && Number.isFinite(audio.duration)) setDuration(audio.duration);
+          audio.currentTime = 0;
+        };
+      } else if (Number.isFinite(audio.duration)) {
+        setDuration(audio.duration);
+      }
+    };
   }, [audioData]);
 
   const bars = waveform.length > 0 ? waveform : STATIC_BARS;

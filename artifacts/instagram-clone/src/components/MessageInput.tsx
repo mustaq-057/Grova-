@@ -13,6 +13,7 @@ const CustomLocationIcon = () => <MapPin className="w-[26px] h-[26px] text-white
 const CustomQuickChatIcon = () => <MessageSquarePlus className="w-[26px] h-[26px] text-white" strokeWidth={1.6} />;
 const CustomDoodleIcon = () => <PenTool className="w-[26px] h-[26px] text-white" strokeWidth={1.6} />;
 const CustomPaletteIcon = () => <Palette className="w-[26px] h-[26px] text-white" strokeWidth={1.6} />;
+const CustomFileIcon = () => <FileIcon className="w-[26px] h-[26px] text-white" strokeWidth={1.6} />;
 
 interface MessageInputProps {
   /** Called with trimmed text when user sends (input state stays inside this component for perf). */
@@ -343,6 +344,18 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
                 <span>Location</span>
               </button>
             )}
+
+            <button
+              type="button"
+              onClick={handleGenericFileClick}
+              className="flex items-center gap-[20px] px-[24px] py-[15px] text-[17px] font-normal hover:bg-white/5 transition-colors w-full text-left text-white"
+              disabled={disabled}
+            >
+              <div className="w-[28px] h-[28px] flex items-center justify-center shrink-0">
+                <CustomFileIcon />
+              </div>
+              <span>Files</span>
+            </button>
 
             <button
               type="button"

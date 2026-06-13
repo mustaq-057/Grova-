@@ -14,7 +14,7 @@ export function CameraOverlay({ onClose, onCapture }: CameraOverlayProps) {
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [facingMode, setFacingMode] = useState<"user" | "environment">("environment");
   const [flashOn, setFlashOn] = useState(false);
-  const [aspectRatio, setAspectRatio] = useState<"16:9" | "4:3" | "1:1">("16:9");
+  const [aspectRatio, setAspectRatio] = useState<"Full" | "16:9" | "4:3" | "1:1">("Full");
   const [error, setError] = useState<string | null>(null);
 
   const startCamera = useCallback(async (mode: "user" | "environment") => {
@@ -60,7 +60,7 @@ export function CameraOverlay({ onClose, onCapture }: CameraOverlayProps) {
   };
 
   const toggleRatio = () => {
-    setAspectRatio(prev => prev === "16:9" ? "4:3" : prev === "4:3" ? "1:1" : "16:9");
+    setAspectRatio(prev => prev === "Full" ? "16:9" : prev === "16:9" ? "4:3" : prev === "4:3" ? "1:1" : "Full");
   };
 
   const handleCapture = () => {
@@ -71,6 +71,7 @@ export function CameraOverlay({ onClose, onCapture }: CameraOverlayProps) {
     const videoRatio = vw / vh;
     
     let targetRatio = 9 / 16;
+    if (aspectRatio === "Full") targetRatio = vw / vh;
     if (aspectRatio === "4:3") targetRatio = 3 / 4;
     if (aspectRatio === "1:1") targetRatio = 1;
     if (vw > vh && targetRatio < 1) targetRatio = 1 / targetRatio; // Landscape fallback
@@ -139,9 +140,9 @@ export function CameraOverlay({ onClose, onCapture }: CameraOverlayProps) {
             <p className="text-white/50 text-center px-4">{error}</p>
           ) : (
             <div 
-               className="relative w-full max-h-full flex items-center justify-center overflow-hidden transition-all duration-300"
+               className={`relative w-full flex items-center justify-center overflow-hidden transition-all duration-300 ${aspectRatio === "Full" ? "h-full" : "max-h-full"}`}
                style={{ 
-                 aspectRatio: aspectRatio === "16:9" ? "9/16" : aspectRatio === "4:3" ? "3/4" : "1/1",
+                 aspectRatio: aspectRatio === "Full" ? "auto" : aspectRatio === "16:9" ? "9/16" : aspectRatio === "4:3" ? "3/4" : "1/1",
                }}
             >
               <video

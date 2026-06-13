@@ -15,6 +15,7 @@ interface InfoPanelProps {
   online: boolean;
   blocked: boolean;
   onToggleBlock: () => void;
+  onClearChat: () => void;
   onAudioCall: () => void;
   onVideoCall: () => void;
 }
@@ -28,6 +29,7 @@ export const InfoPanel = memo(function InfoPanel({
   online,
   blocked,
   onToggleBlock,
+  onClearChat,
   onAudioCall,
   onVideoCall,
 }: InfoPanelProps) {
@@ -103,13 +105,19 @@ export const InfoPanel = memo(function InfoPanel({
             <div className="space-y-2">
               <button
                 onClick={onToggleBlock}
-                className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-offset-1 active:scale-95 ${
-                  blocked ? "text-destructive hover:bg-destructive/10 focus:ring-destructive/50" : "hover:bg-secondary focus:ring-primary/50"
-                }`}
+                className="w-full flex items-center gap-3 p-3 rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-offset-1 active:scale-95 text-destructive hover:bg-destructive/10 focus:ring-destructive/50"
                 aria-label={blocked ? "Unblock user" : "Block user"}
               >
                 <Ban className="w-5 h-5" />
                 <span className="font-medium">{blocked ? "Unblock" : "Block"}</span>
+              </button>
+              <button
+                onClick={onClearChat}
+                className="w-full flex items-center gap-3 p-3 rounded-xl text-destructive hover:bg-destructive/10 transition-all focus:outline-none focus:ring-2 focus:ring-destructive/50 focus:ring-offset-1 active:scale-95"
+                aria-label="Delete for me"
+              >
+                <Trash2 className="w-5 h-5" />
+                <span className="font-medium">Delete for me</span>
               </button>
 
             </div>
