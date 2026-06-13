@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { X, Undo2, Trash2, Send, ChevronLeft } from "lucide-react";
+import { X, Undo2, Send, Pipette } from "lucide-react";
 
 export interface DoodleData {
   imageData: string;
@@ -15,28 +15,47 @@ interface DoodleCanvasProps {
   onError?: (message: string) => void;
 }
 
-const COLORS = [
-  "#000000",
-  "#FFFFFF",
-  "#FF0040",
-  "#FF6B00",
-  "#FFD700",
-  "#00E676",
-  "#0080FF",
-  "#9D00FF",
-  "#FF00FF",
-  "#8B7355",
-  "#E84393",
-  "#4ECDC4",
-  "#FFB347",
-  "#1a1a2e",
-  "#95A5A6",
-  "#2ECC71",
-  "#FF69B4",
-  "#00CED1",
-];
+const BACKGROUND_WHITE = "#FFFFFF";
+const BACKGROUND_BLACK = "#000000";
 
-const SIZES = [2, 4, 8, 14, 22];
+const PALETTE_COLORS = [
+  "#D3D3D3",
+  "#C0C0C0",
+  "#808080",
+  "#404040",
+  "#8B5E3C",
+  "#9B30FF",
+  "#FF0040",
+  "#FF69B4",
+  "#FFB6C1",
+  "#F5F5DC",
+  "#FFFDD0",
+  "#FFCBA4",
+  "#FFB347",
+  "#FF6B00",
+  "#87CEEB",
+  "#0080FF",
+  "#00E676",
+  "#FFD700",
+  "#F88379",
+  "#FF1493",
+  "#FF00FF",
+  "#B8E4F0",
+  "#00CED1",
+  "#BFFF00",
+  "#FFB800",
+  "#FF7043",
+  "#FF85A2",
+  "#FF10F0",
+  "#6B5BFF",
+  "#DA70D6",
+  "#3EB489",
+  "#FFBF00",
+  "#FF8C69",
+  "#7CFC00",
+  "#00FFFF",
+  "#FF6AD5",
+];
 
 type Point = { x: number; y: number };
 
@@ -62,23 +81,58 @@ function roundRectPath(
   ctx.closePath();
 }
 
+function parseHex(hex: string) {
+  const h = hex.replace("#", "");
+  return {
+    r: parseInt(h.slice(0, 2), 16),
+    g: parseInt(h.slice(2, 4), 16),
+    b: parseInt(h.slice(4, 6), 16),
+  };
+}
+
+function isBackgroundPixel(r: number, g: number, b: number, a: number, bg: string) {
+  if (a < 16) return true;
+  const { r: br, g: bg2, b: bb } = parseHex(bg);
+  return Math.abs(r - br) < 8 && Math.abs(g - bg2) < 8 && Math.abs(b - bb) < 8;
+}
+
 export default function DoodleCanvas({ onClose, onSend, onError }: DoodleCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const colorScrollRef = useRef<HTMLDivElement>(null);
 
-  const [color, setColor] = useState("#000000");
+  const [color, setColor] = useState("#FF0040");
+  const [canvasBg, setCanvasBg] = useState(BACKGROUND_WHITE);
   const [brushSize, setBrushSize] = useState(8);
-  const [sliderValue, setSliderValue] = useState(50);
   const [canUndo, setCanUndo] = useState(false);
   const [hasStrokes, setHasStrokes] = useState(false);
   const [sending, setSending] = useState(false);
+  const [eyedropperActive, setEyedropperActive] = useState(false);
 
   const isDrawingRef = useRef(false);
   const lastPtRef = useRef<Point | null>(null);
   const historyRef = useRef<string[]>([]);
   const exportGenRef = useRef(0);
 
-  const actualBrushSize = brushSize * (sliderValue / 50);
+  const fillCanvas = useCallback((bg: string, snap?: string | null) => {
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext("2d");
+    if (!canvas || !ctx) return;
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.width / dpr;
+    const h = canvas.height / dpr;
+
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.scale(dpr, dpr);
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, w, h);
+
+    if (snap) {
+      const img = new Image();
+      img.onload = () => ctx.drawImage(img, 0, 0, w, h);
+      img.src = snap;
+    }
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -98,24 +152,14 @@ export default function DoodleCanvas({ onClose, onSend, onError }: DoodleCanvasP
       canvas.style.width = `${rect.width}px`;
       canvas.style.height = `${rect.height}px`;
 
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.scale(dpr, dpr);
-
-      ctx.fillStyle = "#FFFFFF";
-      ctx.fillRect(0, 0, rect.width, rect.height);
-
-      if (snap) {
-        const img = new Image();
-        img.onload = () => ctx.drawImage(img, 0, 0, rect.width, rect.height);
-        img.src = snap;
-      }
+      fillCanvas(canvasBg, snap);
     };
 
     resize();
     const ro = new ResizeObserver(resize);
     ro.observe(container);
     return () => ro.disconnect();
-  }, []);
+  }, [canvasBg, fillCanvas]);
 
   const saveHistory = useCallback(() => {
     const canvas = canvasRef.current;
@@ -126,22 +170,8 @@ export default function DoodleCanvas({ onClose, onSend, onError }: DoodleCanvasP
   }, []);
 
   const restoreCanvas = useCallback((snap: string | undefined) => {
-    const canvas = canvasRef.current;
-    const ctx = canvas?.getContext("2d");
-    if (!canvas || !ctx) return;
-    const dpr = window.devicePixelRatio || 1;
-    const w = canvas.width / dpr;
-    const h = canvas.height / dpr;
-
-    ctx.fillStyle = "#FFFFFF";
-    ctx.fillRect(0, 0, w, h);
-
-    if (snap) {
-      const img = new Image();
-      img.onload = () => ctx.drawImage(img, 0, 0, w, h);
-      img.src = snap;
-    }
-  }, []);
+    fillCanvas(canvasBg, snap);
+  }, [canvasBg, fillCanvas]);
 
   const undo = useCallback(() => {
     if (!historyRef.current.length) return;
@@ -152,26 +182,22 @@ export default function DoodleCanvas({ onClose, onSend, onError }: DoodleCanvasP
     if (!historyRef.current.length) setHasStrokes(false);
   }, [restoreCanvas]);
 
-  const clear = useCallback(() => {
-    const canvas = canvasRef.current;
-    const ctx = canvas?.getContext("2d");
-    if (!canvas || !ctx) return;
-    const dpr = window.devicePixelRatio || 1;
-    ctx.fillStyle = "#FFFFFF";
-    ctx.fillRect(0, 0, canvas.width / dpr, canvas.height / dpr);
-    historyRef.current = [];
-    setCanUndo(false);
-    setHasStrokes(false);
-  }, []);
+  const applyBackground = useCallback((bg: string) => {
+    setCanvasBg(bg);
+    setColor(bg === BACKGROUND_WHITE ? "#000000" : BACKGROUND_WHITE);
+    fillCanvas(bg);
+    saveHistory();
+    setHasStrokes(true);
+  }, [fillCanvas, saveHistory]);
 
   const applyBrush = useCallback((ctx: CanvasRenderingContext2D) => {
     ctx.globalCompositeOperation = "source-over";
     ctx.strokeStyle = color;
     ctx.fillStyle = color;
-    ctx.lineWidth = actualBrushSize;
+    ctx.lineWidth = brushSize;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
-  }, [color, actualBrushSize]);
+  }, [color, brushSize]);
 
   const getPoint = (e: React.PointerEvent): Point => {
     const rect = canvasRef.current?.getBoundingClientRect();
@@ -182,20 +208,41 @@ export default function DoodleCanvas({ onClose, onSend, onError }: DoodleCanvasP
     };
   };
 
+  const pickColorAt = useCallback((pt: Point) => {
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext("2d");
+    if (!canvas || !ctx) return;
+    const dpr = window.devicePixelRatio || 1;
+    const x = Math.floor(pt.x * dpr);
+    const y = Math.floor(pt.y * dpr);
+    const pixel = ctx.getImageData(x, y, 1, 1).data;
+    const hex = `#${[pixel[0], pixel[1], pixel[2]]
+      .map((v) => v.toString(16).padStart(2, "0"))
+      .join("")}`;
+    setColor(hex);
+    setEyedropperActive(false);
+  }, []);
+
   const onPointerDown = useCallback((e: React.PointerEvent) => {
     e.preventDefault();
+    const pt = getPoint(e);
+
+    if (eyedropperActive) {
+      pickColorAt(pt);
+      return;
+    }
+
     canvasRef.current?.setPointerCapture(e.pointerId);
     isDrawingRef.current = true;
-    const pt = getPoint(e);
     lastPtRef.current = pt;
 
     const ctx = canvasRef.current?.getContext("2d");
     if (!ctx) return;
     applyBrush(ctx);
     ctx.beginPath();
-    ctx.arc(pt.x, pt.y, actualBrushSize / 2, 0, Math.PI * 2);
+    ctx.arc(pt.x, pt.y, brushSize / 2, 0, Math.PI * 2);
     ctx.fill();
-  }, [actualBrushSize, applyBrush]);
+  }, [brushSize, applyBrush, eyedropperActive, pickColorAt]);
 
   const onPointerMove = useCallback((e: React.PointerEvent) => {
     if (!isDrawingRef.current || !lastPtRef.current) return;
@@ -223,6 +270,7 @@ export default function DoodleCanvas({ onClose, onSend, onError }: DoodleCanvasP
     sourceCanvas: HTMLCanvasElement,
     width: number,
     height: number,
+    bg: string,
   ): { x: number; y: number; w: number; h: number } => {
     const cssW = width > 0 ? width : sourceCanvas.width;
     const cssH = height > 0 ? height : sourceCanvas.height;
@@ -243,11 +291,10 @@ export default function DoodleCanvas({ onClose, onSend, onError }: DoodleCanvasP
 
     const isDrawn = (offset: number) => {
       const a = data[offset + 3];
-      if (a < 16) return false;
       const r = data[offset];
       const g = data[offset + 1];
       const b = data[offset + 2];
-      return !(r > 250 && g > 250 && b > 250);
+      return !isBackgroundPixel(r, g, b, a, bg);
     };
 
     let minX = cssW, maxX = -1, minY = cssH, maxY = -1;
@@ -335,7 +382,7 @@ export default function DoodleCanvas({ onClose, onSend, onError }: DoodleCanvasP
         }
         fctx.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, cssW, cssH);
 
-        const crop = cropToContent(fullCanvas, cssW, cssH);
+        const crop = cropToContent(fullCanvas, cssW, cssH, canvasBg);
         const cornerRadius = Math.min(24, crop.w * 0.12, crop.h * 0.12);
 
         const exportCanvas = document.createElement("canvas");
@@ -350,7 +397,7 @@ export default function DoodleCanvas({ onClose, onSend, onError }: DoodleCanvasP
         ectx.save();
         roundRectPath(ectx, 0, 0, crop.w, crop.h, cornerRadius);
         ectx.clip();
-        ectx.fillStyle = "#FFFFFF";
+        ectx.fillStyle = canvasBg;
         ectx.fillRect(0, 0, crop.w, crop.h);
         ectx.drawImage(fullCanvas, crop.x, crop.y, crop.w, crop.h, 0, 0, crop.w, crop.h);
         ectx.restore();
@@ -392,62 +439,51 @@ export default function DoodleCanvas({ onClose, onSend, onError }: DoodleCanvasP
     };
 
     requestAnimationFrame(runExport);
-  }, [hasStrokes, sending, onSend, onError]);
+  }, [hasStrokes, sending, onSend, onError, canvasBg]);
+
+  const swatchClass = (c: string, selected: boolean) => {
+    const needsBorder = c === BACKGROUND_WHITE || c === BACKGROUND_BLACK
+      || parseHex(c).r + parseHex(c).g + parseHex(c).b > 600;
+    return (
+      <button
+        key={c}
+        onClick={() => {
+          if (c === BACKGROUND_WHITE || c === BACKGROUND_BLACK) {
+            applyBackground(c);
+          } else {
+            setColor(c);
+            setEyedropperActive(false);
+          }
+        }}
+        className="relative shrink-0 rounded-full w-[30px] h-[30px] transition-transform active:scale-95"
+        style={{
+          backgroundColor: c,
+          border: needsBorder ? "1.5px solid rgba(255,255,255,0.35)" : "none",
+        }}
+        aria-label="Color"
+      >
+        {selected && (
+          <div className="absolute -inset-[3px] rounded-full border-2 border-white" />
+        )}
+      </button>
+    );
+  };
+
+  const allSwatches = [BACKGROUND_WHITE, ...PALETTE_COLORS, BACKGROUND_BLACK];
+  const isBgSelected = (c: string) =>
+    (c === BACKGROUND_WHITE || c === BACKGROUND_BLACK) ? canvasBg === c : color === c;
 
   return createPortal(
-    <div className="fixed inset-0 z-[600] flex flex-col bg-[#0b101e] text-white overflow-hidden">
+    <div className="fixed inset-0 z-[600] flex flex-col bg-black text-white overflow-hidden">
       <div
-        className="flex items-center justify-between px-4 py-3 shrink-0 border-b border-white/5"
-        style={{ paddingTop: "max(12px, env(safe-area-inset-top))" }}
+        className="flex-1 flex flex-col min-h-0"
+        style={{ paddingTop: "max(8px, env(safe-area-inset-top))" }}
       >
-        <button
-          onClick={onClose}
-          className="p-2 hover:bg-white/10 rounded-full transition-colors"
-          aria-label="Close doodle"
-        >
-          <ChevronLeft className="w-6 h-6" />
-        </button>
-
-        <span className="font-semibold text-[15px]">Draw a doodle</span>
-
-        <button
-          onClick={handleSend}
-          disabled={!hasStrokes || sending}
-          className="w-9 h-9 flex items-center justify-center bg-primary rounded-full text-white hover:bg-primary/90 transition-colors disabled:opacity-50"
-          aria-label="Send doodle"
-        >
-          {sending ? (
-            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-          ) : (
-            <Send className="w-4 h-4 ml-0.5" />
-          )}
-        </button>
-      </div>
-
-      <div className="flex flex-1 min-h-0">
-        <div className="w-[56px] sm:w-[60px] shrink-0 flex flex-col items-center py-3 overflow-y-auto scrollbar-hide gap-3 border-r border-white/5">
-          {COLORS.map((c) => (
-            <button
-              key={c}
-              onClick={() => setColor(c)}
-              className="relative rounded-full w-8 h-8 shrink-0 transition-transform hover:scale-110"
-              style={{
-                backgroundColor: c,
-                border: c === "#FFFFFF" || c === "#000000" ? "1px solid rgba(255,255,255,0.25)" : "none",
-              }}
-              aria-label={`Color ${c}`}
-            >
-              {color === c && (
-                <div className="absolute -inset-[3px] rounded-full border-2 border-primary" />
-              )}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex-1 flex flex-col bg-[#161c2d] min-w-0">
+        <div className="flex-1 flex items-stretch justify-center px-3 pt-2 pb-2 min-h-0">
           <div
             ref={containerRef}
-            className="flex-1 m-2 sm:m-3 rounded-2xl overflow-hidden bg-white shadow-lg relative"
+            className="w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl relative"
+            style={{ backgroundColor: canvasBg }}
           >
             <canvas
               ref={canvasRef}
@@ -455,91 +491,87 @@ export default function DoodleCanvas({ onClose, onSend, onError }: DoodleCanvasP
               onPointerMove={onPointerMove}
               onPointerUp={onPointerUp}
               onPointerCancel={onPointerUp}
-              className="absolute inset-0 touch-none w-full h-full cursor-crosshair"
-            />
-            {!hasStrokes && (
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <p className="text-black/30 text-sm font-medium">Draw something cute ✨</p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="w-[56px] sm:w-[60px] shrink-0 flex flex-col items-center py-3 border-l border-white/5">
-          <div className="text-[10px] text-white/50 font-bold mb-3">SIZE</div>
-          <div className="flex flex-col items-center gap-3 mb-4">
-            {SIZES.map((s) => (
-              <button
-                key={s}
-                onClick={() => setBrushSize(s)}
-                className="relative flex items-center justify-center w-8 h-8 rounded-full hover:bg-white/5"
-                aria-label={`Brush size ${s}`}
-              >
-                <div
-                  className="rounded-full bg-white transition-all"
-                  style={{ width: Math.min(s, 14), height: Math.min(s, 14) }}
-                />
-                {brushSize === s && (
-                  <div className="absolute inset-0 rounded-full border-2 border-primary" />
-                )}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex-1 flex flex-col items-center w-full min-h-[80px] px-2 relative">
-            <div className="absolute inset-y-0 w-1 bg-white/10 rounded-full overflow-hidden flex flex-col justify-end">
-              <div
-                className="w-full bg-primary transition-all duration-75"
-                style={{ height: `${sliderValue}%` }}
-              />
-            </div>
-            <input
-              type="range"
-              min="10"
-              max="100"
-              value={sliderValue}
-              onChange={(e) => setSliderValue(Number(e.target.value))}
-              className="absolute inset-0 w-full h-full opacity-0 cursor-ns-resize"
-              style={{ writingMode: "vertical-rl", direction: "rtl" }}
-              aria-label="Brush size multiplier"
-            />
-            <div
-              className="absolute w-3.5 h-3.5 bg-primary rounded-full shadow-lg pointer-events-none transition-all duration-75"
-              style={{ bottom: `calc(${sliderValue}% - 7px)` }}
+              className={`absolute inset-0 touch-none w-full h-full ${
+                eyedropperActive ? "cursor-cell" : "cursor-crosshair"
+              }`}
             />
           </div>
         </div>
       </div>
 
       <div
-        className="shrink-0 border-t border-white/5 bg-[#0b101e] px-4 py-3 flex items-center justify-between"
-        style={{ paddingBottom: "max(12px, env(safe-area-inset-bottom))" }}
+        className="shrink-0 bg-black px-3 pt-2 pb-3"
+        style={{ paddingBottom: "max(14px, env(safe-area-inset-bottom))" }}
       >
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-3 px-1 mb-3">
+          <div
+            className="w-[30px] h-[30px] rounded-full shrink-0 border border-white/20"
+            style={{ backgroundColor: color }}
+          />
+          <input
+            type="range"
+            min={2}
+            max={28}
+            value={brushSize}
+            onChange={(e) => setBrushSize(Number(e.target.value))}
+            className="flex-1 h-1 appearance-none bg-white/20 rounded-full cursor-pointer
+              [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4
+              [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white
+              [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4
+              [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-0"
+            aria-label="Brush size"
+          />
+        </div>
+
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={onClose}
+            className="w-[34px] h-[34px] flex items-center justify-center bg-white/10 rounded-full shrink-0 active:scale-95 transition-transform"
+            aria-label="Close"
+          >
+            <X className="w-[18px] h-[18px]" strokeWidth={2} />
+          </button>
+
           <button
             onClick={undo}
             disabled={!canUndo}
-            className="p-2.5 hover:bg-white/10 rounded-full transition-colors disabled:opacity-30"
+            className="w-[34px] h-[34px] flex items-center justify-center bg-white/10 rounded-full shrink-0 active:scale-95 transition-transform disabled:opacity-30"
             aria-label="Undo"
           >
-            <Undo2 className="w-5 h-5" />
+            <Undo2 className="w-[18px] h-[18px]" strokeWidth={2} />
           </button>
+
           <button
-            onClick={clear}
-            disabled={!hasStrokes}
-            className="p-2.5 hover:bg-destructive/20 text-destructive rounded-full transition-colors disabled:opacity-30"
-            aria-label="Clear canvas"
+            onClick={() => setEyedropperActive((v) => !v)}
+            className={`w-[34px] h-[34px] flex items-center justify-center rounded-full shrink-0 active:scale-95 transition-all ${
+              eyedropperActive ? "bg-white text-black" : "bg-white/10"
+            }`}
+            aria-label="Eyedropper"
           >
-            <Trash2 className="w-5 h-5" />
+            <Pipette className="w-[18px] h-[18px]" strokeWidth={2} />
+          </button>
+
+          <div
+            ref={colorScrollRef}
+            className="flex-1 flex items-center gap-2.5 overflow-x-auto scrollbar-hide scroll-smooth min-w-0 py-1"
+            style={{ WebkitOverflowScrolling: "touch" }}
+          >
+            {allSwatches.map((c) => swatchClass(c, isBgSelected(c)))}
+          </div>
+
+          <button
+            onClick={handleSend}
+            disabled={!hasStrokes || sending}
+            className="w-[44px] h-[44px] flex items-center justify-center bg-[#E1306C] rounded-full shrink-0 active:scale-95 transition-transform disabled:opacity-40 shadow-lg shadow-[#E1306C]/30"
+            aria-label="Send"
+          >
+            {sending ? (
+              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            ) : (
+              <Send className="w-5 h-5 ml-0.5" strokeWidth={2} />
+            )}
           </button>
         </div>
-        <button
-          onClick={onClose}
-          className="p-2.5 hover:bg-white/10 rounded-full transition-colors"
-          aria-label="Cancel"
-        >
-          <X className="w-5 h-5" />
-        </button>
       </div>
     </div>,
     document.body,

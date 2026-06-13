@@ -143,33 +143,6 @@ export default memo(function Home() {
               transition={{ delay: 0.2, duration: 0.3 }}
               className="relative flex items-center justify-center gap-5 sm:gap-7 mt-8 mb-6 w-full max-w-[340px] mx-auto cursor-pointer active:scale-[0.98] transition-transform"
             >
-              {/* Wavy connection line — curves through the heart center */}
-              <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 z-[8] pointer-events-none">
-                <svg viewBox="0 0 320 36" className="w-full h-9" preserveAspectRatio="none" aria-hidden>
-                  <path
-                    d="M 0,22 C 45,6 75,32 110,14 S 175,4 210,20 S 265,34 320,12"
-                    fill="none"
-                    className="stroke-primary/20"
-                    strokeWidth="14"
-                    filter="blur(8px)"
-                  />
-                  <path
-                    d="M 0,22 C 45,6 75,32 110,14 S 175,4 210,20 S 265,34 320,12"
-                    fill="none"
-                    className="stroke-primary/50"
-                    strokeWidth="5"
-                    filter="blur(2px)"
-                  />
-                  <path
-                    d="M 0,22 C 45,6 75,32 110,14 S 175,4 210,20 S 265,34 320,12"
-                    fill="none"
-                    className="stroke-primary"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                  />
-                </svg>
-              </div>
-
               <div className="relative z-10">
                 <AvatarImage
                   src={user?.avatar}
@@ -181,13 +154,23 @@ export default memo(function Home() {
               </div>
 
               <motion.div
-                animate={{ scale: [1, 1.15, 1] }}
+                animate={{ scale: [1, 1.18, 1] }}
                 transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
-                className="relative z-[7]"
-                style={{ filter: "drop-shadow(0 0 12px rgba(var(--primary), 0.7))" }}
+                className="relative z-[7] flex items-center justify-center"
                 aria-hidden
               >
-                <Heart className="w-8 h-8 sm:w-10 sm:h-10 text-primary fill-primary" />
+                <div className="absolute w-20 h-20 sm:w-24 sm:h-24 bg-primary/25 rounded-full blur-[28px] animate-pulse" />
+                <div className="absolute w-14 h-14 sm:w-16 sm:h-16 bg-primary/40 rounded-full blur-[16px]" />
+                <div
+                  className="absolute w-10 h-10 sm:w-12 sm:h-12 bg-primary/60 rounded-full blur-[8px]"
+                  style={{ boxShadow: "0 0 32px rgba(var(--primary), 0.9), 0 0 64px rgba(var(--primary), 0.5)" }}
+                />
+                <Heart
+                  className="relative w-8 h-8 sm:w-10 sm:h-10 text-primary fill-primary"
+                  style={{
+                    filter: "drop-shadow(0 0 8px rgba(var(--primary), 1)) drop-shadow(0 0 20px rgba(var(--primary), 0.85)) drop-shadow(0 0 40px rgba(var(--primary), 0.5))",
+                  }}
+                />
               </motion.div>
 
               <div className="relative z-10">
