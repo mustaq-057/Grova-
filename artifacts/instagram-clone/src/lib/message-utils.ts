@@ -202,10 +202,13 @@ export function isReplyPhotoPlaceholder(text?: string): boolean {
   return Boolean(text && REPLY_PHOTO_LABELS.has(text.trim()));
 }
 
-export function formatPresence(lastSeen: number | undefined): { label: string; online: boolean } {
+export function formatPresence(lastSeen: number | string | undefined): { label: string; online: boolean } {
   if (!lastSeen) return { label: "Active a while ago", online: false };
 
-  const diff = Date.now() - lastSeen;
+  const timestamp = typeof lastSeen === "string" ? new Date(lastSeen).getTime() : lastSeen;
+  if (isNaN(timestamp)) return { label: "Active a while ago", online: false };
+
+  const diff = Date.now() - timestamp;
   if (diff < 0) return { label: "Active now", online: true };
 
   const mins = Math.floor(diff / 60_000);
