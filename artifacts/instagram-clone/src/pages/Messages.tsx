@@ -1,5 +1,5 @@
 import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, startTransition } from "react";
-import { Info, Heart, Mic, X, Trash2, Ban, Phone, Video, WifiOff, Wifi, Search, AlertCircle, Palette, MessageCircle, Shield } from "lucide-react";
+import { Info, Heart, Mic, X, Trash2, Ban, Phone, Video, WifiOff, Wifi, Search, AlertCircle, FileText, MessageCircle, Shield } from "lucide-react";
 import { motion } from "framer-motion";
 import { api, type ApiMessage } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -3011,11 +3011,11 @@ export default function Messages() {
 
 
               <button
-                onClick={() => { setShowBubbleColors(true); }}
-                className={`p-1.5 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 active:scale-95 ${showBubbleColors ? "text-primary" : "text-muted-foreground hover:text-foreground hover:bg-secondary"}`}
-                aria-label="Change bubble color"
+                onClick={() => document.getElementById('generic-file-upload')?.click()}
+                className={`p-1.5 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 active:scale-95 text-muted-foreground hover:text-foreground hover:bg-secondary`}
+                aria-label="Attach File"
               >
-                <Palette className="w-4 h-4" strokeWidth={1.5} />
+                <FileText className="w-4 h-4" strokeWidth={1.5} />
               </button>
               <button
                 onClick={() => startCall("audio")}

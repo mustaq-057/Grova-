@@ -280,10 +280,7 @@ export function PostFeed() {
                     <MessageCircle className="w-5 h-5" />
                     <span>{post.commentCount ?? 0}</span>
                   </button>
-                  <button type="button" onClick={() => shareToChat(post)} className="flex items-center gap-1.5 text-sm ml-auto text-primary">
-                    <Send className="w-4 h-4" />
-                    {askPartner(partnerId)}
-                  </button>
+                  {/* Removed share to chat button per user request */}
                 </div>
                 {post.caption ? (
                   <p className="px-4 pt-2 text-sm">

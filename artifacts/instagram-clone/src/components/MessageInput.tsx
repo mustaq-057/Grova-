@@ -1,6 +1,6 @@
 import { memo, useRef, useState, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
 import { createPortal } from "react-dom";
-import { Smile, Mic, Send, Sticker, Paperclip, X, MessageCircle, MapPin, PenTool, Zap, Plus, Image as ImageIcon, PlusCircle, Sparkles, FileText, Palette, File as FileIcon, AlertCircle } from "lucide-react";
+import { Smile, Mic, Send, Sticker, Paperclip, X, MessageCircle, MapPin, PenTool, Zap, Plus, Image as ImageIcon, PlusCircle, Sparkles, FileText, Palette, File as FileIcon, AlertCircle, Camera, MessageSquarePlus } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import EmojiPicker from "@/components/EmojiPicker";
 import StickerPicker from "@/components/StickerPicker";
@@ -10,7 +10,7 @@ import { useChatTheme } from "@/hooks/useChatTheme";
 import { isSupportedFileType, MAX_FILE_SIZE_MB, FILE_INPUT_ACCEPT } from "@/lib/supported-file-types";
 
 const CustomLocationIcon = () => <MapPin className="w-[26px] h-[26px] text-white" strokeWidth={1.6} />;
-const CustomQuickChatIcon = () => <Zap className="w-[26px] h-[26px] text-white" strokeWidth={1.6} />;
+const CustomQuickChatIcon = () => <MessageSquarePlus className="w-[26px] h-[26px] text-white" strokeWidth={1.6} />;
 const CustomDoodleIcon = () => <PenTool className="w-[26px] h-[26px] text-white" strokeWidth={1.6} />;
 const CustomPaletteIcon = () => <Palette className="w-[26px] h-[26px] text-white" strokeWidth={1.6} />;
 
@@ -330,18 +330,6 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
             className="fixed z-[201] right-3 sm:right-4 bottom-[calc(8rem+env(safe-area-inset-bottom,0px))] md:bottom-[5.5rem] bg-[#1c1c1c] rounded-[22px] py-[10px] shadow-[0_8px_40px_rgba(0,0,0,0.7)] flex flex-col min-w-[210px] sm:min-w-[230px]"
             role="menu"
           >
-            <button
-              type="button"
-              onClick={handleGenericFileClick}
-              className="flex items-center gap-[20px] px-[24px] py-[15px] text-[17px] font-normal hover:bg-white/5 transition-colors w-full text-left text-white"
-              disabled={disabled}
-            >
-              <div className="w-[28px] h-[28px] flex items-center justify-center shrink-0">
-                <FileIcon className="w-[24px] h-[24px] text-white opacity-80" strokeWidth={1.5} />
-              </div>
-              <span>File</span>
-            </button>
-
             {onShareLocation && (
               <button
                 type="button"
@@ -398,13 +386,14 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
         ref={fileInputRef}
         type="file"
         multiple
-        accept="image/*"
+        accept="image/jpeg,image/png,image/gif,image/webp,image/heic,image/heif"
         className="hidden"
         onChange={handleFileChange}
         aria-label="Upload any file"
       />
 
       <input
+        id="generic-file-upload"
         ref={genericFileInputRef}
         type="file"
         multiple
