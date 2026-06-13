@@ -214,7 +214,7 @@ export default function DoodleCanvas({ onClose, onSend }: DoodleCanvasProps) {
     <div className="fixed inset-0 z-[600] flex flex-col bg-[#0b101e] text-white overflow-hidden">
       
       {/* Top Header - safe-area-inset-top requires inline style */}
-      {/* eslint-disable-next-line */}
+      {/* eslint-disable-next-line css-inline-styles -- env(safe-area-inset-top) for notched devices */}
       <div
         className="flex items-center justify-between px-4 py-3 shrink-0 border-b border-white/5 pt-3"
         style={{ paddingTop: "max(12px, env(safe-area-inset-top))" }}
@@ -264,6 +264,7 @@ export default function DoodleCanvas({ onClose, onSend }: DoodleCanvasProps) {
         <div className="w-[60px] shrink-0 flex flex-col items-center py-4 overflow-y-auto scrollbar-hide gap-4 border-r border-white/5">
           {COLORS.map(c => (
             // eslint-disable-next-line jsx-a11y/no-static-element-interactions
+            // eslint-disable-next-line css-inline-styles -- dynamic color value from state
             <button
               key={c}
               onClick={() => setColor(c)}
@@ -310,7 +311,8 @@ export default function DoodleCanvas({ onClose, onSend }: DoodleCanvasProps) {
                 className="relative flex items-center justify-center w-8 h-8 rounded-full hover:bg-white/5"
                 aria-label={`Brush size ${s}`}
               >
-                <div 
+                {/* eslint-disable-next-line css-inline-styles -- dynamic size from brushSize state */}
+              <div 
                   className="rounded-full bg-white transition-all" 
                   style={{ width: s, height: s }}
                 />
@@ -324,12 +326,14 @@ export default function DoodleCanvas({ onClose, onSend }: DoodleCanvasProps) {
           <div className="flex-1 flex flex-col items-center w-full min-h-[100px] px-2 relative group">
             {/* Slider track */}
             <div className="absolute inset-y-0 w-1 bg-white/10 rounded-full overflow-hidden flex flex-col justify-end">
+              {/* eslint-disable-next-line css-inline-styles -- dynamic height from slider state */}
               <div 
                 className="w-full bg-[#0080FF] transition-all duration-75" 
                 style={{ height: `${sliderValue}%` }}
               />
             </div>
             {/* Slider input */}
+            {/* eslint-disable-next-line css-inline-styles -- writingMode not available in Tailwind */}
             <input 
               type="range" 
               min="10" 
@@ -341,6 +345,7 @@ export default function DoodleCanvas({ onClose, onSend }: DoodleCanvasProps) {
               aria-label="Brush size multiplier"
             />
             {/* Slider thumb representation */}
+            {/* eslint-disable-next-line css-inline-styles -- dynamic calc() position from slider state */}
             <div 
               className="absolute w-4 h-4 bg-[#0080FF] rounded-full shadow-lg pointer-events-none transition-all duration-75"
               style={{ bottom: `calc(${sliderValue}% - 8px)` }}
