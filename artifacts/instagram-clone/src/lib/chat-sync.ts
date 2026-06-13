@@ -251,7 +251,9 @@ export function replaceOptimisticMessage(
   const merged = idx >= 0 ? mergeOptimisticWithServer(prev[idx]!, display) : display;
 
   if (prev.some((m) => m.id === merged.id && m.id !== tempId)) {
-    return prev.filter((m) => m.id !== tempId);
+    return prev
+      .map((m) => (m.id === merged.id ? { ...m, clientUniqueId: tempId } : m))
+      .filter((m) => m.id !== tempId);
   }
 
   if (idx >= 0) {
