@@ -139,6 +139,8 @@ export default memo(function Profile() {
               type="button"
               onClick={() => setAvatarZoom(true)}
               className="rounded-full"
+              title="View profile photo"
+              aria-label="View profile photo"
             >
               <AvatarImage
                 src={user.avatar}
@@ -156,7 +158,7 @@ export default memo(function Profile() {
             >
               <Camera className="w-4 h-4" />
             </button>
-            <input id="avatar-upload" type="file" accept="image/*" className="hidden" onChange={avatarCrop.handleAvatarFileChange} disabled={avatarCrop.uploading} />
+            <input id="avatar-upload" type="file" accept="image/*" className="hidden" onChange={avatarCrop.handleAvatarFileChange} disabled={avatarCrop.uploading} aria-label="Upload avatar image" title="Upload avatar image" />
           </div>
         </div>
         <p className="text-xs text-muted-foreground mb-4 -mt-2">Tap photo to enlarge · camera to change</p>
@@ -176,35 +178,47 @@ export default memo(function Profile() {
                   onClick={() => document.getElementById("avatar-upload-edit")?.click()}
                   className="absolute bottom-0 right-0 w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground shadow-lg"
                   aria-label="Change profile photo"
+                  title="Change profile photo"
                 >
                   <Camera className="w-4 h-4" />
                 </button>
               </div>
-              <input id="avatar-upload-edit" type="file" accept="image/*" className="hidden" onChange={avatarCrop.handleAvatarFileChange} disabled={avatarCrop.uploading} />
+              <input id="avatar-upload-edit" type="file" accept="image/*" className="hidden" onChange={avatarCrop.handleAvatarFileChange} disabled={avatarCrop.uploading} aria-label="Upload new profile photo" title="Upload new profile photo" />
               <p className="text-xs text-primary font-medium">Change profile photo</p>
             </div>
             <p className="text-xs text-muted-foreground uppercase tracking-wider text-center">Profile</p>
             <input
               value={pendingName}
               onChange={(e) => setPendingName(e.target.value)}
+              placeholder="Enter your name"
+              aria-label="Profile name"
               className="w-full bg-secondary/50 rounded-xl px-4 py-2.5 text-sm outline-none border border-border/50 text-center"
             />
             <textarea
               value={pendingBio}
               onChange={(e) => setPendingBio(e.target.value)}
+              placeholder="Add your bio"
+              aria-label="Profile bio"
               rows={2}
               className="w-full bg-secondary/50 rounded-xl px-4 py-2.5 text-sm outline-none resize-none border border-border/50 text-center"
             />
             <div className="flex gap-2 justify-center">
-              <button
+              <button 
+                type="button"
                 onClick={saveEdit}
                 disabled={saving || !pendingName.trim()}
                 className="flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground text-sm font-semibold rounded-xl disabled:opacity-50"
+                title="Save profile changes"
               >
                 <Check className="w-3.5 h-3.5" />
                 {saving ? "Saving..." : "Save"}
               </button>
-              <button onClick={() => setEditing(false)} className="px-4 py-2 bg-secondary text-sm font-semibold rounded-xl">
+              <button 
+                type="button"
+                onClick={() => setEditing(false)} 
+                className="px-4 py-2 bg-secondary text-sm font-semibold rounded-xl"
+                title="Cancel profile editing"
+              >
                 <X className="w-3.5 h-3.5 inline" /> Cancel
               </button>
             </div>

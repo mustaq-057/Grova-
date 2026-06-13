@@ -108,9 +108,11 @@ export default function Milestones() {
           </div>
         </div>
         <button
+          type="button"
           onClick={() => setShowAdd(true)}
           className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground text-sm font-semibold rounded-xl hover:bg-primary/90 transition-colors"
           data-testid="button-add-milestone"
+          title="Add new milestone"
         >
           <Plus className="w-4 h-4" />
           Add
@@ -128,7 +130,7 @@ export default function Milestones() {
           <form onSubmit={handleAdd} className="p-4 space-y-3">
             <div className="flex items-center justify-between mb-1">
               <p className="text-sm font-semibold">Add Milestone</p>
-              <button type="button" onClick={() => setShowAdd(false)} className="text-muted-foreground">
+              <button type="button" onClick={() => setShowAdd(false)} className="text-muted-foreground" title="Close form" aria-label="Close milestone form">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -136,6 +138,7 @@ export default function Milestones() {
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Milestone title..."
+              aria-label="Milestone title"
               className="w-full bg-secondary border border-border rounded-xl px-4 py-2.5 text-sm outline-none focus:border-primary transition-colors"
               data-testid="input-milestone-title"
             />
@@ -143,6 +146,7 @@ export default function Milestones() {
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
+              aria-label="Milestone date"
               className="w-full bg-secondary border border-border rounded-xl px-4 py-2.5 text-sm outline-none focus:border-primary transition-colors"
               data-testid="input-milestone-date"
             />
@@ -171,6 +175,7 @@ export default function Milestones() {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Description (optional)..."
+              aria-label="Milestone description"
               rows={2}
               className="w-full bg-secondary border border-border rounded-xl px-4 py-3 text-sm outline-none focus:border-primary transition-colors resize-none"
               data-testid="input-milestone-description"
@@ -227,6 +232,8 @@ export default function Milestones() {
                           onClick={() => setDeleteId(milestone.id)}
                           className="text-muted-foreground/40 hover:text-destructive transition-colors p-1"
                           data-testid={`button-delete-milestone-${milestone.id}`}
+                          aria-label="Delete milestone"
+                          title="Delete milestone"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
