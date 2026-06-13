@@ -207,7 +207,7 @@ export const MessageItem = memo(function MessageItem({
 
   const defaultBubbleStyle = isMe
     ? { backgroundColor: "var(--color-primary, #2563EB)", borderColor: "var(--color-primary, #2563EB)" }
-    : { backgroundColor: "var(--color-secondary, #374151)", borderColor: "var(--color-secondary, #374151)" };
+    : { backgroundColor: "color-mix(in srgb, var(--color-primary) 20%, var(--color-secondary, #374151))", borderColor: "color-mix(in srgb, var(--color-primary) 30%, var(--color-secondary, #374151))" };
 
   const openReactionPicker = useCallback(() => {
     const anchor = bubbleWrapRef.current;
