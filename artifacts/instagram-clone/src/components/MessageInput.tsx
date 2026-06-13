@@ -1,12 +1,13 @@
 import { memo, useRef, useState, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
 import { createPortal } from "react-dom";
-import { Smile, Mic, Send, Sticker, Paperclip, X, MessageCircle, MapPin, PenTool, Zap, Plus, Image as ImageIcon, Camera, PlusCircle, Sparkles, FileText, Palette, File as FileIcon } from "lucide-react";
+import { Smile, Mic, Send, Sticker, Paperclip, X, MessageCircle, MapPin, PenTool, Zap, Plus, Image as ImageIcon, Camera, PlusCircle, Sparkles, FileText, Palette, File as FileIcon, AlertCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import EmojiPicker from "@/components/EmojiPicker";
 import StickerPicker from "@/components/StickerPicker";
 import GreetingPicker from "@/components/GreetingPicker";
 import { extractClipboardFiles, readClipboardFilesAsync } from "@/lib/media-file";
 import { useChatTheme } from "@/hooks/useChatTheme";
+import { isSupportedFileType, MAX_FILE_SIZE_MB, FILE_INPUT_ACCEPT } from "@/lib/supported-file-types";
 
 const CustomLocationIcon = () => <MapPin className="w-[26px] h-[26px] text-white" strokeWidth={1.6} />;
 const CustomQuickChatIcon = () => <Zap className="w-[26px] h-[26px] text-white" strokeWidth={1.6} />;
@@ -157,16 +158,42 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
   const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
+    
+    // Validate all files before processing
+    const unsupportedFiles: string[] = [];
+    const oversizedFiles: string[] = [];
+    const validFiles: File[] = [];
+
     for (const file of files) {
-      const isVideo = file.type.startsWith("video/") || /\.(mp4|webm|mov|m4v|mkv|3gp)$/i.test(file.name);
-      const maxBytes = isVideo ? 60 * 1024 * 1024 : 25 * 1024 * 1024;
-      if (file.size > maxBytes) {
-        alert(isVideo ? "Video too large (max 60MB)." : "File too large (max 25MB).");
-        e.target.value = "";
-        return;
+      // Check if file type is supported
+      if (!isSupportedFileType(file.type, file.name)) {
+        unsupportedFiles.push(file.name);
+        continue;
       }
+
+      // Check file size
+      const fileSizeMB = file.size / (1024 * 1024);
+      if (fileSizeMB > MAX_FILE_SIZE_MB) {
+        oversizedFiles.push(`${file.name} (${fileSizeMB.toFixed(1)}MB)`);
+        continue;
+      }
+
+      validFiles.push(file);
     }
-    onImageSelect(files, files.length === 1 ? files[0].type || undefined : undefined);
+
+    // Show error messages for unsupported or oversized files
+    if (unsupportedFiles.length > 0) {
+      alert(`❌ Unsupported file types:\n${unsupportedFiles.join("\n")}\n\nPlease use supported document, image, audio, video, or archive formats.`);
+    }
+    if (oversizedFiles.length > 0) {
+      alert(`⚠️ Files too large (max ${MAX_FILE_SIZE_MB}MB):\n${oversizedFiles.join("\n")}`);
+    }
+
+    // Send valid files if any
+    if (validFiles.length > 0) {
+      onImageSelect(validFiles.length === 1 ? validFiles[0] : validFiles, validFiles.length === 1 ? validFiles[0].type || undefined : undefined);
+    }
+
     e.target.value = "";
   }, [onImageSelect]);
 
@@ -382,7 +409,7 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
         ref={genericFileInputRef}
         type="file"
         multiple
-        accept="*/*"
+        accept={FILE_INPUT_ACCEPT}
         className="hidden"
         onChange={handleFileChange}
         aria-label="Upload document or file"

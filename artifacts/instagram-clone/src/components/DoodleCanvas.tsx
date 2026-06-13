@@ -289,13 +289,22 @@ export default function DoodleCanvas({ onClose, onSend }: DoodleCanvasProps) {
     ectx.drawImage(fullCanvas, crop.x, crop.y, crop.w, crop.h, 0, 0, crop.w, crop.h);
 
     // Use toBlob for better performance (async, non-blocking)
+    let blobTimeout: ReturnType<typeof setTimeout> | null = null;
+    
+    const handleBlobComplete = () => {
+      if (blobTimeout) clearTimeout(blobTimeout);
+    };
+
     exportCanvas.toBlob((blob) => {
+      handleBlobComplete();
       if (!blob) {
         setSending(false);
+        console.error("Failed to create blob from canvas");
         return;
       }
       
       const reader = new FileReader();
+      
       reader.onload = () => {
         onSend({ 
           imageData: reader.result as string, 
@@ -306,8 +315,25 @@ export default function DoodleCanvas({ onClose, onSend }: DoodleCanvasProps) {
         });
         setSending(false);
       };
-      reader.readAsDataURL(blob);
+      
+      reader.onerror = () => {
+        setSending(false);
+        console.error("Failed to read blob as data URL");
+      };
+      
+      try {
+        reader.readAsDataURL(blob);
+      } catch (error) {
+        setSending(false);
+        console.error("Error reading blob:", error);
+      }
     }, "image/png", 0.95);
+    
+    // Fallback timeout to prevent infinite loading
+    blobTimeout = setTimeout(() => {
+      setSending(false);
+      console.error("Doodle export timeout");
+    }, 15000); // 15 second timeout
   }, [hasStrokes, sending, onSend]);
 
   return createPortal(

@@ -16,6 +16,7 @@ import { groupByDay, shouldShowTimeGap } from "@/lib/message-helpers";
 import { isEncryptionReady } from "@/lib/crypto";
 import { isOnline } from "@/lib/offline";
 import { requestNotificationPermission, subscribeToPush, sendSubscriptionToServer } from "@/lib/notifications";
+import { isSupportedFileType, MAX_FILE_SIZE_MB } from "@/lib/supported-file-types";
 
 
 
@@ -2215,6 +2216,40 @@ export default function Messages() {
     async (fileInput: File | File[], clipboardItemType?: string) => {
       const files = Array.isArray(fileInput) ? fileInput : [fileInput];
       if (!user || filePickInFlightRef.current || files.length === 0) return;
+      
+      // Validate file types upfront
+      const unsupportedFiles: string[] = [];
+      for (const file of files) {
+        if (!isSupportedFileType(file.type, file.name)) {
+          unsupportedFiles.push(file.name);
+        }
+      }
+      
+      if (unsupportedFiles.length > 0) {
+        toast.error(
+          `❌ Unsupported file types:\n${unsupportedFiles.join(", ")}\n\nPlease use supported document, image, audio, video, or archive formats.`,
+          { duration: 5000 },
+        );
+        return;
+      }
+
+      // Check file sizes
+      const oversizedFiles: string[] = [];
+      for (const file of files) {
+        const fileSizeMB = file.size / (1024 * 1024);
+        if (fileSizeMB > MAX_FILE_SIZE_MB) {
+          oversizedFiles.push(`${file.name} (${fileSizeMB.toFixed(1)}MB)`);
+        }
+      }
+      
+      if (oversizedFiles.length > 0) {
+        toast.error(
+          `⚠️ Files too large (max ${MAX_FILE_SIZE_MB}MB):\n${oversizedFiles.join(", ")}`,
+          { duration: 5000 },
+        );
+        return;
+      }
+
       filePickInFlightRef.current = true;
       const unlockTimer = window.setTimeout(() => {
         filePickInFlightRef.current = false;
