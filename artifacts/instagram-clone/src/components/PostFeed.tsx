@@ -141,7 +141,7 @@ export function PostFeed() {
     try {
       await api.deletePost(deletePostId);
       setPosts((prev) => prev.filter((p) => p.id !== deletePostId));
-      toast.success("Post deleted for both of you.");
+      toast.success("Post deleted for you.");
     } catch {
       toast.error("Could not delete post.");
     } finally {
@@ -203,7 +203,7 @@ export function PostFeed() {
     return (
       <div className="px-4 py-10 text-center border-t border-border/50">
         <p className="font-semibold text-sm">No posts yet</p>
-        <p className="text-xs text-muted-foreground mt-1 mb-4">Share a photo — it appears here for both of you</p>
+        <p className="text-xs text-muted-foreground mt-1 mb-4">Share a photo — it appears here for you</p>
         <Link href="/create">
           <button type="button" className="px-4 py-2 bg-primary text-primary-foreground text-sm font-semibold rounded-xl">
             Upload photo
@@ -327,7 +327,7 @@ export function PostFeed() {
         open={deletePostId !== null}
         onOpenChange={(open) => !open && setDeletePostId(null)}
         title="Delete this post?"
-        description="This removes the photo for both of you. It cannot be undone."
+        description="This removes the photo for you. It cannot be undone."
         confirmLabel="Delete"
         destructive
         loading={deleting}

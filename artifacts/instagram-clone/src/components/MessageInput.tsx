@@ -6,6 +6,7 @@ import EmojiPicker from "@/components/EmojiPicker";
 import StickerPicker from "@/components/StickerPicker";
 import GreetingPicker from "@/components/GreetingPicker";
 import { extractClipboardFiles, readClipboardFilesAsync } from "@/lib/media-file";
+import { useChatTheme } from "@/hooks/useChatTheme";
 
 const CustomLocationIcon = () => <MapPin className="w-[26px] h-[26px] text-white" strokeWidth={1.6} />;
 const CustomQuickChatIcon = () => <Zap className="w-[26px] h-[26px] text-white" strokeWidth={1.6} />;
@@ -66,6 +67,8 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
   const fileInputRef = useRef<HTMLInputElement>(null);
   const genericFileInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const lastSentTimeRef = useRef<number>(0);
+  const { theme } = useChatTheme();
 
   useImperativeHandle(ref, () => inputRef.current as HTMLInputElement);
 
@@ -79,12 +82,19 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
   const submitMessage = useCallback(() => {
     const text = input.trim();
     if (!text || disabled || recording) return;
+
+    // Prevent double-submit within 300ms
+    const now = Date.now();
+    if (now - lastSentTimeRef.current < 300) return;
+    lastSentTimeRef.current = now;
+
     setInput("");
     onSendMessage(text);
   }, [input, disabled, recording, onSendMessage]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
+      if (e.repeat) return; // Guard against Enter keydown repeat
       e.preventDefault();
       submitMessage();
     }
@@ -381,7 +391,8 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
         <button
           type="button"
           onClick={onOpenCamera}
-          className="w-[38px] h-[38px] sm:w-[44px] sm:h-[44px] rounded-full bg-[#5b5ef4] hover:bg-[#4a4de3] active:scale-95 flex shrink-0 items-center justify-center text-white border-none transition-all"
+          className="w-[38px] h-[38px] sm:w-[44px] sm:h-[44px] rounded-full active:scale-95 flex shrink-0 items-center justify-center text-white border-none transition-all hover:brightness-90"
+          style={{ backgroundColor: theme.bubbleColor }}
           disabled={disabled}
         >
           <Camera className="w-[20px] h-[20px] sm:w-[22px] sm:h-[22px]" strokeWidth={1.8} />

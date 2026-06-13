@@ -175,10 +175,10 @@ export function findOptimisticMatch(
     const dt = Math.abs(serverTime - optTime);
 
     if (optimistic.type === "text") {
-      return dt <= 8_000 && outgoingContentMatches(optimistic, f);
+      return dt <= 120_000 && outgoingContentMatches(optimistic, f);
     }
     if (optimistic.type === "gif") {
-      return dt <= 15_000 && outgoingContentMatches(optimistic, f);
+      return dt <= 120_000 && outgoingContentMatches(optimistic, f);
     }
     // Never guess blob uploads during poll merge — wait for send/SSE confirmation.
     if (hasLocalMediaPreview(optimistic)) {
@@ -190,10 +190,10 @@ export function findOptimisticMatch(
           outgoingContentMatches(optimistic, f)
         );
       }
-      return dt <= 15_000 && serverTime >= optTime - 5_000;
+      return dt <= 120_000 && serverTime >= optTime - 5_000;
     }
-    if (outgoingContentMatches(optimistic, f)) return dt <= 15_000;
-    return dt <= 8_000 && serverTime >= optTime - 3_000;
+    if (outgoingContentMatches(optimistic, f)) return dt <= 120_000;
+    return dt <= 120_000 && serverTime >= optTime - 3_000;
   });
 
   if (candidates.length === 0) return undefined;
