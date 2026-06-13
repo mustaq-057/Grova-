@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Download, X } from "lucide-react";
+import { toast } from "sonner";
+import { tryRefreshSession } from "@/lib/api";
+import { isMobileDevice } from "@/lib/file-view";
+import { resolveMediaDownloadUrl } from "@/lib/media-url";
 
 type Props = {
   url: string;
@@ -37,22 +41,75 @@ export function MediaViewerOverlay({
   }, [url]);
 
   const handleDownload = useCallback(async () => {
-    try {
-      const res = await fetch(url);
-      const blob = await res.blob();
+    const fileBase = `grova-${kind}-${Date.now()}`;
+
+    const extFromBlob = (blob: Blob): string => {
+      const ct = blob.type.toLowerCase();
+      if (ct.includes("webp")) return "webp";
+      if (ct.includes("png")) return "png";
+      if (ct.includes("gif")) return "gif";
+      if (ct.includes("mp4") || ct.includes("video")) return "mp4";
+      if (ct.includes("jpeg") || ct.includes("jpg")) return "jpg";
+      return kind === "video" ? "mp4" : "jpg";
+    };
+
+    const saveBlob = (blob: Blob) => {
+      const ext = extFromBlob(blob);
+      const fileName = `${fileBase}.${ext}`;
       const objectUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = objectUrl;
-      a.download = `grova-${kind}-${Date.now()}.${kind === "video" ? "mp4" : "jpg"}`;
+      a.download = fileName;
+      document.body.appendChild(a);
       a.click();
+      a.remove();
       URL.revokeObjectURL(objectUrl);
+      toast.success("Downloaded");
+    };
+
+    const fetchBlob = async (): Promise<Blob> => {
+      let downloadUrl = resolveMediaDownloadUrl(url, kind);
+      let res = await fetch(downloadUrl, { credentials: "include" });
+      if (res.status === 401) {
+        const refreshed = await tryRefreshSession();
+        if (refreshed) {
+          downloadUrl = resolveMediaDownloadUrl(url, kind);
+          res = await fetch(downloadUrl, { credentials: "include" });
+        }
+      }
+      if (!res.ok) throw new Error(`Download failed (${res.status})`);
+      return res.blob();
+    };
+
+    try {
+      const blob = await fetchBlob();
+      if (
+        isMobileDevice() &&
+        navigator.share &&
+        navigator.canShare?.({
+          files: [new File([blob], `${fileBase}.${extFromBlob(blob)}`, { type: blob.type || "application/octet-stream" })],
+        })
+      ) {
+        await navigator.share({
+          files: [new File([blob], `${fileBase}.${extFromBlob(blob)}`, { type: blob.type || "application/octet-stream" })],
+        });
+        return;
+      }
+      saveBlob(blob);
     } catch {
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `grova-${kind}-${Date.now()}`;
-      a.target = "_blank";
-      a.rel = "noopener";
-      a.click();
+      try {
+        const downloadUrl = resolveMediaDownloadUrl(url, kind);
+        const a = document.createElement("a");
+        a.href = downloadUrl;
+        a.download = fileBase;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      } catch {
+        toast.error("Download failed");
+      }
     }
   }, [url, kind]);
 

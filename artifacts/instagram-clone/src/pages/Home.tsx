@@ -7,12 +7,16 @@ import { api, type ApiUser } from "@/lib/api";
 import { isEncryptionReady } from "@/lib/crypto";
 import { AvatarImage } from "@/components/AvatarImage";
 import { PostFeed } from "@/components/PostFeed";
+import { useAppSearchParams } from "@/lib/app-search";
 import { PARTNER_CHANGED } from "@/lib/couple-sync";
 import { parsePresenceResponse } from "@/lib/presence-api";
 import { USER_TIMEZONES } from "@/lib/timezones";
 
 export default memo(function Home() {
   const { user, partner: authPartner } = useAuth();
+  const searchParams = useAppSearchParams();
+  const focusPostId = searchParams.get("post");
+  const focusCommentId = searchParams.get("comment");
   const [partner, setPartner] = useState<ApiUser | null>(authPartner);
   const [moroccoTime, setMoroccoTime] = useState("");
   const [indiaTime, setIndiaTime] = useState("");
@@ -253,10 +257,7 @@ export default memo(function Home() {
         })}
       </motion.div>
 
-      <PostFeed
-        focusPostId={typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("post") : null}
-        focusCommentId={typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("comment") : null}
-      />
+      <PostFeed focusPostId={focusPostId} focusCommentId={focusCommentId} />
     </div>
   );
 });

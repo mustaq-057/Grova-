@@ -14,6 +14,19 @@ import { PostCarousel } from "@/components/PostCarousel";
 import { getPostMediaUrls } from "@/lib/post-media";
 import { resolvePostMediaUrl } from "@/lib/media-url";
 
+async function waitForElement(
+  selector: string,
+  maxAttempts = 20,
+  intervalMs = 100,
+): Promise<Element | null> {
+  for (let i = 0; i < maxAttempts; i++) {
+    const el = document.querySelector(selector);
+    if (el) return el;
+    await new Promise((r) => window.setTimeout(r, intervalMs));
+  }
+  return null;
+}
+
 export function PostFeed({
   focusPostId,
   focusCommentId,
@@ -32,6 +45,7 @@ export function PostFeed({
   const [deleting, setDeleting] = useState(false);
   const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null);
   const commentHighlightRef = useRef<HTMLDivElement | null>(null);
+  const focusHandledRef = useRef<string | null>(null);
 
   const loadPosts = useCallback(async () => {
     try {
@@ -199,15 +213,44 @@ export function PostFeed({
     }
   };
 
+
   useEffect(() => {
-    if (!focusPostId) return;
-    void openComments(focusPostId);
-    if (!focusCommentId) return;
-    const t = window.setTimeout(() => {
-      commentHighlightRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-    }, 500);
-    return () => window.clearTimeout(t);
+    focusHandledRef.current = null;
   }, [focusPostId, focusCommentId]);
+
+  useEffect(() => {
+    if (!focusPostId || posts.length === 0) return;
+    const focusKey = `${focusPostId}:${focusCommentId ?? ""}`;
+    if (focusHandledRef.current === focusKey) return;
+
+    let cancelled = false;
+    void (async () => {
+      await openComments(focusPostId);
+      if (cancelled) return;
+
+      const postEl = await waitForElement(`[data-testid="post-${focusPostId}"]`);
+      if (cancelled) return;
+      postEl?.scrollIntoView({ behavior: "smooth", block: "center" });
+
+      if (focusCommentId) {
+        for (let i = 0; i < 20; i++) {
+          if (cancelled) return;
+          if (commentHighlightRef.current) {
+            commentHighlightRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+            break;
+          }
+          await new Promise((r) => window.setTimeout(r, 100));
+        }
+      }
+
+      focusHandledRef.current = focusKey;
+      window.history.replaceState({}, "", "/");
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [focusPostId, focusCommentId, posts.length, comments[focusPostId ?? ""]?.length]);
 
   const submitComment = async (postId: string) => {
     if (!commentText.trim()) return;
@@ -280,7 +323,7 @@ export function PostFeed({
                   : "aspect-[4/5]";
 
             return (
-              <li key={post.id} className="pb-4">
+              <li key={post.id} data-testid={`post-${post.id}`} className="pb-4">
                 <div className="flex items-center gap-2 px-4 py-3">
                   <AvatarImage
                     src={post.authorId === user?.id ? user?.avatar : partner?.avatar}

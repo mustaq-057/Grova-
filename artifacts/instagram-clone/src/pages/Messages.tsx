@@ -293,6 +293,7 @@ export default function Messages() {
   const scrollPreserveRef = useRef<{ top: number; height: number } | null>(null);
   /** Tracks whether we already scrolled to the first unread message on initial load */
   const initialUnreadHandledRef = useRef(false);
+  const firstPaintScrollDoneRef = useRef(false);
 
   const partnerId = useMemo(() => user?.id === "me" ? "wife" : "me", [user?.id]);
 
@@ -305,12 +306,11 @@ export default function Messages() {
     stickToBottomRef.current = true;
     isNearBottomRef.current = true;
     setIsNearBottom(true);
-    scrollChatToBottomSoft(messagesContainerRef.current, bottomRef.current);
+    scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
   }, []);
 
   const scrollToBottomForMedia = useCallback((messageId?: string) => {
     if (!isNearBottomRef.current && !stickToBottomRef.current) return;
-    if (messageId && !recentTailIdsRef.current.has(messageId)) return;
     if (mediaScrollTimerRef.current) clearTimeout(mediaScrollTimerRef.current);
     mediaScrollTimerRef.current = setTimeout(() => {
       if (!isNearBottomRef.current && !stickToBottomRef.current) return;
@@ -325,6 +325,11 @@ export default function Messages() {
       remoteUrl: string,
     ) => {
       setMessages((prev) => commitRemoteMediaUrl(prev, messageId, field, remoteUrl));
+      if (isNearBottomRef.current || stickToBottomRef.current) {
+        requestAnimationFrame(() => {
+          scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
+        });
+      }
     },
     [],
   );
@@ -686,6 +691,7 @@ export default function Messages() {
 
     if (messages.length === 0 && cached && cached.length > 0) {
       isInitialLoadRef.current = true;
+      firstPaintScrollDoneRef.current = false;
       setMessages(cached);
       messagesSigRef.current = messagesListSignature(cached);
     } else if (!restoreAnchor && isNearBottomRef.current) {
@@ -803,6 +809,9 @@ export default function Messages() {
           void normalizeMessages([raw]).then(([msg]) => {
             if (!mounted) return;
             setMessages((prev) => prev.map((m) => (m.id === msg.id ? { ...m, ...msg } : m)));
+            if (isNearBottomRef.current || stickToBottomRef.current) {
+              scrollChatToBottomAfterPaint(messagesContainerRef.current, bottomRef.current);
+            }
           });
 
           if (preview.senderId === partnerId && !isNearBottomRef.current) {
@@ -1261,38 +1270,13 @@ export default function Messages() {
     const firstPaint = isInitialLoadRef.current;
     const isOwnLast = last?.senderId === user?.id;
 
-    if (firstPaint && !pendingScrollRestoreRef.current && !initialUnreadHandledRef.current) {
+    if (firstPaint && !pendingScrollRestoreRef.current && !firstPaintScrollDoneRef.current) {
+      firstPaintScrollDoneRef.current = true;
       const container = messagesContainerRef.current;
       if (container) {
-        // Detect unread partner messages since user last opened chat
-        const chatOpenedAt = getChatOpenedAt();
-        const unreadPartnerMsgs = chatOpenedAt
-          ? messages.filter(
-              (m) =>
-                m.senderId === partnerId &&
-                new Date(m.timestamp).getTime() > new Date(chatOpenedAt).getTime(),
-            )
-          : [];
-
-        if (unreadPartnerMsgs.length >= 2) {
-          // Scroll to the first unread message and show "New messages" toggle
-          initialUnreadHandledRef.current = true;
-          const firstUnreadId = unreadPartnerMsgs[0]!.id;
-          const el = container.querySelector(`[data-testid="message-${firstUnreadId}"]`) as HTMLElement | null;
-          const row = el?.closest(".chat-message-row") as HTMLElement | null;
-          if (row) {
-            scrollMessageIntoCenter(container, row, "auto");
-            isNearBottomRef.current = false;
-            stickToBottomRef.current = false;
-            setIsNearBottom(false);
-            setHasNewMessages(true);
-          } else {
-            // Fallback: scroll to bottom
-            scrollChatToBottom(container, bottomRef.current);
-          }
-        } else {
-          scrollChatToBottom(container, bottomRef.current);
-        }
+        scrollChatToBottom(container, bottomRef.current);
+        isNearBottomRef.current = true;
+        setHasNewMessages(false);
       }
     }
 
@@ -1323,9 +1307,8 @@ export default function Messages() {
     const shouldStick =
       !isPrependingRef.current &&
       !pendingScrollRestoreRef.current &&
-      !initialUnreadHandledRef.current &&
+      !firstPaint &&
       (stickToBottomRef.current ||
-        (firstPaint && !restoreAnchor) ||
         (isOwnLast && tailChanged && isNearBottomRef.current));
 
     if (shouldStick) {
@@ -1388,6 +1371,25 @@ export default function Messages() {
       }
     });
   }, [user, messages.length, scrollToHighlightedMessage]);
+
+  // Re-pin to bottom when message list height grows (images, decrypt, replies)
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    let raf = 0;
+    const ro = new ResizeObserver(() => {
+      if (!isNearBottomRef.current && !stickToBottomRef.current) return;
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        scrollChatToBottom(container, bottomRef.current);
+      });
+    });
+    ro.observe(container);
+    return () => {
+      ro.disconnect();
+      cancelAnimationFrame(raf);
+    };
+  }, []);
 
   // Composer grew (reply / edit bar) — keep latest message visible
   useLayoutEffect(() => {
@@ -1886,16 +1888,47 @@ export default function Messages() {
         msg.type === "video"
           ? resolveChatVideoUrl(raw, msg.text, msg.fileType)
           : resolveChatImageUrl(raw);
+      const displayUrl = display ?? raw;
+
+      if (msg.type === "video") {
+        setMediaViewer({
+          messageId: msg.id,
+          url: displayUrl,
+          kind: "video",
+          timed: false,
+          useVideoDuration: false,
+          secondsLeft: 0,
+          mediaReady: true,
+          allowDownload: true,
+        });
+        return;
+      }
+
       setMediaViewer({
         messageId: msg.id,
-        url: display ?? raw,
-        kind: msg.type === "video" ? "video" : "image",
+        url: displayUrl,
+        kind: "image",
         timed: false,
         useVideoDuration: false,
         secondsLeft: 0,
-        mediaReady: true,
+        mediaReady: false,
         allowDownload: true,
       });
+      const img = new Image();
+      img.onload = () => {
+        setMediaViewer({
+          messageId: msg.id,
+          url: displayUrl,
+          kind: "image",
+          timed: false,
+          useVideoDuration: false,
+          secondsLeft: 0,
+          mediaReady: true,
+          allowDownload: true,
+        });
+      };
+      img.onerror = () => toast.error("Could not load photo");
+      img.src = displayUrl;
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not open media");
     }

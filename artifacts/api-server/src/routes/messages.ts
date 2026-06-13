@@ -496,7 +496,7 @@ router.post("/messages", authenticate, validateBody({
     if (companionSticker === "🤲") {
       await postCoupleActivity("dua", senderId!, fromName, "shared a dua with you 🤲", "/dua").catch(() => {});
     } else if (type === "location") {
-      await postCoupleActivity("location", senderId!, fromName, "shared a location").catch(() => {});
+      await postCoupleActivity("location", senderId!, fromName, "shared a location", `/chat?highlight=${id}`).catch(() => {});
     } else if (type === "doodle") {
       await postCoupleActivity("doodle", senderId!, fromName, "shared a doodle", `/chat?highlight=${id}`).catch(() => {});
     } else if (type === "image") {
@@ -504,16 +504,16 @@ router.post("/messages", authenticate, validateBody({
     } else if (type === "video") {
       await postCoupleActivity("file", senderId!, fromName, "shared a video", `/chat?highlight=${id}`).catch(() => {});
     } else if (type === "file") {
-      await postCoupleActivity("file", senderId!, fromName, "shared a file").catch(() => {});
+      await postCoupleActivity("file", senderId!, fromName, "shared a file", `/chat?highlight=${id}`).catch(() => {});
     } else if (type === "sticker") {
-      await postCoupleActivity("story", senderId!, fromName, "sent a sticker").catch(() => {});
+      await postCoupleActivity("story", senderId!, fromName, "sent a sticker", `/chat?highlight=${id}`).catch(() => {});
     } else if (type === "gif") {
-      await postCoupleActivity("story", senderId!, fromName, "sent a GIF").catch(() => {});
+      await postCoupleActivity("story", senderId!, fromName, "sent a GIF", `/chat?highlight=${id}`).catch(() => {});
     } else if (type === "text" && variant === "cute") {
-      await postCoupleActivity("greeting", senderId!, fromName, "sent a quick chat").catch(() => {});
+      await postCoupleActivity("greeting", senderId!, fromName, "sent a quick chat", `/chat?highlight=${id}`).catch(() => {});
     } else if (type === "text" && text && /^📞 (Audio|Video) call (started|ended)/.test(text)) {
       const snippet = text.includes("ended") ? "ended a call" : "started a call";
-      await postCoupleActivity("call", senderId!, fromName, snippet).catch(() => {});
+      await postCoupleActivity("call", senderId!, fromName, snippet, `/chat?highlight=${id}`).catch(() => {});
     }
 
     res.json(msg);

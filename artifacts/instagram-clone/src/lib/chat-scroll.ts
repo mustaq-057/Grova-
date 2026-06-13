@@ -1,14 +1,10 @@
-/** Instant scroll to latest message — no animated scroll through history. */
+/** Instant scroll to latest message — direct scrollTop avoids scrollIntoView jitter. */
 export function scrollChatToBottom(
   container: HTMLElement | null,
-  bottomAnchor?: HTMLElement | null,
+  _bottomAnchor?: HTMLElement | null,
 ): void {
   if (!container) return;
-  if (bottomAnchor?.isConnected) {
-    bottomAnchor.scrollIntoView({ block: "end", inline: "nearest", behavior: "auto" });
-    return;
-  }
-  container.scrollTop = container.scrollHeight;
+  container.scrollTop = Math.max(0, container.scrollHeight - container.clientHeight);
 }
 
 /** Scroll a message row to the vertical center of the chat container (precise jump). */

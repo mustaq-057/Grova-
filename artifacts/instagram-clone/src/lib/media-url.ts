@@ -79,3 +79,30 @@ export function resolveChatVideoUrl(
 export function resolveChatAudioUrl(url: string | undefined): string | undefined {
   return resolveStorageMediaUrl(url, { fileName: "voice.webm", mimeType: "audio/webm" });
 }
+
+/** Strip proxy wrapper to get the upstream storage URL. */
+export function extractRawMediaUrl(url: string): string {
+  if (url.includes("/api/media/inline")) {
+    try {
+      const inner = new URL(url, typeof window !== "undefined" ? window.location.origin : "http://local")
+        .searchParams.get("url");
+      if (inner) return inner;
+    } catch {
+      /* fall through */
+    }
+  }
+  return url;
+}
+
+/** Authenticated download URL — works for B2, Cloudinary, and other proxied media. */
+export function resolveMediaDownloadUrl(url: string, kind: "image" | "video"): string {
+  const raw = extractRawMediaUrl(url);
+  const fileName = kind === "video" ? "video.mp4" : "photo.jpg";
+  const mime = kind === "video" ? "video/mp4" : "image/jpeg";
+  const proxied = resolveStorageMediaUrl(raw, { fileName, mimeType: mime, download: true });
+  if (proxied?.includes("/api/media/inline")) return proxied;
+  const params = new URLSearchParams({ url: raw, name: fileName, type: mime, download: "1" });
+  const token = getAccessToken();
+  if (token) params.set("token", token);
+  return `/api/media/inline?${params.toString()}`;
+}

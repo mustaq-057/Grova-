@@ -203,7 +203,7 @@ router.post("/posts", rateLimiters.messages, authenticate, async (req, res) => {
     };
     broadcast("post-added", post);
     const fromName = await profileDisplayName(userId);
-    await postCoupleActivity("story", userId, fromName, "shared a new post").catch(() => {});
+    await postCoupleActivity("story", userId, fromName, "shared a new post", `/?post=${id}`).catch(() => {});
     res.json(post);
   } catch (err) {
     console.error("Failed to create post:", err);
@@ -257,6 +257,8 @@ router.post("/posts/:id/like", rateLimiters.messages, authenticate, async (req, 
         "INSERT INTO post_likes (post_id, user_id, created_at) VALUES ($1, $2, $3)",
         [postId, userId, new Date().toISOString()],
       );
+      const fromName = await profileDisplayName(userId);
+      await postCoupleActivity("like", userId, fromName, "liked your post", `/?post=${postId}`).catch(() => {});
     }
     const post = await enrichSinglePost(postId, userId);
     if (post) broadcast("post-liked", post);

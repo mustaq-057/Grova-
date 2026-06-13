@@ -58,7 +58,7 @@ router.post("/reactions", rateLimiters.messages, authenticate, async (req, res) 
       const messageSenderId = (msgRow.rows[0] as { sender_id?: string } | undefined)?.sender_id;
       if (messageSenderId && messageSenderId !== userId) {
         const fromName = await profileDisplayName(userId);
-        await postCoupleActivity("reaction", userId, fromName, `reacted with ${emoji}`).catch(() => {});
+        await postCoupleActivity("reaction", userId, fromName, `reacted with ${emoji}`, `/chat?highlight=${messageId}`).catch(() => {});
       }
     }
 
