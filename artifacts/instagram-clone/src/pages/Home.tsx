@@ -140,32 +140,72 @@ export default memo(function Home() {
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.2, duration: 0.3 }}
-            className="flex items-center justify-center gap-3 mt-6"
+            className="relative flex items-center justify-center gap-6 sm:gap-8 mt-8 mb-6 w-full max-w-[340px] mx-auto"
           >
-            <div className="relative">
-              <AvatarImage src={user?.avatar} userId={user?.id ?? "me"} alt="" className="w-16 h-16 rounded-full object-cover border-2 border-primary/30 shadow-lg" />
-              <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-2 border-background" aria-label="Online status" />
+            {/* Glowing background wave & ambient glow */}
+            <div className="absolute inset-0 flex items-center justify-center -z-10 overflow-visible pointer-events-none">
+              <svg viewBox="0 0 300 100" className="absolute w-[120%] h-[150%] max-w-[400px] opacity-80" preserveAspectRatio="none">
+                <path 
+                  d="M 0,60 Q 75,30 150,50 T 300,40" 
+                  fill="none" 
+                  className="stroke-primary" 
+                  strokeWidth="2.5"
+                  filter="blur(1px)"
+                />
+                <path 
+                  d="M 0,60 Q 75,30 150,50 T 300,40" 
+                  fill="none" 
+                  className="stroke-primary/50" 
+                  strokeWidth="8"
+                  filter="blur(6px)"
+                />
+                <path 
+                  d="M 0,60 Q 75,30 150,50 T 300,40" 
+                  fill="none" 
+                  className="stroke-primary/30" 
+                  strokeWidth="16"
+                  filter="blur(12px)"
+                />
+              </svg>
+              {/* Center Heart Glow */}
+              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-28 h-28 bg-primary/30 rounded-full blur-[24px]" />
+              
+              {/* Particles */}
+              <div className="absolute left-[30%] top-[20%] w-1.5 h-1.5 bg-primary/80 rounded-full blur-[1px] animate-pulse" />
+              <div className="absolute left-[65%] top-[70%] w-1.5 h-1.5 bg-primary/60 rounded-full blur-[1px] animate-pulse" style={{ animationDelay: "1s" }} />
+              <div className="absolute left-[45%] top-[80%] w-1 h-1 bg-primary/80 rounded-full blur-[0.5px] animate-pulse" style={{ animationDelay: "0.5s" }} />
+              <div className="absolute left-[70%] top-[25%] w-2 h-2 bg-primary/40 rounded-full blur-[2px] animate-pulse" style={{ animationDelay: "1.5s" }} />
             </div>
+
+            <div className="relative">
+              <AvatarImage src={user?.avatar} userId={user?.id ?? "me"} alt="" className="w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-[3px] border-primary/40 shadow-[0_0_20px_rgba(var(--primary),0.25)] z-10 relative bg-background" />
+              <div className="absolute bottom-0 right-0 w-5 h-5 sm:w-6 sm:h-6 bg-green-500 rounded-full border-[3px] border-background z-20 shadow-sm" aria-label="Online status" />
+            </div>
+            
             <motion.div 
-              animate={{ scale: [1, 1.2, 1] }}
-              transition={{ repeat: Infinity, duration: 1.5 }}
+              animate={{ scale: [1, 1.15, 1] }}
+              transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
               aria-hidden="true"
+              className="z-10"
+              style={{ filter: "drop-shadow(0 0 12px rgba(var(--primary), 0.7))" }}
             >
-              <Heart className="w-6 h-6 text-primary fill-primary" />
+              <Heart className="w-8 h-8 sm:w-10 sm:h-10 text-primary fill-primary" />
             </motion.div>
+            
             <div className="relative">
               <AvatarImage
                 src={partner.avatar}
                 userId={partner.id}
                 alt=""
-                className="w-16 h-16 rounded-full object-cover border-2 border-primary/30 shadow-lg"
+                className="w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-[3px] border-primary/40 shadow-[0_0_20px_rgba(var(--primary),0.25)] z-10 relative bg-background"
               />
-              <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-2 border-background ${partnerOnline ? "bg-green-500" : "bg-gray-400"}`} aria-label="Online status" />
+              <div className={`absolute bottom-0 right-0 w-5 h-5 sm:w-6 sm:h-6 rounded-full border-[3px] border-background z-20 shadow-sm ${partnerOnline ? "bg-green-500" : "bg-gray-400"}`} aria-label="Online status" />
             </div>
           </motion.div>
         )}
-        <p className="text-sm text-muted-foreground mt-4">
+        <p className="text-base sm:text-lg font-medium mt-4 drop-shadow-sm flex items-center justify-center gap-1.5 text-foreground/90">
           {partner ? `You & ${partner.name}` : "Your private space"}
+          {partner && <Heart className="w-4 h-4 text-primary" strokeWidth={2.5} />}
         </p>
         
         {/* Live Time Display */}

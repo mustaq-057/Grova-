@@ -5,7 +5,6 @@ import { api, type ApiMessage } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import CallScreen, { IncomingCallOverlay } from "@/components/CallScreen";
 import { MessageItem } from "@/components/MessageItem";
-import { ThemePicker } from "@/components/ThemePicker";
 import { MessageInput } from "@/components/MessageInput";
 import { InfoPanel } from "@/components/InfoPanel";
 import { Link } from "wouter";
@@ -18,7 +17,7 @@ import { isEncryptionReady } from "@/lib/crypto";
 import { isOnline } from "@/lib/offline";
 import { requestNotificationPermission, subscribeToPush, sendSubscriptionToServer } from "@/lib/notifications";
 
-import { THEMES } from "@/lib/themes";
+
 
 function unsendErrorMessage(err: unknown): string {
   if (!(err instanceof Error)) return "Could not unsend. Try again.";
@@ -32,14 +31,18 @@ function unsendErrorMessage(err: unknown): string {
 }
 import { ChatInbox } from "@/components/ChatInbox";
 import { AppThemeModal } from "@/components/AppThemeModal";
+import { BubbleColorSelector } from "@/components/BubbleColorSelector";
+import { CameraOverlay } from "@/components/CameraOverlay";
+import { PendingMediaPreview } from "@/components/PendingMediaPreview";
 import { MessageContextMenu } from "@/components/MessageContextMenu";
 import { ReplyPreview } from "@/components/ReplyPreview";
 import { EditMessageBar } from "@/components/EditMessageBar";
 import { defaultAvatar } from "@/lib/avatars";
 import { AvatarImage } from "@/components/AvatarImage";
 import { saveMemoryFromMessage, removeMemory } from "@/lib/memories";
-import { APP_THEME_CHANGED, getStoredAppTheme, getPremiumChatThemeClass, isPremiumAnimatedTheme, type AppThemeId } from "@/lib/app-theme";
-import { ChatThemeLayer } from "@/components/ChatThemeLayer";
+import { APP_THEME_CHANGED, getStoredAppTheme, isMoonlightSagaTheme, getPremiumChatThemeClass, isPremiumAnimatedTheme, type AppThemeId } from "@/lib/app-theme";
+import { ChatAuroraLayer } from "@/components/ChatAuroraLayer";
+
 import {
   filterVisibleMessages,
   hideMessageForUser,
@@ -84,9 +87,10 @@ import {
   NOTIFY_CHANGED,
   hydrateNotifications,
   clearUnreadChatBadge,
+  getChatOpenedAt,
 } from "@/lib/notifications-feed";
-import { isReadReceiptsEnabled, isShowPresenceEnabled, areNotificationsEnabled } from "@/lib/couple-sync";
-import { isChatBlocked, setChatBlocked, getCuteMode, setCuteMode } from "@/lib/client-memory";
+import { isReadReceiptsEnabled, isShowPresenceEnabled, areNotificationsEnabled, getCachedChatTheme } from "@/lib/couple-sync";
+import { isChatBlocked, setChatBlocked } from "@/lib/client-memory";
 import { hydrateQuickReactions } from "@/lib/quick-reactions";
 import {
   scrollChatToBottom,
@@ -105,7 +109,7 @@ import {
   shouldRestoreScrollAnchor,
 } from "@/lib/chat-scroll-anchor";
 import { resolveChatImageUrl, resolveChatVideoUrl } from "@/lib/media-url";
-import DoodleCanvas, { DOODLE_HEIGHT_STEP, DOODLE_MIN_HEIGHT } from "@/components/DoodleCanvas";
+import DoodleCanvas, { type DoodleData } from "@/components/DoodleCanvas";
 import { ImageCropModal } from "@/components/ImageCropModal";
 import { partnerTypingLine } from "@/lib/partner-words";
 import { toast } from "sonner";
@@ -135,6 +139,8 @@ function TypingDots() {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+
 type CallState = { status: "outgoing" | "incoming" | "active"; type: "audio" | "video"; incomingOffer?: RTCSessionDescriptionInit } | null;
 
 function initialChatMessages(): ApiMessage[] {
@@ -143,13 +149,12 @@ function initialChatMessages(): ApiMessage[] {
 
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function Messages() {
-  const { user, partner, chatThemeId, updateChatTheme, refreshCouplePrefs } = useAuth();
+  const { user, partner, refreshCouplePrefs, updateChatTheme } = useAuth();
   const [messages, setMessages] = useState<ApiMessage[]>(initialChatMessages);
   const messagesSigRef = useRef(
     messages.length ? messagesListSignature(messages) : "0",
   );
   const [showInfo, setShowInfo] = useState(false);
-  const [showThemes, setShowThemes] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [blocked, setBlocked] = useState(() => isChatBlocked());
   const [recording, setRecording] = useState(false);
@@ -160,6 +165,13 @@ export default function Messages() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesStartRef = useRef<HTMLDivElement>(null);
   const [callState, setCallState] = useState<CallState>(null);
+  const [showCamera, setShowCamera] = useState(false);
+  const [pendingMediaPreview, setPendingMediaPreview] = useState<{
+    file: File;
+    clipboardItemType?: string;
+    kind: "image" | "video" | "other";
+    normalized: File;
+  } | null>(null);
   const [incomingCall, setIncomingCall] = useState<{
     type: "audio" | "video";
     offer?: RTCSessionDescriptionInit;
@@ -170,7 +182,7 @@ export default function Messages() {
   const callLoggedStartRef = useRef(false);
   const activeCallTypeRef = useRef<"audio" | "video">("audio");
   const callRoleRef = useRef<"outgoing" | "incoming">("outgoing");
-  const endCallRef = useRef<(opts?: { fromRemote?: boolean }) => void>(() => {});
+  const endCallRef = useRef<(opts?: { fromRemote?: boolean }) => void>(() => { });
   const [partnerName, setPartnerName] = useState(() => partner?.name ?? "");
   const [partnerAvatar, setPartnerAvatar] = useState(() => partner?.avatar ?? "");
   const [partnerLastSeen, setPartnerLastSeen] = useState<number | undefined>();
@@ -187,6 +199,7 @@ export default function Messages() {
   const [isTyping, setIsTyping] = useState(false);
   const [appThemeId, setAppThemeId] = useState<AppThemeId>(() => getStoredAppTheme());
   const [showAppThemes, setShowAppThemes] = useState(false);
+  const [showBubbleColors, setShowBubbleColors] = useState(false);
   const [replyTo, setReplyTo] = useState<ApiMessage | null>(null);
   const [editingMessage, setEditingMessage] = useState<ApiMessage | null>(null);
   const [editText, setEditText] = useState("");
@@ -194,7 +207,6 @@ export default function Messages() {
   const [sharingLocation, setSharingLocation] = useState(false);
   const [imageToCrop, setImageToCrop] = useState<string | null>(null);
   const [doodleOpen, setDoodleOpen] = useState(false);
-  const [doodleHeight, setDoodleHeight] = useState(0);
   const [pendingImageType, setPendingImageType] = useState("image/jpeg");
   const [mediaViewMode, setMediaViewMode] = useState<"keep" | "once" | "twice">("keep");
   const [mediaViewer, setMediaViewer] = useState<{
@@ -210,7 +222,7 @@ export default function Messages() {
   const [showThreadPanel, setShowThreadPanel] = useState(false);
   const [hiddenTick, setHiddenTick] = useState(0);
   const [contextMenu, setContextMenu] = useState<{ msg: ApiMessage; top: number; left: number } | null>(null);
-  const [cuteMode, setCuteModeState] = useState<string | null>(() => getCuteMode());
+
   const [notifCount, setNotifCount] = useState(() => unreadCount());
   const [unreadChat, setUnreadChat] = useState(0);
   const [isNearBottom, setIsNearBottom] = useState(true);
@@ -233,7 +245,8 @@ export default function Messages() {
   const sseRetryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingRequestsRef = useRef<Map<string, Promise<any>>>(new Map());
   const previousMessagesLengthRef = useRef(0);
-  const isInitialLoadRef = useRef(messages.length > 0);
+  const isInitialLoadRef = useRef(true);
+  const initialLoadTimeRef = useRef(Date.now());
   const stickToBottomRef = useRef(false);
   const lastMessageTailRef = useRef("");
   const hasMessagesRef = useRef(false);
@@ -245,7 +258,7 @@ export default function Messages() {
   const cropSendInFlightRef = useRef(false);
   const shouldSendVoiceRef = useRef(false);
   const voiceSendInFlightRef = useRef(false);
-  const sendMsgRef = useRef<(partial: Partial<ApiMessage>) => Promise<void>>(async () => {});
+  const sendMsgRef = useRef<(partial: Partial<ApiMessage>) => Promise<void>>(async () => { });
   const userIdRef = useRef<string | undefined>(undefined);
   const prependScrollHeightRef = useRef<number | null>(null);
   const isPrependingRef = useRef(false);
@@ -257,9 +270,11 @@ export default function Messages() {
   const anchorResolveStartedRef = useRef(false);
   const mediaScrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrollPreserveRef = useRef<{ top: number; height: number } | null>(null);
+  /** Tracks whether we already scrolled to the first unread message on initial load */
+  const initialUnreadHandledRef = useRef(false);
 
   const partnerId = useMemo(() => user?.id === "me" ? "wife" : "me", [user?.id]);
-  const theme = THEMES.find(t => t.id === chatThemeId) ?? THEMES[0]!;
+
   const presence = usePresenceLabel(partnerLastSeen);
   const partnerActive = isPartnerActiveInChat(partnerLastSeen);
   const showPartnerTyping = isTyping;
@@ -273,11 +288,12 @@ export default function Messages() {
   }, []);
 
   const scrollToBottomForMedia = useCallback((messageId?: string) => {
-    if (messageId && !recentTailIdsRef.current.has(messageId)) return;
-    if (!isNearBottomRef.current && !stickToBottomRef.current) return;
+    const isInitialWindow = Date.now() - initialLoadTimeRef.current < 2500;
+    if (messageId && !recentTailIdsRef.current.has(messageId) && !isInitialWindow) return;
+    if (!isNearBottomRef.current && !stickToBottomRef.current && !isInitialWindow) return;
     if (mediaScrollTimerRef.current) clearTimeout(mediaScrollTimerRef.current);
     mediaScrollTimerRef.current = setTimeout(() => {
-      if (!isNearBottomRef.current && !stickToBottomRef.current) return;
+      if (!isNearBottomRef.current && !stickToBottomRef.current && !isInitialWindow) return;
       scrollChatToBottomSoft(messagesContainerRef.current, bottomRef.current);
     }, 150);
   }, []);
@@ -346,21 +362,85 @@ export default function Messages() {
     [scrollToHighlightedMessage],
   );
 
-  const expandDoodleSpace = useCallback(() => {
-    setDoodleHeight((h) => h + DOODLE_HEIGHT_STEP);
-  }, []);
+  const openDoodlePanel = useCallback(() => setDoodleOpen(true), []);
+  const closeDoodlePanel = useCallback(() => setDoodleOpen(false), []);
 
-  const openDoodlePanel = useCallback(() => {
-    setDoodleOpen(true);
-    setDoodleHeight((h) => (h > 0 ? h + DOODLE_HEIGHT_STEP : DOODLE_MIN_HEIGHT));
-    requestAnimationFrame(() => {
-      scrollChatToBottomAfterPaint(messagesContainerRef.current, bottomRef.current);
-    });
-  }, []);
+  const handleDoodleSend = useCallback((data: DoodleData) => {
+    closeDoodlePanel();
+    if (!user) return;
+    const tempId = crypto.randomUUID();
 
-  const closeDoodlePanel = useCallback(() => {
-    setDoodleOpen(false);
-  }, []);
+    // Calculate absolute scroll position
+    const container = messagesContainerRef.current;
+    let absoluteX = data.canvasX;
+    let absoluteY = data.canvasY;
+
+    if (container) {
+      const rect = container.getBoundingClientRect();
+      const style = window.getComputedStyle(container);
+      const paddingLeft = parseFloat(style.paddingLeft) || 0;
+      const paddingTop = parseFloat(style.paddingTop) || 0;
+      const borderLeft = parseFloat(style.borderLeftWidth) || 0;
+      const borderTop = parseFloat(style.borderTopWidth) || 0;
+
+      absoluteX = data.canvasX - rect.left - paddingLeft - borderLeft;
+      absoluteY = data.canvasY - rect.top - paddingTop - borderTop + container.scrollTop;
+    }
+
+    // Encode position metadata into the text field as JSON
+    const posText = JSON.stringify({ canvasX: absoluteX, canvasY: absoluteY, width: data.width, height: data.height });
+
+    pendingOutgoingRef.current.add(tempId);
+    setMessages((prev) => [
+      ...prev,
+      buildOptimisticMessage(
+        { senderId: user.id, type: "doodle", imageData: data.imageData, text: posText },
+        tempId,
+      ),
+    ]);
+    requestStickToBottom();
+
+    const attemptUpload = async (attempt = 0): Promise<string> => {
+      try {
+        return await uploadMediaToB2(data.imageData, "image/png");
+      } catch (err) {
+        const raw = err instanceof Error ? err.message : "";
+        const isRetryable = /timed out|502|503|504/i.test(raw);
+        if (isRetryable && attempt < 2) {
+          await new Promise((r) => setTimeout(r, 1200 * (attempt + 1)));
+          return attemptUpload(attempt + 1);
+        }
+        throw err;
+      }
+    };
+
+    void (async () => {
+      try {
+        const url = await attemptUpload();
+        const outgoing = await prepareOutgoingMessage({
+          senderId: user.id,
+          type: "doodle",
+          imageUrl: url,
+          text: posText,
+        });
+        const saved = await api.sendMessage(outgoing);
+        const [display] = await normalizeMessages([saved]);
+        setMessages((prev) => {
+          const next = replaceOptimisticMessage(prev, tempId, display, user.id);
+          pendingOutgoingRef.current.delete(tempId);
+          messagesSigRef.current = messagesListSignature(next);
+          writeChatCache(user.id, next);
+          return next;
+        });
+        requestStickToBottom();
+      } catch (err) {
+        pendingOutgoingRef.current.delete(tempId);
+        setMessages((prev) => prev.filter((m) => m.id !== tempId));
+        const raw = err instanceof Error ? err.message : "";
+        toast.error(raw || "Doodle upload failed. Please try again.", { duration: 5000 });
+      }
+    })();
+  }, [closeDoodlePanel, user, requestStickToBottom]);
 
   // Define partner info early to avoid hoisting issues
   const pAvatar = partner?.avatar || partnerAvatar || defaultAvatar(partnerId);
@@ -394,12 +474,12 @@ export default function Messages() {
         const { lastSeen, typing } = parsePresenceResponse(raw);
         if (lastSeen[partnerId] != null) setPartnerLastSeen(lastSeen[partnerId]);
         setIsTyping(Boolean(typing[partnerId]));
-      }).catch(() => {});
+      }).catch(() => { });
     };
-    api.heartbeat(user.id).catch(() => {});
+    api.heartbeat(user.id).catch(() => { });
     refreshPresence();
     const hb = setInterval(() => {
-      if (isShowPresenceEnabled()) api.heartbeat(user.id).catch(() => {});
+      if (isShowPresenceEnabled()) api.heartbeat(user.id).catch(() => { });
     }, 10_000);
     const poll = setInterval(() => {
       if (document.visibilityState === "visible") refreshPresence();
@@ -426,7 +506,7 @@ export default function Messages() {
         if (user?.id) writeChatCache(user.id, next);
         return next;
       });
-      if ((isNearBottomRef.current || isInitialLoadRef.current) && !pendingScrollRestoreRef.current) {
+      if ((isNearBottomRef.current || isInitialLoadRef.current) && !pendingScrollRestoreRef.current && !initialUnreadHandledRef.current) {
         stickToBottomRef.current = true;
       } else if (readingHistory) {
         stickToBottomRef.current = false;
@@ -510,7 +590,7 @@ export default function Messages() {
         prependScrollHeightRef.current = null;
         return;
       }
-      
+
       prependScrollHeightRef.current = scrollHeightBefore;
 
       setMessages((prev) => {
@@ -578,7 +658,7 @@ export default function Messages() {
           if (typingTimeout) clearTimeout(typingTimeout);
           typingTimeout = setTimeout(() => setIsTyping(false), 4000);
         }
-      }).catch(() => {});
+      }).catch(() => { });
     };
 
     void hydrateQuickReactions();
@@ -715,14 +795,14 @@ export default function Messages() {
             return prev.map((m) =>
               m.id === msg.id
                 ? {
-                    ...m,
-                    ...msg,
-                    deleted: m.deleted || msg.deleted,
-                    text: m.deleted ? undefined : (msg.text ?? m.text),
-                    reaction: m.reaction ?? msg.reaction,
-                    imageUrl: m.deleted ? undefined : (msg.imageUrl ?? m.imageUrl),
-                    imageData: m.deleted ? undefined : (msg.imageData ?? m.imageData),
-                  }
+                  ...m,
+                  ...msg,
+                  deleted: m.deleted || msg.deleted,
+                  text: m.deleted ? undefined : (msg.text ?? m.text),
+                  reaction: m.reaction ?? msg.reaction,
+                  imageUrl: m.deleted ? undefined : (msg.imageUrl ?? m.imageUrl),
+                  imageData: m.deleted ? undefined : (msg.imageData ?? m.imageData),
+                }
                 : m,
             );
           });
@@ -952,10 +1032,10 @@ export default function Messages() {
             prev.map((m) =>
               m.id === d.messageId
                 ? {
-                    ...m,
-                    mediaOpenedAt: d.userId === partnerId ? d.mediaOpenedAt : m.mediaOpenedAt,
-                    mediaOpenCount: d.userId === user.id ? d.mediaOpenCount : m.mediaOpenCount,
-                  }
+                  ...m,
+                  mediaOpenedAt: d.userId === partnerId ? d.mediaOpenedAt : m.mediaOpenedAt,
+                  mediaOpenCount: d.userId === user.id ? d.mediaOpenCount : m.mediaOpenCount,
+                }
                 : m,
             ),
           );
@@ -965,7 +1045,7 @@ export default function Messages() {
       };
 
       const handleDuaAdded = () => { hydrateNotifications(); };
-      const handleDuaDeleted = () => { api.getDuas().catch(() => {}); };
+      const handleDuaDeleted = () => { api.getDuas().catch(() => { }); };
       const handlePrefsUpdated = () => { refreshCouplePrefs(); };
 
       es.addEventListener("new-message", handleNewMessage);
@@ -1143,9 +1223,39 @@ export default function Messages() {
     const firstPaint = isInitialLoadRef.current;
     const isOwnLast = last?.senderId === user?.id;
 
-    if (firstPaint && !pendingScrollRestoreRef.current) {
+    if (firstPaint && !pendingScrollRestoreRef.current && !initialUnreadHandledRef.current) {
       const container = messagesContainerRef.current;
-      if (container) scrollChatToBottom(container, bottomRef.current);
+      if (container) {
+        // Detect unread partner messages since user last opened chat
+        const chatOpenedAt = getChatOpenedAt();
+        const unreadPartnerMsgs = chatOpenedAt
+          ? messages.filter(
+              (m) =>
+                m.senderId === partnerId &&
+                new Date(m.timestamp).getTime() > new Date(chatOpenedAt).getTime(),
+            )
+          : [];
+
+        if (unreadPartnerMsgs.length >= 2) {
+          // Scroll to the first unread message and show "New messages" toggle
+          initialUnreadHandledRef.current = true;
+          const firstUnreadId = unreadPartnerMsgs[0]!.id;
+          const el = container.querySelector(`[data-testid="message-${firstUnreadId}"]`) as HTMLElement | null;
+          const row = el?.closest(".chat-message-row") as HTMLElement | null;
+          if (row) {
+            scrollMessageIntoCenter(container, row, "auto");
+            isNearBottomRef.current = false;
+            stickToBottomRef.current = false;
+            setIsNearBottom(false);
+            setHasNewMessages(true);
+          } else {
+            // Fallback: scroll to bottom
+            scrollChatToBottom(container, bottomRef.current);
+          }
+        } else {
+          scrollChatToBottom(container, bottomRef.current);
+        }
+      }
     }
 
     const restoreAnchor = pendingScrollRestoreRef.current;
@@ -1175,25 +1285,18 @@ export default function Messages() {
     const shouldStick =
       !isPrependingRef.current &&
       !pendingScrollRestoreRef.current &&
+      !initialUnreadHandledRef.current &&
       (stickToBottomRef.current ||
         (firstPaint && !restoreAnchor) ||
         (isOwnLast && tailChanged && isNearBottomRef.current) ||
         (isNearBottomRef.current && tailChanged));
 
     if (shouldStick) {
-      const aggressive = Boolean(firstPaint && !restoreAnchor);
       scrollChatToBottomAfterPaint(
         messagesContainerRef.current,
         bottomRef.current,
-        aggressive,
+        false,
       );
-      if (firstPaint && !restoreAnchor) {
-        window.setTimeout(() => {
-          if (!pendingScrollRestoreRef.current && isNearBottomRef.current) {
-            scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
-          }
-        }, 120);
-      }
       setHasNewMessages(false);
       stickToBottomRef.current = false;
     } else if (
@@ -1205,7 +1308,10 @@ export default function Messages() {
       setHasNewMessages(true);
     }
 
-    if (firstPaint) isInitialLoadRef.current = false;
+    if (firstPaint) {
+      isInitialLoadRef.current = false;
+      initialLoadTimeRef.current = Date.now();
+    }
     previousMessagesLengthRef.current = messages.length;
   }, [messages, user?.id, partnerId]);
 
@@ -1216,13 +1322,19 @@ export default function Messages() {
     prependScrollHeightRef.current = null;
     const container = messagesContainerRef.current;
     if (!container) return;
-    const restore = () => {
-      const diff = container.scrollHeight - before;
-      if (diff > 0) container.scrollTop = container.scrollTop + diff;
-    };
-    restore();
+
+    let isRestored = false;
+    const diff = container.scrollHeight - before;
+    if (diff > 0) {
+      container.scrollTop += diff;
+      isRestored = true;
+    }
+
     requestAnimationFrame(() => {
-      restore();
+      if (!isRestored) {
+        const nextDiff = container.scrollHeight - before;
+        if (nextDiff > 0) container.scrollTop += nextDiff;
+      }
       isPrependingRef.current = false;
     });
   }, [messages]);
@@ -1274,6 +1386,7 @@ export default function Messages() {
         setIsNearBottom(isNear);
         if (isNear) {
           setHasNewMessages(false);
+          initialUnreadHandledRef.current = false;
           if (userIdRef.current) clearChatScrollAnchor(userIdRef.current);
         } else {
           const uid = userIdRef.current;
@@ -1418,11 +1531,6 @@ export default function Messages() {
       mounted = false;
     };
   }, [user]);
-
-  const setTheme = useCallback((id: string) => {
-    updateChatTheme(id);
-    setShowThemes(false);
-  }, [updateChatTheme]);
 
   const fetchAllMessagesForExport = useCallback(async () => {
     const collected: ApiMessage[] = [];
@@ -1660,13 +1768,13 @@ export default function Messages() {
           ...(kind === "image"
             ? { type: "image" as const, imageUrl: url, companionSticker: sticker }
             : {
-                type: "video" as const,
-                text: file.name || "Video",
-                fileData: url,
-                fileType: mime,
-                fileSize: file.size,
-                companionSticker: sticker,
-              }),
+              type: "video" as const,
+              text: file.name || "Video",
+              fileData: url,
+              fileType: mime,
+              fileSize: file.size,
+              companionSticker: sticker,
+            }),
         });
         const saved = await api.sendMessage(outgoing);
         const [display] = await normalizeMessages([saved]);
@@ -1700,10 +1808,10 @@ export default function Messages() {
           prev.map((m) =>
             m.id === msg.id
               ? {
-                  ...m,
-                  mediaOpenCount: opened.mediaOpenCount,
-                  mediaOpenedAt: opened.mediaOpenedAt ?? m.mediaOpenedAt,
-                }
+                ...m,
+                mediaOpenCount: opened.mediaOpenCount,
+                mediaOpenedAt: opened.mediaOpenedAt ?? m.mediaOpenedAt,
+              }
               : m,
           ),
         );
@@ -1741,10 +1849,7 @@ export default function Messages() {
     }
   }, []);
 
-  const toggleCuteMode = useCallback((mode: string | null) => {
-    setCuteMode(mode);
-    setCuteModeState(mode);
-  }, []);
+
 
   const sendText = useCallback((rawText: string) => {
     const text = rawText.trim();
@@ -1752,36 +1857,28 @@ export default function Messages() {
     stopTyping();
     const replyMeta = replyTo
       ? {
-          replyToId: replyTo.id,
-          replyToText: replyPreviewLabel(replyTo).slice(0, 200),
-          replyToSenderId: replyTo.senderId,
-        }
+        replyToId: replyTo.id,
+        replyToText: replyPreviewLabel(replyTo).slice(0, 200),
+        replyToSenderId: replyTo.senderId,
+      }
       : {};
     setReplyTo(null);
-    const modeStickers: Record<string, string> = {
-      frog: "🐸",
-      cat: "🐱",
-      panda: "🐼",
-    };
     sendMsg({
       text,
       type: "text",
       ...replyMeta,
-      ...(cuteMode
-        ? { variant: "cute" as const, companionSticker: modeStickers[cuteMode] || "🐸" }
-        : { variant: "default" as const }),
     });
-  }, [sendMsg, cuteMode, replyTo, stopTyping]);
+  }, [sendMsg, replyTo, stopTyping]);
 
   // Debounced search handler
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    
+
     // Clear previous timeout
     if (searchDebounceRef.current) {
       clearTimeout(searchDebounceRef.current);
     }
-    
+
     // Set new timeout with 300ms debounce
     searchDebounceRef.current = setTimeout(() => {
       setSearchQuery(value);
@@ -1858,12 +1955,17 @@ export default function Messages() {
       toast.error("Geolocation is not supported in this browser");
       return;
     }
-    if (!window.isSecureContext) {
-      toast.error("Location only works on HTTPS or localhost. Open the app via http://localhost:5000");
+
+    // Only block on clearly insecure contexts (http:// non-localhost)
+    const proto = window.location?.protocol;
+    if (proto === "http:" && !window.location?.hostname?.match(/^(localhost|127\.0\.0\.1)$/)) {
+      toast.error("Location requires HTTPS. Open the app via a secure URL.");
       return;
     }
 
     setSharingLocation(true);
+    const toastId = "location-sharing";
+    toast.loading("Getting your location…", { id: toastId, duration: 30_000 });
 
     const sendFromPosition = async (position: GeolocationPosition) => {
       const location = {
@@ -1877,6 +1979,9 @@ export default function Messages() {
           location,
           text: "📍 Shared location",
         });
+        toast.success("Location shared!", { id: toastId, duration: 2000 });
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Failed to send location", { id: toastId, duration: 4000 });
       } finally {
         setSharingLocation(false);
       }
@@ -1884,46 +1989,50 @@ export default function Messages() {
 
     const geoErrorMessage = (error: GeolocationPositionError) =>
       error.code === 1
-        ? "Location permission denied. Allow location for this site in browser settings."
+        ? "Location permission denied. Allow location access in your browser settings."
         : error.code === 2
-          ? "Location unavailable. Turn on Windows location, or try again on Wi‑Fi."
+          ? "Location unavailable. Make sure location/GPS is turned on."
           : error.code === 3
             ? "Location request timed out. Try again."
             : "Could not get your location.";
 
-    // Desktop-friendly first (Wi‑Fi / IP). High-accuracy GPS often fails on PC (code 2).
-    const tryGetPosition = (
-      options: PositionOptions,
-      onFail?: (err: GeolocationPositionError) => void,
-    ) => {
-      navigator.geolocation.getCurrentPosition(
-        (position) => void sendFromPosition(position),
-        onFail ?? ((error) => {
-          toast.error(geoErrorMessage(error));
-          setSharingLocation(false);
-        }),
-        options,
-      );
+    const fail = (error: GeolocationPositionError) => {
+      toast.error(geoErrorMessage(error), { id: toastId, duration: 5000 });
+      setSharingLocation(false);
     };
 
-    tryGetPosition(
-      { enableHighAccuracy: false, timeout: 15000, maximumAge: 120_000 },
-      (firstError) => {
-        if (firstError.code === 1) {
-          toast.error(geoErrorMessage(firstError));
-          setSharingLocation(false);
-          return;
-        }
-        // Retry once with a fresh low-accuracy read (no GPS requirement)
-        tryGetPosition(
-          { enableHighAccuracy: false, timeout: 25_000, maximumAge: 0 },
-          (secondError) => {
-            toast.error(geoErrorMessage(secondError));
-            setSharingLocation(false);
-          },
-        );
-      },
-    );
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+    if (isMobile) {
+      // Mobile: try high accuracy first (triggers GPS prompt), fall back to low accuracy
+      navigator.geolocation.getCurrentPosition(
+        (position) => void sendFromPosition(position),
+        (firstError) => {
+          if (firstError.code === 1) { fail(firstError); return; }
+          // GPS failed — retry with low accuracy (cell/wifi)
+          navigator.geolocation.getCurrentPosition(
+            (position) => void sendFromPosition(position),
+            fail,
+            { enableHighAccuracy: false, timeout: 20_000, maximumAge: 60_000 },
+          );
+        },
+        { enableHighAccuracy: true, timeout: 15_000, maximumAge: 60_000 },
+      );
+    } else {
+      // Desktop: low accuracy first (IP/Wi-Fi), fall back to no-cache
+      navigator.geolocation.getCurrentPosition(
+        (position) => void sendFromPosition(position),
+        (firstError) => {
+          if (firstError.code === 1) { fail(firstError); return; }
+          navigator.geolocation.getCurrentPosition(
+            (position) => void sendFromPosition(position),
+            fail,
+            { enableHighAccuracy: false, timeout: 25_000, maximumAge: 0 },
+          );
+        },
+        { enableHighAccuracy: false, timeout: 15_000, maximumAge: 120_000 },
+      );
+    }
   }, [sendMsg]);
 
   const handleStartThread = useCallback((message: ApiMessage) => {
@@ -2003,7 +2112,7 @@ export default function Messages() {
     return new Promise((resolve, reject) => {
       const img = new Image();
       const canvas = document.createElement('canvas');
-      
+
       img.onload = () => {
         canvas.width = img.width;
         canvas.height = img.height;
@@ -2016,9 +2125,9 @@ export default function Messages() {
         const webpDataUrl = canvas.toDataURL('image/webp', 0.8);
         resolve(webpDataUrl);
       };
-      
+
       img.onerror = () => reject(new Error('Failed to load image'));
-      
+
       const reader = new FileReader();
       reader.onload = (e) => {
         img.src = e.target?.result as string;
@@ -2078,68 +2187,115 @@ export default function Messages() {
   );
 
   const mediaModeSticker = useCallback(
-    (mode: "keep" | "once" | "twice"): string | undefined =>
-      mode === "once" ? "__vm:once" : mode === "twice" ? "__vm:twice" : undefined,
+    (mode: "keep" | "once" | "twice"): string | undefined => {
+      if (mode === "once") return "__vm:once";
+      if (mode === "twice") return "__vm:twice";
+      return undefined;
+    },
     [],
   );
 
   const handlePickedFile = useCallback(
-    async (file: File, clipboardItemType?: string) => {
-      if (!user || filePickInFlightRef.current) return;
+    async (fileInput: File | File[], clipboardItemType?: string) => {
+      const files = Array.isArray(fileInput) ? fileInput : [fileInput];
+      if (!user || filePickInFlightRef.current || files.length === 0) return;
       filePickInFlightRef.current = true;
       const unlockTimer = window.setTimeout(() => {
         filePickInFlightRef.current = false;
       }, 90_000);
-      const normalized = clipboardItemType
-        ? normalizePastedFile(file, clipboardItemType)
-        : await resolveGalleryPick(file);
-      const toastId = `media-pick-${Date.now()}`;
-      const quickDoc = isDocumentFile(normalized, clipboardItemType);
-      const likelyVideo =
-        clipboardItemType?.startsWith("video/") || isVideoFile(normalized, clipboardItemType);
 
-      let kind: "image" | "video" | "other";
+      const processSingleFile = async (file: File) => {
+        const normalized = clipboardItemType
+          ? normalizePastedFile(file, clipboardItemType)
+          : await resolveGalleryPick(file);
+        const toastId = `media-pick-${Date.now()}`;
+        const quickDoc = isDocumentFile(normalized, clipboardItemType);
+        const likelyVideo =
+          clipboardItemType?.startsWith("video/") || isVideoFile(normalized, clipboardItemType);
+
+        let kind: "image" | "video" | "other";
+        try {
+          if (quickDoc) {
+            kind = "other";
+          } else if (likelyVideo) {
+            kind = "video";
+          } else if (clipboardItemType?.startsWith("image/")) {
+            kind = "image";
+          } else {
+            const magic = await detectMediaByMagicBytes(normalized);
+            if (magic === "video") kind = "video";
+            else if (magic === "image") kind = "image";
+            else kind = await classifyMediaFile(normalized, clipboardItemType);
+          }
+          if (kind === "image") {
+            const magic = await detectMediaByMagicBytes(normalized);
+            if (magic === "video") kind = "video";
+          }
+        } catch {
+          finishToast(toastId, { type: "error", message: "Could not read pasted file." });
+          return;
+        }
+
+        const MAX_FILE_SIZE =
+          kind === "video" ? 20 * 1024 * 1024 : kind === "image" ? 25 * 1024 * 1024 : 25 * 1024 * 1024;
+        if (normalized.size > MAX_FILE_SIZE) {
+          finishToast(toastId, {
+            type: "error",
+            message: kind === "video" ? "Video too large (max 20MB)." : "File too large (max 25MB).",
+          });
+          return;
+        }
+
+        if (files.length === 1 && (kind === "image" || kind === "video")) {
+          setPendingMediaPreview({ file, clipboardItemType, kind, normalized });
+          return;
+        }
+
+        try {
+          if (kind === "image") {
+            await uploadAndSendGalleryImage(normalized);
+          } else if (kind === "video") {
+            await uploadAndSendFile(normalized);
+          } else {
+            await uploadAndSendFile(normalized);
+          }
+        } catch (error) {
+          console.error("Failed to process file:", error);
+          finishToast(toastId, {
+            type: "error",
+            message: error instanceof Error ? error.message : "Failed to send media.",
+          });
+        }
+      };
+
       try {
-        if (quickDoc) {
-          kind = "other";
-        } else if (likelyVideo) {
-          kind = "video";
-        } else if (clipboardItemType?.startsWith("image/")) {
-          kind = "image";
-        } else {
-          const magic = await detectMediaByMagicBytes(normalized);
-          if (magic === "video") kind = "video";
-          else if (magic === "image") kind = "image";
-          else kind = await classifyMediaFile(normalized, clipboardItemType);
+        for (const f of files) {
+          await processSingleFile(f);
         }
-        if (kind === "image") {
-          const magic = await detectMediaByMagicBytes(normalized);
-          if (magic === "video") kind = "video";
-        }
-      } catch {
-        finishToast(toastId, { type: "error", message: "Could not read pasted file." });
+      } finally {
         filePickInFlightRef.current = false;
-        return;
+        clearTimeout(unlockTimer);
       }
+    },
+    [user, uploadAndSendFile, uploadAndSendGalleryImage],
+  );
 
-      const isEphemeral = mediaViewMode === "once" || mediaViewMode === "twice";
+  const processAndSendMedia = useCallback(
+    async (viewMode: "keep" | "once" | "twice") => {
+      if (!pendingMediaPreview || !user || filePickInFlightRef.current) return;
+      filePickInFlightRef.current = true;
+      setMediaViewMode(viewMode);
 
-      const MAX_FILE_SIZE =
-        kind === "video" ? 60 * 1024 * 1024 : kind === "image" ? 25 * 1024 * 1024 : 25 * 1024 * 1024;
-      if (normalized.size > MAX_FILE_SIZE) {
-        finishToast(toastId, {
-          type: "error",
-          message: kind === "video" ? "Video too large (max 60MB)." : "File too large (max 25MB).",
-        });
-        filePickInFlightRef.current = false;
-        return;
-      }
+      const { clipboardItemType, kind, normalized } = pendingMediaPreview;
+      setPendingMediaPreview(null);
+      const isEphemeral = viewMode === "once" || viewMode === "twice";
+      const toastId = `media-send-${Date.now()}`;
 
       try {
         if (kind === "image") {
           const prepared = await prepareImageForUpload(normalized, clipboardItemType);
           if (isEphemeral) {
-            await uploadAndSendEphemeralMedia(prepared, "image", mediaViewMode);
+            await uploadAndSendEphemeralMedia(prepared, "image", viewMode);
           } else if (!clipboardItemType) {
             await uploadAndSendGalleryImage(prepared);
           } else {
@@ -2162,9 +2318,9 @@ export default function Messages() {
               fileSize: normalized.size,
               ...(isEphemeral
                 ? {
-                    companionSticker: mediaModeSticker(mediaViewMode),
-                    mediaViewMode,
-                  }
+                  companionSticker: mediaModeSticker(viewMode),
+                  mediaViewMode: viewMode,
+                }
                 : {}),
             },
             tempId,
@@ -2184,7 +2340,7 @@ export default function Messages() {
 
             const url = await uploadMediaFile(normalized, mime);
 
-            const sticker = mediaModeSticker(mediaViewMode);
+            const sticker = mediaModeSticker(viewMode);
             const outgoing = await prepareOutgoingMessage({
               senderId: user.id,
               type: "video",
@@ -2214,21 +2370,18 @@ export default function Messages() {
           } finally {
             URL.revokeObjectURL(previewUrl);
           }
-        } else {
-          await uploadAndSendFile(normalized);
         }
       } catch (error) {
-        console.error("Failed to process file:", error);
+        console.error("Failed to process media:", error);
         finishToast(toastId, {
           type: "error",
-          message: error instanceof Error ? error.message : "Failed to send video. Try a shorter clip or check your connection.",
+          message: error instanceof Error ? error.message : "Failed to send media. Check your connection.",
         });
       } finally {
-        window.clearTimeout(unlockTimer);
         filePickInFlightRef.current = false;
       }
     },
-    [uploadAndSendFile, uploadAndSendGalleryImage, uploadAndSendEphemeralMedia, mediaViewMode, mediaModeSticker, user],
+    [uploadAndSendFile, uploadAndSendGalleryImage, uploadAndSendEphemeralMedia, mediaModeSticker, user, pendingMediaPreview],
   );
 
   const handleFileChange = useCallback(
@@ -2395,7 +2548,11 @@ export default function Messages() {
             const voiceFile = new File([blob], `voice-${Date.now()}.webm`, { type: voiceMime });
             const [url, outgoing] = await Promise.all([
               uploadMediaFile(voiceFile, voiceMime),
-              prepareOutgoingMessage({ senderId, type: "audio", audioData: "" }),
+              prepareOutgoingMessage({
+                senderId,
+                type: "audio",
+                audioData: "",
+              }),
             ]);
             outgoing.audioData = url;
             const saved = await api.sendMessage(outgoing);
@@ -2498,7 +2655,7 @@ export default function Messages() {
 
   const rejectCall = useCallback(() => {
     if (user) {
-      api.sendCallSignal({ type: "reject", senderId: user.id }).catch(() => {});
+      api.sendCallSignal({ type: "reject", senderId: user.id }).catch(() => { });
     }
     setIncomingCall(null);
   }, [user]);
@@ -2672,19 +2829,19 @@ export default function Messages() {
 
   const filteredMessages = useMemo(() => {
     let filtered = visibleMessages;
-    
+
     // Apply search query
     if (searchQuery) {
       filtered = filtered.filter((msg) =>
         msg.text?.toLowerCase().includes(searchQuery.toLowerCase()),
       );
     }
-    
+
     // Apply message type filter
     if (searchFilters.messageType !== "all") {
       filtered = filtered.filter((msg) => msg.type === searchFilters.messageType);
     }
-    
+
     // Apply sender filter
     if (searchFilters.sender !== "all") {
       filtered = filtered.filter((msg) => {
@@ -2693,17 +2850,17 @@ export default function Messages() {
         return true;
       });
     }
-    
+
     // Apply reaction filter
     if (searchFilters.hasReaction) {
       filtered = filtered.filter((msg) => msg.reaction);
     }
-    
+
     // Apply pinned filter
     if (searchFilters.isPinned) {
       filtered = filtered.filter((msg) => msg.pinned);
     }
-    
+
     return filtered;
   }, [visibleMessages, searchQuery, searchFilters, user?.id]);
 
@@ -2728,7 +2885,8 @@ export default function Messages() {
     return map;
   }, [messages]);
 
-  const premiumChatClass = getPremiumChatThemeClass(appThemeId);
+  const showChatAurora = isMoonlightSagaTheme(appThemeId);
+  const premiumChatClass = "";
 
   if (blocked) {
     return (
@@ -2754,318 +2912,134 @@ export default function Messages() {
           active
         />
       )}
-    <div
-      className={`chat-panel flex-1 min-w-0 h-full min-h-0 relative bg-black ${premiumChatClass ?? ""}`}
-    >
-      {isPremiumAnimatedTheme(appThemeId) && <ChatThemeLayer variant={appThemeId} />}
-
-      <div className="chat-panel-top shrink-0 z-20 flex flex-col relative">
-      {/* ── Header ── */}
-      <div className="chat-panel-header flex items-center gap-1.5 sm:gap-3 px-2 sm:px-4 py-1.5 sm:py-2.5 border-b shrink-0 text-white">
-        <div className="relative shrink-0">
-          <AvatarImage src={pAvatar} userId={partnerId} alt={pName} className="w-9 h-9 rounded-full object-cover" />
-          {presence.online && (
-            <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-background" />
-          )}
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="font-semibold text-sm" data-testid="chat-partner-name">{pName}</p>
-          <p className={`text-xs flex items-center ${isTyping ? "text-primary" : presence.online ? "text-green-400" : "text-muted-foreground"}`}>
-            {showPartnerTyping ? (
-              <>
-                <span>{partnerTypingLine(partnerId)}</span>
-                <TypingDots />
-              </>
-            ) : (
-              presence.label
-            )}
-          </p>
-        </div>
-        <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
-          {isEncryptionReady() && (
-            <span className="hidden sm:flex items-center gap-1 text-[10px] text-green-400 bg-green-500/10 px-2 py-0.5 rounded-full border border-green-500/20 mr-1">
-              <Shield className="w-3 h-3" /> Encrypted
-            </span>
-          )}
-          <div className="hidden sm:flex items-center gap-1 px-2 py-1 rounded-full bg-secondary/60">
-            {online ? (
-              <Wifi className="w-3 h-3 text-green-400" />
-            ) : (
-              <WifiOff className="w-3 h-3 text-destructive" />
-            )}
-            <span className="text-xs text-muted-foreground">{presence.label}</span>
-          </div>
-          <button 
-            onClick={() => setShowSearch(s => !s)} 
-            className={`p-1.5 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 active:scale-95 ${
-              showSearch ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground hover:bg-secondary"
-            }`} 
-            data-testid="button-search"
-            aria-label="Search messages"
-          >
-            <Search className="w-4 h-4" strokeWidth={1.5} />
-          </button>
-          <div className="relative">
-            <button 
-              onClick={() => { setShowThemes(s => !s); setShowInfo(false); }} 
-              className={`p-1.5 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 active:scale-95 ${showThemes ? "bg-primary/20 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-secondary"}`} 
-              data-testid="button-themes"
-              aria-label="Change theme"
-            >
-              <Palette className="w-4 h-4" strokeWidth={1.5} />
-            </button>
-          </div>
-          <button 
-            onClick={() => startCall("audio")} 
-            className="hidden sm:inline-flex p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 active:scale-95" 
-            data-testid="button-voice-call"
-            aria-label="Start audio call"
-          >
-            <Phone className="w-4 h-4" strokeWidth={1.5} />
-          </button>
-          <button 
-            onClick={() => startCall("video")} 
-            className="hidden sm:inline-flex p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 active:scale-95" 
-            data-testid="button-video-call"
-            aria-label="Start video call"
-          >
-            <Video className="w-4 h-4" strokeWidth={1.5} />
-          </button>
-          <button 
-            onClick={() => { setShowInfo(s => !s); setShowThemes(false); }}
-            className={`p-1.5 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 active:scale-95 ${showInfo ? "text-primary" : "text-muted-foreground hover:text-foreground hover:bg-secondary"}`} 
-            data-testid="button-info"
-            aria-label="Show chat info"
-          >
-            <Info className="w-4 h-4" strokeWidth={1.5} />
-          </button>
-        </div>
-      </div>
-      </div>
-
-      {/* ── Messages ── */}
       <div
-        className="chat-panel-messages relative z-[1] overflow-y-auto px-2 sm:px-3 py-2 md:py-3 md:px-4 flex flex-col gap-1 scrollbar-hide"
-        data-testid="messages-list"
-        ref={messagesContainerRef}
-        style={{ scrollBehavior: 'auto' }}
-        onClick={(e) => {
-          const t = e.target as HTMLElement;
-          if (t.closest("button, a, input, textarea, video, audio, img, [role='button']")) return;
-          if (!isNearBottomRef.current) return;
-          if (window.matchMedia("(max-width: 767px)").matches) return;
-          messageInputRef.current?.focus();
-        }}
+        className={`chat-panel flex-1 min-w-0 h-full min-h-0 relative bg-black ${premiumChatClass ?? ""}`}
       >
-        {/* New messages indicator */}
-        {hasNewMessages && !isNearBottom && (
-          <div className="flex justify-center mb-2 sticky top-0 z-10">
-            <button
-              onClick={() => {
-                scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
-                setHasNewMessages(false);
-              }}
-              className="px-3 py-1 bg-primary text-primary-foreground text-xs font-semibold rounded-full hover:bg-primary/90 transition-colors shadow-sm"
-            >
-              ↓ New messages
-            </button>
-          </div>
-        )}
 
-        {/* Load more indicator at top */}
-        <div ref={messagesStartRef} className="h-2" />
-        
-        {/* Pinned messages section */}
-        {pinnedMessages.length > 0 && (
-          <div className="mb-4 px-2">
-            <p className="text-[10px] text-muted-foreground/60 uppercase tracking-wider mb-2 font-semibold px-2">Pinned</p>
-            {pinnedMessages.map(msg => {
-              const isMe = msg.senderId === user?.id;
-              return (
-                <MessageItem
-                  key={msg.id}
-                  msg={msg}
-                  isMe={isMe}
-                  myId={user?.id ?? "me"}
-                  partnerName={pName}
-                  partnerAvatar={pAvatar}
-                  theme={theme}
-                  onDelete={deleteMessage}
-                  onLike={toggleLike}
-                  onReact={handleReact}
-                  onUnsend={handleUnsend}
-                  onPin={handlePin}
-                  onReply={startReply}
-                  onEdit={handleEdit}
-                  onOpenMenu={(m, rect) => setContextMenu({ msg: m, top: rect.bottom + 4, left: rect.left })}
-                  onOpenMedia={openMediaMessage}
-                  seenLabel={buildSeenLabel(msg, isMe, lastSeenOutgoingId, partnerId)}
-                  onStartThread={handleStartThread}
-                  onReplyToThread={handleReplyToThread}
-                  onMediaLoad={scrollToBottomForMedia}
-                  onMediaCommitted={handleMediaCommitted}
-                  replySource={msg.replyToId ? messageById.get(msg.replyToId) : undefined}
-                  onJumpToMessage={jumpToMessage}
-                />
-              );
-            })}
-          </div>
-        )}
-        {loadingMore && messages.length > 0 && (
-          <div className="flex justify-center py-2">
-            <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-          </div>
-        )}
-        
-        {/* Search bar */}
-        {showSearch && (
-          <div className="mb-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <input
-                type="text"
-                placeholder="Search messages..."
-                value={searchQuery}
-                onChange={handleSearchChange}
-                className="w-full pl-10 pr-10 py-2 bg-secondary/50 rounded-full text-sm outline-none placeholder:text-muted-foreground"
-                data-testid="search-input"
-              />
-              {searchQuery && (
-                <button onClick={() => setSearchQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" title="Clear search">
-                  <X className="w-4 h-4" />
-                </button>
+
+        <div className="chat-panel-top shrink-0 z-20 flex flex-col relative">
+          {/* ── Header ── */}
+          <div className="chat-panel-header flex items-center gap-1.5 sm:gap-2 px-1.5 sm:px-3 py-1 sm:py-1.5 border-b shrink-0 text-white">
+            <div className="relative shrink-0">
+              <AvatarImage src={pAvatar} userId={partnerId} alt={pName} className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover" />
+              {presence.online && (
+                <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-background" />
               )}
             </div>
-            {searchQuery && (
-              <>
-                <p className="text-xs text-muted-foreground mt-2">
-                  Found {filteredMessages.length} message{filteredMessages.length !== 1 ? 's' : ''}
-                </p>
-                {/* Filter Controls */}
-                <div className="flex flex-wrap gap-2 mt-3">
-                  <select
-                    value={searchFilters.messageType}
-                    onChange={(e) => setSearchFilters(prev => ({ ...prev, messageType: e.target.value as any }))}
-                    className="px-3 py-1.5 bg-background border border-border rounded-full text-xs"
-                    title="Filter by message type"
-                  >
-                    <option value="all">All Types</option>
-                    <option value="text">Text</option>
-                    <option value="image">Images</option>
-                    <option value="sticker">Stickers</option>
-                    <option value="audio">Audio</option>
-                    <option value="gif">GIFs</option>
-                  </select>
-                  <select
-                    value={searchFilters.sender}
-                    onChange={(e) => setSearchFilters(prev => ({ ...prev, sender: e.target.value as any }))}
-                    className="px-3 py-1.5 bg-background border border-border rounded-full text-xs"
-                    title="Filter by sender"
-                  >
-                    <option value="all">All Senders</option>
-                    <option value="me">From Me</option>
-                    <option value="partner">From {pName}</option>
-                  </select>
-                  <button
-                    onClick={() => setSearchFilters(prev => ({ ...prev, hasReaction: !prev.hasReaction }))}
-                    className={`px-3 py-1.5 border rounded-full text-xs ${searchFilters.hasReaction ? 'bg-primary text-primary-foreground border-primary' : 'bg-background border-border'}`}
-                  >
-                    With Reactions
-                  </button>
-                  <button
-                    onClick={() => setSearchFilters(prev => ({ ...prev, isPinned: !prev.isPinned }))}
-                    className={`px-3 py-1.5 border rounded-full text-xs ${searchFilters.isPinned ? 'bg-primary text-primary-foreground border-primary' : 'bg-background border-border'}`}
-                  >
-                    Pinned Only
-                  </button>
-                  <button
-                    onClick={() => setSearchFilters({ messageType: "all", sender: "all", hasReaction: false, isPinned: false })}
-                    className="px-3 py-1.5 bg-secondary text-foreground rounded-full text-xs hover:bg-secondary/80"
-                  >
-                    Reset Filters
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        )}
-        {/* Profile header — only when chat is empty so scroll stays on messages */}
-        {visibleMessages.length <= 3 && (
-          <div className="flex flex-col items-center gap-2 py-3 md:py-6 mb-1 shrink-0">
-            <AvatarImage src={pAvatar} userId={partnerId} alt={`Profile picture of ${pName}`} className="w-14 h-14 md:w-20 md:h-20 rounded-full object-cover" />
-            <p className="font-bold text-sm md:text-base">{pName}</p>
-            <span className="text-[10px] md:text-xs bg-secondary/60 px-3 py-1 rounded-full text-muted-foreground">Just the two of you ♥</span>
-          </div>
-        )}
-
-        {error && messages.length === 0 && visibleMessages.length === 0 && (
-          <div
-            className="flex flex-col items-center gap-3 py-8 text-center px-4 bg-destructive/5 border border-destructive/30 rounded-2xl mx-2"
-          >
-            <div className="w-12 h-12 rounded-full bg-destructive/15 flex items-center justify-center">
-              <AlertCircle className="w-6 h-6 text-destructive" />
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-sm" data-testid="chat-partner-name">{pName}</p>
+              <p className={`text-xs flex items-center ${isTyping ? "text-primary" : presence.online ? "text-green-400" : "text-muted-foreground"}`}>
+                {isTyping ? `${pName} is typing...` : presence.label}
+              </p>
             </div>
-            <div>
-              <p className="text-sm font-semibold text-foreground mb-1">Failed to load messages</p>
-              <p className="text-xs text-destructive/80">{error}</p>
+            <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
+              {isEncryptionReady() && (
+                <span className="hidden sm:flex items-center gap-1 text-[10px] text-green-400 bg-green-500/10 px-2 py-0.5 rounded-full border border-green-500/20 mr-1">
+                  <Shield className="w-3 h-3" /> Encrypted
+                </span>
+              )}
+              <div className="hidden sm:flex items-center gap-1 px-2 py-1 rounded-full bg-secondary/60">
+                {online ? (
+                  <Wifi className="w-3 h-3 text-green-400" />
+                ) : (
+                  <WifiOff className="w-3 h-3 text-destructive" />
+                )}
+                <span className="text-xs text-muted-foreground">{presence.label}</span>
+              </div>
+
+
+              <button
+                onClick={() => { setShowBubbleColors(true); }}
+                className={`p-1.5 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 active:scale-95 ${showBubbleColors ? "text-primary" : "text-muted-foreground hover:text-foreground hover:bg-secondary"}`}
+                aria-label="Change bubble color"
+              >
+                <Palette className="w-4 h-4" strokeWidth={1.5} />
+              </button>
+              <button
+                onClick={() => startCall("audio")}
+                className="hidden sm:inline-flex p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 active:scale-95"
+                data-testid="button-voice-call"
+                aria-label="Start audio call"
+              >
+                <Phone className="w-4 h-4" strokeWidth={1.5} />
+              </button>
+              <button
+                onClick={() => startCall("video")}
+                className="hidden sm:inline-flex p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 active:scale-95"
+                data-testid="button-video-call"
+                aria-label="Start video call"
+              >
+                <Video className="w-4 h-4" strokeWidth={1.5} />
+              </button>
+              <button
+                onClick={() => { setShowInfo(s => !s); }}
+                className={`p-1.5 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 active:scale-95 ${showInfo ? "text-primary" : "text-muted-foreground hover:text-foreground hover:bg-secondary"}`}
+                data-testid="button-info"
+                aria-label="Show chat info"
+              >
+                <Info className="w-4 h-4" strokeWidth={1.5} />
+              </button>
             </div>
-            <button 
-              onClick={() => { setError(null); loadMessages(); }} 
-              className="px-4 py-2 bg-destructive text-destructive-foreground rounded-lg text-sm font-semibold hover:bg-destructive/90 transition-colors active:scale-95"
-            >
-              Try Again
-            </button>
           </div>
-        )}
+        </div>
 
-        {!error && visibleMessages.length === 0 && messages.length === 0 && (
-          <div className="flex flex-col items-center gap-2 py-8 text-center px-4">
-            <span className="text-4xl">💬</span>
-            {user && getChatClearedAt(user.id) ? (
-              <>
-                <p className="text-sm font-medium text-foreground">Chat cleared on your side</p>
-                <p className="text-xs text-muted-foreground">
-                  Older messages are hidden for you. {pName} may still see the full history — send a new message anytime.
-                </p>
-              </>
-            ) : (
-              <p className="text-sm text-muted-foreground">Say hi to {pName}!</p>
-            )}
-          </div>
-        )}
+        {/* ── Messages ── */}
+        <div
+          className="chat-panel-messages relative z-[1] overflow-y-auto px-2 sm:px-3 py-2 md:py-3 md:px-4 flex flex-col gap-1 scrollbar-hide"
+          data-testid="messages-list"
+          ref={messagesContainerRef}
+          style={{ scrollBehavior: 'auto' }}
+          onClick={(e) => {
+            const t = e.target as HTMLElement;
+            if (t.closest("button, a, input, textarea, video, audio, img, [role='button']")) return;
+            if (!isNearBottomRef.current) return;
+            if (window.matchMedia("(max-width: 767px)").matches) return;
+            messageInputRef.current?.focus();
+          }}
+        >
+          {/* New messages indicator */}
+          {hasNewMessages && !isNearBottom && (
+            <div className="flex justify-center mb-2 sticky top-0 z-10">
+              <button
+                onClick={() => {
+                  initialUnreadHandledRef.current = false;
+                  scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
+                  setHasNewMessages(false);
+                }}
+                className="px-3 py-1 bg-primary text-primary-foreground text-xs font-semibold rounded-full hover:bg-primary/90 transition-colors shadow-sm"
+              >
+                ↓ New messages
+              </button>
+            </div>
+          )}
 
-        {groupedMessages.map((group, groupIndex) => (
-          <div key={`${group.dayKey}-${groupIndex}`}>
-            {group.label ? (
-              <p className="text-center text-[11px] text-muted-foreground/70 my-4 font-medium">{group.label}</p>
-            ) : null}
-            {group.msgs
-              .filter((msg: ApiMessage) => !msg.pinned)
-              .map((msg, i, arr) => {
-              const isMe = msg.senderId === user?.id;
-              const prevMsg = arr[i - 1];
-              const timeGap = shouldShowTimeGap(prevMsg, msg, user?.id);
-              return (
-                <div key={msg.id} className="chat-message-row">
-                  {timeGap && (
-                    <p className="text-center text-[10px] text-muted-foreground/60 my-3 font-medium">{timeGap}</p>
-                  )}
+          {/* Load more indicator at top */}
+          <div ref={messagesStartRef} className="h-2" />
+
+          {/* Pinned messages section */}
+          {pinnedMessages.length > 0 && (
+            <div className="mb-4 px-2">
+              <p className="text-[10px] text-muted-foreground/60 uppercase tracking-wider mb-2 font-semibold px-2">Pinned</p>
+              {pinnedMessages.map(msg => {
+                const isMe = msg.senderId === user?.id;
+                return (
                   <MessageItem
+                    key={msg.clientUniqueId || msg.id}
                     msg={msg}
                     isMe={isMe}
                     myId={user?.id ?? "me"}
                     partnerName={pName}
+
                     partnerAvatar={pAvatar}
-                    theme={theme}
                     onDelete={deleteMessage}
                     onLike={toggleLike}
                     onReact={handleReact}
                     onUnsend={handleUnsend}
                     onPin={handlePin}
                     onReply={startReply}
-                    onOpenMenu={(m, rect) => setContextMenu({ msg: m, top: rect.bottom + 4, left: rect.left })}
+                    onEdit={handleEdit}
+                    onOpenMenu={(m: ApiMessage, rect: DOMRect) => setContextMenu({ msg: m, top: rect.bottom + 4, left: rect.left })}
                     onOpenMedia={openMediaMessage}
-                    prevMsg={prevMsg}
                     seenLabel={buildSeenLabel(msg, isMe, lastSeenOutgoingId, partnerId)}
                     onStartThread={handleStartThread}
                     onReplyToThread={handleReplyToThread}
@@ -3074,283 +3048,353 @@ export default function Messages() {
                     replySource={msg.replyToId ? messageById.get(msg.replyToId) : undefined}
                     onJumpToMessage={jumpToMessage}
                   />
-                </div>
-              );
-            })}
-          </div>
-        ))}
+                );
+              })}
+            </div>
+          )}
+          {loadingMore && messages.length > 0 && (
+            <div className="flex justify-center py-2">
+              <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            </div>
+          )}
 
-        <div ref={bottomRef} className="h-8 shrink-0" aria-hidden />
-      </div>
+          {/* Profile header — only when chat is empty so scroll stays on messages */}
+          {visibleMessages.length <= 3 && (
+            <div className="flex flex-col items-center gap-2 py-3 md:py-6 mb-1 shrink-0">
+              <AvatarImage src={pAvatar} userId={partnerId} alt={`Profile picture of ${pName}`} className="w-14 h-14 md:w-20 md:h-20 rounded-full object-cover" />
+              <p className="font-bold text-sm md:text-base">{pName}</p>
+              <span className="text-[10px] md:text-xs bg-secondary/60 px-3 py-1 rounded-full text-muted-foreground">Just the two of you ♥</span>
+            </div>
+          )}
 
-      <div className="chat-panel-bottom shrink-0 relative z-10">
-        {showPartnerTyping && (
-          <div className="flex items-end gap-2 px-3 py-1.5 shrink-0 border-t border-white/5 bg-background/80 backdrop-blur-sm">
-            <AvatarImage src={pAvatar} userId={partnerId} alt="" className="w-6 h-6 rounded-full object-cover shrink-0" />
-            <div className="bg-secondary/80 rounded-2xl rounded-bl-md px-3 py-2 flex items-center gap-1.5">
-              <span className="text-xs text-muted-foreground">{partnerTypingLine(partnerId)}</span>
-              <TypingDots />
+          {error && messages.length === 0 && visibleMessages.length === 0 && (
+            <div
+              className="flex flex-col items-center gap-3 py-8 text-center px-4 bg-destructive/5 border border-destructive/30 rounded-2xl mx-2"
+            >
+              <div className="w-12 h-12 rounded-full bg-destructive/15 flex items-center justify-center">
+                <AlertCircle className="w-6 h-6 text-destructive" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-foreground mb-1">Failed to load messages</p>
+                <p className="text-xs text-destructive/80">{error}</p>
+              </div>
+              <button
+                onClick={() => { setError(null); loadMessages(); }}
+                className="px-4 py-2 bg-destructive text-destructive-foreground rounded-lg text-sm font-semibold hover:bg-destructive/90 transition-colors active:scale-95"
+              >
+                Try Again
+              </button>
+            </div>
+          )}
+
+          {!error && visibleMessages.length === 0 && messages.length === 0 && (
+            <div className="flex flex-col items-center gap-2 py-8 text-center px-4">
+              <span className="text-4xl">💬</span>
+              {user && getChatClearedAt(user.id) ? (
+                <>
+                  <p className="text-sm font-medium text-foreground">Chat cleared on your side</p>
+                  <p className="text-xs text-muted-foreground">
+                    Older messages are hidden for you. {pName} may still see the full history — send a new message anytime.
+                  </p>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">Say hi to {pName}!</p>
+              )}
+            </div>
+          )}
+
+          {groupedMessages.map((group, groupIndex) => (
+            <div key={`${group.dayKey}-${groupIndex}`}>
+              {group.label ? (
+                <p className="text-center text-[11px] text-muted-foreground/70 my-4 font-medium">{group.label}</p>
+              ) : null}
+              {group.msgs
+                .filter((msg: ApiMessage) => !msg.pinned)
+                .map((msg, i, arr) => {
+                  const isMe = msg.senderId === user?.id;
+                  const prevMsg = arr[i - 1];
+                  const timeGap = shouldShowTimeGap(prevMsg, msg, user?.id);
+                  return (
+                    <div key={msg.clientUniqueId || msg.id} className="chat-message-row">
+                      {timeGap && (
+                        <p className="text-center text-[10px] text-muted-foreground/60 my-3 font-medium">{timeGap}</p>
+                      )}
+                      <MessageItem
+                        msg={msg}
+                        isMe={isMe}
+                        myId={user?.id ?? "me"}
+                        partnerName={pName}
+                        partnerAvatar={pAvatar}
+                        onDelete={deleteMessage}
+                        onLike={toggleLike}
+                        onReact={handleReact}
+                        onUnsend={handleUnsend}
+                        onPin={handlePin}
+                        onReply={startReply}
+                        onOpenMenu={(m: ApiMessage, rect: DOMRect) => setContextMenu({ msg: m, top: rect.bottom + 4, left: rect.left })}
+                        onOpenMedia={openMediaMessage}
+                        prevMsg={prevMsg}
+                        seenLabel={buildSeenLabel(msg, isMe, lastSeenOutgoingId, partnerId)}
+                        onStartThread={handleStartThread}
+                        onReplyToThread={handleReplyToThread}
+                        onMediaLoad={scrollToBottomForMedia}
+                        onMediaCommitted={handleMediaCommitted}
+                        replySource={msg.replyToId ? messageById.get(msg.replyToId) : undefined}
+                        onJumpToMessage={jumpToMessage}
+                      />
+                    </div>
+                  );
+                })}
+            </div>
+          ))}
+
+          <div ref={bottomRef} className="h-8 shrink-0" aria-hidden />
+        </div>
+
+        <div className="chat-panel-bottom shrink-0 relative z-10">
+          {showPartnerTyping && (
+            <div className="flex items-end gap-2 px-3 py-1.5 shrink-0 border-t border-white/5 bg-background/80 backdrop-blur-sm">
+              <AvatarImage src={pAvatar} userId={partnerId} alt="" className="w-6 h-6 rounded-full object-cover shrink-0" />
+              <div className="bg-secondary/80 rounded-2xl rounded-bl-md px-3 py-2 flex items-center gap-1.5">
+                <span className="text-xs text-muted-foreground">{partnerTypingLine(partnerId)}</span>
+                <TypingDots />
+              </div>
+            </div>
+          )}
+          {/* ── Edit Message Bar ── */}
+          {editingMessage && (
+            <EditMessageBar
+              value={editText}
+              onChange={setEditText}
+              onSave={handleSaveEdit}
+              onCancel={handleCancelEdit}
+              saving={editSaving}
+            />
+          )}
+
+          {doodleOpen && (
+            <DoodleCanvas
+              onClose={closeDoodlePanel}
+              onSend={handleDoodleSend}
+            />
+          )}
+
+          {/* ── Input Bar or Media Preview ── */}
+          {pendingMediaPreview ? (
+            <PendingMediaPreview
+              file={pendingMediaPreview.normalized}
+              onCancel={() => setPendingMediaPreview(null)}
+              onSend={processAndSendMedia}
+              disabled={!online || blocked}
+            />
+          ) : (
+            <MessageInput
+              ref={messageInputRef}
+              onInputActivity={handleInputActivity}
+              onSendMessage={sendText}
+              onShareLocation={handleShareLocation}
+              sharingLocation={sharingLocation}
+              replyPreview={
+                replyTo && user ? (
+                  <ReplyPreview
+                    replyTo={replyTo}
+                    myId={user.id}
+                    partnerName={pName}
+                    onCancel={() => setReplyTo(null)}
+                  />
+                ) : undefined
+              }
+              onStickerSelect={sendSticker}
+              onGifSelect={sendGif}
+              onGreetingSelect={sendGreeting}
+              onImageSelect={(file, itemType) => {
+                void handlePickedFile(file, itemType);
+              }}
+              onOpenCamera={() => setShowCamera(true)}
+              mediaViewMode={mediaViewMode}
+              onMediaViewModeChange={setMediaViewMode}
+              onDoodleOpen={openDoodlePanel}
+              doodleActive={doodleOpen}
+              onStartRecording={startRecording}
+              onCancelRecording={cancelRecording}
+              onSendRecording={sendVoiceRecording}
+              recording={recording}
+              recordingTime={recordingTime}
+              disabled={!online || blocked || editingMessage !== null}
+            />
+          )}
+          <BubbleColorSelector
+            show={showBubbleColors}
+            onClose={() => setShowBubbleColors(false)}
+            currentThemeId={user ? getCachedChatTheme() : "default"}
+            onSelect={(themeId) => {
+              if (updateChatTheme) updateChatTheme(themeId);
+            }}
+          />
+        </div>
+
+        <AppThemeModal
+          show={showAppThemes}
+          onClose={() => setShowAppThemes(false)}
+          current={appThemeId}
+          onSelect={(themeId) => {
+            setAppThemeId(themeId);
+            api.updateCouplePrefs({ appTheme: themeId }).then(refreshCouplePrefs).catch(console.error);
+          }}
+        />
+
+        {showCamera && (
+          <CameraOverlay
+            onClose={() => setShowCamera(false)}
+            onCapture={(file) => {
+              setShowCamera(false);
+              void handlePickedFile(file);
+            }}
+          />
+        )}
+
+        {/* ── Info Panel ── */}
+        <InfoPanel
+          show={showInfo}
+          onClose={() => setShowInfo(false)}
+          partnerName={pName}
+          partnerAvatar={pAvatar}
+          partnerLastSeen={partnerLastSeen}
+          online={online}
+          blocked={blocked}
+          onToggleBlock={() => {
+            setBlocked((prev) => {
+              const next = !prev;
+              setChatBlocked(next);
+              return next;
+            });
+          }}
+          onClearChat={() => setShowDeleteConfirm(true)}
+          onExportChat={exportChatHistory}
+          onAudioCall={() => startCall("audio")}
+          onVideoCall={() => startCall("video")}
+        />
+
+        {/* ── Delete confirm ── */}
+        {showDeleteConfirm && (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-6">
+            <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-xs" data-testid="delete-confirm">
+              <Trash2 className="w-8 h-8 text-destructive mx-auto mb-3" />
+              <h3 className="font-bold text-center mb-1">Clear chat for you?</h3>
+              <p className="text-sm text-muted-foreground text-center mb-5">
+                Messages disappear on your account only. {pName} will still see the full chat.
+              </p>
+              <div className="flex gap-2">
+                <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 py-2.5 bg-secondary rounded-xl text-sm font-semibold" data-testid="button-cancel-delete">Cancel</button>
+                <button onClick={handleDeleteChat} className="flex-1 py-2.5 bg-destructive text-white rounded-xl text-sm font-semibold" data-testid="button-confirm-delete">Delete</button>
+              </div>
             </div>
           </div>
         )}
-      {/* ── Edit Message Bar ── */}
-      {editingMessage && (
-        <EditMessageBar
-          value={editText}
-          onChange={setEditText}
-          onSave={handleSaveEdit}
-          onCancel={handleCancelEdit}
-          saving={editSaving}
-        />
-      )}
 
-      {doodleOpen && (
-        <DoodleCanvas
-          canvasHeight={doodleHeight}
-          onExpandCanvas={expandDoodleSpace}
-          onClose={closeDoodlePanel}
-          onSend={(imageData) => {
-            closeDoodlePanel();
-            if (!user) return;
-            const tempId = crypto.randomUUID();
-            pendingOutgoingRef.current.add(tempId);
-            setMessages((prev) => [
-              ...prev,
-              buildOptimisticMessage(
-                { senderId: user.id, type: "image", imageData: imageData, text: "✏️ Doodle" },
-                tempId,
-              ),
-            ]);
-            requestStickToBottom();
-            void (async () => {
-              try {
-                const outgoing = await prepareOutgoingMessage({
-                  senderId: user.id,
-                  type: "image",
-                  imageUrl: "",
-                  text: "✏️ Doodle",
-                });
-                const url = await uploadMediaToB2(imageData, "image/jpeg");
-                outgoing.imageUrl = url;
-                const saved = await api.sendMessage(outgoing);
-                const [display] = await normalizeMessages([saved]);
-                setMessages((prev) => {
-                  const next = replaceOptimisticMessage(prev, tempId, display, user.id);
-                  pendingOutgoingRef.current.delete(tempId);
-                  messagesSigRef.current = messagesListSignature(next);
-                  writeChatCache(user.id, next);
-                  return next;
-                });
-                requestStickToBottom();
-              } catch (err) {
-                pendingOutgoingRef.current.delete(tempId);
-                setMessages((prev) => prev.filter((m) => m.id !== tempId));
-                toast.error(
-                  err instanceof Error ? err.message : "Doodle upload failed — check CLOUDINARY_URL in .env",
-                  { duration: 4000 },
-                );
-              }
-            })();
-          }}
-        />
-      )}
+        {/* ── Incoming call banner ── */}
+        {incomingCall && (
+          <IncomingCallOverlay
+            callerName={pName}
+            callerAvatar={pAvatar}
+            callType={incomingCall.type}
+            canAccept={Boolean(incomingCall.offer)}
+            onAccept={acceptCall}
+            onReject={rejectCall}
+          />
+        )}
 
-      {/* ── Input Bar ── */}
-      <MessageInput
-        ref={messageInputRef}
-        onInputActivity={handleInputActivity}
-        onSendMessage={sendText}
-        cuteMode={cuteMode}
-        onToggleCuteMode={toggleCuteMode}
-        onShareLocation={handleShareLocation}
-        sharingLocation={sharingLocation}
-        replyPreview={
-          replyTo && user ? (
-            <ReplyPreview
-              replyTo={replyTo}
-              myId={user.id}
-              partnerName={pName}
-              onCancel={() => setReplyTo(null)}
-            />
-          ) : undefined
-        }
-        onStickerSelect={sendSticker}
-        onGifSelect={sendGif}
-        onGreetingSelect={sendGreeting}
-        onImageSelect={(file, itemType) => {
-          void handlePickedFile(file, itemType);
-        }}
-        mediaViewMode={mediaViewMode}
-        onMediaViewModeChange={setMediaViewMode}
-        onDoodleOpen={openDoodlePanel}
-        doodleActive={doodleOpen}
-        onStartRecording={startRecording}
-        onCancelRecording={cancelRecording}
-        onSendRecording={sendVoiceRecording}
-        recording={recording}
-        recordingTime={recordingTime}
-        disabled={!online || blocked || editingMessage !== null}
-      />
-      </div>
+        {/* ── Active / Outgoing call screen ── */}
+        {callState && (
+          <CallScreen
+            call={callState}
+            partnerId={partnerId}
+            partnerName={pName}
+            partnerAvatar={pAvatar}
+            myId={user!.id}
+            onSendSignal={(data) => api.sendCallSignal(data)}
+            onConnected={onCallConnected}
+            onEnd={endCall}
+            incomingSignal={callSignal ?? undefined}
+          />
+        )}
 
-      <AppThemeModal
-        show={showAppThemes}
-        onClose={() => setShowAppThemes(false)}
-        current={appThemeId}
-        onSelect={(themeId) => {
-          setAppThemeId(themeId);
-          api.updateCouplePrefs({ appTheme: themeId }).then(refreshCouplePrefs).catch(console.error);
-        }}
-      />
-      <ThemePicker
-        show={showThemes}
-        onClose={() => setShowThemes(false)}
-        currentThemeId={chatThemeId}
-        onThemeChange={setTheme}
-      />
-
-      {/* ── Info Panel ── */}
-      <InfoPanel
-        show={showInfo}
-        onClose={() => setShowInfo(false)}
-        partnerName={pName}
-        partnerAvatar={pAvatar}
-        partnerLastSeen={partnerLastSeen}
-        online={online}
-        blocked={blocked}
-        onToggleBlock={() => {
-          setBlocked((prev) => {
-            const next = !prev;
-            setChatBlocked(next);
-            return next;
-          });
-        }}
-        onClearChat={() => setShowDeleteConfirm(true)}
-        onExportChat={exportChatHistory}
-        onAudioCall={() => startCall("audio")}
-        onVideoCall={() => startCall("video")}
-      />
-
-      {/* ── Delete confirm ── */}
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-6">
-          <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-xs" data-testid="delete-confirm">
-            <Trash2 className="w-8 h-8 text-destructive mx-auto mb-3" />
-            <h3 className="font-bold text-center mb-1">Clear chat for you?</h3>
-            <p className="text-sm text-muted-foreground text-center mb-5">
-              Messages disappear on your account only. {pName} will still see the full chat.
-            </p>
-            <div className="flex gap-2">
-              <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 py-2.5 bg-secondary rounded-xl text-sm font-semibold" data-testid="button-cancel-delete">Cancel</button>
-              <button onClick={handleDeleteChat} className="flex-1 py-2.5 bg-destructive text-white rounded-xl text-sm font-semibold" data-testid="button-confirm-delete">Delete</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Incoming call banner ── */}
-      {incomingCall && (
-        <IncomingCallOverlay
-          callerName={pName}
-          callerAvatar={pAvatar}
-          callType={incomingCall.type}
-          canAccept={Boolean(incomingCall.offer)}
-          onAccept={acceptCall}
-          onReject={rejectCall}
-        />
-      )}
-
-      {/* ── Active / Outgoing call screen ── */}
-      {callState && (
-        <CallScreen
-          call={callState}
-          partnerId={partnerId}
-          partnerName={pName}
-          partnerAvatar={pAvatar}
-          myId={user!.id}
-          onSendSignal={(data) => api.sendCallSignal(data)}
-          onConnected={onCallConnected}
-          onEnd={endCall}
-          incomingSignal={callSignal ?? undefined}
-        />
-      )}
-
-      {mediaViewer && (
-        <div
-          className="fixed inset-0 z-[120] bg-black/95 flex items-center justify-center p-4"
-          onContextMenu={(e) => e.preventDefault()}
-        >
-          <button
-            type="button"
-            onClick={() => setMediaViewer(null)}
-            className="absolute top-4 right-4 w-10 h-10 rounded-full bg-black/60 text-white flex items-center justify-center"
-            aria-label="Close media"
+        {mediaViewer && (
+          <div
+            className="fixed inset-0 z-[120] bg-black/95 flex items-center justify-center p-4"
+            onContextMenu={(e) => e.preventDefault()}
           >
-            <X className="w-5 h-5" />
-          </button>
-          {mediaViewer.timed && !mediaViewer.useVideoDuration && (
-            <div className="absolute top-4 left-4 px-3 py-1.5 rounded-full bg-primary/30 text-white text-sm font-semibold">
-              {mediaViewer.secondsLeft}s
-            </div>
-          )}
-          {mediaViewer.kind === "video" ? (
-            <video
-              src={mediaViewer.url}
-              controls={!mediaViewer.timed}
-              autoPlay
-              playsInline
-              onEnded={() => {
-                if (mediaViewer.timed) setMediaViewer(null);
-              }}
-              className="max-w-full max-h-full rounded-xl"
-            />
-          ) : (
-            <img src={mediaViewer.url} alt="" className="max-w-full max-h-full rounded-xl object-contain" />
-          )}
-        </div>
-      )}
+            <button
+              type="button"
+              onClick={() => setMediaViewer(null)}
+              className="absolute top-4 right-4 w-10 h-10 rounded-full bg-black/60 text-white flex items-center justify-center"
+              aria-label="Close media"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            {mediaViewer.timed && !mediaViewer.useVideoDuration && (
+              <div className="absolute top-4 left-4 px-3 py-1.5 rounded-full bg-primary/30 text-white text-sm font-semibold">
+                {mediaViewer.secondsLeft}s
+              </div>
+            )}
+            {mediaViewer.kind === "video" ? (
+              <video
+                src={mediaViewer.url}
+                controls={!mediaViewer.timed}
+                autoPlay
+                playsInline
+                onEnded={() => {
+                  if (mediaViewer.timed) setMediaViewer(null);
+                }}
+                className="w-full h-full object-contain"
+              />
+            ) : (
+              <img src={mediaViewer.url} alt="Media Viewer" className="w-full h-full object-contain" />
+            )}
+          </div>
+        )}
 
-      {contextMenu && user && (
-        <MessageContextMenu
-          msg={contextMenu.msg}
-          position={{ top: contextMenu.top, left: contextMenu.left }}
-          mode={contextMenu.msg.type === "audio" ? "audio" : "full"}
-          isMe={contextMenu.msg.senderId === user.id}
-          canEdit={canEditMessage(contextMenu.msg)}
-          onClose={() => setContextMenu(null)}
-          onReply={() => startReply(contextMenu.msg)}
-          onCopy={() => {
-            if (contextMenu.msg.text) navigator.clipboard.writeText(contextMenu.msg.text);
-          }}
-          onPin={() => handlePin(contextMenu.msg.id)}
-          onDeleteForMe={() => handleDeleteForMe(contextMenu.msg.id)}
-          onUnsend={
-            contextMenu.msg.senderId === user.id ? () => handleUnsend(contextMenu.msg.id) : undefined
-          }
-          onRemoveReaction={
-            typeof contextMenu.msg.reaction === "string" && contextMenu.msg.reaction.trim()
-              ? () => handleReact(contextMenu.msg.id, contextMenu.msg.reaction as string)
-              : undefined
-          }
-          onEdit={
-            canEditMessage(contextMenu.msg)
-              ? () => handleEdit(contextMenu.msg)
-              : undefined
-          }
-          onDownloadChat={contextMenu.msg.type !== "audio" ? downloadChatImages : undefined}
-        />
-      )}
+        {contextMenu && user && (
+          <MessageContextMenu
+            msg={contextMenu.msg}
+            position={{ top: contextMenu.top, left: contextMenu.left }}
+            mode={contextMenu.msg.type === "audio" ? "audio" : "full"}
+            isMe={contextMenu.msg.senderId === user.id}
+            canEdit={canEditMessage(contextMenu.msg)}
+            onClose={() => setContextMenu(null)}
+            onReply={() => startReply(contextMenu.msg)}
+            onCopy={() => {
+              if (contextMenu.msg.text) navigator.clipboard.writeText(contextMenu.msg.text);
+            }}
+            onPin={() => handlePin(contextMenu.msg.id)}
+            onDeleteForMe={() => handleDeleteForMe(contextMenu.msg.id)}
+            onUnsend={
+              contextMenu.msg.senderId === user.id ? () => handleUnsend(contextMenu.msg.id) : undefined
+            }
+            onRemoveReaction={
+              typeof contextMenu.msg.reaction === "string" && contextMenu.msg.reaction.trim()
+                ? () => handleReact(contextMenu.msg.id, contextMenu.msg.reaction as string)
+                : undefined
+            }
+            onEdit={
+              canEditMessage(contextMenu.msg)
+                ? () => handleEdit(contextMenu.msg)
+                : undefined
+            }
+            onDownloadChat={contextMenu.msg.type !== "audio" ? downloadChatImages : undefined}
+          />
+        )}
 
-      {imageToCrop && (
-        <ImageCropModal
-          imageSrc={imageToCrop}
-          title="Crop before sending"
-          onCancel={dismissImageCrop}
-          onApply={handleCroppedImage}
-        />
-      )}
+        {imageToCrop && (
+          <ImageCropModal
+            imageSrc={imageToCrop}
+            title="Crop before sending"
+            onCancel={dismissImageCrop}
+            onApply={handleCroppedImage}
+          />
+        )}
 
-    </div>
+      </div>
     </div>
   );
 }

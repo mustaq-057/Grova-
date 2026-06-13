@@ -1,37 +1,105 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useFeatureLoading } from "@/hooks/useFeatureLoading";
-import { Plus, Trash2, CheckCircle2, Circle, ListTodo, X } from "lucide-react";
-import { motion } from "framer-motion";
+import { Plus, Trash2, CheckCircle2, Circle, ListTodo, X, ChevronDown } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { api, type ApiTask } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { AvatarImage } from "@/components/AvatarImage";
-type AssignValue = "me" | "wife" | "both";
+
+function CustomSelect({
+  value,
+  onChange,
+  options,
+  label,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: { value: string; label: string }[];
+  label: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const selectedLabel = options.find((o) => o.value === value)?.label ?? value;
+
+  return (
+    <div className="relative">
+      <p className="text-xs text-muted-foreground mb-1">{label}</p>
+      <button
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        className="w-full flex items-center justify-between bg-secondary/50 border border-border/50 hover:border-primary/50 hover:bg-secondary/80 rounded-xl px-4 py-2.5 text-sm outline-none transition-colors"
+      >
+        <span className="truncate">{selectedLabel}</span>
+        <ChevronDown className="w-4 h-4 text-muted-foreground ml-2 shrink-0" />
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-40 bg-black/20"
+              onClick={() => setOpen(false)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: -10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: -10 }}
+              transition={{ duration: 0.15 }}
+              className="absolute left-0 right-0 top-full mt-2 z-50 bg-[#1c1c1c] border border-white/10 rounded-2xl shadow-2xl overflow-hidden py-1"
+            >
+              {options.map((opt, idx) => {
+                const isSelected = value === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => {
+                      onChange(opt.value);
+                      setOpen(false);
+                    }}
+                    className={`w-full flex items-center justify-between px-4 py-3.5 hover:bg-white/5 transition-colors ${
+                      idx !== options.length - 1 ? "border-b border-white/5" : ""
+                    }`}
+                  >
+                    <span className="text-[15px] font-medium text-white/90">{opt.label}</span>
+                    <div
+                      className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                        isSelected ? "border-[#5b5ef4]" : "border-white/30"
+                      }`}
+                    >
+                      {isSelected && <div className="w-2.5 h-2.5 bg-[#5b5ef4] rounded-full" />}
+                    </div>
+                  </button>
+                );
+              })}
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
 
 export default function Tasks() {
   const { user, partner } = useAuth();
-  const mustaqLabel = useMemo(
-    () =>
-      user?.id === "me"
-        ? (user.name?.split(" ")[0] ?? "Mustaq")
-        : (partner?.name?.split(" ")[0] ?? "Mustaq"),
-    [user, partner],
-  );
-  const saraLabel = useMemo(
-    () =>
-      user?.id === "wife"
-        ? (user.name?.split(" ")[0] ?? "Sara")
-        : (partner?.name?.split(" ")[0] ?? "Sara"),
-    [user, partner],
-  );
-  const mustaqAvatar = user?.id === "me" ? user.avatar : partner?.avatar;
-  const saraAvatar = user?.id === "wife" ? user.avatar : partner?.avatar;
-
+  const partnerId = user?.id === "me" ? "wife" : "me";
+  const mustaqLabel =
+    user?.id === "me"
+      ? (user.name?.split(" ")[0] ?? "Mustaq")
+      : (partner?.name?.split(" ")[0] ?? "Mustaq");
+  const saraLabel =
+    user?.id === "wife"
+      ? (user.name?.split(" ")[0] ?? "Sara")
+      : (partner?.name?.split(" ")[0] ?? "Sara");
+  const myAssignValue = user?.id === "me" ? "me" : "wife";
+  const partnerAssignValue = user?.id === "me" ? "wife" : "me";
   const [tasks, setTasks] = useState<ApiTask[]>([]);
   const { showLoading, finishLoading } = useFeatureLoading(tasks.length === 0);
   const [showAdd, setShowAdd] = useState(false);
   const [title, setTitle] = useState("");
-  const [assignedTo, setAssignedTo] = useState<AssignValue>("both");
+  const [assignedTo, setAssignedTo] = useState<string>("both");
   const [priority, setPriority] = useState<"low" | "medium" | "high">("medium");
   const [submitting, setSubmitting] = useState(false);
 
@@ -50,13 +118,6 @@ export default function Tasks() {
     }
   };
 
-  const getAssignedLabel = (assignee: string) => {
-    if (assignee === "both") return `${mustaqLabel} & ${saraLabel}`;
-    if (assignee === "me") return mustaqLabel;
-    if (assignee === "wife") return saraLabel;
-    return assignee;
-  };
-
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !user) return;
@@ -64,18 +125,15 @@ export default function Tasks() {
     try {
       const task = await api.addTask({
         title: title.trim(),
-        assignedTo,
+        assignedTo: assignedTo as "me" | "wife" | "both",
         priority,
         author: user.id,
       });
       setTasks((prev) => [task, ...prev]);
       setTitle("");
-      setAssignedTo("both");
       setShowAdd(false);
-      toast.success("Task added");
     } catch (err) {
       console.error("Failed to add task:", err);
-      toast.error("Could not add task.");
     } finally {
       setSubmitting(false);
     }
@@ -102,66 +160,78 @@ export default function Tasks() {
     }
   };
 
-  const getPriorityColor = (p: string) => {
-    switch (p) {
-      case "high":
-        return "bg-red-500/20 text-red-600 border-red-500/30";
-      case "medium":
-        return "bg-yellow-500/20 text-yellow-600 border-yellow-500/30";
-      case "low":
-        return "bg-green-500/20 text-green-600 border-green-500/30";
-      default:
-        return "bg-secondary/50 text-muted-foreground border-border";
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case "high": return "bg-red-500/20 text-red-600 border-red-500/30";
+      case "medium": return "bg-yellow-500/20 text-yellow-600 border-yellow-500/30";
+      case "low": return "bg-green-500/20 text-green-600 border-green-500/30";
+      default: return "bg-secondary/50 text-muted-foreground border-border";
     }
   };
 
-  const assignOptions: {
-    value: AssignValue;
-    label: string;
-    avatars?: { id: string; src?: string; alt: string }[];
-  }[] = [
-    {
-      value: "both",
-      label: "Both",
-      avatars: [
-        { id: "me", src: mustaqAvatar, alt: mustaqLabel },
-        { id: "wife", src: saraAvatar, alt: saraLabel },
-      ],
-    },
-    {
-      value: "me",
-      label: mustaqLabel,
-      avatars: [{ id: "me", src: mustaqAvatar, alt: mustaqLabel }],
-    },
-    {
-      value: "wife",
-      label: saraLabel,
-      avatars: [{ id: "wife", src: saraAvatar, alt: saraLabel }],
-    },
-  ];
+  const getAssignedLabel = (assignee: string) => {
+    if (assignee === "both") return "Both";
+    if (assignee === "me") return mustaqLabel;
+    if (assignee === "wife") return saraLabel;
+    if (assignee === user?.id) return user?.id === "me" ? mustaqLabel : saraLabel;
+    if (assignee === partnerId) return user?.id === "me" ? saraLabel : mustaqLabel;
+    return assignee;
+  };
 
   const incompleteTasks = tasks.filter((t) => !t.completed);
   const completedTasks = tasks.filter((t) => t.completed);
 
-  const renderAssigneeAvatars = (assignee: string) => {
-    if (assignee === "both") {
-      return (
-        <span className="inline-flex -space-x-1.5 shrink-0">
-          <AvatarImage src={mustaqAvatar} userId="me" alt={mustaqLabel} className="w-5 h-5 rounded-full ring-2 ring-card object-cover" />
-          <AvatarImage src={saraAvatar} userId="wife" alt={saraLabel} className="w-5 h-5 rounded-full ring-2 ring-card object-cover" />
-        </span>
-      );
+  const groupTasksByDate = (taskList: ApiTask[]) => {
+    const groups: Record<string, ApiTask[]> = {};
+    for (const t of taskList) {
+      const d = new Date(t.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+      if (!groups[d]) groups[d] = [];
+      groups[d].push(t);
     }
-    const id = assignee === "me" ? "me" : "wife";
-    const src = assignee === "me" ? mustaqAvatar : saraAvatar;
-    const alt = assignee === "me" ? mustaqLabel : saraLabel;
-    return (
-      <AvatarImage src={src} userId={id} alt={alt} className="w-5 h-5 rounded-full shrink-0 object-cover" />
-    );
+    return Object.entries(groups).sort((a, b) => new Date(b[0]).getTime() - new Date(a[0]).getTime());
   };
+
+  const renderTaskItem = (task: ApiTask) => (
+    <motion.div
+      key={task.id}
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      className={`border rounded-2xl p-4 transition-colors ${task.completed ? "bg-card/30 border-border/50 opacity-60" : "bg-card/50 border-border hover:bg-card/70"}`}
+      data-testid={`task-${task.id}`}
+    >
+      <div className="flex items-start gap-3">
+        <button
+          onClick={() => handleToggleComplete(task.id, task.completed)}
+          className="mt-0.5 shrink-0"
+          data-testid={task.completed ? `button-uncomplete-task-${task.id}` : `button-complete-task-${task.id}`}
+        >
+          {task.completed ? <CheckCircle2 className="w-5 h-5 text-green-500" /> : <Circle className="w-5 h-5 text-muted-foreground" />}
+        </button>
+        <div className="flex-1 min-w-0">
+          <p className={`text-sm font-medium mb-1.5 ${task.completed ? "line-through text-muted-foreground" : ""}`}>{task.title}</p>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium border ${getPriorityColor(task.priority)}`}>
+              {task.priority}
+            </span>
+            <span className="text-[10px] text-muted-foreground">
+              Assigned to {getAssignedLabel(task.assignedTo)}
+            </span>
+          </div>
+        </div>
+        <button
+          onClick={() => handleDelete(task.id)}
+          className="shrink-0 text-muted-foreground/40 hover:text-destructive transition-colors p-1"
+          data-testid={`button-delete-task-${task.id}`}
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    </motion.div>
+  );
 
   return (
     <div className="max-w-[600px] mx-auto pb-20 md:pb-6">
+      {/* Header */}
       <div className="px-4 py-5 border-b border-border flex items-center justify-between sticky top-0 bg-background/95 backdrop-blur z-10">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 bg-primary/10 rounded-xl flex items-center justify-center">
@@ -169,9 +239,7 @@ export default function Tasks() {
           </div>
           <div>
             <h1 className="font-semibold text-base">Shared Tasks</h1>
-            <p className="text-xs text-muted-foreground">
-              {mustaqLabel} & {saraLabel}
-            </p>
+            <p className="text-xs text-muted-foreground">Manage tasks together</p>
           </div>
         </div>
         <button
@@ -184,6 +252,7 @@ export default function Tasks() {
         </button>
       </div>
 
+      {/* Add Task Form */}
       {showAdd && (
         <motion.div
           initial={{ opacity: 0, height: 0 }}
@@ -191,98 +260,55 @@ export default function Tasks() {
           exit={{ opacity: 0, height: 0 }}
           className="border-b border-border bg-card/50"
         >
-          <form onSubmit={handleAdd} className="p-4 space-y-4">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold">New task</p>
-              <button type="button" onClick={() => setShowAdd(false)} className="text-muted-foreground p-1">
+          <form onSubmit={handleAdd} className="p-4 space-y-3">
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-sm font-semibold">Add Task</p>
+              <button type="button" onClick={() => setShowAdd(false)} className="text-muted-foreground">
                 <X className="w-4 h-4" />
               </button>
             </div>
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="What needs to be done?"
+              placeholder="Task title..."
               className="w-full bg-secondary border border-border rounded-xl px-4 py-2.5 text-sm outline-none focus:border-primary transition-colors"
               data-testid="input-task-title"
             />
-
-            <div>
-              <p className="text-xs font-medium text-muted-foreground mb-2">Assign to</p>
-              <div className="grid grid-cols-3 gap-2" data-testid="input-task-assigned">
-                {assignOptions.map((opt) => {
-                  const selected = assignedTo === opt.value;
-                  return (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => setAssignedTo(opt.value)}
-                      className={`flex flex-col items-center gap-1.5 rounded-xl border px-2 py-2.5 transition-all ${
-                        selected
-                          ? "border-primary bg-primary/10 ring-1 ring-primary/40"
-                          : "border-border bg-secondary/40 hover:bg-secondary/70"
-                      }`}
-                    >
-                      {opt.value === "both" ? (
-                        <span className="inline-flex -space-x-2">
-                          {opt.avatars?.map((a) => (
-                            <AvatarImage
-                              key={a.id}
-                              src={a.src}
-                              userId={a.id}
-                              alt={a.alt}
-                              className="w-8 h-8 rounded-full ring-2 ring-background object-cover"
-                            />
-                          ))}
-                        </span>
-                      ) : (
-                        <AvatarImage
-                          src={opt.avatars?.[0]?.src}
-                          userId={opt.avatars?.[0]?.id ?? "me"}
-                          alt={opt.label}
-                          className="w-8 h-8 rounded-full object-cover"
-                        />
-                      )}
-                      <span className={`text-[11px] font-semibold leading-tight text-center ${selected ? "text-primary" : ""}`}>
-                        {opt.label}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
+            <div className="grid grid-cols-2 gap-3 relative">
+              <CustomSelect
+                label="Assigned to"
+                value={assignedTo}
+                onChange={setAssignedTo}
+                options={[
+                  { value: "both", label: "Both" },
+                  { value: myAssignValue, label: `${user?.id === "me" ? mustaqLabel : saraLabel} (You)` },
+                  { value: partnerAssignValue, label: user?.id === "me" ? saraLabel : mustaqLabel },
+                ]}
+              />
+              <CustomSelect
+                label="Priority"
+                value={priority}
+                onChange={(v) => setPriority(v as "low" | "medium" | "high")}
+                options={[
+                  { value: "low", label: "Low" },
+                  { value: "medium", label: "Medium" },
+                  { value: "high", label: "High" },
+                ]}
+              />
             </div>
-
-            <div>
-              <p className="text-xs font-medium text-muted-foreground mb-2">Priority</p>
-              <div className="flex gap-2">
-                {(["low", "medium", "high"] as const).map((p) => (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() => setPriority(p)}
-                    className={`flex-1 py-2 rounded-xl text-xs font-semibold capitalize border transition-colors ${
-                      priority === p
-                        ? getPriorityColor(p)
-                        : "border-border bg-secondary/40 text-muted-foreground"
-                    }`}
-                  >
-                    {p}
-                  </button>
-                ))}
-              </div>
-            </div>
-
             <button
               type="submit"
               disabled={!title.trim() || submitting}
               className="w-full py-2.5 bg-primary text-primary-foreground font-semibold rounded-xl disabled:opacity-50 text-sm"
               data-testid="button-submit-task"
             >
-              {submitting ? "Adding..." : "Add task"}
+              {submitting ? "Adding..." : "Add Task"}
             </button>
           </form>
         </motion.div>
       )}
 
+      {/* Tasks List */}
       <div className="p-4">
         {showLoading ? (
           <div className="space-y-3">
@@ -298,93 +324,31 @@ export default function Tasks() {
           </div>
         ) : (
           <div className="space-y-6">
+            {/* Incomplete Tasks */}
             {incompleteTasks.length > 0 && (
               <div>
-                <h3 className="text-sm font-semibold mb-3 text-muted-foreground">To Do ({incompleteTasks.length})</h3>
-                <div className="space-y-3">
-                  {incompleteTasks.map((task) => (
-                    <motion.div
-                      key={task.id}
-                      initial={{ opacity: 0, y: 4 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="bg-card/50 border border-border rounded-2xl p-4 hover:bg-card/70 transition-colors"
-                      data-testid={`task-${task.id}`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <button
-                          onClick={() => handleToggleComplete(task.id, task.completed)}
-                          className="mt-0.5 shrink-0"
-                          data-testid={`button-complete-task-${task.id}`}
-                        >
-                          <Circle className="w-5 h-5 text-muted-foreground" />
-                        </button>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium mb-2">{task.title}</p>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium border capitalize ${getPriorityColor(task.priority)}`}>
-                              {task.priority}
-                            </span>
-                            <span className="inline-flex items-center gap-1.5 text-[10px] text-muted-foreground bg-secondary/50 px-2 py-0.5 rounded-full">
-                              {renderAssigneeAvatars(task.assignedTo)}
-                              {getAssignedLabel(task.assignedTo)}
-                            </span>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => handleDelete(task.id)}
-                          className="shrink-0 text-muted-foreground/40 hover:text-destructive transition-colors p-1"
-                          data-testid={`button-delete-task-${task.id}`}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </motion.div>
+                <h3 className="text-sm font-semibold mb-4 text-muted-foreground">To Do ({incompleteTasks.length})</h3>
+                <div className="space-y-6">
+                  {groupTasksByDate(incompleteTasks).map(([date, dateTasks]) => (
+                    <div key={date} className="space-y-3">
+                      <h4 className="text-xs font-semibold text-muted-foreground/80 px-2 uppercase tracking-wider">{date}</h4>
+                      {dateTasks.map(renderTaskItem)}
+                    </div>
                   ))}
                 </div>
               </div>
             )}
 
+            {/* Completed Tasks */}
             {completedTasks.length > 0 && (
-              <div>
-                <h3 className="text-sm font-semibold mb-3 text-muted-foreground">Completed ({completedTasks.length})</h3>
-                <div className="space-y-3">
-                  {completedTasks.map((task) => (
-                    <motion.div
-                      key={task.id}
-                      initial={{ opacity: 0, y: 4 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="bg-card/30 border border-border/50 rounded-2xl p-4 opacity-60"
-                      data-testid={`task-${task.id}`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <button
-                          onClick={() => handleToggleComplete(task.id, task.completed)}
-                          className="mt-0.5 shrink-0"
-                          data-testid={`button-uncomplete-task-${task.id}`}
-                        >
-                          <CheckCircle2 className="w-5 h-5 text-green-500" />
-                        </button>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium mb-2 line-through text-muted-foreground">{task.title}</p>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium border capitalize ${getPriorityColor(task.priority)}`}>
-                              {task.priority}
-                            </span>
-                            <span className="inline-flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                              {renderAssigneeAvatars(task.assignedTo)}
-                              {getAssignedLabel(task.assignedTo)}
-                            </span>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => handleDelete(task.id)}
-                          className="shrink-0 text-muted-foreground/40 hover:text-destructive transition-colors p-1"
-                          data-testid={`button-delete-task-${task.id}`}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </motion.div>
+              <div className="pt-4 border-t border-border/50">
+                <h3 className="text-sm font-semibold mb-4 text-muted-foreground">Completed ({completedTasks.length})</h3>
+                <div className="space-y-6">
+                  {groupTasksByDate(completedTasks).map(([date, dateTasks]) => (
+                    <div key={date} className="space-y-3">
+                      <h4 className="text-xs font-semibold text-muted-foreground/80 px-2 uppercase tracking-wider">{date}</h4>
+                      {dateTasks.map(renderTaskItem)}
+                    </div>
                   ))}
                 </div>
               </div>

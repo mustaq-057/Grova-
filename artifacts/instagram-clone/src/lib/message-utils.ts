@@ -141,6 +141,7 @@ export function buildOptimisticMessage(
 
   return {
     id,
+    clientUniqueId: id,
     senderId: partial.senderId,
     text: partial.text,
     type: (partial.type as ApiMessage["type"]) ?? "text",
@@ -274,9 +275,16 @@ export function buildSeenLabel(
   if (!isMe || !msg.seenByPartner || msg.deleted || msg.id !== lastSeenOutgoingId) return undefined;
   if (msg.readAt) {
     const readMs = Date.now() - new Date(msg.readAt).getTime();
-    if (readMs >= 0 && readMs < 180_000) return "Just seen";
-    const time = formatSeenTime(msg.readAt, partnerId);
-    return time ? `Seen · ${time}` : "Seen";
+    if (readMs >= 0 && readMs < 60_000) return "Just seen";
+    
+    const mins = Math.floor(readMs / 60_000);
+    if (mins >= 0 && mins < 60) return `Seen ${mins}m ago`;
+    
+    const hrs = Math.floor(readMs / 3_600_000);
+    if (hrs >= 0 && hrs < 24) return `Seen ${hrs}h ago`;
+    
+    const days = Math.floor(readMs / 86_400_000);
+    if (days >= 0) return `Seen ${days}d ago`;
   }
   return "Seen";
 }

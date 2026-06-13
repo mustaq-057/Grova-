@@ -1,453 +1,348 @@
 import { useRef, useState, useEffect, useCallback } from "react";
-import { X, Undo, Trash2, Send, ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { createPortal } from "react-dom";
+import { X, Undo2, Trash2, Send, ChevronLeft, Maximize } from "lucide-react";
+import { cn } from "@/lib/utils";
 
-export const DOODLE_HEIGHT_STEP = 320;
-export const DOODLE_MIN_HEIGHT = 280;
+export interface DoodleData {
+  imageData: string;
+  canvasX: number;
+  canvasY: number;
+  width: number;
+  height: number;
+}
 
 interface DoodleCanvasProps {
   onClose: () => void;
-  onSend: (imageData: string) => void;
-  canvasHeight: number;
-  onExpandCanvas: () => void;
+  onSend: (data: DoodleData) => void;
 }
 
 const COLORS = [
-  "#000000",
-  "#ffffff",
-  "#ef4444",
-  "#f97316",
-  "#eab308",
-  "#22c55e",
-  "#3b82f6",
-  "#8b5cf6",
-  "#ec4899",
-  "#78716c",
+  "#000000", // Black
+  "#FFFFFF", // White
+  "#FF0040", // Red
+  "#FF6B00", // Orange
+  "#FFD700", // Yellow
+  "#00E676", // Green
+  "#0080FF", // Blue
+  "#9D00FF", // Purple
+  "#FF00FF", // Magenta
+  "#8B7355", // Brown/Grey
 ];
 
-const BRUSH_PRESETS = [4, 8, 12, 18, 26];
+const SIZES = [2, 4, 8, 14, 22];
 
 type Point = { x: number; y: number };
 
-function applyBrush(ctx: CanvasRenderingContext2D, color: string, size: number) {
-  ctx.strokeStyle = color;
-  ctx.lineWidth = size;
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = "high";
-}
-
-function clearDrawingSurface(ctx: CanvasRenderingContext2D, pixelW: number, pixelH: number) {
-  ctx.save();
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.clearRect(0, 0, pixelW, pixelH);
-  ctx.restore();
-}
-
-export default function DoodleCanvas({ onClose, onSend, canvasHeight, onExpandCanvas }: DoodleCanvasProps) {
+export default function DoodleCanvas({ onClose, onSend }: DoodleCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const lastPointRef = useRef<Point | null>(null);
-  const colorRef = useRef("#000000");
-  const brushRef = useRef(8);
-  const historyRef = useRef<string[]>([]);
-  const historyIndexRef = useRef(0);
-  const expandCooldownRef = useRef(0);
-  const canvasHeightRef = useRef(canvasHeight);
-  canvasHeightRef.current = canvasHeight;
-
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [currentColor, setCurrentColor] = useState("#000000");
+  
+  const [color, setColor] = useState("#000000");
   const [brushSize, setBrushSize] = useState(8);
+  const [sliderValue, setSliderValue] = useState(50);
   const [canUndo, setCanUndo] = useState(false);
-  const [colorsOpen, setColorsOpen] = useState(true);
+  const [hasStrokes, setHasStrokes] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [moreSpace, setMoreSpace] = useState(false);
 
-  colorRef.current = currentColor;
-  brushRef.current = brushSize;
+  const isDrawingRef = useRef(false);
+  const lastPtRef = useRef<Point | null>(null);
+  const historyRef = useRef<string[]>([]);
 
-  const getCtx = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return null;
-    return canvas.getContext("2d", { alpha: true });
-  };
+  // Calculate actual brush size based on base size and slider (slider acts as multiplier 0.5x to 2x)
+  const actualBrushSize = brushSize * (sliderValue / 50);
 
-  const layoutCanvas = useCallback((preserveSnapshot?: string) => {
+  useEffect(() => {
     const canvas = canvasRef.current;
     const container = containerRef.current;
     if (!canvas || !container) return;
 
-    const ctx = canvas.getContext("2d", { alpha: true });
-    if (!ctx) return;
+    const resize = () => {
+      const rect = container.getBoundingClientRect();
+      const ctx = canvas.getContext("2d")!;
+      const snap = historyRef.current.length ? canvas.toDataURL("image/png") : null;
+      const dpr = window.devicePixelRatio || 1;
+      
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      canvas.style.width = `${rect.width}px`;
+      canvas.style.height = `${rect.height}px`;
+      
+      ctx.scale(dpr, dpr);
+      
+      // Fill white background
+      ctx.fillStyle = "#FFFFFF";
+      ctx.fillRect(0, 0, rect.width, rect.height);
+      
+      if (snap) {
+        const img = new Image();
+        img.onload = () => ctx.drawImage(img, 0, 0, rect.width, rect.height);
+        img.src = snap;
+      }
+    };
 
-    const dpr = Math.min(window.devicePixelRatio || 1, 3);
-    const cssW = Math.max(1, Math.floor(container.clientWidth));
-    const cssH = Math.max(DOODLE_MIN_HEIGHT, canvasHeightRef.current);
+    resize();
+    window.addEventListener("resize", resize);
+    return () => window.removeEventListener("resize", resize);
+  }, [moreSpace]); // Re-run when canvas size changes
 
-    container.style.minHeight = `${cssH}px`;
-    container.style.height = `${cssH}px`;
-
-    canvas.style.width = `${cssW}px`;
-    canvas.style.height = `${cssH}px`;
-    canvas.width = Math.floor(cssW * dpr);
-    canvas.height = Math.floor(cssH * dpr);
-
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    applyBrush(ctx, colorRef.current, brushRef.current);
-
-    if (preserveSnapshot) {
-      const img = new Image();
-      img.onload = () => {
-        clearDrawingSurface(ctx, canvas.width, canvas.height);
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        applyBrush(ctx, colorRef.current, brushRef.current);
-        const drawH = (img.height / img.width) * cssW;
-        ctx.drawImage(img, 0, 0, cssW, drawH);
-      };
-      img.src = preserveSnapshot;
-    } else {
-      clearDrawingSurface(ctx, canvas.width, canvas.height);
-    }
-  }, []);
-
-  const pushHistory = useCallback(() => {
+  const saveHistory = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const snap = canvas.toDataURL("image/png");
-    const next = historyRef.current.slice(0, historyIndexRef.current + 1);
-    next.push(snap);
-    historyRef.current = next;
-    historyIndexRef.current = next.length - 1;
-    setCanUndo(historyIndexRef.current > 0);
+    historyRef.current.push(canvas.toDataURL("image/png"));
+    setCanUndo(true);
   }, []);
 
-  useEffect(() => {
-    const snap = canvasRef.current?.toDataURL("image/png");
-    layoutCanvas(snap);
-  }, [canvasHeight, layoutCanvas]);
-
-  useEffect(() => {
-    layoutCanvas();
-    pushHistory();
-
-    const container = containerRef.current;
-    if (!container) return;
-
-    const ro = new ResizeObserver(() => {
-      const snap = canvasRef.current?.toDataURL("image/png");
-      layoutCanvas(snap);
-    });
-    ro.observe(container);
-
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-
-    return () => {
-      ro.disconnect();
-      window.removeEventListener("keydown", onKey);
-    };
-    // Mount once — do not depend on layoutCanvas or height changes wipe the drawing
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onClose]);
-
-  const restoreSnapshot = (index: number) => {
+  const restoreCanvas = useCallback((snap: string | undefined) => {
     const canvas = canvasRef.current;
-    const ctx = getCtx();
-    const snap = historyRef.current[index];
-    if (!canvas || !ctx || !snap) return;
-
-    const img = new Image();
-    img.onload = () => {
-      const dpr = Math.min(window.devicePixelRatio || 1, 3);
-      const cssW = canvas.width / dpr;
-      const cssH = canvas.height / dpr;
-      clearDrawingSurface(ctx, canvas.width, canvas.height);
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      applyBrush(ctx, colorRef.current, brushRef.current);
-      ctx.drawImage(img, 0, 0, cssW, cssH);
-    };
-    img.src = snap;
-  };
-
-  const undo = () => {
-    if (historyIndexRef.current <= 0) return;
-    historyIndexRef.current -= 1;
-    restoreSnapshot(historyIndexRef.current);
-    setCanUndo(historyIndexRef.current > 0);
-  };
-
-  const clearCanvas = () => {
-    layoutCanvas();
-    pushHistory();
-  };
-
-  const handleExpandCanvas = useCallback(() => {
-    const snap = canvasRef.current?.toDataURL("image/png");
-    onExpandCanvas();
+    const ctx = canvas?.getContext("2d");
+    if (!canvas || !ctx) return;
+    const dpr = window.devicePixelRatio || 1;
+    
+    // Fill white
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fillRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+    
     if (snap) {
-      requestAnimationFrame(() => layoutCanvas(snap));
+      const img = new Image();
+      img.onload = () => ctx.drawImage(img, 0, 0, canvas.width / dpr, canvas.height / dpr);
+      img.src = snap;
     }
-  }, [layoutCanvas, onExpandCanvas]);
+  }, []);
 
-  const maybeExpandWhileDrawing = (y: number) => {
-    const container = containerRef.current;
-    if (!container) return;
-    const h = container.getBoundingClientRect().height;
-    if (y < h - 72) return;
-    const now = Date.now();
-    if (now - expandCooldownRef.current < 400) return;
-    expandCooldownRef.current = now;
-    handleExpandCanvas();
-    requestAnimationFrame(() => {
-      scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-    });
-  };
+  const undo = useCallback(() => {
+    if (!historyRef.current.length) return;
+    historyRef.current.pop();
+    const prev = historyRef.current[historyRef.current.length - 1];
+    restoreCanvas(prev);
+    setCanUndo(historyRef.current.length > 0);
+    if (!historyRef.current.length) setHasStrokes(false);
+  }, [restoreCanvas]);
 
-  const getPoint = (e: React.PointerEvent<HTMLCanvasElement>): Point => {
+  const clear = useCallback(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return { x: 0, y: 0 };
-    const rect = canvas.getBoundingClientRect();
-    return {
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
+    const ctx = canvas?.getContext("2d");
+    if (!canvas || !ctx) return;
+    const dpr = window.devicePixelRatio || 1;
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fillRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+    historyRef.current = [];
+    setCanUndo(false);
+    setHasStrokes(false);
+  }, []);
+
+  const applyBrush = useCallback((ctx: CanvasRenderingContext2D) => {
+    ctx.globalCompositeOperation = "source-over";
+    ctx.strokeStyle = color;
+    ctx.lineWidth = actualBrushSize;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+  }, [color, actualBrushSize]);
+
+  const getPoint = (e: React.PointerEvent): Point => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return { x: 0, y: 0 };
+    return { 
+      x: e.clientX - rect.left, 
+      y: e.clientY - rect.top 
     };
   };
 
-  const startDrawing = (e: React.PointerEvent<HTMLCanvasElement>) => {
+  const onPointerDown = useCallback((e: React.PointerEvent) => {
     e.preventDefault();
     canvasRef.current?.setPointerCapture(e.pointerId);
-    setIsDrawing(true);
-    const { x, y } = getPoint(e);
-    const ctx = getCtx();
+    isDrawingRef.current = true;
+    const pt = getPoint(e);
+    lastPtRef.current = pt;
+    
+    const ctx = canvasRef.current?.getContext("2d");
     if (!ctx) return;
-    applyBrush(ctx, colorRef.current, brushRef.current);
+    applyBrush(ctx);
     ctx.beginPath();
-    ctx.moveTo(x, y);
-    lastPointRef.current = { x, y };
-  };
+    ctx.arc(pt.x, pt.y, actualBrushSize / 2, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+  }, [actualBrushSize, applyBrush, color]);
 
-  const draw = (e: React.PointerEvent<HTMLCanvasElement>) => {
+  const onPointerMove = useCallback((e: React.PointerEvent) => {
+    if (!isDrawingRef.current || !lastPtRef.current) return;
     e.preventDefault();
-    if (!isDrawing) return;
-
-    const { x, y } = getPoint(e);
-    maybeExpandWhileDrawing(y);
-
-    const ctx = getCtx();
-    const last = lastPointRef.current;
-    if (!ctx || !last) return;
-
-    applyBrush(ctx, colorRef.current, brushRef.current);
-
-    const midX = (last.x + x) / 2;
-    const midY = (last.y + y) / 2;
-    ctx.quadraticCurveTo(last.x, last.y, midX, midY);
+    const pt = getPoint(e);
+    const ctx = canvasRef.current?.getContext("2d");
+    if (!ctx) return;
+    applyBrush(ctx);
+    ctx.beginPath();
+    ctx.moveTo(lastPtRef.current.x, lastPtRef.current.y);
+    ctx.lineTo(pt.x, pt.y);
     ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(midX, midY);
+    lastPtRef.current = pt;
+  }, [applyBrush]);
 
-    lastPointRef.current = { x, y };
-  };
+  const onPointerUp = useCallback(() => {
+    if (!isDrawingRef.current) return;
+    isDrawingRef.current = false;
+    lastPtRef.current = null;
+    saveHistory();
+    setHasStrokes(true);
+  }, [saveHistory]);
 
-  const stopDrawing = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!isDrawing) return;
-    e.preventDefault();
-    try {
-      canvasRef.current?.releasePointerCapture(e.pointerId);
-    } catch {
-      /* ignore */
-    }
-    setIsDrawing(false);
-    lastPointRef.current = null;
-    getCtx()?.closePath();
-    pushHistory();
-  };
-
-  const handleSend = () => {
+  const handleSend = useCallback(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas || !hasStrokes || sending) return;
+    setSending(true);
 
-    // Get the actual CSS dimensions and DPR
-    const dpr = Math.min(window.devicePixelRatio || 1, 3);
-    const cssW = canvas.width / dpr;
-    const cssH = canvas.height / dpr;
-
+    // Downscale from DPR-scaled canvas to CSS pixel size for a reasonable file size.
+    // On a 3x phone a 400px canvas is 1200px internally → huge PNG. Export at 1x CSS size.
+    const cssW = canvas.clientWidth;
+    const cssH = canvas.clientHeight;
     const exportCanvas = document.createElement("canvas");
     exportCanvas.width = cssW;
     exportCanvas.height = cssH;
-    const octx = exportCanvas.getContext("2d");
-    if (!octx) return;
+    const ectx = exportCanvas.getContext("2d")!;
+    ectx.drawImage(canvas, 0, 0, cssW, cssH);
 
-    // Fill white background
-    octx.fillStyle = "#ffffff";
-    octx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
-    
-    // Draw the original canvas at its actual size without DPR scaling
-    octx.drawImage(canvas, 0, 0, cssW, cssH);
+    onSend({ 
+      imageData: exportCanvas.toDataURL("image/png"), 
+      canvasX: 0, 
+      canvasY: 0, 
+      width: cssW, 
+      height: cssH 
+    });
+  }, [hasStrokes, sending, onSend]);
 
-    onSend(exportCanvas.toDataURL("image/jpeg", 0.82));
-    onClose();
-  };
-
-  return (
-    <div
-      className="border-t border-border/80 bg-background shrink-0 flex flex-col"
-      role="region"
-      aria-label="Doodle drawing area in chat"
-      data-testid="doodle-panel"
-    >
-      <div className="flex items-center justify-between gap-2 px-2 py-1.5 bg-secondary/40 border-b border-border/50">
-        <p className="text-xs font-semibold text-foreground truncate">Draw in chat</p>
-        <div className="flex items-center gap-1 shrink-0">
-          <button
-            type="button"
-            onClick={handleExpandCanvas}
-            className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium bg-primary/15 text-primary hover:bg-primary/25"
-            title="Add more drawing space"
+  return createPortal(
+    <div className="fixed inset-0 z-[600] flex flex-col bg-[#0b101e] text-white overflow-hidden">
+      
+      {/* Top Header */}
+      <div className="flex items-center justify-between px-4 py-3 shrink-0 border-b border-white/5" style={{ paddingTop: "max(12px, env(safe-area-inset-top))" }}>
+        <div className="flex items-center gap-3">
+          <button onClick={onClose} className="p-1 hover:bg-white/10 rounded-full transition-colors">
+            <ChevronLeft className="w-6 h-6" />
+          </button>
+          <span className="font-semibold text-[15px]">Draw in chat</span>
+        </div>
+        
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={() => setMoreSpace(!moreSpace)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0080FF]/15 text-[#0080FF] rounded-lg text-sm font-medium hover:bg-[#0080FF]/25 transition-colors"
           >
-            <Plus className="w-3.5 h-3.5" />
+            <Maximize className="w-4 h-4" />
             More space
           </button>
-          <button
-            type="button"
-            onClick={undo}
-            disabled={!canUndo}
-            className="p-1.5 rounded-lg bg-secondary disabled:opacity-40"
-            aria-label="Undo"
-          >
-            <Undo className="w-4 h-4" />
+          
+          <button onClick={undo} disabled={!canUndo} className="p-2 hover:bg-white/10 rounded-full transition-colors disabled:opacity-30">
+            <Undo2 className="w-5 h-5" />
           </button>
-          <button
-            type="button"
-            onClick={clearCanvas}
-            className="p-1.5 rounded-lg bg-destructive/15 text-destructive"
-            aria-label="Clear"
-          >
-            <Trash2 className="w-4 h-4" />
+          
+          <button onClick={clear} className="p-2 hover:bg-[#FF0040]/20 text-[#FF0040] rounded-full transition-colors">
+            <Trash2 className="w-5 h-5" />
           </button>
-          <button
-            type="button"
-            onClick={handleSend}
-            className="p-1.5 rounded-lg bg-primary text-primary-foreground"
-            aria-label="Send doodle"
-            data-testid="button-send-doodle"
+          
+          <button 
+            onClick={handleSend} 
+            disabled={!hasStrokes || sending}
+            className="w-9 h-9 flex items-center justify-center bg-[#0080FF] rounded-full text-white hover:bg-[#0066CC] transition-colors disabled:opacity-50 disabled:bg-[#0080FF]/50"
           >
-            <Send className="w-4 h-4" />
+            {sending ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Send className="w-4 h-4 ml-0.5" />}
           </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1.5 rounded-lg bg-secondary"
-            aria-label="Close doodle"
-          >
-            <X className="w-4 h-4" />
+          
+          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors ml-1">
+            <X className="w-5 h-5" />
           </button>
         </div>
       </div>
 
-      <div className="flex min-h-0" style={{ height: Math.min(canvasHeight, typeof window !== "undefined" ? window.innerHeight * 0.55 : 480) }}>
-        {/* Left — color drawer */}
-        <aside
-          className={`shrink-0 flex flex-col border-r border-border/60 bg-card/95 transition-[width] duration-200 overflow-hidden ${
-            colorsOpen ? "w-[3.25rem] sm:w-14" : "w-9"
-          }`}
-        >
-          <button
-            type="button"
-            onClick={() => setColorsOpen((o) => !o)}
-            className="p-2 border-b border-border/50 text-muted-foreground hover:text-foreground"
-            aria-label={colorsOpen ? "Collapse colors" : "Expand colors"}
-          >
-            {colorsOpen ? <ChevronLeft className="w-4 h-4 mx-auto" /> : <ChevronRight className="w-4 h-4 mx-auto" />}
-          </button>
-          {colorsOpen && (
-            <div className="flex-1 overflow-y-auto py-2 px-1.5 flex flex-col items-center gap-1.5 scrollbar-hide">
-              {COLORS.map((color) => (
-                <button
-                  key={color}
-                  type="button"
-                  onClick={() => setCurrentColor(color)}
-                  className={`w-8 h-8 rounded-full border-2 shrink-0 transition-transform ${
-                    currentColor === color
-                      ? "border-primary scale-110 ring-2 ring-primary/30"
-                      : color === "#ffffff"
-                        ? "border-border"
-                        : "border-transparent"
-                  }`}
-                  style={{ backgroundColor: color }}
-                  aria-label={`Color ${color}`}
-                />
-              ))}
-            </div>
-          )}
-          {!colorsOpen && (
+      {/* Main Content Area */}
+      <div className="flex flex-1 min-h-0 relative">
+        
+        {/* Left Sidebar (Colors) */}
+        <div className="w-[60px] shrink-0 flex flex-col items-center py-4 overflow-y-auto scrollbar-hide gap-4 border-r border-white/5">
+          {COLORS.map(c => (
             <button
-              type="button"
-              onClick={() => setColorsOpen(true)}
-              className="mx-auto mt-2 w-7 h-7 rounded-full border-2 border-primary"
-              style={{ backgroundColor: currentColor }}
-              aria-label="Open color drawer"
-            />
-          )}
-        </aside>
-
-        {/* Center — scrollable white drawing sheet */}
-        <div
-          ref={scrollRef}
-          className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden bg-white scrollbar-hide"
-        >
-          <div ref={containerRef} className="relative w-full">
-            <canvas
-              ref={canvasRef}
-              onPointerDown={startDrawing}
-              onPointerMove={draw}
-              onPointerUp={stopDrawing}
-              onPointerLeave={stopDrawing}
-              onPointerCancel={stopDrawing}
-              className="block w-full cursor-crosshair touch-none"
-              style={{ touchAction: "none" }}
-              data-testid="doodle-canvas"
-            />
-          </div>
-        </div>
-
-        {/* Right — brush size */}
-        <aside className="w-[3.25rem] sm:w-14 shrink-0 flex flex-col items-center gap-2 py-2 px-1 border-l border-border/60 bg-card/95">
-          <span className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wide">Size</span>
-          {BRUSH_PRESETS.map((size) => (
-            <button
-              key={size}
-              type="button"
-              onClick={() => setBrushSize(size)}
-              className={`rounded-full border-2 flex items-center justify-center transition-all ${
-                brushSize === size ? "border-primary bg-primary/10" : "border-border bg-background"
-              }`}
-              style={{ width: Math.min(28, 10 + size), height: Math.min(28, 10 + size) }}
-              aria-label={`Brush size ${size}`}
-              title={`Size ${size}`}
+              key={c}
+              onClick={() => setColor(c)}
+              className="relative rounded-full w-8 h-8 shrink-0 transition-transform hover:scale-110"
+              style={{ backgroundColor: c, border: c === "#000000" ? "1px solid rgba(255,255,255,0.2)" : "none" }}
             >
-              <span
-                className="rounded-full bg-foreground"
-                style={{ width: Math.max(4, size / 2.5), height: Math.max(4, size / 2.5) }}
-              />
+              {color === c && (
+                <div className="absolute -inset-[4px] rounded-full border-2 border-[#0080FF]" />
+              )}
             </button>
           ))}
-          <div className="flex-1 flex flex-col items-center justify-center w-full px-0.5 min-h-[4rem]">
-            <span className="text-[10px] font-bold text-foreground mb-1">{brushSize}</span>
-            <input
-              type="range"
-              min={2}
-              max={36}
-              value={brushSize}
-              onChange={(e) => setBrushSize(Number(e.target.value))}
-              className="w-16 h-1 accent-primary -rotate-90 origin-center"
-              aria-label="Brush size slider"
+        </div>
+
+        {/* Canvas Area */}
+        <div className="flex-1 flex flex-col bg-[#161c2d] p-0 md:p-2">
+          <div 
+            ref={containerRef} 
+            className={cn(
+              "flex-1 bg-white shadow-lg overflow-hidden relative transition-all duration-300",
+              moreSpace ? "m-0 rounded-none" : "m-2 md:m-4 rounded-xl md:rounded-2xl"
+            )}
+          >
+            <canvas
+              ref={canvasRef}
+              onPointerDown={onPointerDown}
+              onPointerMove={onPointerMove}
+              onPointerUp={onPointerUp}
+              onPointerCancel={onPointerUp}
+              className="absolute inset-0 touch-none w-full h-full cursor-crosshair"
             />
           </div>
-        </aside>
+        </div>
+
+        {/* Right Sidebar (Sizes & Opacity/Size Multiplier Slider) */}
+        <div className="w-[60px] shrink-0 flex flex-col items-center py-4 border-l border-white/5 bg-[#0b101e] z-10">
+          <div className="text-[10px] text-white/50 font-bold mb-4">SIZE</div>
+          <div className="flex flex-col items-center justify-between h-[200px] mb-8">
+            {SIZES.map(s => (
+              <button
+                key={s}
+                onClick={() => setBrushSize(s)}
+                className="relative flex items-center justify-center w-8 h-8 rounded-full hover:bg-white/5"
+              >
+                <div 
+                  className="rounded-full bg-white transition-all" 
+                  style={{ width: s, height: s }}
+                />
+                {brushSize === s && (
+                  <div className="absolute inset-0 rounded-full border-2 border-[#0080FF]" />
+                )}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex-1 flex flex-col items-center w-full min-h-[100px] px-2 relative group">
+            {/* Slider track */}
+            <div className="absolute inset-y-0 w-1 bg-white/10 rounded-full overflow-hidden flex flex-col justify-end">
+              <div 
+                className="w-full bg-[#0080FF] transition-all duration-75" 
+                style={{ height: `${sliderValue}%` }} 
+              />
+            </div>
+            {/* Slider input */}
+            <input 
+              type="range" 
+              min="10" 
+              max="100" 
+              value={sliderValue}
+              onChange={(e) => setSliderValue(Number(e.target.value))}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-ns-resize"
+              style={{ writingMode: 'vertical-rl', direction: 'rtl' }}
+            />
+            {/* Slider thumb representation */}
+            <div 
+              className="absolute w-4 h-4 bg-[#0080FF] rounded-full shadow-lg pointer-events-none transition-all duration-75"
+              style={{ bottom: `calc(${sliderValue}% - 8px)` }}
+            >
+              <div className="absolute inset-x-0 h-[2px] top-1/2 -translate-y-1/2 -mx-1 bg-[#0080FF]" />
+            </div>
+          </div>
+        </div>
+
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

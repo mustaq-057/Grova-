@@ -169,7 +169,7 @@ export default memo(function Create() {
       </div>
 
       <p className="text-xs text-muted-foreground mb-4">
-        Photos only · {photosUsed}/{MAX_PHOTOS}
+        Photos only · {queue.length > 0 ? `${queue.length}/${MAX_PHOTOS_PER_POST} selected` : `Up to ${MAX_PHOTOS_PER_POST} per post`}
         {queue.length > 0 ? " · tap a photo to crop" : ""}
       </p>
 

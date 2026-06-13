@@ -9,18 +9,6 @@ let couplePrefs: CouplePrefs | null = null;
 let notifications: AppNotification[] = [];
 let unreadChatBadge = 0;
 let chatBlocked = false;
-const CUTE_MODE_KEY = "grova_cute_mode_v2";
-
-function readCuteModeFromSession(): string | null {
-  try {
-    const v = sessionStorage.getItem(CUTE_MODE_KEY);
-    return v === "frog" || v === "cat" || v === "panda" ? v : null;
-  } catch {
-    return null;
-  }
-}
-
-let cuteMode: string | null = readCuteModeFromSession();
 
 export function getCouplePrefsCache(): CouplePrefs | null {
   return couplePrefs;
@@ -54,31 +42,12 @@ export function setChatBlocked(blocked: boolean): void {
   chatBlocked = blocked;
 }
 
-export function getCuteMode(): string | null {
-  return cuteMode;
-}
-
-export function setCuteMode(mode: string | null): void {
-  cuteMode = mode;
-  try {
-    if (mode) sessionStorage.setItem(CUTE_MODE_KEY, mode);
-    else sessionStorage.removeItem(CUTE_MODE_KEY);
-  } catch {
-    /* private mode */
-  }
-}
 
 export function clearClientMemory(): void {
   couplePrefs = null;
   notifications = [];
   unreadChatBadge = 0;
   chatBlocked = false;
-  cuteMode = null;
-  try {
-    sessionStorage.removeItem(CUTE_MODE_KEY);
-  } catch {
-    /* ignore */
-  }
 }
 
 const LEGACY_PURGED_KEY = "grova_legacy_storage_purged_v1";

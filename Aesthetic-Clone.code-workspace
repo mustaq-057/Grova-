@@ -8,5 +8,7 @@
 			"path": "../../../../github grova/Grova-"
 		}
 	],
-	"settings": {}
+	"settings": {
+		"css.lint.unknownAtRules": "ignore"
+	}
 }

@@ -123,14 +123,7 @@ export const InfoPanel = memo(function InfoPanel({
                 <Trash2 className="w-5 h-5" />
                 <span className="font-medium">Clear Chat (for you)</span>
               </button>
-              <button
-                onClick={onExportChat}
-                className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-secondary transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-1 active:scale-95"
-                aria-label="Export chat history"
-              >
-                <Download className="w-5 h-5" />
-                <span className="font-medium">Export Chat</span>
-              </button>
+
             </div>
           </div>
 

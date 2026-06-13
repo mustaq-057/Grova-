@@ -51,7 +51,7 @@ export function bootstrapAppearance(): void {
     applyCouplePrefs(prefs);
     return;
   }
-  applyAppTheme("grova");
+  applyAppTheme("sara-lavender");
 }
 
 /** Restore toggles from disk before Neon responds (survives refresh). */
@@ -77,7 +77,7 @@ export function areNotificationsEnabled(): boolean {
 function couplePrefsEqual(a: CouplePrefs, b: CouplePrefs): boolean {
   return (
     (a.chatTheme || "default") === (b.chatTheme || "default") &&
-    (a.appTheme || "grova") === (b.appTheme || "grova") &&
+    (a.appTheme || "sara-lavender") === (b.appTheme || "sara-lavender") &&
     a.readReceipts === b.readReceipts &&
     a.showPresence === b.showPresence &&
     (a.notifications ?? true) === (b.notifications ?? true)

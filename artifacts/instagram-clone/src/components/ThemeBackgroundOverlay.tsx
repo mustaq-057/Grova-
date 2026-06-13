@@ -44,7 +44,7 @@ export const ThemeBackgroundOverlay = memo(function ThemeBackgroundOverlay({ the
         backgroundSize: "cover",
         backgroundPosition: "center",
         opacity,
-        filter: themeId === "book-bouquet" ? "brightness(0.92) saturate(0.95)" : "brightness(0.9) saturate(1.05)",
+        filter: "brightness(0.9) saturate(1.05)",
       }}
     >
       <img src={url} alt="" className="hidden" onError={() => setHidden(true)} />

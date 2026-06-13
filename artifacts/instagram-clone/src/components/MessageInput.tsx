@@ -1,24 +1,29 @@
 import { memo, useRef, useState, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
 import { createPortal } from "react-dom";
-import { Smile, Mic, Send, Sticker, Paperclip, X, MessageCircle, MapPin, PenTool, Zap } from "lucide-react";
-import { motion } from "framer-motion";
+import { Smile, Mic, Send, Sticker, Paperclip, X, MessageCircle, MapPin, PenTool, Zap, Plus, Image as ImageIcon, Camera, PlusCircle, Sparkles, FileText, Palette, File as FileIcon } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import EmojiPicker from "@/components/EmojiPicker";
 import StickerPicker from "@/components/StickerPicker";
 import GreetingPicker from "@/components/GreetingPicker";
 import { extractClipboardFiles, readClipboardFilesAsync } from "@/lib/media-file";
+import { useChatTheme } from "@/hooks/useChatTheme";
+
+const CustomLocationIcon = () => <MapPin className="w-[26px] h-[26px] text-white" strokeWidth={1.6} />;
+const CustomQuickChatIcon = () => <Zap className="w-[26px] h-[26px] text-white" strokeWidth={1.6} />;
+const CustomDoodleIcon = () => <PenTool className="w-[26px] h-[26px] text-white" strokeWidth={1.6} />;
+const CustomPaletteIcon = () => <Palette className="w-[26px] h-[26px] text-white" strokeWidth={1.6} />;
 
 interface MessageInputProps {
   /** Called with trimmed text when user sends (input state stays inside this component for perf). */
   onSendMessage: (text: string) => void;
   onInputActivity?: (value: string) => void;
-  cuteMode?: string | null;
-  onToggleCuteMode?: (mode: string | null) => void;
   onShareLocation?: () => void;
   sharingLocation?: boolean;
   onStickerSelect: (sticker: string) => void;
   onGifSelect: (gif: string) => void;
   onGreetingSelect: (greeting: unknown) => void;
-  onImageSelect: (file: File, clipboardItemType?: string) => void;
+  onImageSelect: (file: File | File[], clipboardItemType?: string) => void;
+  onOpenCamera?: () => void;
   mediaViewMode?: "keep" | "once" | "twice";
   onMediaViewModeChange?: (mode: "keep" | "once" | "twice") => void;
   onDoodleOpen?: () => void;
@@ -37,14 +42,13 @@ type OpenPicker = "emoji" | "sticker" | "greeting" | null;
 export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>(function MessageInput({
   onSendMessage,
   onInputActivity,
-  cuteMode = null,
-  onToggleCuteMode,
   onShareLocation,
   sharingLocation = false,
   onStickerSelect,
   onGifSelect,
   onGreetingSelect,
   onImageSelect,
+  onOpenCamera,
   mediaViewMode = "keep",
   onMediaViewModeChange,
   onDoodleOpen,
@@ -59,9 +63,12 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
 }, ref) {
   const [input, setInput] = useState("");
   const [openPicker, setOpenPicker] = useState<OpenPicker>(null);
-  const [showCuteMenu, setShowCuteMenu] = useState(false);
+  const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const genericFileInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const lastSentTimeRef = useRef<number>(0);
+  const { theme } = useChatTheme();
 
   useImperativeHandle(ref, () => inputRef.current as HTMLInputElement);
 
@@ -75,12 +82,19 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
   const submitMessage = useCallback(() => {
     const text = input.trim();
     if (!text || disabled || recording) return;
+
+    // Prevent double-submit within 300ms
+    const now = Date.now();
+    if (now - lastSentTimeRef.current < 300) return;
+    lastSentTimeRef.current = now;
+
     setInput("");
     onSendMessage(text);
   }, [input, disabled, recording, onSendMessage]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
+      if (e.repeat) return; // Guard against Enter keydown repeat
       e.preventDefault();
       submitMessage();
     }
@@ -126,60 +140,56 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
   }, [setInput, onInputActivity]);
 
   const handleImageClick = useCallback(() => {
+    setShowAttachmentMenu(false);
     fileInputRef.current?.click();
   }, []);
 
+  const handleGenericFileClick = useCallback(() => {
+    setShowAttachmentMenu(false);
+    genericFileInputRef.current?.click();
+  }, []);
+
   const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const isVideo = file.type.startsWith("video/") || /\.(mp4|webm|mov|m4v|mkv|3gp)$/i.test(file.name);
-    const maxBytes = isVideo ? 60 * 1024 * 1024 : 25 * 1024 * 1024;
-    if (file.size > maxBytes) {
-      alert(isVideo ? "Video too large (max 60MB)." : "File too large (max 25MB).");
-      e.target.value = "";
-      return;
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    for (const file of files) {
+      const isVideo = file.type.startsWith("video/") || /\.(mp4|webm|mov|m4v|mkv|3gp)$/i.test(file.name);
+      const maxBytes = isVideo ? 60 * 1024 * 1024 : 25 * 1024 * 1024;
+      if (file.size > maxBytes) {
+        alert(isVideo ? "Video too large (max 60MB)." : "File too large (max 25MB).");
+        e.target.value = "";
+        return;
+      }
     }
-    onImageSelect(file, file.type || undefined);
+    onImageSelect(files, files.length === 1 ? files[0].type || undefined : undefined);
     e.target.value = "";
   }, [onImageSelect]);
 
   const openDoodle = useCallback(() => {
     setOpenPicker(null);
-    setShowCuteMenu(false);
+    setShowAttachmentMenu(false);
     onDoodleOpen?.();
   }, [onDoodleOpen]);
 
-  const toggleCuteMenu = useCallback(() => {
-    setShowCuteMenu((s) => !s);
-  }, []);
-
-  const toggleCuteFrog = useCallback(() => {
-    onToggleCuteMode?.(cuteMode === "frog" ? null : "frog");
-    setShowCuteMenu(false);
-  }, [onToggleCuteMode, cuteMode]);
-
-  const toggleCatMode = useCallback(() => {
-    onToggleCuteMode?.(cuteMode === "cat" ? null : "cat");
-    setShowCuteMenu(false);
-  }, [onToggleCuteMode, cuteMode]);
-
-  const togglePandaMode = useCallback(() => {
-    onToggleCuteMode?.(cuteMode === "panda" ? null : "panda");
-    setShowCuteMenu(false);
-  }, [onToggleCuteMode, cuteMode]);
-
   const toggleEmojiPicker = useCallback(() => {
     setOpenPicker((p) => (p === "emoji" ? null : "emoji"));
+    setShowAttachmentMenu(false);
   }, []);
 
   const toggleStickerPicker = useCallback(() => {
     setOpenPicker((p) => (p === "sticker" ? null : "sticker"));
+    setShowAttachmentMenu(false);
   }, []);
 
   const toggleQuickReplies = useCallback(() => {
-    setShowCuteMenu(false);
+    setShowAttachmentMenu(false);
     setOpenPicker((p) => (p === "greeting" ? null : "greeting"));
   }, []);
+
+  const handleShareLocation = useCallback(() => {
+    setShowAttachmentMenu(false);
+    onShareLocation?.();
+  }, [onShareLocation]);
 
   const handleEmojiSelect = useCallback((emoji: string) => {
     setInput((i) => i + emoji);
@@ -263,7 +273,7 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
       onPaste={handlePaste}
       onClick={() => inputRef.current?.focus()}
       placeholder="Message..."
-      className={`w-full min-w-0 px-4 py-2.5 bg-secondary/50 border border-border/50 rounded-full text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/50 transition-all ${
+      className={`flex-1 w-0 min-w-0 bg-transparent text-[17px] placeholder-[#888] text-white focus:outline-none border-none font-[inherit] ${
         disabled || recording ? "opacity-60 cursor-not-allowed" : ""
       }`}
       disabled={disabled || recording}
@@ -271,170 +281,171 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
     />
   );
 
-  const attachmentToolbar = (
-    <>
-      {onMediaViewModeChange && (
-        <button
-          type="button"
-          onClick={() => onMediaViewModeChange(mediaViewMode === "keep" ? "once" : mediaViewMode === "once" ? "twice" : "keep")}
-          className={disabled ? iconBtnDisabled : iconBtnIdle}
-          aria-label="Media view mode"
-          title={`Media mode: ${mediaViewMode === "keep" ? "Keep in chat" : mediaViewMode === "once" ? "View once" : "View twice"}`}
-          disabled={disabled}
-        >
-          <span className="text-[11px] font-bold">{mediaViewMode === "keep" ? "K" : mediaViewMode === "once" ? "1" : "2"}</span>
-        </button>
-      )}
+  const attachmentMenu = (
+    showAttachmentMenu &&
+      createPortal(
+        <>
+          <div
+            className="fixed inset-0 z-[200] bg-transparent"
+            onClick={() => setShowAttachmentMenu(false)}
+            aria-hidden
+          />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 10, transformOrigin: "bottom right" }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 10 }}
+            className="fixed z-[201] right-3 sm:right-4 bottom-[calc(8rem+env(safe-area-inset-bottom,0px))] md:bottom-[5.5rem] bg-[#1c1c1c] rounded-[22px] py-[10px] shadow-[0_8px_40px_rgba(0,0,0,0.7)] flex flex-col min-w-[210px] sm:min-w-[230px]"
+            role="menu"
+          >
+            {onShareLocation && (
+              <button
+                type="button"
+                onClick={handleShareLocation}
+                className="flex items-center gap-[20px] px-[24px] py-[15px] text-[17px] font-normal hover:bg-white/5 transition-colors w-full text-left text-white"
+                disabled={disabled || sharingLocation}
+              >
+                <div className="w-[28px] h-[28px] flex items-center justify-center shrink-0">
+                  {sharingLocation ? (
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <CustomLocationIcon />
+                  )}
+                </div>
+                <span>Location</span>
+              </button>
+            )}
 
-      <button
-        type="button"
-        onClick={handleImageClick}
-        className={disabled ? iconBtnDisabled : iconBtnIdle}
-        aria-label="Attach file"
-        disabled={disabled}
-      >
-        <Paperclip className="w-5 h-5" />
-      </button>
+            <button
+              type="button"
+              onClick={toggleQuickReplies}
+              className="flex items-center gap-[20px] px-[24px] py-[15px] text-[17px] font-normal hover:bg-white/5 transition-colors w-full text-left text-white"
+              disabled={disabled}
+            >
+              <div className="w-[28px] h-[28px] flex items-center justify-center shrink-0">
+                <CustomQuickChatIcon />
+              </div>
+              <span>Quick Chat</span>
+            </button>
 
-      {onShareLocation && (
-        <button
-          type="button"
-          onClick={onShareLocation}
-          className={disabled || sharingLocation ? iconBtnDisabled : iconBtnIdle}
-          aria-label="Share location"
-          disabled={disabled || sharingLocation}
-        >
-          {sharingLocation ? (
-            <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-          ) : (
-            <MapPin className="w-5 h-5" />
-          )}
-        </button>
-      )}
+            <button
+              type="button"
+              onClick={openDoodle}
+              className="flex items-center gap-[20px] px-[24px] py-[15px] text-[17px] font-normal hover:bg-white/5 transition-colors w-full text-left text-white"
+              disabled={disabled}
+            >
+              <div className="w-[28px] h-[28px] flex items-center justify-center shrink-0">
+                <CustomDoodleIcon />
+              </div>
+              <span>Doodle</span>
+            </button>
 
-      {onToggleCuteMode && (
-        <button
-          type="button"
-          onClick={toggleCuteMenu}
-          className={
-            showCuteMenu || cuteMode
-              ? `${iconBtn} bg-secondary text-foreground`
-              : disabled
-                ? iconBtnDisabled
-                : iconBtnIdle
-          }
-          title="Chat styles"
-          aria-expanded={showCuteMenu}
-          disabled={disabled}
-        >
-          <MessageCircle className="w-5 h-5" />
-        </button>
-      )}
+            <button
+              type="button"
+              onClick={handleGenericFileClick}
+              className="flex items-center gap-[20px] px-[24px] py-[15px] text-[17px] font-normal hover:bg-white/5 transition-colors w-full text-left text-white"
+              disabled={disabled}
+            >
+              <div className="w-[28px] h-[28px] flex items-center justify-center shrink-0">
+                <FileIcon className="w-[24px] h-[24px] text-white opacity-80" strokeWidth={1.5} />
+              </div>
+              <span>File</span>
+            </button>
 
-      <button
-        type="button"
-        onClick={toggleQuickReplies}
-        className={
-          openPicker === "greeting"
-            ? `${iconBtn} text-primary bg-primary/10`
-            : disabled
-              ? iconBtnDisabled
-              : iconBtnIdle
-        }
-        title="Quick replies"
-        aria-expanded={openPicker === "greeting"}
-        aria-label="Quick replies"
-        disabled={disabled}
-      >
-        <Zap className="w-5 h-5" />
-      </button>
 
-      <button
-        type="button"
-        onClick={toggleEmojiPicker}
-        className={
-          openPicker === "emoji"
-            ? `${iconBtn} text-primary bg-primary/10`
-            : disabled
-              ? iconBtnDisabled
-              : iconBtnIdle
-        }
-        title="Emoji"
-        aria-expanded={openPicker === "emoji"}
-        disabled={disabled}
-      >
-        <Smile className="w-5 h-5" />
-      </button>
 
-      <button
-        type="button"
-        onClick={toggleStickerPicker}
-        className={
-          openPicker === "sticker"
-            ? `${iconBtn} text-primary bg-primary/10`
-            : disabled
-              ? iconBtnDisabled
-              : iconBtnIdle
-        }
-        title="Stickers & GIFs"
-        aria-expanded={openPicker === "sticker"}
-        disabled={disabled}
-      >
-        <Sticker className="w-5 h-5" />
-      </button>
-
-      <button
-        type="button"
-        onClick={openDoodle}
-        className={
-          doodleActive
-            ? `${iconBtn} text-primary bg-primary/15`
-            : disabled
-              ? iconBtnDisabled
-              : iconBtnIdle
-        }
-        aria-label="Draw doodle — tap again for more space"
-        disabled={disabled}
-      >
-        <PenTool className="w-5 h-5" />
-      </button>
-    </>
+          </motion.div>
+        </>,
+        document.body,
+      )
   );
 
   return (
-    <div className="chat-panel-input relative z-20 shrink-0 px-2 sm:px-4 pb-2 md:pb-3 pt-1.5 md:pt-2 border-t border-border/50 bg-background/95 backdrop-blur-sm">
+    <div className="chat-panel-input relative w-full z-20 shrink-0 px-0 pt-1.5 pb-1">
       {replyPreview}
 
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*,video/*,.pdf,.doc,.docx,.txt,audio/*"
+        multiple
+        accept="image/*,video/*"
         className="hidden"
         onChange={handleFileChange}
         capture={false}
         aria-label="Upload any file"
       />
 
+      <input
+        ref={genericFileInputRef}
+        type="file"
+        multiple
+        accept="*/*"
+        className="hidden"
+        onChange={handleFileChange}
+        capture={false}
+        aria-label="Upload document or file"
+      />
+
       {openPicker === "greeting" && (
         <GreetingPicker onSelect={handleGreetingSelect} onClose={() => setOpenPicker(null)} />
       )}
 
-      {/* Mobile: message row + tool row (no quick-emoji strip) */}
-      <div className="flex flex-col gap-1.5 md:hidden">
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="flex-1 min-w-0">{textInput}</div>
-          {sendOrMic}
-        </div>
-        <div className="flex items-center gap-0.5 overflow-x-auto scrollbar-hide pb-0.5 -mx-0.5 px-0.5">
-          {attachmentToolbar}
-        </div>
-      </div>
+      <div className="flex items-center gap-[8px] sm:gap-[10px] bg-[#1a1a1a] rounded-[40px] py-[7px] sm:py-[9px] pr-[8px] sm:pr-[14px] pl-[5px] sm:pl-[9px] mx-[4px] md:mx-auto md:w-full md:max-w-[800px]">
+        <button
+          type="button"
+          onClick={onOpenCamera}
+          className="w-[38px] h-[38px] sm:w-[44px] sm:h-[44px] rounded-full active:scale-95 flex shrink-0 items-center justify-center text-white border-none transition-all hover:brightness-90"
+          style={{ backgroundColor: theme.bubbleColor }}
+          disabled={disabled}
+        >
+          <Camera className="w-[20px] h-[20px] sm:w-[22px] sm:h-[22px]" strokeWidth={1.8} />
+        </button>
 
-      {/* Desktop: single row */}
-      <div className="hidden md:flex items-center gap-2 min-w-0">
-        {attachmentToolbar}
-        <div className="flex-1 min-w-0">{textInput}</div>
-        {sendOrMic}
+        {textInput}
+
+        {input.trim() || recording ? (
+          <div className="pr-1">
+            {sendOrMic}
+          </div>
+        ) : (
+          <div className="flex items-center gap-0 sm:gap-[2px] shrink-0">
+            <button
+              type="button"
+              onClick={onStartRecording}
+              className={`w-[34px] h-[34px] sm:w-[38px] sm:h-[38px] flex items-center justify-center rounded-full hover:bg-white/10 active:scale-95 transition-all text-[#ccc] border-none bg-transparent ${disabled ? iconBtnDisabled : ""}`}
+              disabled={disabled}
+            >
+              <Mic className="w-[22px] h-[22px] sm:w-[24px] sm:h-[24px]" strokeWidth={1.8} />
+            </button>
+            <button
+              type="button"
+              onClick={handleImageClick}
+              className={`w-[34px] h-[34px] sm:w-[38px] sm:h-[38px] flex items-center justify-center rounded-full hover:bg-white/10 active:scale-95 transition-all text-[#ccc] border-none bg-transparent ${disabled ? iconBtnDisabled : ""}`}
+              disabled={disabled}
+            >
+              <ImageIcon className="w-[22px] h-[22px] sm:w-[24px] sm:h-[24px]" strokeWidth={1.8} />
+            </button>
+            <button
+              type="button"
+              onClick={toggleStickerPicker}
+              className={`w-[34px] h-[34px] sm:w-[38px] sm:h-[38px] flex items-center justify-center rounded-full hover:bg-white/10 active:scale-95 transition-all text-[#ccc] border-none bg-transparent ${disabled ? iconBtnDisabled : ""}`}
+              disabled={disabled}
+            >
+              <Sticker className="w-[22px] h-[22px] sm:w-[24px] sm:h-[24px]" strokeWidth={1.8} />
+            </button>
+            
+            <div className="relative shrink-0 flex items-center justify-center">
+              <button
+                type="button"
+                onClick={() => setShowAttachmentMenu((s) => !s)}
+                className={`w-[34px] h-[34px] sm:w-[38px] sm:h-[38px] flex items-center justify-center rounded-full hover:bg-white/10 active:scale-95 transition-all text-[#ccc] border-none bg-transparent ${disabled ? iconBtnDisabled : ""}`}
+                disabled={disabled}
+              >
+                <PlusCircle className={`w-[22px] h-[22px] sm:w-[24px] sm:h-[24px] transition-transform duration-[0.3s] ease-[cubic-bezier(0.34,1.56,0.64,1)] ${showAttachmentMenu ? "rotate-45" : ""}`} strokeWidth={1.8} />
+              </button>
+              {attachmentMenu}
+            </div>
+          </div>
+        )}
       </div>
 
       {recording && (
@@ -459,33 +470,7 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
         />
       )}
 
-      {showCuteMenu && onToggleCuteMode &&
-        createPortal(
-          <>
-            <div className="fixed inset-0 z-[200] bg-black/40" onClick={() => setShowCuteMenu(false)} aria-hidden />
-            <motion.div
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="fixed z-[201] left-3 right-3 bottom-[calc(5.5rem+env(safe-area-inset-bottom,0px))] md:bottom-[max(5.5rem,env(safe-area-inset-bottom))] bg-card border border-border rounded-2xl p-2 shadow-xl flex flex-col gap-1"
-              role="dialog"
-              aria-label="Chat styles"
-            >
-              <button type="button" onClick={toggleCuteFrog} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm hover:bg-secondary ${cuteMode === "frog" ? "bg-primary/15" : ""}`}>
-                <span className="emoji-native text-2xl leading-none">🐸</span>
-                <span>Frog mode</span>
-              </button>
-              <button type="button" onClick={toggleCatMode} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm hover:bg-secondary ${cuteMode === "cat" ? "bg-primary/15" : ""}`}>
-                <span className="emoji-native text-2xl leading-none">🐱</span>
-                <span>Cat mode</span>
-              </button>
-              <button type="button" onClick={togglePandaMode} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm hover:bg-secondary ${cuteMode === "panda" ? "bg-primary/15" : ""}`}>
-                <span className="emoji-native text-2xl leading-none">🐼</span>
-                <span>Panda mode</span>
-              </button>
-            </motion.div>
-          </>,
-          document.body,
-        )}
+
     </div>
   );
 }));

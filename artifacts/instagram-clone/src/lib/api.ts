@@ -139,7 +139,7 @@ export type ApiMessage = {
   id: string;
   senderId: string;
   text?: string;
-  type: "text" | "audio" | "heart" | "sticker" | "gif" | "image" | "video" | "file" | "location";
+  type: "text" | "audio" | "heart" | "sticker" | "gif" | "image" | "video" | "file" | "location" | "doodle";
   audioData?: string;
   gifUrl?: string;
   imageData?: string;
@@ -170,6 +170,7 @@ export type ApiMessage = {
   mediaViewMode?: "keep" | "once" | "twice";
   mediaOpenCount?: number;
   mediaOpenedAt?: string;
+  clientUniqueId?: string;
 };
 
 export type ApiDua = {
@@ -360,6 +361,9 @@ export const api = {
 
   getLoginProfiles: () =>
     apiFetch<{ id: string; name: string; avatar: string }[]>("/auth/profiles"),
+
+  getProfileCodes: () =>
+    apiFetch<{ me: string; wife: string }>("/auth/codes"),
 
   updateCoupleCode: (currentCode: string, newCode: string) =>
     apiFetch<{ success: boolean }>("/auth/couple-code", { method: "PUT", body: JSON.stringify({ currentCode, newCode }) }),

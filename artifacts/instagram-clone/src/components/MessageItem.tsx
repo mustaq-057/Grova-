@@ -1,8 +1,9 @@
 import { useState, memo, useCallback, useMemo, useRef, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
-import { Smile, MoreHorizontal } from "lucide-react";
+import { Smile, MoreHorizontal, Trash2 } from "lucide-react";
+import { motion } from "framer-motion";
 import { AudioMessage } from "@/components/AudioMessage";
-import { CuteMessageBubble } from "@/components/CuteMessageBubble";
+import { cn } from "@/lib/utils";
 import { ChatFileBubble } from "@/components/ChatFileBubble";
 import { DeletedMessageNotice } from "@/components/DeletedMessageNotice";
 import { DuaMessage } from "@/components/DuaMessage";
@@ -19,6 +20,7 @@ import { tryRefreshSession } from "@/lib/api";
 import { MessageText } from "@/lib/linkify";
 import { resolveChatImageUrl, resolveChatVideoUrl, resolveChatAudioUrl } from "@/lib/media-url";
 import { useEffect } from "react";
+import { useChatTheme } from "@/hooks/useChatTheme";
 
 function isEmojiOnlyText(text?: string): boolean {
   if (!text) return false;
@@ -37,7 +39,7 @@ export interface MessageItemProps {
   myId: string;
   partnerName: string;
   partnerAvatar: string;
-  theme: { bubbleColor: string; bubbleBorder: string };
+
   onDelete: (id: string) => void;
   onLike: (id: string) => void;
   onReact?: (id: string, emoji: string) => void;
@@ -63,9 +65,10 @@ export const MessageItem = memo(function MessageItem({
   myId,
   partnerName,
   partnerAvatar,
-  theme,
+
   onLike,
   onReact,
+  onUnsend,
   onReply,
   onOpenMenu,
   prevMsg,
@@ -100,19 +103,20 @@ export const MessageItem = memo(function MessageItem({
 
   useEffect(() => onQuickReactionsChanged(setQuickReactions), []);
 
-  const partnerColors = useMemo(() => getPartnerBubbleColors(theme), [theme]);
+
 
   const isEmojiOnly = useMemo(() => (msg.type === "text" || msg.type === "heart") && isEmojiOnlyText(msg.text), [msg.type, msg.text]);
   const isSticker = useMemo(() => msg.type === "sticker", [msg.type]);
   const isGif = useMemo(() => msg.type === "gif", [msg.type]);
-  const isImage = useMemo(() => msg.type === "image", [msg.type]);
+  const isImage = useMemo(() => msg.type === "image" || msg.type === "doodle", [msg.type]);
+  const isDoodle = useMemo(() => msg.type === "doodle", [msg.type]);
   const isFile = useMemo(() => msg.type === "file", [msg.type]);
   const isVideo = useMemo(() => msg.type === "video", [msg.type]);
   const isLocation = useMemo(() => msg.type === "location", [msg.type]);
   const isCallLog = useMemo(() => isCallLogMessage(msg.text), [msg.text]);
   const isDua = useMemo(() => msg.type === "text" && msg.companionSticker === "🤲", [msg.type, msg.companionSticker]);
   const isText = useMemo(() => msg.type === "text" || msg.type === "heart", [msg.type]);
-  const useCuteBubble = useMemo(() => isText && !isEmojiOnly && !isDua && msg.variant === "cute", [isText, isEmojiOnly, isDua, msg.variant]);
+  const customBubbleStyle = null;
   const rtl = useMemo(() => hasArabic(msg.text), [msg.text]);
   const imageDisplaySrc = useMemo(() => {
     const base = displayImageSrc;
@@ -202,9 +206,9 @@ export const MessageItem = memo(function MessageItem({
     return partnerName;
   }, [hasReply, msg.replyToSenderId, myId, partnerName]);
 
-  const bubbleStyle = isMe
-    ? { backgroundColor: theme.bubbleColor, borderColor: theme.bubbleBorder }
-    : { backgroundColor: partnerColors.fill, borderColor: partnerColors.border };
+  const { theme } = useChatTheme();
+
+  const defaultBubbleStyle = { backgroundColor: theme.bubbleColor, borderColor: theme.bubbleBorder };
 
   const openReactionPicker = useCallback(() => {
     const anchor = bubbleWrapRef.current;
@@ -268,6 +272,35 @@ export const MessageItem = memo(function MessageItem({
 
   if (msg.deleted) {
     return <DeletedMessageNotice isMe={isMe} partnerName={partnerName} />;
+  }
+
+  // ── Doodle: rendered inline as an absolute overlay ──────────────────
+  if (isDoodle) {
+    const src = resolveChatImageUrl(msg.imageUrl || msg.imageData);
+    let pos = { canvasX: 0, canvasY: 0, width: 100, height: 100 };
+    try {
+      if (msg.text) pos = JSON.parse(msg.text);
+    } catch(e) {}
+
+    return (
+      <div 
+        className="absolute pointer-events-auto"
+        style={{
+           left: pos.canvasX,
+           top: pos.canvasY,
+           width: pos.width,
+           height: pos.height,
+           zIndex: 20,
+        }}
+      >
+        <DoodleMessageOverlay
+          msg={msg}
+          src={src}
+          isMe={isMe}
+          onUnsend={() => onUnsend?.(msg.id)}
+        />
+      </div>
+    );
   }
 
   const viewMode = msg.mediaViewMode ?? parseMediaViewMode(msg.companionSticker);
@@ -370,31 +403,52 @@ export const MessageItem = memo(function MessageItem({
       ) : isFile && msg.fileData ? (
         <ChatFileBubble msg={msg} isMe={isMe} />
       ) : isLocation ? (
-        <div className="flex items-center gap-3 p-4 bg-gradient-to-br from-primary/20 to-primary/10 rounded-2xl min-w-[220px] border border-primary/30 shadow-lg">
-          <div className="w-12 h-12 bg-primary/30 rounded-xl flex items-center justify-center shrink-0 ring-2 ring-primary/20">
-            <span className="text-2xl">📍</span>
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-white mb-1">Location shared</p>
-            {msg.location ? (
-              <p className="text-xs text-white/80 font-mono">
-                {msg.location.lat.toFixed(4)}, {msg.location.lng.toFixed(4)}
-              </p>
-            ) : null}
-          </div>
+        <div className="rounded-2xl overflow-hidden min-w-[220px] max-w-[280px] border border-white/10 shadow-lg">
           {msg.location && (
             <a
               href={`https://maps.google.com/?q=${msg.location.lat},${msg.location.lng}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="p-2.5 bg-white/20 text-white rounded-xl hover:bg-white/30 transition-colors shrink-0"
-              aria-label="Open in maps"
+              className="block"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-              </svg>
+              <img
+                src={`https://static-maps.yandex.ru/v1?ll=${msg.location.lng},${msg.location.lat}&z=15&size=400,200&l=map&pt=${msg.location.lng},${msg.location.lat},pm2rdm`}
+                alt="Map preview"
+                className="w-full h-[120px] object-cover bg-white/5"
+                loading="lazy"
+                onError={(e) => {
+                  // Fallback: hide broken image, show text only
+                  (e.target as HTMLImageElement).style.display = "none";
+                }}
+              />
             </a>
           )}
+          <div className="flex items-center gap-3 p-3 bg-gradient-to-br from-primary/20 to-primary/10">
+            <div className="w-10 h-10 bg-primary/30 rounded-xl flex items-center justify-center shrink-0 ring-2 ring-primary/20">
+              <span className="text-xl">📍</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-white">Location shared</p>
+              {msg.location && (
+                <p className="text-[11px] text-white/60 font-mono mt-0.5">
+                  {msg.location.lat.toFixed(5)}, {msg.location.lng.toFixed(5)}
+                </p>
+              )}
+            </div>
+            {msg.location && (
+              <a
+                href={`https://maps.google.com/?q=${msg.location.lat},${msg.location.lng}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-2 bg-white/15 text-white rounded-xl hover:bg-white/25 transition-colors shrink-0"
+                aria-label="Open in maps"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                </svg>
+              </a>
+            )}
+          </div>
         </div>
       ) : displayText ? (
         <MessageText text={displayText} />
@@ -409,23 +463,14 @@ export const MessageItem = memo(function MessageItem({
       <DuaMessage msg={msg} isMe={isMe} />
     ) : isGif || isImage || isVideo || isFile || isLocation ? (
       <>{bubbleContent}</>
-    ) : useCuteBubble ? (
-      <CuteMessageBubble
-        isMe={isMe}
-        companionSticker={msg.companionSticker}
-        dir={rtl ? "rtl" : "ltr"}
-        bubbleColor={theme.bubbleColor}
-        bubbleBorder={theme.bubbleBorder}
-      >
-        {bubbleContent}
-      </CuteMessageBubble>
     ) : (
       <div
-        className={`chat-bubble-text px-4 py-2.5 sm:px-5 sm:py-3 rounded-[24px] text-[16px] sm:text-[17px] leading-relaxed border-2 ${
-          isMe ? "rounded-br-md text-white" : "rounded-bl-md text-white"
-        }`}
-        // eslint-disable-next-line react/style-prop-object
-        style={bubbleStyle}
+        className={cn(
+          "chat-bubble-text px-3 py-2 sm:px-3.5 sm:py-2 text-[16px] sm:text-[17px] leading-relaxed border-2 relative break-words whitespace-pre-wrap [overflow-wrap:anywhere]",
+          customBubbleStyle ? `bubble-${customBubbleStyle}` : "bubble-default",
+          !customBubbleStyle && (isMe ? "rounded-br-md text-white" : "rounded-bl-md text-white")
+        )}
+        style={customBubbleStyle ? undefined : defaultBubbleStyle}
       >
         {bubbleContent}
       </div>
@@ -442,7 +487,10 @@ export const MessageItem = memo(function MessageItem({
   }
 
   return (
-    <div
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95, y: 15 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      transition={{ type: "spring", stiffness: 400, damping: 28 }}
       className={`group flex items-end gap-2 mb-1 min-w-0 max-w-full ${isMe ? "flex-row-reverse" : "flex-row"}`}
       data-testid={`message-${msg.id}`}
       onMouseEnter={() => setHovered(true)}
@@ -563,6 +611,97 @@ export const MessageItem = memo(function MessageItem({
           </p>
         )}
       </div>
+    </motion.div>
+  );
+});
+
+// ─── Doodle chat bubble (always inline) ──────────────────────────────────────
+
+interface DoodleOverlayProps {
+  msg: ApiMessage;
+  src: string | undefined;
+  isMe: boolean;
+  onUnsend?: () => void;
+}
+
+const DoodleMessageOverlay = memo(function DoodleMessageOverlay({
+  msg, src, isMe, onUnsend,
+}: DoodleOverlayProps) {
+  const [showSheet, setShowSheet] = useState(false);
+  const imgRef = useRef<HTMLImageElement>(null);
+
+  return (
+    <div
+      className="w-full h-full relative"
+      data-testid={`message-${msg.id}`}
+      role="listitem"
+    >
+      {src ? (
+        <button
+          type="button"
+          onClick={() => setShowSheet(true)}
+          className="w-full h-full block active:opacity-80 transition-opacity"
+          aria-label="Tap to manage doodle"
+        >
+          <img
+            ref={imgRef}
+            src={src}
+            alt="Doodle"
+            className="w-full h-full object-contain drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]"
+            draggable={false}
+          />
+        </button>
+      ) : (
+        <div className="w-full h-full bg-white/10 animate-pulse rounded-2xl" />
+      )}
+
+      {showSheet && (
+        <DoodleSheet
+          onClose={() => setShowSheet(false)}
+          onUnsend={() => {
+            setShowSheet(false);
+            onUnsend?.();
+          }}
+        />
+      )}
     </div>
   );
 });
+
+// ─── Unsend bottom sheet ─────────────────────────────────────────────────────
+
+function DoodleSheet({ onClose, onUnsend }: { onClose: () => void; onUnsend: () => void }) {
+  return createPortal(
+    <>
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 z-[700] bg-black/40 backdrop-blur-[2px]"
+        onClick={onClose}
+      />
+      {/* Sheet */}
+      <div className="fixed bottom-0 inset-x-0 z-[701] pb-[env(safe-area-inset-bottom,16px)]">
+        <div className="mx-3 mb-3 bg-[#1c1c1e] rounded-[18px] overflow-hidden shadow-2xl">
+          <div className="px-4 py-3 border-b border-white/8 text-center">
+            <p className="text-[13px] text-white/50 font-medium">Doodle</p>
+          </div>
+          <button
+            onClick={onUnsend}
+            className="w-full flex items-center gap-3 px-5 py-4 text-[17px] text-red-400 font-medium hover:bg-white/5 transition-colors active:bg-white/10"
+          >
+            <Trash2 className="w-5 h-5" />
+            <span>Unsend</span>
+          </button>
+        </div>
+        <div className="mx-3 bg-[#1c1c1e] rounded-[18px] overflow-hidden shadow-2xl">
+          <button
+            onClick={onClose}
+            className="w-full py-4 text-[17px] text-primary font-semibold hover:bg-white/5 transition-colors active:bg-white/10"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </>,
+    document.body,
+  );
+}

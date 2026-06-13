@@ -45,12 +45,23 @@ export function resolveStorageMediaUrl(
   return `/api/media/inline?${params.toString()}`;
 }
 
+export function optimizeCloudinaryUrl(url: string | undefined, type: "image" | "video"): string | undefined {
+  if (!url) return undefined;
+  if (!url.includes("res.cloudinary.com")) return url;
+  if (url.includes("/upload/q_auto")) return url; // Already optimized
+  
+  const insert = type === "image" ? "q_auto,f_auto,w_1200,c_limit" : "q_auto,f_auto";
+  return url.replace("/upload/", `/upload/${insert}/`);
+}
+
 export function resolveChatImageUrl(url: string | undefined): string | undefined {
-  return resolveStorageMediaUrl(url, { fileName: "photo.jpg", mimeType: "image/jpeg" });
+  const resolved = resolveStorageMediaUrl(url, { fileName: "photo.jpg", mimeType: "image/jpeg" });
+  return optimizeCloudinaryUrl(resolved, "image");
 }
 
 export function resolvePostMediaUrl(url: string | undefined): string | undefined {
-  return resolveStorageMediaUrl(url, { fileName: "post.jpg", mimeType: "image/jpeg" });
+  const resolved = resolveStorageMediaUrl(url, { fileName: "post.jpg", mimeType: "image/jpeg" });
+  return optimizeCloudinaryUrl(resolved, "image");
 }
 
 export function resolveChatVideoUrl(
@@ -58,10 +69,11 @@ export function resolveChatVideoUrl(
   fileName?: string,
   mimeType?: string,
 ): string | undefined {
-  return resolveStorageMediaUrl(url, {
+  const resolved = resolveStorageMediaUrl(url, {
     fileName: fileName || "video.mp4",
     mimeType: mimeType || "video/mp4",
   });
+  return optimizeCloudinaryUrl(resolved, "video");
 }
 
 export function resolveChatAudioUrl(url: string | undefined): string | undefined {

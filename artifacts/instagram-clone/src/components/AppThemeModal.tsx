@@ -13,7 +13,7 @@ export const AppThemeModal = memo(function AppThemeModal({ show, onClose, curren
   if (!show) return null;
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/50 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
       <div
         className="bg-card border border-border rounded-2xl w-full max-w-md p-5 shadow-xl"
         onClick={(e) => e.stopPropagation()}

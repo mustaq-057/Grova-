@@ -33,7 +33,9 @@ export const THEMES: ChatTheme[] = [
   { id: "midnight", name: "Midnight", bubbleColor: "#4338ca", bubbleBorder: "#818cf8", swatch: "bg-indigo-700" },
   { id: "rose", name: "Rose", bubbleColor: "#be123c", bubbleBorder: "#fb7185", swatch: "bg-rose-700" },
   { id: "forest", name: "Forest", bubbleColor: "#047857", bubbleBorder: "#34d399", swatch: "bg-emerald-700" },
+  { id: "ocean", name: "Ocean", bubbleColor: "#0369a1", bubbleBorder: "#38bdf8", swatch: "bg-sky-700" },
   { id: "sakura", name: "Sakura", bubbleColor: "#be185d", bubbleBorder: "#f472b6", swatch: "bg-pink-700" },
+  { id: "aurora", name: "Aurora", bubbleColor: "#0891b2", bubbleBorder: "#22d3ee", swatch: "bg-cyan-600" },
   { id: "sunset", name: "Sunset", bubbleColor: "#ea580c", bubbleBorder: "#fb923c", swatch: "bg-orange-600" },
   { id: "lavender", name: "Lavender", bubbleColor: "#7c3aed", bubbleBorder: "#a78bfa", swatch: "bg-violet-600" },
   { id: "mint", name: "Mint", bubbleColor: "#16a34a", bubbleBorder: "#4ade80", swatch: "bg-green-600" },
@@ -60,7 +62,20 @@ export const THEMES: ChatTheme[] = [
   { id: "honey", name: "Honey", bubbleColor: "#d97706", bubbleBorder: "#fcd34d", swatch: "bg-amber-500" },
   { id: "violet", name: "Violet", bubbleColor: "#7c3aed", bubbleBorder: "#c4b5fd", swatch: "bg-violet-600" },
   { id: "bronze", name: "Bronze", bubbleColor: "#c2410c", bubbleBorder: "#fdba74", swatch: "bg-orange-700" },
+  { id: "peach", name: "Peach", bubbleColor: "#f43f5e", bubbleBorder: "#fda4af", swatch: "bg-rose-500" },
+  { id: "mango", name: "Mango", bubbleColor: "#f59e0b", bubbleBorder: "#fcd34d", swatch: "bg-amber-500" },
+  { id: "tangerine", name: "Tangerine", bubbleColor: "#ea580c", bubbleBorder: "#fdba74", swatch: "bg-orange-600" },
+  { id: "lemon", name: "Lemon", bubbleColor: "#eab308", bubbleBorder: "#fef08a", swatch: "bg-yellow-500" },
+  { id: "lime", name: "Lime", bubbleColor: "#84cc16", bubbleBorder: "#d9f99d", swatch: "bg-lime-500" },
+  { id: "sky", name: "Sky", bubbleColor: "#0ea5e9", bubbleBorder: "#bae6fd", swatch: "bg-sky-500" },
+  { id: "indigo", name: "Indigo", bubbleColor: "#6366f1", bubbleBorder: "#c7d2fe", swatch: "bg-indigo-500" },
+  { id: "orchid", name: "Orchid", bubbleColor: "#d946ef", bubbleBorder: "#f5d0fe", swatch: "bg-fuchsia-500" },
+  { id: "magenta", name: "Magenta", bubbleColor: "#ec4899", bubbleBorder: "#fbcfe8", swatch: "bg-pink-500" },
+  { id: "teal2", name: "Teal", bubbleColor: "#14b8a6", bubbleBorder: "#99f6e4", swatch: "bg-teal-500" },
+  { id: "cyan2", name: "Cyan", bubbleColor: "#06b6d4", bubbleBorder: "#a5f3fc", swatch: "bg-cyan-500" },
+  { id: "moonlight-saga", name: "Moonlight Saga", bubbleColor: "#1e293b", bubbleBorder: "#64748b", swatch: "bg-slate-700" },
 ];
+
 
 export const THEME_SWATCHES: Record<string, string> = Object.fromEntries(
   THEMES.map((t) => [t.id, t.swatch]),

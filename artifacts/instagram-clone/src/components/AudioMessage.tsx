@@ -151,6 +151,15 @@ export function AudioMessage({
     };
   }, []);
 
+  useEffect(() => {
+    const audio = new Audio(audioData);
+    audio.onloadedmetadata = () => {
+      if (Number.isFinite(audio.duration)) setDuration(audio.duration);
+    };
+    // Preload metadata to get duration without playing
+    audio.preload = "metadata";
+  }, [audioData]);
+
   const bars = waveform.length > 0 ? waveform : STATIC_BARS;
   const barHeights = bars.map((a) => Math.max(3, Math.min(16, (typeof a === "number" ? a : 0.5) * 16)));
   const timeLabel = `${formatAudioTime(currentTime)} / ${formatAudioTime(duration)}`;
@@ -173,7 +182,16 @@ export function AudioMessage({
           {playing ? <Pause className="w-4 h-4 fill-current" /> : <Play className="w-4 h-4 fill-current ml-0.5" />}
         </button>
 
-        <div className="flex-1 min-w-0 flex items-center gap-0.5 h-5 overflow-hidden">
+        <div 
+          className="flex-1 min-w-0 flex items-center gap-0.5 h-5 overflow-hidden cursor-pointer"
+          onClick={(e) => {
+            if (!duration) return;
+            const rect = e.currentTarget.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const percentage = Math.max(0, Math.min(1, clickX / rect.width));
+            void seekTo(percentage * duration);
+          }}
+        >
           {barHeights.map((h, i) => {
             const isActive = progress > 0 && i / barHeights.length <= progress;
             return (

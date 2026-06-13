@@ -1,4 +1,4 @@
-import { useState, memo, useEffect } from "react";
+import { useState, memo, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { Eye, EyeOff, Lock, Mail } from "lucide-react";
 import { api } from "@/lib/api";
@@ -51,6 +51,7 @@ export default memo(function Login() {
   const [users, setUsers] = useState<PickUser[]>(defaultPickUsers);
   const [serverOnline, setServerOnline] = useState<boolean | null>(null);
 
+
   useEffect(() => {
     let cancelled = false;
     let failStreak = 0;
@@ -101,6 +102,7 @@ export default memo(function Login() {
       .catch(() => {});
   }, [authReady, trustedDevice]);
 
+
   const handlePrimaryLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim() || !password) return;
@@ -148,6 +150,7 @@ export default memo(function Login() {
     setSelectedId(id);
     setStep("code");
     setError("");
+    setCode("");
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -347,10 +350,13 @@ export default memo(function Login() {
                   <input
                     type={showCode ? "text" : "password"}
                     value={code}
-                    onChange={(e) => setCode(e.target.value)}
+                    onChange={(e) => {
+                      setCode(e.target.value);
+                    }}
                     placeholder="Enter code"
                     className="w-full bg-secondary border border-border rounded-xl px-4 py-3 text-sm outline-none focus:border-primary transition-colors pr-10"
                     autoFocus
+                    disabled={loading}
                     onCopy={(e) => e.preventDefault()}
                     onPaste={(e) => e.preventDefault()}
                     data-testid="input-couple-code"

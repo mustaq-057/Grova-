@@ -37,12 +37,17 @@ function mergeOptimisticWithServer(optimistic: ApiMessage, server: ApiMessage): 
     server.type === "video" &&
     isRemoteMediaUrl(server.fileData) &&
     isLocalMediaUrl(optimistic.fileData);
+  const imageUrl = pickMediaUrl(server.imageUrl, optimistic.imageUrl);
+  const hasRemoteImage = isRemoteMediaUrl(imageUrl) || isRemoteMediaUrl(server.imageUrl);
   return {
     ...server,
+    clientUniqueId: optimistic.clientUniqueId || optimistic.id,
     text: server.text ?? optimistic.text,
     gifUrl: server.gifUrl || optimistic.gifUrl,
-    imageUrl: pickMediaUrl(server.imageUrl, optimistic.imageUrl),
-    imageData: pickMediaUrl(server.imageData, optimistic.imageData),
+    imageUrl,
+    imageData: (server.type === "doodle" || hasRemoteImage)
+      ? undefined
+      : pickMediaUrl(server.imageData, optimistic.imageData),
     fileData: remoteVideoReady
       ? server.fileData
       : pickMediaUrl(server.fileData, optimistic.fileData),
@@ -91,11 +96,15 @@ export function mergeMessagesById(existing: ApiMessage[], incoming: ApiMessage[]
     const prevText = prev.text ?? "";
     const text =
       incomingText === "…" && prevText && prevText !== "…" ? prevText : m.text ?? prev.text;
+    const imageUrl = pickMediaUrl(m.imageUrl, prev.imageUrl);
+    const hasRemoteImage = isRemoteMediaUrl(imageUrl) || isRemoteMediaUrl(m.imageUrl);
     map.set(m.id, {
       ...m,
       text,
-      imageUrl: pickMediaUrl(m.imageUrl, prev.imageUrl),
-      imageData: pickMediaUrl(m.imageData, prev.imageData),
+      imageUrl,
+      imageData: (m.type === "doodle" || hasRemoteImage)
+        ? undefined
+        : pickMediaUrl(m.imageData, prev.imageData),
       audioData: m.audioData ?? prev.audioData,
       fileData: pickMediaUrl(m.fileData, prev.fileData),
       fileType: m.fileType ?? prev.fileType,
@@ -167,10 +176,10 @@ export function findOptimisticMatch(
     const dt = Math.abs(serverTime - optTime);
 
     if (optimistic.type === "text") {
-      return dt <= 8_000 && outgoingContentMatches(optimistic, f);
+      return dt <= 120_000 && outgoingContentMatches(optimistic, f);
     }
     if (optimistic.type === "gif") {
-      return dt <= 15_000 && outgoingContentMatches(optimistic, f);
+      return dt <= 120_000 && outgoingContentMatches(optimistic, f);
     }
     // Never guess blob uploads during poll merge — wait for send/SSE confirmation.
     if (hasLocalMediaPreview(optimistic)) {
@@ -182,10 +191,10 @@ export function findOptimisticMatch(
           outgoingContentMatches(optimistic, f)
         );
       }
-      return dt <= 15_000 && serverTime >= optTime - 5_000;
+      return dt <= 120_000 && serverTime >= optTime - 5_000;
     }
-    if (outgoingContentMatches(optimistic, f)) return dt <= 15_000;
-    return dt <= 8_000 && serverTime >= optTime - 3_000;
+    if (outgoingContentMatches(optimistic, f)) return dt <= 120_000;
+    return dt <= 120_000 && serverTime >= optTime - 3_000;
   });
 
   if (candidates.length === 0) return undefined;
@@ -211,6 +220,7 @@ export function reconcilePendingOptimistics(
     if (!pendingIds.has(m.id)) return true;
     const match = findOptimisticMatch(m, fresh);
     if (match) {
+      match.clientUniqueId = m.clientUniqueId || m.id;
       pendingIds.delete(m.id);
       return false;
     }

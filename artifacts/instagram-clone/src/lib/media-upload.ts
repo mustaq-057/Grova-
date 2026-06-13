@@ -83,8 +83,13 @@ export async function uploadMedia(dataUrl: string, contentType?: string, attempt
   const base64Data = dataUrl.replace(/^data:[^;]+;base64,/, "");
   const approxBytes = Math.floor((base64Data.length * 3) / 4);
   if (approxBytes >= BINARY_UPLOAD_MIN_BYTES) {
-    const bin = Uint8Array.from(atob(base64Data), (c) => c.charCodeAt(0));
-    return uploadMediaBinary(new Blob([bin], { type: mime }), mime);
+    const binaryString = atob(base64Data);
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    return uploadMediaBinary(new Blob([bytes], { type: mime }), mime);
   }
 
   const res = await fetch("/api/media/upload", {
@@ -113,11 +118,17 @@ export async function uploadMedia(dataUrl: string, contentType?: string, attempt
 
 /** Upload a File/Blob — binary path to Cloudinary (best for mobile camera, docs, video). */
 export async function uploadMediaFile(file: File | Blob, contentType?: string): Promise<string> {
-  const mime = normalizeUploadMime(
-    contentType ||
-      (file instanceof File ? file.type : "") ||
-      "application/octet-stream",
-  );
+  let inferred = contentType || (file instanceof File ? file.type : "") || "";
+  if (!inferred && file instanceof File && file.name) {
+    const ext = file.name.match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase();
+    if (ext && ["mp4", "mov", "webm", "mkv", "3gp", "m4v"].includes(ext)) {
+      inferred = `video/${ext === "mov" ? "quicktime" : ext}`;
+    } else if (ext && ["jpg", "jpeg", "png", "gif", "webp", "heic"].includes(ext)) {
+      inferred = `image/${ext === "jpg" ? "jpeg" : ext}`;
+    }
+  }
+
+  const mime = normalizeUploadMime(inferred || "application/octet-stream");
   const useBinary =
     file instanceof File ||
     mime.startsWith("video/") ||
