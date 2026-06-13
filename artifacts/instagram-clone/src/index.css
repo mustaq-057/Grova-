@@ -294,9 +294,7 @@
   scroll-padding-bottom: 2rem;
   padding-bottom: 1.25rem;
 }
-.chat-message-row {
-  /* Avoid content-visibility here — it underestimates height and breaks stick-to-bottom. */
-}
+/* Avoid content-visibility on .chat-message-row — it underestimates height and breaks stick-to-bottom. */
 .chat-panel-bottom {
   grid-row: 3;
   min-height: 0;
@@ -859,8 +857,7 @@ html[data-photo-theme="true"] .app-chrome [class*="bg-card"] {
 }
 
 @layer utilities {
-  .no-default-hover-elevate { /* no-op class */ }
-  .no-default-active-elevate { /* no-op class */ }
+  /* no-op classes: .no-default-hover-elevate, .no-default-active-elevate */
 
   .toggle-elevate::before,
   .toggle-elevate-2::before {
@@ -1039,11 +1036,15 @@ html[data-photo-theme="true"] .app-chrome [class*="bg-card"] {
 /* Mobile-specific grid layouts */
 @media (max-width: 640px) {
   .mobile-grid-2 {
-    @apply grid grid-cols-2 gap-3;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
   }
 
   .mobile-grid-1 {
-    @apply grid grid-cols-1 gap-3;
+    display: grid;
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+    gap: 0.75rem;
   }
 }
 
