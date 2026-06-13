@@ -51,7 +51,8 @@ export async function uploadMediaBinary(
   } catch (err) {
     clearTimeout(timer);
     if (err instanceof DOMException && err.name === "AbortError") {
-      throw new Error("Upload timed out — try a shorter video or better connection.");
+      const timeoutSec = Math.round(timeoutMs / 1000);
+      throw new Error(`Video upload timed out after ${timeoutSec}s. Try a smaller video or better connection.`);
     }
     if (attempt < 2) {
       await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));

@@ -734,9 +734,10 @@ const DoodleMessageOverlay = memo(function DoodleMessageOverlay({
       {src ? (
         <button
           type="button"
-          onClick={() => setShowSheet(true)}
+          onClick={() => isMe && setShowSheet(true)}
           className="w-full h-full block active:opacity-80 transition-opacity"
-          aria-label="Tap to manage doodle"
+          aria-label={isMe ? "Tap to manage doodle" : "Doodle"}
+          disabled={!isMe}
         >
           <img
             ref={imgRef}
@@ -752,6 +753,7 @@ const DoodleMessageOverlay = memo(function DoodleMessageOverlay({
 
       {showSheet && (
         <DoodleSheet
+          isMe={isMe}
           onClose={() => setShowSheet(false)}
           onUnsend={() => {
             setShowSheet(false);
@@ -763,9 +765,9 @@ const DoodleMessageOverlay = memo(function DoodleMessageOverlay({
   );
 });
 
-// ─── Unsend bottom sheet ─────────────────────────────────────────────────────
+// ── Unsend bottom sheet ──────────────────────────────────────────────────────
 
-function DoodleSheet({ onClose, onUnsend }: { onClose: () => void; onUnsend: () => void }) {
+function DoodleSheet({ isMe, onClose, onUnsend }: { isMe: boolean; onClose: () => void; onUnsend: () => void }) {
   return createPortal(
     <>
       {/* Backdrop */}
@@ -779,13 +781,15 @@ function DoodleSheet({ onClose, onUnsend }: { onClose: () => void; onUnsend: () 
           <div className="px-4 py-3 border-b border-white/8 text-center">
             <p className="text-[13px] text-white/50 font-medium">Doodle</p>
           </div>
-          <button
-            onClick={onUnsend}
-            className="w-full flex items-center gap-3 px-5 py-4 text-[17px] text-red-400 font-medium hover:bg-white/5 transition-colors active:bg-white/10"
-          >
-            <Trash2 className="w-5 h-5" />
-            <span>Unsend</span>
-          </button>
+          {isMe && (
+            <button
+              onClick={onUnsend}
+              className="w-full flex items-center gap-3 px-5 py-4 text-[17px] text-red-400 font-medium hover:bg-white/5 transition-colors active:bg-white/10"
+            >
+              <Trash2 className="w-5 h-5" />
+              <span>Unsend</span>
+            </button>
+          )}
         </div>
         <div className="mx-3 bg-[#1c1c1e] rounded-[18px] overflow-hidden shadow-2xl">
           <button

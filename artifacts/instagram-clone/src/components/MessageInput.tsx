@@ -140,8 +140,13 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
   }, [setInput, onInputActivity]);
 
   const handleImageClick = useCallback(() => {
-    setShowAttachmentMenu(false);
-    fileInputRef.current?.click();
+    // On mobile, open directly without showing attachment menu
+    const isMobile = typeof window !== 'undefined' && window.matchMedia("(max-width: 767px)").matches;
+    if (isMobile) {
+      fileInputRef.current?.click();
+    } else {
+      setShowAttachmentMenu((s) => !s);
+    }
   }, []);
 
   const handleGenericFileClick = useCallback(() => {
