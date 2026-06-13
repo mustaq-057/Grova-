@@ -147,6 +147,11 @@ export const SUPPORTED_MIME_TYPES = Object.values(SUPPORTED_FILE_TYPES)
 // Create accept string for file input
 export const FILE_INPUT_ACCEPT = SUPPORTED_MIME_TYPES.join(",");
 
+/** Documents-only accept — excludes images/video so mobile won't offer camera or screen recorder. */
+export const DOCUMENTS_ONLY_ACCEPT = SUPPORTED_MIME_TYPES.filter(
+  (mime) => !mime.startsWith("image/") && !mime.startsWith("video/"),
+).join(",");
+
 // Helper function to check if a file is supported
 export function isSupportedFileType(mimeType?: string, filename?: string): boolean {
   if (!mimeType && !filename) return false;

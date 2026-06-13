@@ -1,12 +1,11 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { X, Undo2, Trash2, Send, ChevronLeft, Maximize } from "lucide-react";
+import { X, Undo2, Eraser, Send, ChevronLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface DoodleData {
   imageData: string;
-  canvasX: number;
-  canvasY: number;
+  blob: Blob;
   width: number;
   height: number;
 }
@@ -14,43 +13,40 @@ export interface DoodleData {
 interface DoodleCanvasProps {
   onClose: () => void;
   onSend: (data: DoodleData) => void;
+  onError?: (message: string) => void;
 }
 
 const COLORS = [
-  "#000000", // Black
-  "#FFFFFF", // White
-  "#FF0040", // Red
-  "#FF6B00", // Orange
-  "#FFD700", // Yellow
-  "#00E676", // Green
-  "#0080FF", // Blue
-  "#9D00FF", // Purple
-  "#FF00FF", // Magenta
-  "#8B7355", // Brown/Grey
+  "#1a1a2e",
+  "#FFFFFF",
+  "#FF4D8D",
+  "#FF6B6B",
+  "#FFB347",
+  "#FFE066",
+  "#4ECDC4",
+  "#45B7D1",
+  "#9B59B6",
+  "#E84393",
 ];
 
-const SIZES = [2, 4, 8, 14, 22];
+const SIZES = [3, 6, 12, 20];
 
 type Point = { x: number; y: number };
 
-export default function DoodleCanvas({ onClose, onSend }: DoodleCanvasProps) {
+export default function DoodleCanvas({ onClose, onSend, onError }: DoodleCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  
-  const [color, setColor] = useState("#000000");
-  const [brushSize, setBrushSize] = useState(8);
-  const [sliderValue, setSliderValue] = useState(50);
+
+  const [color, setColor] = useState("#1a1a2e");
+  const [brushSize, setBrushSize] = useState(6);
   const [canUndo, setCanUndo] = useState(false);
   const [hasStrokes, setHasStrokes] = useState(false);
   const [sending, setSending] = useState(false);
-  const [moreSpace, setMoreSpace] = useState(false);
 
   const isDrawingRef = useRef(false);
   const lastPtRef = useRef<Point | null>(null);
   const historyRef = useRef<string[]>([]);
-
-  // Calculate actual brush size based on base size and slider (slider acts as multiplier 0.5x to 2x)
-  const actualBrushSize = brushSize * (sliderValue / 50);
+  const exportGenRef = useRef(0);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -59,21 +55,23 @@ export default function DoodleCanvas({ onClose, onSend }: DoodleCanvasProps) {
 
     const resize = () => {
       const rect = container.getBoundingClientRect();
-      const ctx = canvas.getContext("2d")!;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+
       const snap = historyRef.current.length ? canvas.toDataURL("image/png") : null;
       const dpr = window.devicePixelRatio || 1;
-      
+
       canvas.width = rect.width * dpr;
       canvas.height = rect.height * dpr;
       canvas.style.width = `${rect.width}px`;
       canvas.style.height = `${rect.height}px`;
-      
+
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.scale(dpr, dpr);
-      
-      // Fill white background
+
       ctx.fillStyle = "#FFFFFF";
       ctx.fillRect(0, 0, rect.width, rect.height);
-      
+
       if (snap) {
         const img = new Image();
         img.onload = () => ctx.drawImage(img, 0, 0, rect.width, rect.height);
@@ -82,14 +80,16 @@ export default function DoodleCanvas({ onClose, onSend }: DoodleCanvasProps) {
     };
 
     resize();
-    window.addEventListener("resize", resize);
-    return () => window.removeEventListener("resize", resize);
-  }, [moreSpace]); // Re-run when canvas size changes
+    const ro = new ResizeObserver(resize);
+    ro.observe(container);
+    return () => ro.disconnect();
+  }, []);
 
   const saveHistory = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     historyRef.current.push(canvas.toDataURL("image/png"));
+    if (historyRef.current.length > 30) historyRef.current.shift();
     setCanUndo(true);
   }, []);
 
@@ -98,14 +98,15 @@ export default function DoodleCanvas({ onClose, onSend }: DoodleCanvasProps) {
     const ctx = canvas?.getContext("2d");
     if (!canvas || !ctx) return;
     const dpr = window.devicePixelRatio || 1;
-    
-    // Fill white
+    const w = canvas.width / dpr;
+    const h = canvas.height / dpr;
+
     ctx.fillStyle = "#FFFFFF";
-    ctx.fillRect(0, 0, canvas.width / dpr, canvas.height / dpr);
-    
+    ctx.fillRect(0, 0, w, h);
+
     if (snap) {
       const img = new Image();
-      img.onload = () => ctx.drawImage(img, 0, 0, canvas.width / dpr, canvas.height / dpr);
+      img.onload = () => ctx.drawImage(img, 0, 0, w, h);
       img.src = snap;
     }
   }, []);
@@ -134,17 +135,18 @@ export default function DoodleCanvas({ onClose, onSend }: DoodleCanvasProps) {
   const applyBrush = useCallback((ctx: CanvasRenderingContext2D) => {
     ctx.globalCompositeOperation = "source-over";
     ctx.strokeStyle = color;
-    ctx.lineWidth = actualBrushSize;
+    ctx.fillStyle = color;
+    ctx.lineWidth = brushSize;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
-  }, [color, actualBrushSize]);
+  }, [color, brushSize]);
 
   const getPoint = (e: React.PointerEvent): Point => {
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return { x: 0, y: 0 };
-    return { 
-      x: e.clientX - rect.left, 
-      y: e.clientY - rect.top 
+    return {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
     };
   };
 
@@ -154,15 +156,14 @@ export default function DoodleCanvas({ onClose, onSend }: DoodleCanvasProps) {
     isDrawingRef.current = true;
     const pt = getPoint(e);
     lastPtRef.current = pt;
-    
+
     const ctx = canvasRef.current?.getContext("2d");
     if (!ctx) return;
     applyBrush(ctx);
     ctx.beginPath();
-    ctx.arc(pt.x, pt.y, actualBrushSize / 2, 0, Math.PI * 2);
-    ctx.fillStyle = color;
+    ctx.arc(pt.x, pt.y, brushSize / 2, 0, Math.PI * 2);
     ctx.fill();
-  }, [actualBrushSize, applyBrush, color]);
+  }, [brushSize, applyBrush]);
 
   const onPointerMove = useCallback((e: React.PointerEvent) => {
     if (!isDrawingRef.current || !lastPtRef.current) return;
@@ -192,75 +193,76 @@ export default function DoodleCanvas({ onClose, onSend }: DoodleCanvasProps) {
 
     const cssW = sourceCanvas.clientWidth;
     const cssH = sourceCanvas.clientHeight;
-    
-    // Get image data at CSS pixel size
+
     const tempCanvas = document.createElement("canvas");
     tempCanvas.width = cssW;
     tempCanvas.height = cssH;
     const tempCtx = tempCanvas.getContext("2d")!;
     tempCtx.drawImage(sourceCanvas, 0, 0, cssW, cssH);
-    
+
     const imageData = tempCtx.getImageData(0, 0, cssW, cssH);
     const data = imageData.data;
 
-    const isNonWhite = (offset: number) => {
+    const isDrawn = (offset: number) => {
       const a = data[offset + 3];
-      return a > 128 && !(data[offset] === 255 && data[offset + 1] === 255 && data[offset + 2] === 255);
+      if (a < 16) return false;
+      const r = data[offset];
+      const g = data[offset + 1];
+      const b = data[offset + 2];
+      return !(r > 250 && g > 250 && b > 250);
     };
 
-    // Scan from edges inward (fast)
     let minX = cssW, maxX = -1, minY = cssH, maxY = -1;
 
-    // Scan top to bottom (find minY and maxY)
-    outer: for (let y = 0; y < cssH; y++) {
+    for (let y = 0; y < cssH; y++) {
       for (let x = 0; x < cssW; x++) {
-        if (isNonWhite((y * cssW + x) * 4)) {
+        if (isDrawn((y * cssW + x) * 4)) {
           minY = y;
-          break outer;
+          y = cssH;
+          break;
         }
       }
     }
 
-    if (minY === cssH) return { x: 0, y: 0, w: cssW, h: cssH }; // No content
+    if (minY === cssH) return { x: 0, y: 0, w: Math.min(cssW, 200), h: Math.min(cssH, 200) };
 
-    // Scan bottom to top (find maxY)
-    outer: for (let y = cssH - 1; y >= minY; y--) {
+    for (let y = cssH - 1; y >= minY; y--) {
       for (let x = 0; x < cssW; x++) {
-        if (isNonWhite((y * cssW + x) * 4)) {
+        if (isDrawn((y * cssW + x) * 4)) {
           maxY = y;
-          break outer;
+          y = -1;
+          break;
         }
       }
     }
 
-    // Scan left to right (find minX)
-    outer: for (let x = 0; x < cssW; x++) {
+    for (let x = 0; x < cssW; x++) {
       for (let y = minY; y <= maxY; y++) {
-        if (isNonWhite((y * cssW + x) * 4)) {
+        if (isDrawn((y * cssW + x) * 4)) {
           minX = x;
-          break outer;
+          x = cssW;
+          break;
         }
       }
     }
 
-    // Scan right to left (find maxX)
-    outer: for (let x = cssW - 1; x >= minX; x--) {
+    for (let x = cssW - 1; x >= minX; x--) {
       for (let y = minY; y <= maxY; y++) {
-        if (isNonWhite((y * cssW + x) * 4)) {
+        if (isDrawn((y * cssW + x) * 4)) {
           maxX = x;
-          break outer;
+          x = -1;
+          break;
         }
       }
     }
 
-    // Add 8px padding around the content
-    const padding = 8;
+    const padding = 12;
     const cropX = Math.max(0, minX - padding);
     const cropY = Math.max(0, minY - padding);
     const cropW = Math.min(cssW - cropX, maxX - minX + padding * 2);
     const cropH = Math.min(cssH - cropY, maxY - minY + padding * 2);
-    
-    return { x: cropX, y: cropY, w: cropW, h: cropH };
+
+    return { x: cropX, y: cropY, w: Math.max(cropW, 40), h: Math.max(cropH, 40) };
   };
 
   const handleSend = useCallback(() => {
@@ -268,221 +270,185 @@ export default function DoodleCanvas({ onClose, onSend }: DoodleCanvasProps) {
     if (!canvas || !hasStrokes || sending) return;
     setSending(true);
 
+    const gen = ++exportGenRef.current;
     const cssW = canvas.clientWidth;
     const cssH = canvas.clientHeight;
-    
-    // Export at full size first
+
     const fullCanvas = document.createElement("canvas");
     fullCanvas.width = cssW;
     fullCanvas.height = cssH;
     const fctx = fullCanvas.getContext("2d")!;
     fctx.drawImage(canvas, 0, 0, cssW, cssH);
-    
-    // Detect drawn area (fast edge-scanning)
+
     const crop = cropToContent(fullCanvas);
-    
-    // Create cropped export
+
     const exportCanvas = document.createElement("canvas");
     exportCanvas.width = crop.w;
     exportCanvas.height = crop.h;
     const ectx = exportCanvas.getContext("2d")!;
+    ectx.fillStyle = "#FFFFFF";
+    ectx.fillRect(0, 0, crop.w, crop.h);
     ectx.drawImage(fullCanvas, crop.x, crop.y, crop.w, crop.h, 0, 0, crop.w, crop.h);
 
-    // Use toBlob for better performance (async, non-blocking)
-    let blobTimeout: ReturnType<typeof setTimeout> | null = null;
-    
-    const handleBlobComplete = () => {
-      if (blobTimeout) clearTimeout(blobTimeout);
+    const fail = (msg: string) => {
+      if (exportGenRef.current !== gen) return;
+      setSending(false);
+      onError?.(msg);
     };
 
-    exportCanvas.toBlob((blob) => {
-      handleBlobComplete();
-      if (!blob) {
-        setSending(false);
-        console.error("Failed to create blob from canvas");
-        return;
-      }
-      
-      const reader = new FileReader();
-      
-      reader.onload = () => {
-        onSend({ 
-          imageData: reader.result as string, 
-          canvasX: crop.x, 
-          canvasY: crop.y, 
-          width: crop.w, 
-          height: crop.h 
-        });
-        setSending(false);
-      };
-      
-      reader.onerror = () => {
-        setSending(false);
-        console.error("Failed to read blob as data URL");
-      };
-      
-      try {
+    const blobTimeout = setTimeout(() => {
+      fail("Doodle export took too long. Try again with a simpler drawing.");
+    }, 12000);
+
+    exportCanvas.toBlob(
+      (blob) => {
+        clearTimeout(blobTimeout);
+        if (exportGenRef.current !== gen) return;
+        if (!blob) {
+          fail("Could not export your doodle. Please try again.");
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = () => {
+          if (exportGenRef.current !== gen) return;
+          setSending(false);
+          onSend({
+            imageData: reader.result as string,
+            blob,
+            width: crop.w,
+            height: crop.h,
+          });
+        };
+        reader.onerror = () => fail("Could not read doodle data. Please try again.");
         reader.readAsDataURL(blob);
-      } catch (error) {
-        setSending(false);
-        console.error("Error reading blob:", error);
-      }
-    }, "image/png", 0.95);
-    
-    // Fallback timeout to prevent infinite loading
-    blobTimeout = setTimeout(() => {
-      setSending(false);
-      console.error("Doodle export timeout");
-    }, 15000); // 15 second timeout
-  }, [hasStrokes, sending, onSend]);
+      },
+      "image/png",
+      0.92,
+    );
+  }, [hasStrokes, sending, onSend, onError]);
 
   return createPortal(
-    <div className="fixed inset-0 z-[600] flex flex-col bg-[#0b101e] text-white overflow-hidden">
-      
-      {/* Top Header - safe-area-inset-top requires inline style */}
-      {/* eslint-disable-next-line css-inline-styles -- env(safe-area-inset-top) for notched devices */}
+    <div className="fixed inset-0 z-[600] flex flex-col bg-[#12081a] text-white overflow-hidden">
       <div
-        className="flex items-center justify-between px-4 py-3 shrink-0 border-b border-white/5 pt-3"
+        className="flex items-center justify-between px-4 py-3 shrink-0 border-b border-pink-500/10"
         style={{ paddingTop: "max(12px, env(safe-area-inset-top))" }}
       >
-        <div className="flex items-center gap-3">
-          <button onClick={onClose} className="p-1 hover:bg-white/10 rounded-full transition-colors" aria-label="Close doodle canvas">
-            <ChevronLeft className="w-6 h-6" />
-          </button>
-          <span className="font-semibold text-[15px]">Draw in chat</span>
-        </div>
-        
-        <div className="flex items-center gap-3">
-          <button 
-            onClick={() => setMoreSpace(!moreSpace)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0080FF]/15 text-[#0080FF] rounded-lg text-sm font-medium hover:bg-[#0080FF]/25 transition-colors"
-          >
-            <Maximize className="w-4 h-4" />
-            More space
-          </button>
-          
-          <button onClick={undo} disabled={!canUndo} className="p-2 hover:bg-white/10 rounded-full transition-colors disabled:opacity-30" aria-label="Undo drawing">
-            <Undo2 className="w-5 h-5" />
-          </button>
-          
-          <button onClick={clear} className="p-2 hover:bg-[#FF0040]/20 text-[#FF0040] rounded-full transition-colors" aria-label="Clear canvas">
-            <Trash2 className="w-5 h-5" />
-          </button>
-          
-          <button 
-            onClick={handleSend} 
-            disabled={!hasStrokes || sending}
-            className="w-9 h-9 flex items-center justify-center bg-[#0080FF] rounded-full text-white hover:bg-[#0066CC] transition-colors disabled:opacity-50 disabled:bg-[#0080FF]/50"
-          >
-            {sending ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Send className="w-4 h-4 ml-0.5" />}
-          </button>
-          
-          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors ml-1" aria-label="Close drawing">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+        <button
+          onClick={onClose}
+          className="p-2 hover:bg-white/10 rounded-full transition-colors"
+          aria-label="Close doodle"
+        >
+          <ChevronLeft className="w-6 h-6" />
+        </button>
+
+        <span className="font-semibold text-[15px] text-pink-100">Draw a doodle</span>
+
+        <button
+          onClick={handleSend}
+          disabled={!hasStrokes || sending}
+          className="flex items-center gap-1.5 px-4 py-2 bg-pink-500 rounded-full text-sm font-semibold hover:bg-pink-400 transition-colors disabled:opacity-40"
+        >
+          {sending ? (
+            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+          ) : (
+            <>
+              <Send className="w-4 h-4" />
+              Send
+            </>
+          )}
+        </button>
       </div>
 
-      {/* Main Content Area */}
-      <div className="flex flex-1 min-h-0 relative">
-        
-        {/* Left Sidebar (Colors) */}
-        <div className="w-[60px] shrink-0 flex flex-col items-center py-4 overflow-y-auto scrollbar-hide gap-4 border-r border-white/5">
-          {COLORS.map(c => (
-            // eslint-disable-next-line jsx-a11y/no-static-element-interactions
-            // eslint-disable-next-line css-inline-styles -- dynamic color value from state
+      <div
+        ref={containerRef}
+        className="flex-1 min-h-0 relative bg-[#1a1028] m-3 rounded-2xl overflow-hidden shadow-[inset_0_0_40px_rgba(255,77,141,0.08)]"
+      >
+        <canvas
+          ref={canvasRef}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerUp}
+          className="absolute inset-0 touch-none w-full h-full cursor-crosshair"
+        />
+        {!hasStrokes && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <p className="text-pink-200/40 text-sm font-medium">Draw something cute ✨</p>
+          </div>
+        )}
+      </div>
+
+      <div
+        className="shrink-0 border-t border-pink-500/10 bg-[#12081a] px-4 pt-3"
+        style={{ paddingBottom: "max(16px, env(safe-area-inset-bottom))" }}
+      >
+        <div className="flex items-center gap-2 mb-3 overflow-x-auto scrollbar-hide pb-1">
+          {COLORS.map((c) => (
             <button
               key={c}
               onClick={() => setColor(c)}
-              className="relative rounded-full w-8 h-8 shrink-0 transition-transform hover:scale-110"
-              style={{ backgroundColor: c, border: c === "#000000" ? "1px solid rgba(255,255,255,0.2)" : "none" }}
-              aria-label={`Select ${c} color`}
-            >
-              {color === c && (
-                <div className="absolute -inset-[4px] rounded-full border-2 border-[#0080FF]" />
+              className={cn(
+                "relative rounded-full w-9 h-9 shrink-0 transition-transform hover:scale-110",
+                color === c && "ring-2 ring-pink-400 ring-offset-2 ring-offset-[#12081a]",
               )}
-            </button>
+              style={{
+                backgroundColor: c,
+                border: c === "#FFFFFF" ? "1px solid rgba(255,255,255,0.3)" : "none",
+              }}
+              aria-label={`Color ${c}`}
+            />
           ))}
         </div>
 
-        {/* Canvas Area */}
-        <div className="flex-1 flex flex-col bg-[#161c2d] p-0 md:p-2">
-          <div 
-            ref={containerRef} 
-            className={cn(
-              "flex-1 bg-white shadow-lg overflow-hidden relative transition-all duration-300",
-              moreSpace ? "m-0 rounded-none" : "m-2 md:m-4 rounded-xl md:rounded-2xl"
-            )}
-          >
-            <canvas
-              ref={canvasRef}
-              onPointerDown={onPointerDown}
-              onPointerMove={onPointerMove}
-              onPointerUp={onPointerUp}
-              onPointerCancel={onPointerUp}
-              className="absolute inset-0 touch-none w-full h-full cursor-crosshair"
-            />
-          </div>
-        </div>
-
-        {/* Right Sidebar (Sizes & Opacity/Size Multiplier Slider) */}
-        <div className="w-[60px] shrink-0 flex flex-col items-center py-4 border-l border-white/5 bg-[#0b101e] z-10">
-          <div className="text-[10px] text-white/50 font-bold mb-4">SIZE</div>
-          <div className="flex flex-col items-center justify-between h-[200px] mb-8">
-            {SIZES.map(s => (
-              // eslint-disable-next-line jsx-a11y/no-static-element-interactions
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            {SIZES.map((s) => (
               <button
                 key={s}
                 onClick={() => setBrushSize(s)}
-                className="relative flex items-center justify-center w-8 h-8 rounded-full hover:bg-white/5"
+                className={cn(
+                  "flex items-center justify-center w-9 h-9 rounded-full transition-colors",
+                  brushSize === s ? "bg-pink-500/25 ring-1 ring-pink-400" : "hover:bg-white/10",
+                )}
                 aria-label={`Brush size ${s}`}
               >
-                {/* eslint-disable-next-line css-inline-styles -- dynamic size from brushSize state */}
-              <div 
-                  className="rounded-full bg-white transition-all" 
-                  style={{ width: s, height: s }}
+                <div
+                  className="rounded-full bg-white"
+                  style={{ width: Math.min(s, 16), height: Math.min(s, 16) }}
                 />
-                {brushSize === s && (
-                  <div className="absolute inset-0 rounded-full border-2 border-[#0080FF]" />
-                )}
               </button>
             ))}
           </div>
 
-          <div className="flex-1 flex flex-col items-center w-full min-h-[100px] px-2 relative group">
-            {/* Slider track */}
-            <div className="absolute inset-y-0 w-1 bg-white/10 rounded-full overflow-hidden flex flex-col justify-end">
-              {/* eslint-disable-next-line css-inline-styles -- dynamic height from slider state */}
-              <div 
-                className="w-full bg-[#0080FF] transition-all duration-75" 
-                style={{ height: `${sliderValue}%` }}
-              />
-            </div>
-            {/* Slider input */}
-            {/* eslint-disable-next-line css-inline-styles -- writingMode not available in Tailwind */}
-            <input 
-              type="range" 
-              min="10" 
-              max="100" 
-              value={sliderValue}
-              onChange={(e) => setSliderValue(Number(e.target.value))}
-              className="absolute inset-0 w-full h-full opacity-0 cursor-ns-resize"
-              style={{ writingMode: 'vertical-rl', direction: 'rtl' }}
-              aria-label="Brush size multiplier"
-            />
-            {/* Slider thumb representation */}
-            {/* eslint-disable-next-line css-inline-styles -- dynamic calc() position from slider state */}
-            <div 
-              className="absolute w-4 h-4 bg-[#0080FF] rounded-full shadow-lg pointer-events-none transition-all duration-75"
-              style={{ bottom: `calc(${sliderValue}% - 8px)` }}
+          <div className="flex items-center gap-1">
+            <button
+              onClick={undo}
+              disabled={!canUndo}
+              className="p-2.5 hover:bg-white/10 rounded-full transition-colors disabled:opacity-30"
+              aria-label="Undo"
             >
-              <div className="absolute inset-x-0 h-[2px] top-1/2 -translate-y-1/2 -mx-1 bg-[#0080FF]" />
-            </div>
+              <Undo2 className="w-5 h-5" />
+            </button>
+            <button
+              onClick={clear}
+              disabled={!hasStrokes}
+              className="p-2.5 hover:bg-pink-500/20 text-pink-300 rounded-full transition-colors disabled:opacity-30"
+              aria-label="Clear canvas"
+            >
+              <Eraser className="w-5 h-5" />
+            </button>
+            <button
+              onClick={onClose}
+              className="p-2.5 hover:bg-white/10 rounded-full transition-colors"
+              aria-label="Cancel"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
         </div>
-
       </div>
     </div>,
-    document.body
+    document.body,
   );
 }

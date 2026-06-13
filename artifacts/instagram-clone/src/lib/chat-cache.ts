@@ -73,6 +73,14 @@ export function readChatCache(userId: string): ApiMessage[] | null {
   }
 }
 
+export function clearChatCache(userId: string): void {
+  try {
+    sessionStorage.removeItem(cacheKey(userId));
+  } catch {
+    /* quota or private mode */
+  }
+}
+
 export function writeChatCache(userId: string, messages: ApiMessage[]): void {
   try {
     const tail = messages.slice(-MAX_CACHED).map(slimMessage);

@@ -182,6 +182,7 @@ export function messagePreview(msg: ApiMessage): string {
   if (msg.type === "location") return "📍 Shared location";
   if (msg.type === "audio") return "Voice message";
   if (msg.type === "image") return "Photo";
+  if (msg.type === "doodle") return "Doodle";
   if (msg.type === "video") return "Video";
   if (msg.type === "gif") return "GIF";
   if (msg.type === "file") return msg.text || "File";

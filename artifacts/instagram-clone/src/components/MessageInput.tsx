@@ -7,7 +7,7 @@ import StickerPicker from "@/components/StickerPicker";
 import GreetingPicker from "@/components/GreetingPicker";
 import { extractClipboardFiles, readClipboardFilesAsync } from "@/lib/media-file";
 import { useChatTheme } from "@/hooks/useChatTheme";
-import { isSupportedFileType, MAX_FILE_SIZE_MB, FILE_INPUT_ACCEPT } from "@/lib/supported-file-types";
+import { isSupportedFileType, MAX_FILE_SIZE_MB, DOCUMENTS_ONLY_ACCEPT } from "@/lib/supported-file-types";
 
 const CustomLocationIcon = () => <MapPin className="w-[26px] h-[26px] text-white" strokeWidth={1.6} />;
 const CustomQuickChatIcon = () => <MessageSquarePlus className="w-[26px] h-[26px] text-white" strokeWidth={1.6} />;
@@ -410,7 +410,7 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
         ref={genericFileInputRef}
         type="file"
         multiple
-        accept={FILE_INPUT_ACCEPT}
+        accept={DOCUMENTS_ONLY_ACCEPT}
         className="hidden"
         onChange={handleFileChange}
         aria-label="Upload document or file"

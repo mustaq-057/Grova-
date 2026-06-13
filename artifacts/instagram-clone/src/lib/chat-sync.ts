@@ -60,10 +60,18 @@ function mergeOptimisticWithServer(optimistic: ApiMessage, server: ApiMessage): 
 }
 
 /** Re-attach rows that vanished during a bad optimistic reconcile / poll race. */
-export function preserveDroppedMessages(prev: ApiMessage[], next: ApiMessage[]): ApiMessage[] {
+export function preserveDroppedMessages(
+  prev: ApiMessage[],
+  next: ApiMessage[],
+  opts?: { keepIds?: ReadonlySet<string> },
+): ApiMessage[] {
   if (next.length >= prev.length) return next;
   const nextIds = new Set(next.map((m) => m.id));
-  const missing = prev.filter((m) => !nextIds.has(m.id) && !m.deleted);
+  const missing = prev.filter((m) => {
+    if (nextIds.has(m.id) || m.deleted) return false;
+    if (opts?.keepIds && !opts.keepIds.has(m.id)) return false;
+    return true;
+  });
   if (missing.length === 0) return next;
   return mergeMessagesById(next, missing);
 }

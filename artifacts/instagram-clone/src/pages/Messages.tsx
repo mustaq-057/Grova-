@@ -103,7 +103,8 @@ import {
   scrollChatForComposerChange,
   scrollMessageIntoCenter,
 } from "@/lib/chat-scroll";
-import { readChatCache, readChatCacheForCurrentUser, writeChatCache } from "@/lib/chat-cache";
+import { readSessionSnapshot } from "@/lib/profile-cache";
+import { readChatCache, readChatCacheForCurrentUser, writeChatCache, clearChatCache } from "@/lib/chat-cache";
 import {
   captureScrollAnchor,
   clearChatScrollAnchor,
@@ -148,7 +149,17 @@ function TypingDots() {
 type CallState = { status: "outgoing" | "incoming" | "active"; type: "audio" | "video"; incomingOffer?: RTCSessionDescriptionInit } | null;
 
 function initialChatMessages(): ApiMessage[] {
-  return readChatCacheForCurrentUser();
+  const cached = readChatCacheForCurrentUser();
+  const userId = readSessionSnapshot()?.user?.id;
+  if (!userId) return cached;
+  const clearedAt = getChatClearedAt(userId);
+  if (!clearedAt) return cached;
+  const clearMs = new Date(clearedAt).getTime();
+  return cached.filter((m) => {
+    if (!m.timestamp) return false;
+    const msgMs = new Date(m.timestamp).getTime();
+    return !Number.isNaN(msgMs) && !Number.isNaN(clearMs) && msgMs > clearMs;
+  });
 }
 
 // ── Main Component ────────────────────────────────────────────────────────────
@@ -373,26 +384,7 @@ export default function Messages() {
     closeDoodlePanel();
     if (!user) return;
     const tempId = crypto.randomUUID();
-
-    // Calculate absolute scroll position
-    const container = messagesContainerRef.current;
-    let absoluteX = data.canvasX;
-    let absoluteY = data.canvasY;
-
-    if (container) {
-      const rect = container.getBoundingClientRect();
-      const style = window.getComputedStyle(container);
-      const paddingLeft = parseFloat(style.paddingLeft) || 0;
-      const paddingTop = parseFloat(style.paddingTop) || 0;
-      const borderLeft = parseFloat(style.borderLeftWidth) || 0;
-      const borderTop = parseFloat(style.borderTopWidth) || 0;
-
-      absoluteX = data.canvasX - rect.left - paddingLeft - borderLeft;
-      absoluteY = data.canvasY - rect.top - paddingTop - borderTop + container.scrollTop;
-    }
-
-    // Encode position metadata into the text field as JSON
-    const posText = JSON.stringify({ canvasX: absoluteX, canvasY: absoluteY, width: data.width, height: data.height });
+    const posText = JSON.stringify({ width: data.width, height: data.height });
 
     pendingOutgoingRef.current.add(tempId);
     setMessages((prev) => [
@@ -404,27 +396,11 @@ export default function Messages() {
     ]);
     requestStickToBottom();
 
-    const attemptUpload = async (attempt = 0): Promise<string> => {
-      try {
-        return await uploadMediaToB2(data.imageData, "image/png");
-      } catch (err) {
-        const raw = err instanceof Error ? err.message : "";
-        const isRetryable = /timed out|502|503|504/i.test(raw);
-        if (isRetryable && attempt < 2) {
-          await new Promise((r) => setTimeout(r, 1200 * (attempt + 1)));
-          return attemptUpload(attempt + 1);
-        }
-        throw err;
-      }
-    };
-
     void (async () => {
       try {
-        const url = await attemptUpload();
-        if (!url || !url.trim()) {
-          throw new Error("Upload returned empty URL");
-        }
-        
+        const url = await uploadMediaFile(data.blob, "image/png");
+        if (!url?.trim()) throw new Error("Upload returned empty URL");
+
         const outgoing = await prepareOutgoingMessage({
           senderId: user.id,
           type: "doodle",
@@ -433,7 +409,7 @@ export default function Messages() {
         });
         const saved = await api.sendMessage(outgoing);
         const [display] = await normalizeMessages([saved]);
-        
+
         setMessages((prev) => {
           const next = replaceOptimisticMessage(prev, tempId, display, user.id);
           pendingOutgoingRef.current.delete(tempId);
@@ -441,7 +417,6 @@ export default function Messages() {
           writeChatCache(user.id, next);
           return next;
         });
-        // Notify partner that we shared a doodle
         const partnerDisplayName = partner?.name || partnerName || (partnerId === "wife" ? "Sara" : "Mustaq");
         notifyDoodleShared(partnerDisplayName);
         requestStickToBottom();
@@ -449,10 +424,8 @@ export default function Messages() {
         console.error("Doodle send failed:", err);
         pendingOutgoingRef.current.delete(tempId);
         setMessages((prev) => prev.filter((m) => m.id !== tempId));
-        const errorMsg = err instanceof Error ? err.message : "Unknown error";
-        toast.error(`Failed to send doodle: ${errorMsg}`, { duration: 4000 });
-        const raw = err instanceof Error ? err.message : "";
-        toast.error(raw || "Doodle upload failed. Please try again.", { duration: 5000 });
+        const errorMsg = err instanceof Error ? err.message : "Doodle upload failed. Please try again.";
+        toast.error(`Failed to send doodle: ${errorMsg}`, { duration: 5000 });
       }
     })();
   }, [closeDoodlePanel, user, requestStickToBottom, partner, partnerName, partnerId]);
@@ -516,7 +489,10 @@ export default function Messages() {
       setMessages((prev) => {
         const merged = reconcilePendingOptimistics(prev, fromServer, pendingOutgoingRef.current);
         const guarded = enforceUnsentMessages(merged, unsentIdsRef.current);
-        const next = preserveDroppedMessages(prev, guarded);
+        const keepIds = new Set(
+          user?.id ? filterVisibleMessages(user.id, prev).map((m) => m.id) : prev.map((m) => m.id),
+        );
+        const next = preserveDroppedMessages(prev, guarded, { keepIds });
         messagesSigRef.current = messagesListSignature(next);
         if (user?.id) writeChatCache(user.id, next);
         return next;
@@ -720,7 +696,10 @@ export default function Messages() {
         setMessages((prev) => {
           const merged = reconcilePendingOptimistics(prev, fresh, pendingOutgoingRef.current);
           const guarded = enforceUnsentMessages(merged, unsentIdsRef.current);
-          const preserved = preserveDroppedMessages(prev, guarded);
+          const keepIds = new Set(
+            user?.id ? filterVisibleMessages(user.id, prev).map((m) => m.id) : prev.map((m) => m.id),
+          );
+          const preserved = preserveDroppedMessages(prev, guarded, { keepIds });
           const next = mergeMessagesIfChanged(prev, preserved, (_, m) => m);
           if (!next) {
             scrollPreserveRef.current = null;
@@ -1160,7 +1139,10 @@ export default function Messages() {
         setMessages((prev) => {
           const merged = reconcilePendingOptimistics(prev, fresh, pendingOutgoingRef.current);
           const guarded = enforceUnsentMessages(merged, unsentIdsRef.current);
-          const preserved = preserveDroppedMessages(prev, guarded);
+          const keepIds = new Set(
+            user?.id ? filterVisibleMessages(user.id, prev).map((m) => m.id) : prev.map((m) => m.id),
+          );
+          const preserved = preserveDroppedMessages(prev, guarded, { keepIds });
           const next = mergeMessagesIfChanged(prev, preserved, (_, m) => m);
           if (!next) {
             scrollPreserveRef.current = null;
@@ -2719,9 +2701,13 @@ export default function Messages() {
     setLoadingMore(false);
     setHasNewMessages(false);
     setError(null);
+    messagesSigRef.current = "0";
+    clearChatCache(user.id);
+    clearChatScrollAnchor(user.id);
     setHiddenTick((t) => t + 1);
     try {
       await clearChatForUser(user.id);
+      writeChatCache(user.id, []);
     } catch (err) {
       console.error("Failed to clear chat:", err);
       window.alert("Could not clear chat on the server. Try again.");
@@ -3109,7 +3095,7 @@ export default function Messages() {
             </div>
           )}
 
-          {!error && visibleMessages.length === 0 && messages.length === 0 && (
+          {!error && visibleMessages.length === 0 && (
             <div className="flex flex-col items-center gap-2 py-8 text-center px-4">
               <span className="text-4xl">💬</span>
               {user && getChatClearedAt(user.id) ? (
@@ -3198,6 +3184,7 @@ export default function Messages() {
             <DoodleCanvas
               onClose={closeDoodlePanel}
               onSend={handleDoodleSend}
+              onError={(msg) => toast.error(msg, { duration: 4000 })}
             />
           )}
 

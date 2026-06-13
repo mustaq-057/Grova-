@@ -1,8 +1,28 @@
 import { api } from "./api";
 
+const CLEARED_AT_STORAGE_PREFIX = "grova_chat_cleared_v1_";
+
 /** Per-user hidden message ids — synced from Neon only (no localStorage). */
 const hiddenByUser = new Map<string, Set<string>>();
 const clearedAtByUser = new Map<string, string | null>();
+
+function persistClearedAt(userId: string, clearedAt: string | null): void {
+  try {
+    const key = `${CLEARED_AT_STORAGE_PREFIX}${userId}`;
+    if (clearedAt) sessionStorage.setItem(key, clearedAt);
+    else sessionStorage.removeItem(key);
+  } catch {
+    /* quota or private mode */
+  }
+}
+
+function readPersistedClearedAt(userId: string): string | null {
+  try {
+    return sessionStorage.getItem(`${CLEARED_AT_STORAGE_PREFIX}${userId}`);
+  } catch {
+    return null;
+  }
+}
 
 export async function hydrateHiddenMessages(userId: string): Promise<Set<string>> {
   try {
@@ -10,6 +30,7 @@ export async function hydrateHiddenMessages(userId: string): Promise<Set<string>
     const set = new Set(messageIds);
     hiddenByUser.set(userId, set);
     clearedAtByUser.set(userId, clearedAt ?? null);
+    persistClearedAt(userId, clearedAt ?? null);
     return set;
   } catch {
     hiddenByUser.set(userId, new Set());
@@ -22,13 +43,14 @@ export function getHiddenMessageIds(userId: string): Set<string> {
 }
 
 export function getChatClearedAt(userId: string): string | null {
-  return clearedAtByUser.get(userId) ?? null;
+  return clearedAtByUser.get(userId) ?? readPersistedClearedAt(userId);
 }
 
 export async function clearChatForUser(userId: string): Promise<string> {
   const res = await api.clearChatForMe();
   const clearedAt = res.clearedAt || new Date().toISOString();
   clearedAtByUser.set(userId, clearedAt);
+  persistClearedAt(userId, clearedAt);
   hiddenByUser.set(userId, new Set());
   return clearedAt;
 }
