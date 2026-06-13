@@ -148,7 +148,7 @@ function initialChatMessages(): ApiMessage[] {
 
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function Messages() {
-  const { user, partner, refreshCouplePrefs } = useAuth();
+  const { user, partner, refreshCouplePrefs, updateChatTheme } = useAuth();
   const [messages, setMessages] = useState<ApiMessage[]>(initialChatMessages);
   const messagesSigRef = useRef(
     messages.length ? messagesListSignature(messages) : "0",
@@ -3205,9 +3205,7 @@ export default function Messages() {
             onClose={() => setShowBubbleColors(false)}
             currentThemeId={user ? getCachedChatTheme() : "default"}
             onSelect={(themeId) => {
-              api.updateCouplePrefs({ chatTheme: themeId }).then(() => {
-                if (refreshCouplePrefs) refreshCouplePrefs();
-              }).catch(console.error);
+              if (updateChatTheme) updateChatTheme(themeId);
             }}
           />
         </div>
