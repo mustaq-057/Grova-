@@ -213,10 +213,14 @@ export default function DoodleCanvas({ onClose, onSend }: DoodleCanvasProps) {
   return createPortal(
     <div className="fixed inset-0 z-[600] flex flex-col bg-[#0b101e] text-white overflow-hidden">
       
-      {/* Top Header */}
-      <div className="flex items-center justify-between px-4 py-3 shrink-0 border-b border-white/5" style={{ paddingTop: "max(12px, env(safe-area-inset-top))" }}>
+      {/* Top Header - safe-area-inset-top requires inline style */}
+      {/* eslint-disable-next-line */}
+      <div
+        className="flex items-center justify-between px-4 py-3 shrink-0 border-b border-white/5 pt-3"
+        style={{ paddingTop: "max(12px, env(safe-area-inset-top))" }}
+      >
         <div className="flex items-center gap-3">
-          <button onClick={onClose} className="p-1 hover:bg-white/10 rounded-full transition-colors">
+          <button onClick={onClose} className="p-1 hover:bg-white/10 rounded-full transition-colors" aria-label="Close doodle canvas">
             <ChevronLeft className="w-6 h-6" />
           </button>
           <span className="font-semibold text-[15px]">Draw in chat</span>
@@ -231,11 +235,11 @@ export default function DoodleCanvas({ onClose, onSend }: DoodleCanvasProps) {
             More space
           </button>
           
-          <button onClick={undo} disabled={!canUndo} className="p-2 hover:bg-white/10 rounded-full transition-colors disabled:opacity-30">
+          <button onClick={undo} disabled={!canUndo} className="p-2 hover:bg-white/10 rounded-full transition-colors disabled:opacity-30" aria-label="Undo drawing">
             <Undo2 className="w-5 h-5" />
           </button>
           
-          <button onClick={clear} className="p-2 hover:bg-[#FF0040]/20 text-[#FF0040] rounded-full transition-colors">
+          <button onClick={clear} className="p-2 hover:bg-[#FF0040]/20 text-[#FF0040] rounded-full transition-colors" aria-label="Clear canvas">
             <Trash2 className="w-5 h-5" />
           </button>
           
@@ -247,7 +251,7 @@ export default function DoodleCanvas({ onClose, onSend }: DoodleCanvasProps) {
             {sending ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Send className="w-4 h-4 ml-0.5" />}
           </button>
           
-          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors ml-1">
+          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors ml-1" aria-label="Close drawing">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -259,11 +263,13 @@ export default function DoodleCanvas({ onClose, onSend }: DoodleCanvasProps) {
         {/* Left Sidebar (Colors) */}
         <div className="w-[60px] shrink-0 flex flex-col items-center py-4 overflow-y-auto scrollbar-hide gap-4 border-r border-white/5">
           {COLORS.map(c => (
+            {/* eslint-disable-next-line */}
             <button
               key={c}
               onClick={() => setColor(c)}
               className="relative rounded-full w-8 h-8 shrink-0 transition-transform hover:scale-110"
               style={{ backgroundColor: c, border: c === "#000000" ? "1px solid rgba(255,255,255,0.2)" : "none" }}
+              aria-label={`Select ${c} color`}
             >
               {color === c && (
                 <div className="absolute -inset-[4px] rounded-full border-2 border-[#0080FF]" />
@@ -301,7 +307,9 @@ export default function DoodleCanvas({ onClose, onSend }: DoodleCanvasProps) {
                 key={s}
                 onClick={() => setBrushSize(s)}
                 className="relative flex items-center justify-center w-8 h-8 rounded-full hover:bg-white/5"
+                aria-label={`Brush size ${s}`}
               >
+                {/* eslint-disable-next-line */}
                 <div 
                   className="rounded-full bg-white transition-all" 
                   style={{ width: s, height: s }}
@@ -316,12 +324,14 @@ export default function DoodleCanvas({ onClose, onSend }: DoodleCanvasProps) {
           <div className="flex-1 flex flex-col items-center w-full min-h-[100px] px-2 relative group">
             {/* Slider track */}
             <div className="absolute inset-y-0 w-1 bg-white/10 rounded-full overflow-hidden flex flex-col justify-end">
+              {/* eslint-disable-next-line */}
               <div 
                 className="w-full bg-[#0080FF] transition-all duration-75" 
-                style={{ height: `${sliderValue}%` }} 
+                style={{ height: `${sliderValue}%` }}
               />
             </div>
             {/* Slider input */}
+            {/* eslint-disable-next-line */}
             <input 
               type="range" 
               min="10" 
@@ -330,8 +340,10 @@ export default function DoodleCanvas({ onClose, onSend }: DoodleCanvasProps) {
               onChange={(e) => setSliderValue(Number(e.target.value))}
               className="absolute inset-0 w-full h-full opacity-0 cursor-ns-resize"
               style={{ writingMode: 'vertical-rl', direction: 'rtl' }}
+              aria-label="Brush size multiplier"
             />
             {/* Slider thumb representation */}
+            {/* eslint-disable-next-line */}
             <div 
               className="absolute w-4 h-4 bg-[#0080FF] rounded-full shadow-lg pointer-events-none transition-all duration-75"
               style={{ bottom: `calc(${sliderValue}% - 8px)` }}

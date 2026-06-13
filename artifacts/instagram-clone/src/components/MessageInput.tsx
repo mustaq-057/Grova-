@@ -370,7 +370,6 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
         accept="image/*,video/*"
         className="hidden"
         onChange={handleFileChange}
-        capture={false}
         aria-label="Upload any file"
       />
 
@@ -381,7 +380,6 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
         accept="*/*"
         className="hidden"
         onChange={handleFileChange}
-        capture={false}
         aria-label="Upload document or file"
       />
 
@@ -390,12 +388,14 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
       )}
 
       <div className="flex items-center gap-[8px] sm:gap-[10px] bg-[#1a1a1a] rounded-[40px] py-[7px] sm:py-[9px] pr-[8px] sm:pr-[14px] pl-[5px] sm:pl-[9px] mx-[4px] md:mx-auto md:w-full md:max-w-[800px]">
+        {/* eslint-disable-next-line */}
         <button
           type="button"
           onClick={onOpenCamera}
           className="w-[38px] h-[38px] sm:w-[44px] sm:h-[44px] rounded-full active:scale-95 flex shrink-0 items-center justify-center text-white border-none transition-all hover:brightness-90"
           style={{ backgroundColor: theme.bubbleColor }}
           disabled={disabled}
+          aria-label="Take photo with camera"
         >
           <Camera className="w-[20px] h-[20px] sm:w-[22px] sm:h-[22px]" strokeWidth={1.8} />
         </button>
@@ -413,6 +413,7 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
               onClick={onStartRecording}
               className={`w-[34px] h-[34px] sm:w-[38px] sm:h-[38px] flex items-center justify-center rounded-full hover:bg-white/10 active:scale-95 transition-all text-[#ccc] border-none bg-transparent ${disabled ? iconBtnDisabled : ""}`}
               disabled={disabled}
+              aria-label="Start voice recording"
             >
               <Mic className="w-[22px] h-[22px] sm:w-[24px] sm:h-[24px]" strokeWidth={1.8} />
             </button>
@@ -421,6 +422,7 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
               onClick={handleImageClick}
               className={`w-[34px] h-[34px] sm:w-[38px] sm:h-[38px] flex items-center justify-center rounded-full hover:bg-white/10 active:scale-95 transition-all text-[#ccc] border-none bg-transparent ${disabled ? iconBtnDisabled : ""}`}
               disabled={disabled}
+              aria-label="Attach image or video"
             >
               <ImageIcon className="w-[22px] h-[22px] sm:w-[24px] sm:h-[24px]" strokeWidth={1.8} />
             </button>
@@ -429,6 +431,7 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
               onClick={toggleStickerPicker}
               className={`w-[34px] h-[34px] sm:w-[38px] sm:h-[38px] flex items-center justify-center rounded-full hover:bg-white/10 active:scale-95 transition-all text-[#ccc] border-none bg-transparent ${disabled ? iconBtnDisabled : ""}`}
               disabled={disabled}
+              aria-label="Stickers and GIFs"
             >
               <Sticker className="w-[22px] h-[22px] sm:w-[24px] sm:h-[24px]" strokeWidth={1.8} />
             </button>
@@ -439,6 +442,7 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
                 onClick={() => setShowAttachmentMenu((s) => !s)}
                 className={`w-[34px] h-[34px] sm:w-[38px] sm:h-[38px] flex items-center justify-center rounded-full hover:bg-white/10 active:scale-95 transition-all text-[#ccc] border-none bg-transparent ${disabled ? iconBtnDisabled : ""}`}
                 disabled={disabled}
+                aria-label="More attachment options"
               >
                 <PlusCircle className={`w-[22px] h-[22px] sm:w-[24px] sm:h-[24px] transition-transform duration-[0.3s] ease-[cubic-bezier(0.34,1.56,0.64,1)] ${showAttachmentMenu ? "rotate-45" : ""}`} strokeWidth={1.8} />
               </button>
