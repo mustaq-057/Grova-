@@ -219,7 +219,6 @@ export function PostFeed() {
         <div className="px-4 py-3 flex items-center gap-2">
           <Heart className="w-4 h-4 text-primary" />
           <h2 className="font-semibold text-sm">Your feed</h2>
-          <span className="text-xs text-muted-foreground">— both of you</span>
         </div>
         <ul className="divide-y divide-border/50">
           {posts.map((post) => {
