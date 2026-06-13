@@ -15,7 +15,7 @@ import type { ApiMessage } from "@/lib/api";
 import { isCallLogMessage } from "@/lib/call-chat-log";
 import { getPartnerBubbleColors } from "@/lib/themes";
 import { getQuickReactions, onQuickReactionsChanged } from "@/lib/quick-reactions";
-import { isReplyPhotoPlaceholder, parseLegacyReply, parseMediaViewMode, replyPreviewLabel } from "@/lib/message-utils";
+import { isEphemeralMedia, isReplyPhotoPlaceholder, parseLegacyReply, parseMediaViewMode, replyPreviewLabel } from "@/lib/message-utils";
 import { tryRefreshSession } from "@/lib/api";
 import { MessageText } from "@/lib/linkify";
 import { resolveChatImageUrl, resolveChatVideoUrl, resolveChatAudioUrl } from "@/lib/media-url";
@@ -191,12 +191,11 @@ export const MessageItem = memo(function MessageItem({
 
   const replyThumbSrc = useMemo(() => {
     if (!replySource || replySource.type !== "image") return undefined;
+    if (isEphemeralMedia(replySource)) return undefined;
     return resolveChatImageUrl(replySource.imageUrl || replySource.imageData);
   }, [replySource]);
 
-  const showReplyPhoto =
-    Boolean(replyThumbSrc) &&
-    (replySource?.type === "image" || isReplyPhotoPlaceholder(quotedText));
+  const showReplyPhoto = Boolean(replyThumbSrc);
 
   const replyTargetLabel = useMemo(() => {
     if (!hasReply) return "";
@@ -520,19 +519,23 @@ export const MessageItem = memo(function MessageItem({
             <button
               type="button"
               onClick={() => msg.replyToId && onJumpToMessage?.(msg.replyToId)}
-              className={`w-full max-w-full rounded-2xl bg-[#262626] border border-white/10 px-3 py-2 text-left text-[14px] sm:text-[15px] text-white/85 leading-snug max-h-28 overflow-hidden scrollbar-hide transition-colors hover:bg-[#2e2e2e] active:bg-[#333] ${msg.replyToId ? "cursor-pointer" : "cursor-default"}`}
+              className={`w-full max-w-full rounded-2xl bg-[#262626] border border-white/10 px-3 py-2.5 text-left transition-colors hover:bg-[#2e2e2e] active:bg-[#333] ${msg.replyToId ? "cursor-pointer" : "cursor-default"}`}
               disabled={!msg.replyToId || !onJumpToMessage}
             >
-              <div className="flex gap-2.5 items-start min-w-0">
+              <div className="flex gap-2.5 items-center min-w-0">
                 {showReplyPhoto && replyThumbSrc ? (
                   <img
                     src={replyThumbSrc}
                     alt=""
-                    className="w-12 h-12 rounded-lg object-cover shrink-0 bg-black/30"
+                    className="w-10 h-10 rounded-lg object-cover shrink-0 bg-black/30 border border-white/10"
                     loading="lazy"
                   />
+                ) : isReplyPhotoPlaceholder(quotedText) || (replySource && isEphemeralMedia(replySource)) ? (
+                  <div className="w-10 h-10 rounded-lg bg-white/8 border border-white/10 flex items-center justify-center shrink-0">
+                    <span className="text-base opacity-60">📷</span>
+                  </div>
                 ) : null}
-                <span className="flex-1 min-w-0 whitespace-pre-wrap break-words line-clamp-4">
+                <span className="flex-1 min-w-0 text-[13px] sm:text-[14px] text-white/80 whitespace-pre-wrap break-words line-clamp-3">
                   {replySource ? replyPreviewLabel(replySource) : quotedText}
                 </span>
               </div>

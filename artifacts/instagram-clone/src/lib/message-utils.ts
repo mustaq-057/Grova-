@@ -125,6 +125,45 @@ export function parseMediaViewMode(companionSticker?: string): "keep" | "once" |
   return "keep";
 }
 
+export function isEphemeralMedia(msg: ApiMessage): boolean {
+  const mode = msg.mediaViewMode ?? parseMediaViewMode(msg.companionSticker);
+  return (mode === "once" || mode === "twice") && (msg.type === "image" || msg.type === "video");
+}
+
+export function collectImageStack(
+  msgs: ApiMessage[],
+  startIndex: number,
+): { stack: ApiMessage[]; skip: number } {
+  const first = msgs[startIndex];
+  if (!first) return { stack: [], skip: 0 };
+
+  const canStack =
+    first.type === "image" &&
+    !first.pinned &&
+    !first.replyToId &&
+    !isEphemeralMedia(first);
+
+  if (!canStack) return { stack: [first], skip: 1 };
+
+  const stack: ApiMessage[] = [first];
+  let i = startIndex + 1;
+  while (i < msgs.length) {
+    const m = msgs[i];
+    if (m.pinned || m.replyToId) break;
+    if (m.senderId !== first.senderId || m.type !== "image") break;
+    if (isEphemeralMedia(m)) break;
+    const prev = stack[stack.length - 1]!;
+    const gap = new Date(m.timestamp).getTime() - new Date(prev.timestamp).getTime();
+    if (gap > 120_000) break;
+    stack.push(m);
+    i++;
+    if (stack.length >= 10) break;
+  }
+
+  if (stack.length < 2) return { stack: [first], skip: 1 };
+  return { stack, skip: stack.length };
+}
+
 /** Optimistic row shown immediately while sending (always human-readable). */
 export function buildOptimisticMessage(
   partial: Partial<ApiMessage> & { senderId: string },
@@ -179,7 +218,7 @@ export function parseLegacyReply(text: string): { quoted: string; body: string }
 }
 
 export function messagePreview(msg: ApiMessage): string {
-  if (msg.type === "location") return "📍 Shared location";
+  if (msg.type === "location") return "📍 Location";
   if (msg.type === "audio") return "Voice message";
   if (msg.type === "image") return "Photo";
   if (msg.type === "doodle") return "Doodle";
@@ -194,10 +233,17 @@ export function messagePreview(msg: ApiMessage): string {
 /** Short label for reply composer and quoted blocks. */
 export function replyPreviewLabel(msg: ApiMessage): string {
   if (msg.text?.trim()) return msg.text.slice(0, 280);
+  if (isEphemeralMedia(msg)) {
+    const mode = msg.mediaViewMode ?? parseMediaViewMode(msg.companionSticker);
+    return mode === "once" ? "Photo · view once" : "Photo · view twice";
+  }
   return messagePreview(msg);
 }
 
-const REPLY_PHOTO_LABELS = new Set(["Photo", "photo", "📷 Photo"]);
+const REPLY_PHOTO_LABELS = new Set([
+  "Photo", "photo", "📷 Photo",
+  "Photo · view once", "Photo · view twice",
+]);
 
 export function isReplyPhotoPlaceholder(text?: string): boolean {
   return Boolean(text && REPLY_PHOTO_LABELS.has(text.trim()));

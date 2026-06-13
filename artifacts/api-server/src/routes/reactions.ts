@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { randomUUID } from "crypto";
 import db from "../lib/db";
+import { postCoupleActivity, profileDisplayName } from "../lib/activity-feed";
 import { broadcast } from "../lib/sse";
 import { authenticate } from "../lib/auth-middleware";
 import { rateLimiters } from "../lib/security";
@@ -53,6 +54,12 @@ router.post("/reactions", rateLimiters.messages, authenticate, async (req, res) 
         "INSERT INTO message_reactions (id, message_id, user_id, emoji, timestamp) VALUES ($1, $2, $3, $4, $5)",
         [id, messageId, userId, emoji, timestamp]
       );
+      const msgRow = await db.execute("SELECT sender_id FROM messages WHERE id = $1", [messageId]);
+      const messageSenderId = (msgRow.rows[0] as { sender_id?: string } | undefined)?.sender_id;
+      if (messageSenderId && messageSenderId !== userId) {
+        const fromName = await profileDisplayName(userId);
+        await postCoupleActivity("reaction", userId, fromName, `reacted with ${emoji}`).catch(() => {});
+      }
     }
 
     // Get all reactions for this message

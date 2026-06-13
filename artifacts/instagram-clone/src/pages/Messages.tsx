@@ -9,7 +9,8 @@ import { MessageInput } from "@/components/MessageInput";
 import { InfoPanel } from "@/components/InfoPanel";
 import { Link } from "wouter";
 import type { GreetingTemplate } from "@/lib/greeting-messages";
-import { normalizeMessages, prepareOutgoingMessage, buildOptimisticMessage, buildSeenLabel, findLastSeenOutgoingId, messagePreview, replyPreviewLabel } from "@/lib/message-utils";
+import { normalizeMessages, prepareOutgoingMessage, buildOptimisticMessage, buildSeenLabel, findLastSeenOutgoingId, messagePreview, replyPreviewLabel, collectImageStack } from "@/lib/message-utils";
+import { ImageStackBubble } from "@/components/ImageStackBubble";
 import { callStartedText, callEndedText, isCallLogMessage } from "@/lib/call-chat-log";
 import { usePresenceLabel } from "@/hooks/usePresenceLabel";
 import { groupByDay, shouldShowTimeGap } from "@/lib/message-helpers";
@@ -91,9 +92,6 @@ import {
   hydrateNotifications,
   clearUnreadChatBadge,
   getChatOpenedAt,
-  notifyMessageReaction,
-  notifyDoodleShared,
-  notifyFileShared,
 } from "@/lib/notifications-feed";
 import { isReadReceiptsEnabled, isShowPresenceEnabled, areNotificationsEnabled, getCachedChatTheme } from "@/lib/couple-sync";
 import { isChatBlocked, setChatBlocked } from "@/lib/client-memory";
@@ -235,6 +233,7 @@ export default function Messages() {
     timed: boolean;
     useVideoDuration: boolean;
     secondsLeft: number;
+    mediaReady: boolean;
   } | null>(null);
   const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [activeThread, setActiveThread] = useState<string | null>(null);
@@ -428,8 +427,6 @@ export default function Messages() {
           writeChatCache(user.id, next);
           return next;
         });
-        const partnerDisplayName = partner?.name || partnerName || (partnerId === "wife" ? "Sara" : "Mustaq");
-        notifyDoodleShared(partnerDisplayName);
         requestStickToBottom();
       } catch (err) {
         console.error("Doodle send failed:", err);
@@ -880,11 +877,7 @@ export default function Messages() {
           const myReaction = list.find((r) => r.userId === user.id)?.emoji;
           const partnerReaction = list.find((r) => r.userId === partnerId)?.emoji;
           
-          // Notify when partner reacts
-          if (d.byUserId === partnerId && partnerReaction && !myReaction) {
-            notifyMessageReaction(pName, partnerReaction);
-          }
-          
+          // Partner reactions are logged server-side via activity feed SSE.
           setMessages((prev) => {
             const found = prev.find(m => m.id === d.messageId);
             if (!found) return prev;
@@ -1709,8 +1702,6 @@ export default function Messages() {
           writeChatCache(user.id, next);
           return next;
         });
-        // Notify partner that we shared a photo
-        notifyFileShared(pName, "photo");
         requestAnimationFrame(() => URL.revokeObjectURL(localPreview));
       } catch (err) {
         URL.revokeObjectURL(localPreview);
@@ -1816,13 +1807,36 @@ export default function Messages() {
           opened.kind === "video"
             ? resolveChatVideoUrl(opened.url, msg.text, msg.fileType)
             : resolveChatImageUrl(opened.url);
+        const displayUrl = openedDisplay ?? opened.url;
+
+        if (opened.kind === "image") {
+          const img = new Image();
+          img.onload = () => {
+            setMediaViewer({
+              messageId: msg.id,
+              url: displayUrl,
+              kind: "image",
+              timed: true,
+              useVideoDuration: false,
+              secondsLeft: 10,
+              mediaReady: true,
+            });
+          };
+          img.onerror = () => {
+            toast.error("Could not load photo");
+          };
+          img.src = displayUrl;
+          return;
+        }
+
         setMediaViewer({
           messageId: msg.id,
-          url: openedDisplay ?? opened.url,
+          url: displayUrl,
           kind: opened.kind,
           timed: true,
-          useVideoDuration: opened.kind === "video",
-          secondsLeft: opened.kind === "video" ? 0 : 10,
+          useVideoDuration: true,
+          secondsLeft: 0,
+          mediaReady: true,
         });
         return;
       }
@@ -1840,6 +1854,7 @@ export default function Messages() {
         timed: false,
         useVideoDuration: false,
         secondsLeft: 0,
+        mediaReady: true,
       });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not open media");
@@ -2146,8 +2161,6 @@ export default function Messages() {
         const [display] = await normalizeMessages([saved]);
         pendingOutgoingRef.current.delete(tempId);
         setMessages((prev) => replaceOptimisticMessage(prev, tempId, display, user.id));
-        // Notify partner that we shared a file
-        notifyFileShared(pName, "file");
         scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
       } catch (uploadError) {
         console.error("File upload failed:", uploadError);
@@ -2372,8 +2385,6 @@ export default function Messages() {
               writeChatCache(user.id, next);
               return next;
             });
-            // Notify partner that we shared a video
-            notifyFileShared(pName, "video");
             requestStickToBottom();
           } catch (videoErr) {
             pendingOutgoingRef.current.delete(tempId);
@@ -2446,7 +2457,7 @@ export default function Messages() {
   }, [user, blocked, handlePickedFile, recording]);
 
   useEffect(() => {
-    if (!mediaViewer?.timed || mediaViewer.useVideoDuration) return;
+    if (!mediaViewer?.timed || mediaViewer.useVideoDuration || !mediaViewer.mediaReady) return;
     const interval = setInterval(() => {
       setMediaViewer((prev) => {
         if (!prev || !prev.timed || prev.useVideoDuration) return prev;
@@ -2455,7 +2466,7 @@ export default function Messages() {
       });
     }, 1000);
     return () => clearInterval(interval);
-  }, [mediaViewer?.timed, mediaViewer?.useVideoDuration, mediaViewer?.messageId]);
+  }, [mediaViewer?.timed, mediaViewer?.useVideoDuration, mediaViewer?.mediaReady, mediaViewer?.messageId]);
 
   useEffect(() => {
     if (!mediaViewer?.timed) return;
@@ -3133,43 +3144,67 @@ export default function Messages() {
               {group.label ? (
                 <p className="text-center text-[11px] text-muted-foreground/70 my-4 font-medium">{group.label}</p>
               ) : null}
-              {group.msgs
-                .filter((msg: ApiMessage) => !msg.pinned)
-                .map((msg, i, arr) => {
-                  const isMe = msg.senderId === user?.id;
-                  const prevMsg = arr[i - 1];
+              {(() => {
+                const arr = group.msgs.filter((msg: ApiMessage) => !msg.pinned);
+                const nodes: JSX.Element[] = [];
+                let i = 0;
+                while (i < arr.length) {
+                  const { stack, skip } = collectImageStack(arr, i);
+                  const msg = arr[i]!;
+                  const prevMsg = i > 0 ? arr[i - 1] : undefined;
                   const timeGap = shouldShowTimeGap(prevMsg, msg, user?.id);
-                  return (
-                    <div key={msg.clientUniqueId || msg.id} className="chat-message-row">
-                      {timeGap && (
-                        <p className="text-center text-[10px] text-muted-foreground/60 my-3 font-medium">{timeGap}</p>
-                      )}
-                      <MessageItem
-                        msg={msg}
-                        isMe={isMe}
-                        myId={user?.id ?? "me"}
-                        partnerName={pName}
-                        partnerAvatar={pAvatar}
-                        onDelete={deleteMessage}
-                        onLike={toggleLike}
-                        onReact={handleReact}
-                        onUnsend={handleUnsend}
-                        onPin={handlePin}
-                        onReply={startReply}
-                        onOpenMenu={(m: ApiMessage, rect: DOMRect) => setContextMenu({ msg: m, top: rect.bottom + 4, left: rect.left })}
-                        onOpenMedia={openMediaMessage}
-                        prevMsg={prevMsg}
-                        seenLabel={buildSeenLabel(msg, isMe, lastSeenOutgoingId, partnerId)}
-                        onStartThread={handleStartThread}
-                        onReplyToThread={handleReplyToThread}
-                        onMediaLoad={scrollToBottomForMedia}
-                        onMediaCommitted={handleMediaCommitted}
-                        replySource={msg.replyToId ? messageById.get(msg.replyToId) : undefined}
-                        onJumpToMessage={jumpToMessage}
-                      />
-                    </div>
-                  );
-                })}
+                  const isMe = msg.senderId === user?.id;
+
+                  if (stack.length >= 2) {
+                    nodes.push(
+                      <div key={`stack-${stack[0]!.clientUniqueId || stack[0]!.id}`} className="chat-message-row">
+                        {timeGap && (
+                          <p className="text-center text-[10px] text-muted-foreground/60 my-3 font-medium">{timeGap}</p>
+                        )}
+                        <ImageStackBubble
+                          messages={stack}
+                          isMe={isMe}
+                          onOpenMedia={openMediaMessage}
+                          onMediaLoad={scrollToBottomForMedia}
+                        />
+                      </div>,
+                    );
+                  } else {
+                    nodes.push(
+                      <div key={msg.clientUniqueId || msg.id} className="chat-message-row">
+                        {timeGap && (
+                          <p className="text-center text-[10px] text-muted-foreground/60 my-3 font-medium">{timeGap}</p>
+                        )}
+                        <MessageItem
+                          msg={msg}
+                          isMe={isMe}
+                          myId={user?.id ?? "me"}
+                          partnerName={pName}
+                          partnerAvatar={pAvatar}
+                          onDelete={deleteMessage}
+                          onLike={toggleLike}
+                          onReact={handleReact}
+                          onUnsend={handleUnsend}
+                          onPin={handlePin}
+                          onReply={startReply}
+                          onOpenMenu={(m: ApiMessage, rect: DOMRect) => setContextMenu({ msg: m, top: rect.bottom + 4, left: rect.left })}
+                          onOpenMedia={openMediaMessage}
+                          prevMsg={prevMsg}
+                          seenLabel={buildSeenLabel(msg, isMe, lastSeenOutgoingId, partnerId)}
+                          onStartThread={handleStartThread}
+                          onReplyToThread={handleReplyToThread}
+                          onMediaLoad={scrollToBottomForMedia}
+                          onMediaCommitted={handleMediaCommitted}
+                          replySource={msg.replyToId ? messageById.get(msg.replyToId) : undefined}
+                          onJumpToMessage={jumpToMessage}
+                        />
+                      </div>,
+                    );
+                  }
+                  i += skip;
+                }
+                return nodes;
+              })()}
             </div>
           ))}
 
@@ -3357,12 +3392,14 @@ export default function Messages() {
             >
               <X className="w-5 h-5" />
             </button>
-            {mediaViewer.timed && !mediaViewer.useVideoDuration && (
+            {mediaViewer.timed && !mediaViewer.useVideoDuration && mediaViewer.mediaReady && (
               <div className="absolute top-4 left-4 px-3 py-1.5 rounded-full bg-primary/30 text-white text-sm font-semibold">
                 {mediaViewer.secondsLeft}s
               </div>
             )}
-            {mediaViewer.kind === "video" ? (
+            {!mediaViewer.mediaReady ? (
+              <div className="w-12 h-12 border-3 border-white/20 border-t-white rounded-full animate-spin" />
+            ) : mediaViewer.kind === "video" ? (
               <video
                 src={mediaViewer.url}
                 controls={!mediaViewer.timed}

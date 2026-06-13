@@ -168,8 +168,20 @@ export default function Calendar() {
     return date.toDateString() === today.toDateString();
   };
 
+  const getEventDateTime = (eventDate: string, eventTime?: string) => {
+    return new Date(`${eventDate}${eventTime ? `T${eventTime}` : "T23:59:59"}`);
+  };
+
+  const now = new Date();
+  const upcomingEvents = events
+    .filter((ev) => getEventDateTime(ev.date, ev.time) > now)
+    .sort((a, b) => getEventDateTime(a.date, a.time).getTime() - getEventDateTime(b.date, b.time).getTime());
+  const finishedEvents = events
+    .filter((ev) => getEventDateTime(ev.date, ev.time) <= now)
+    .sort((a, b) => getEventDateTime(b.date, b.time).getTime() - getEventDateTime(a.date, a.time).getTime());
+
   const getCountdown = (eventDate: string, eventTime?: string) => {
-    const eventDateTime = new Date(`${eventDate}${eventTime ? 'T' + eventTime : ''}`);
+    const eventDateTime = getEventDateTime(eventDate, eventTime);
     const now = new Date();
     const diff = eventDateTime.getTime() - now.getTime();
 
@@ -364,10 +376,7 @@ export default function Calendar() {
             </div>
           ) : (
             <div className="space-y-3">
-              {events
-                .filter((ev) => new Date(ev.date) >= new Date(new Date().setHours(0, 0, 0, 0)))
-                .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-                .map((ev) => {
+              {upcomingEvents.map((ev) => {
                   const countdown = getCountdown(ev.date, ev.time);
                   return (
                     <motion.div
@@ -416,9 +425,66 @@ export default function Calendar() {
                     </motion.div>
                   );
                 })}
+              {upcomingEvents.length === 0 && finishedEvents.length > 0 && (
+                <p className="text-sm text-muted-foreground text-center py-4">No upcoming events</p>
+              )}
             </div>
           )}
         </div>
+
+        {finishedEvents.length > 0 && (
+          <div className="mt-8">
+            <h3 className="font-semibold text-sm mb-3 flex items-center gap-2 text-muted-foreground">
+              <CalendarIcon className="w-4 h-4" />
+              Finished Events
+            </h3>
+            <div className="space-y-3">
+              {finishedEvents.map((ev) => (
+                <motion.div
+                  key={ev.id}
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-card/30 border border-border/60 rounded-2xl p-4 opacity-80 hover:opacity-100 transition-opacity"
+                  data-testid={`event-finished-${ev.id}`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        {ev.type === "anniversary" && <Heart className="w-4 h-4 text-pink-500/70" />}
+                        {ev.type === "reminder" && <Clock className="w-4 h-4 text-yellow-500/70" />}
+                        <p className="font-semibold text-sm text-muted-foreground">{ev.title}</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground/80 mb-1">
+                        {new Date(ev.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
+                        {ev.time && ` at ${ev.time}`}
+                      </p>
+                      {ev.description && <p className="text-xs text-muted-foreground/70">{ev.description}</p>}
+                      <span className="mt-2 inline-flex items-center gap-1 px-2 py-1 bg-secondary/60 rounded-lg text-xs text-muted-foreground">
+                        Finished
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1 ml-2">
+                      <button
+                        onClick={() => startEdit(ev)}
+                        className="p-1.5 hover:bg-secondary rounded-lg transition-colors text-muted-foreground hover:text-foreground"
+                        aria-label="Edit event"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => setDeleteId(ev.id)}
+                        className="p-1.5 hover:bg-destructive/10 rounded-lg transition-colors text-muted-foreground hover:text-destructive"
+                        aria-label="Delete event"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <ConfirmDialog

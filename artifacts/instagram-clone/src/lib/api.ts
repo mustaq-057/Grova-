@@ -294,7 +294,19 @@ type SessionResponse = {
 
 export type AppNotification = {
   id: string;
-  type: "like" | "comment" | "story" | "dua" | "call" | "location" | "message" | "task";
+  type:
+    | "like"
+    | "comment"
+    | "story"
+    | "dua"
+    | "call"
+    | "location"
+    | "message"
+    | "task"
+    | "reaction"
+    | "doodle"
+    | "file"
+    | "greeting";
   actorId?: string;
   fromName: string;
   text: string;

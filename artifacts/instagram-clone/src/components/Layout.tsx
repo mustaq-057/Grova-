@@ -11,7 +11,6 @@ import {
   UNREAD_CHAT_CHANGED,
   syncChatBadgeFromServer,
   markChatOpened,
-  bumpUnreadChatBadge,
 } from "@/lib/notifications-feed";
 import { AvatarImage } from "@/components/AvatarImage";
 import { FallingFlowersOverlay } from "@/components/FallingFlowersOverlay";
@@ -72,10 +71,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
     refresh();
     window.addEventListener(UNREAD_CHAT_CHANGED, refresh);
     const onPartnerMsg = () => {
-      const onChat = location === "/chat";
-      if (!onChat || document.visibilityState === "hidden") {
-        bumpUnreadChatBadge();
-      }
       setChatBadge(getUnreadChatBadge());
     };
     window.addEventListener("grova-partner-message", onPartnerMsg);

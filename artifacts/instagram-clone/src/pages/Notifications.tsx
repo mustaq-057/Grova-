@@ -1,6 +1,6 @@
 import { memo, useState, useEffect } from "react";
 import { Link } from "wouter";
-import { ChevronLeft, Heart, MessageCircle, BookOpen, Phone, MapPin, ListTodo } from "lucide-react";
+import { ChevronLeft, Heart, MessageCircle, BookOpen, Phone, MapPin, ListTodo, PenTool, Paperclip, Smile, Zap } from "lucide-react";
 import { getNotifications, markAllRead, hydrateNotifications, NOTIFY_CHANGED, setNotificationViewer } from "@/lib/notifications-feed";
 import { useAuth } from "@/lib/auth";
 
@@ -57,6 +57,14 @@ export default memo(function Notifications() {
                   <MapPin className="w-5 h-5 text-amber-500" />
                 ) : n.type === "task" ? (
                   <ListTodo className="w-5 h-5 text-violet-500" />
+                ) : n.type === "doodle" ? (
+                  <PenTool className="w-5 h-5 text-pink-400" />
+                ) : n.type === "file" ? (
+                  <Paperclip className="w-5 h-5 text-blue-400" />
+                ) : n.type === "reaction" ? (
+                  <Smile className="w-5 h-5 text-yellow-400" />
+                ) : n.type === "greeting" ? (
+                  <Zap className="w-5 h-5 text-primary" />
                 ) : (
                   <MessageCircle className="w-5 h-5 text-primary" />
                 )}

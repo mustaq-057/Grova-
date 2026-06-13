@@ -95,7 +95,7 @@ export async function hydrateNotifications(): Promise<void> {
     filterForViewer(
       notifications
         .filter((n) => !isSecretNoteActivity(n))
-        .filter((n) => ["like", "comment", "story", "dua", "call", "location", "task"].includes(n.type))
+        .filter((n) => ["like", "comment", "story", "dua", "call", "location", "task", "reaction", "doodle", "file", "greeting"].includes(n.type))
         .filter((n) => n.type !== "message")
         .slice(0, 50),
     ),
@@ -105,7 +105,7 @@ export async function hydrateNotifications(): Promise<void> {
 }
 
 export function addNotification(n: Omit<AppNotification, "id" | "read" | "timestamp">) {
-  const allowedTypes = ["like", "comment", "share", "story", "dua", "call", "location", "task", "reaction", "doodle", "file"];
+  const allowedTypes = ["like", "comment", "share", "story", "dua", "call", "location", "task", "reaction", "doodle", "file", "greeting"];
   if (!allowedTypes.includes(n.type)) return;
   if (n.type === "message") return;
   if (isSecretNoteActivity(n)) return;

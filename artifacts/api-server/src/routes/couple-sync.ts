@@ -180,7 +180,19 @@ router.get("/couple/activity", rateLimiters.read, authenticate, async (_req, res
 router.post("/couple/activity", rateLimiters.messages, authenticate, async (req, res) => {
   const userId = (req as { user?: { id: string } }).user!.id;
   const { type, text } = req.body as {
-    type: "like" | "comment" | "story" | "dua" | "call" | "location" | "message" | "task";
+    type:
+      | "like"
+      | "comment"
+      | "story"
+      | "dua"
+      | "call"
+      | "location"
+      | "message"
+      | "task"
+      | "reaction"
+      | "doodle"
+      | "file"
+      | "greeting";
     fromName?: string;
     text: string;
   };
