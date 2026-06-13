@@ -49,12 +49,12 @@ export const BubbleColorSelector = memo(function BubbleColorSelector({
               className="flex flex-col items-center gap-2 group outline-none"
             >
               <div 
-                className={`w-[48px] h-[48px] rounded-full flex items-center justify-center transition-all ${
+                className={`w-[36px] h-[36px] rounded-full flex items-center justify-center transition-all ${
                   currentThemeId === t.id ? "ring-2 ring-[#38bdf8] ring-offset-2 ring-offset-[#121826]" : ""
                 }`}
                 style={{ backgroundColor: t.bubbleColor }}
               />
-              <span className="text-[12px] font-medium text-white/80">{t.name}</span>
+              <span className="text-[11px] font-medium text-white/80">{t.name}</span>
             </button>
           ))}
         </div>

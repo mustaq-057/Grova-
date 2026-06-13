@@ -208,9 +208,7 @@ export const MessageItem = memo(function MessageItem({
 
   const { theme } = useChatTheme();
 
-  const defaultBubbleStyle = isMe
-    ? { backgroundColor: theme.bubbleColor, borderColor: theme.bubbleBorder }
-    : { backgroundColor: getPartnerBubbleColors(theme).fill, borderColor: getPartnerBubbleColors(theme).border };
+  const defaultBubbleStyle = { backgroundColor: theme.bubbleColor, borderColor: theme.bubbleBorder };
 
   const openReactionPicker = useCallback(() => {
     const anchor = bubbleWrapRef.current;
