@@ -399,9 +399,7 @@ export default function Messages() {
 
     const attemptUpload = async (attempt = 0): Promise<string> => {
       try {
-        const res = await fetch(data.imageData);
-        const blob = await res.blob();
-        return await uploadMediaFile(blob, "image/png");
+        return await uploadMediaToB2(data.imageData, "image/png");
       } catch (err) {
         const raw = err instanceof Error ? err.message : "";
         const isNetwork = /fetch|network|failed to fetch|connection/i.test(raw);
