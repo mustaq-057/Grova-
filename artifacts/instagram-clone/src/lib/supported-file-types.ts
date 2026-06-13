@@ -55,18 +55,6 @@ export const SUPPORTED_FILE_TYPES = {
     "audio/midi": ".mid",
   },
 
-  // Video
-  video: {
-    "video/mp4": ".mp4",
-    "video/x-matroska": ".mkv",
-    "video/x-msvideo": ".avi",
-    "video/quicktime": ".mov",
-    "video/x-ms-wmv": ".wmv",
-    "video/x-flv": ".flv",
-    "video/webm": ".webm",
-    "video/3gpp": ".3gp",
-    "video/mpeg": ".mpeg",
-  },
 
   // Archives
   archives: {

@@ -3,7 +3,6 @@
 import { loadPersistedDarkMode, persistDarkMode } from "./couple-prefs-persist";
 
 export type AppThemeId =
-  | "midnight"
   | "sakura-fall"
   | "sara-lavender"
   | "moonlight-saga";
@@ -77,28 +76,7 @@ export const APP_THEMES: {
       "--app-border": "350 30% 90%",
     },
   },
-  {
-    id: "midnight",
-    name: "Midnight",
-    description: "Deep purple night",
-    swatch: "bg-violet-600",
-    dark: {
-      "--app-background": "260 30% 6%",
-      "--app-foreground": "260 15% 92%",
-      "--app-primary": "270 80% 65%",
-      "--app-card": "260 28% 9%",
-      "--app-secondary": "260 22% 13%",
-      "--app-border": "260 20% 15%",
-    },
-    light: {
-      "--app-background": "260 30% 98%",
-      "--app-foreground": "260 25% 12%",
-      "--app-primary": "270 70% 50%",
-      "--app-card": "0 0% 100%",
-      "--app-secondary": "260 25% 95%",
-      "--app-border": "260 20% 88%",
-    },
-  },
+
   {
     id: "moonlight-saga",
     name: "Moonlight Saga",

@@ -165,9 +165,7 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
     const validFiles: File[] = [];
 
     for (const file of files) {
-      // Check file size first - video has 10MB limit
-      const isVideo = file.type.startsWith("video/") || /\.(mp4|webm|mov|m4v|mkv|3gp)$/i.test(file.name);
-      const maxMB = isVideo ? 10 : MAX_FILE_SIZE_MB;
+      const maxMB = MAX_FILE_SIZE_MB;
       const fileSizeMB = file.size / (1024 * 1024);
       
       if (fileSizeMB > maxMB) {
@@ -175,8 +173,8 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
         continue;
       }
 
-      // Check if file type is supported (skip for images/videos as they're always supported)
-      if (!isVideo && !file.type.startsWith("image/") && !isSupportedFileType(file.type, file.name)) {
+      // Check if file type is supported (skip for images as they're always supported)
+      if (!file.type.startsWith("image/") && !isSupportedFileType(file.type, file.name)) {
         unsupportedFiles.push(file.name);
         continue;
       }
@@ -360,7 +358,7 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
         ref={fileInputRef}
         type="file"
         multiple
-        accept="image/*,video/*"
+        accept="image/*"
         className="hidden"
         onChange={handleFileChange}
         aria-label="Upload any file"
