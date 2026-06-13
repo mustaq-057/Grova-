@@ -245,25 +245,18 @@ export function MediaViewerOverlay({
         </div>
       )}
 
-      {!internalReady && currentItem.kind === "image" ? (
-        <img
-          src={currentItem.url}
-          alt=""
-          className="max-w-full max-h-full object-contain opacity-0"
-          onLoad={() => {
-            setInternalReady(true);
-            onMediaReady?.();
-          }}
-          draggable={false}
-        />
-      ) : !internalReady ? null : currentItem.kind === "video" ? (
+      {currentItem.kind === "video" ? (
         <video
           src={currentItem.url}
           controls={!timed}
           autoPlay
           playsInline
           onEnded={onVideoEnded}
-          className="w-full h-full object-contain"
+          className={`w-full h-full object-contain ${timed && !internalReady ? "opacity-0" : ""}`}
+          onLoadedData={() => {
+            setInternalReady(true);
+            onMediaReady?.();
+          }}
         />
       ) : (
         <div
@@ -275,7 +268,7 @@ export function MediaViewerOverlay({
           <img
             src={currentItem.url}
             alt="Media Viewer"
-            className="max-w-full max-h-full object-contain transition-transform duration-75"
+            className={`max-w-full max-h-full object-contain transition-transform duration-75 ${timed && !internalReady ? "opacity-0" : ""}`}
             style={{
               transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
             }}

@@ -38,8 +38,7 @@ export const ImageStackBubble = memo(function ImageStackBubble({
   );
 
   return (
-    <div className={`flex w-full ${isMe ? "justify-end" : "justify-start"} py-1`}>
-      <div className="relative" style={{ width: 188, height: 228 }}>
+    <div className="relative" style={{ width: 188, height: 228 }}>
         {layers.map((layer) => (
           <button
             key={layer.msg.id}
@@ -83,6 +82,5 @@ export const ImageStackBubble = memo(function ImageStackBubble({
           </span>
         )}
       </div>
-    </div>
   );
 });

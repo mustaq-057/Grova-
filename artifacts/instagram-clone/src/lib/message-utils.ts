@@ -154,7 +154,7 @@ export function collectImageStack(
     if (isEphemeralMedia(m)) break;
     const prev = stack[stack.length - 1]!;
     const gap = new Date(m.timestamp).getTime() - new Date(prev.timestamp).getTime();
-    if (gap > 120_000) break;
+    if (gap > 5_000) break;
     stack.push(m);
     i++;
     if (stack.length >= 10) break;

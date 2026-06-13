@@ -3271,11 +3271,32 @@ export default function Messages() {
                         {timeGap && (
                           <p className="text-center text-[10px] text-muted-foreground/60 my-3 font-medium">{timeGap}</p>
                         )}
-                        <ImageStackBubble
-                          messages={stack}
+                        <MessageItem
+                          msg={msg}
+                          stack={stack}
                           isMe={isMe}
+                          myId={user?.id ?? "me"}
+                          partnerName={pName}
+                          partnerAvatar={pAvatar}
+                          onDelete={deleteMessage}
+                          onLike={toggleLike}
+                          onReact={handleReact}
+                          onUnsend={handleUnsend}
+                          onPin={handlePin}
+                          onReply={startReply}
+                          onEdit={handleEdit}
+                          onOpenMenu={(m: ApiMessage, rect: DOMRect) => setContextMenu({ msg: m, top: rect.bottom + 4, left: rect.left })}
                           onOpenMedia={openMediaMessage}
+                          prevMsg={prevMsg}
+                          seenLabel={buildSeenLabel(msg, isMe, lastSeenOutgoingId, partnerId)}
+                          onStartThread={handleStartThread}
+                          onReplyToThread={handleReplyToThread}
                           onMediaLoad={scrollToBottomForMedia}
+                          onMediaCommitted={handleMediaCommitted}
+                          replySource={msg.replyToId ? messageById.get(msg.replyToId) : undefined}
+                          onJumpToMessage={jumpToMessage}
+                          animateEntrance={chatAnimationsEnabled}
+                          openingMedia={openingMediaId === msg.id}
                         />
                       </div>,
                     );

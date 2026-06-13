@@ -8,6 +8,7 @@ import { ChatFileBubble } from "@/components/ChatFileBubble";
 import { DeletedMessageNotice } from "@/components/DeletedMessageNotice";
 import { DuaMessage } from "@/components/DuaMessage";
 import { EphemeralMediaBubble } from "@/components/EphemeralMediaBubble";
+import { ImageStackBubble } from "@/components/ImageStackBubble";
 import { AvatarImage } from "@/components/AvatarImage";
 import { EmojiReactionsModal } from "@/components/EmojiReactionsModal";
 import EmojiPicker from "@/components/EmojiPicker";
@@ -35,6 +36,7 @@ function hasArabic(text?: string): boolean {
 
 export interface MessageItemProps {
   msg: ApiMessage;
+  stack?: ApiMessage[];
   isMe: boolean;
   myId: string;
   partnerName: string;
@@ -63,6 +65,7 @@ export interface MessageItemProps {
 
 export const MessageItem = memo(function MessageItem({
   msg,
+  stack,
   isMe,
   myId,
   partnerName,
@@ -316,6 +319,13 @@ export const MessageItem = memo(function MessageItem({
             sentAt={msg.timestamp}
             opening={openingMedia}
             onOpen={() => onOpenMedia?.(msg)}
+          />
+        ) : stack && stack.length > 1 ? (
+          <ImageStackBubble
+            messages={stack}
+            isMe={isMe}
+            onOpenMedia={onOpenMedia}
+            onMediaLoad={() => onMediaLoad?.(msg.id)}
           />
         ) : imageDisplaySrc && !imageLoadFailed ? (
           <img
