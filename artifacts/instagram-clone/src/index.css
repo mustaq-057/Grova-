@@ -311,7 +311,7 @@
 /* Keep composer above the fixed mobile bottom nav (Layout z-50 bar) */
 @media (max-width: 767px) {
   .chat-panel-bottom {
-    padding-bottom: calc(4rem + env(safe-area-inset-bottom, 0px));
+    padding-bottom: 4rem;
   }
 }
 
