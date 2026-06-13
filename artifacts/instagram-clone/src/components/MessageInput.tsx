@@ -1,6 +1,6 @@
 import { memo, useRef, useState, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
 import { createPortal } from "react-dom";
-import { Smile, Mic, Send, Sticker, Paperclip, X, MessageCircle, MapPin, PenTool, Zap, Plus, Image as ImageIcon, Camera, PlusCircle, Sparkles, FileText, Palette, File as FileIcon, AlertCircle } from "lucide-react";
+import { Smile, Mic, Send, Sticker, Paperclip, X, MessageCircle, MapPin, PenTool, Zap, Plus, Image as ImageIcon, PlusCircle, Sparkles, FileText, Palette, File as FileIcon, AlertCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import EmojiPicker from "@/components/EmojiPicker";
 import StickerPicker from "@/components/StickerPicker";
@@ -165,16 +165,19 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
     const validFiles: File[] = [];
 
     for (const file of files) {
-      // Check if file type is supported
-      if (!isSupportedFileType(file.type, file.name)) {
-        unsupportedFiles.push(file.name);
+      // Check file size first - video has 10MB limit
+      const isVideo = file.type.startsWith("video/") || /\.(mp4|webm|mov|m4v|mkv|3gp)$/i.test(file.name);
+      const maxMB = isVideo ? 10 : MAX_FILE_SIZE_MB;
+      const fileSizeMB = file.size / (1024 * 1024);
+      
+      if (fileSizeMB > maxMB) {
+        oversizedFiles.push(`${file.name} (${fileSizeMB.toFixed(1)}MB)`);
         continue;
       }
 
-      // Check file size
-      const fileSizeMB = file.size / (1024 * 1024);
-      if (fileSizeMB > MAX_FILE_SIZE_MB) {
-        oversizedFiles.push(`${file.name} (${fileSizeMB.toFixed(1)}MB)`);
+      // Check if file type is supported (skip for images/videos as they're always supported)
+      if (!isVideo && !file.type.startsWith("image/") && !isSupportedFileType(file.type, file.name)) {
+        unsupportedFiles.push(file.name);
         continue;
       }
 
@@ -329,48 +332,6 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
             className="fixed z-[201] right-3 sm:right-4 bottom-[calc(8rem+env(safe-area-inset-bottom,0px))] md:bottom-[5.5rem] bg-[#1c1c1c] rounded-[22px] py-[10px] shadow-[0_8px_40px_rgba(0,0,0,0.7)] flex flex-col min-w-[210px] sm:min-w-[230px]"
             role="menu"
           >
-            {onShareLocation && (
-              <button
-                type="button"
-                onClick={handleShareLocation}
-                className="flex items-center gap-[20px] px-[24px] py-[15px] text-[17px] font-normal hover:bg-white/5 transition-colors w-full text-left text-white"
-                disabled={disabled || sharingLocation}
-              >
-                <div className="w-[28px] h-[28px] flex items-center justify-center shrink-0">
-                  {sharingLocation ? (
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <CustomLocationIcon />
-                  )}
-                </div>
-                <span>Location</span>
-              </button>
-            )}
-
-            <button
-              type="button"
-              onClick={toggleQuickReplies}
-              className="flex items-center gap-[20px] px-[24px] py-[15px] text-[17px] font-normal hover:bg-white/5 transition-colors w-full text-left text-white"
-              disabled={disabled}
-            >
-              <div className="w-[28px] h-[28px] flex items-center justify-center shrink-0">
-                <CustomQuickChatIcon />
-              </div>
-              <span>Quick Chat</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={openDoodle}
-              className="flex items-center gap-[20px] px-[24px] py-[15px] text-[17px] font-normal hover:bg-white/5 transition-colors w-full text-left text-white"
-              disabled={disabled}
-            >
-              <div className="w-[28px] h-[28px] flex items-center justify-center shrink-0">
-                <CustomDoodleIcon />
-              </div>
-              <span>Doodle</span>
-            </button>
-
             <button
               type="button"
               onClick={handleGenericFileClick}
@@ -380,7 +341,7 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
               <div className="w-[28px] h-[28px] flex items-center justify-center shrink-0">
                 <FileIcon className="w-[24px] h-[24px] text-white opacity-80" strokeWidth={1.5} />
               </div>
-              <span>File</span>
+              <span>Files</span>
             </button>
 
 
@@ -420,18 +381,6 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
       )}
 
       <div className="flex items-center gap-[8px] sm:gap-[10px] bg-[#1a1a1a] rounded-[40px] py-[7px] sm:py-[9px] pr-[8px] sm:pr-[14px] pl-[5px] sm:pl-[9px] mx-[4px] md:mx-auto md:w-full md:max-w-[800px]">
-        {/* eslint-disable-next-line */}
-        <button
-          type="button"
-          onClick={onOpenCamera}
-          className="w-[38px] h-[38px] sm:w-[44px] sm:h-[44px] rounded-full active:scale-95 flex shrink-0 items-center justify-center text-white border-none transition-all hover:brightness-90"
-          style={{ backgroundColor: theme.bubbleColor }}
-          disabled={disabled}
-          aria-label="Take photo with camera"
-        >
-          <Camera className="w-[20px] h-[20px] sm:w-[22px] sm:h-[22px]" strokeWidth={1.8} />
-        </button>
-
         {textInput}
 
         {input.trim() || recording ? (

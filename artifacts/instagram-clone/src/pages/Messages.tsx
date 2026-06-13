@@ -421,6 +421,10 @@ export default function Messages() {
     void (async () => {
       try {
         const url = await attemptUpload();
+        if (!url || !url.trim()) {
+          throw new Error("Upload returned empty URL");
+        }
+        
         const outgoing = await prepareOutgoingMessage({
           senderId: user.id,
           type: "doodle",
@@ -429,6 +433,7 @@ export default function Messages() {
         });
         const saved = await api.sendMessage(outgoing);
         const [display] = await normalizeMessages([saved]);
+        
         setMessages((prev) => {
           const next = replaceOptimisticMessage(prev, tempId, display, user.id);
           pendingOutgoingRef.current.delete(tempId);
@@ -441,8 +446,11 @@ export default function Messages() {
         notifyDoodleShared(partnerDisplayName);
         requestStickToBottom();
       } catch (err) {
+        console.error("Doodle send failed:", err);
         pendingOutgoingRef.current.delete(tempId);
         setMessages((prev) => prev.filter((m) => m.id !== tempId));
+        const errorMsg = err instanceof Error ? err.message : "Unknown error";
+        toast.error(`Failed to send doodle: ${errorMsg}`, { duration: 4000 });
         const raw = err instanceof Error ? err.message : "";
         toast.error(raw || "Doodle upload failed. Please try again.", { duration: 5000 });
       }
@@ -2219,8 +2227,18 @@ export default function Messages() {
       
       // Validate file types upfront
       const unsupportedFiles: string[] = [];
+      const oversizedFiles: string[] = [];
+      
       for (const file of files) {
-        if (!isSupportedFileType(file.type, file.name)) {
+        // Check video size limit (10MB)
+        const isVideo = file.type.startsWith("video/") || /\.(mp4|webm|mov|m4v|mkv|3gp)$/i.test(file.name);
+        if (isVideo) {
+          const videoSizeMB = file.size / (1024 * 1024);
+          if (videoSizeMB > 10) {
+            oversizedFiles.push(`${file.name} (${videoSizeMB.toFixed(1)}MB - max 10MB for videos)`);
+            continue;
+          }
+        } else if (!isSupportedFileType(file.type, file.name)) {
           unsupportedFiles.push(file.name);
         }
       }
@@ -2233,18 +2251,9 @@ export default function Messages() {
         return;
       }
 
-      // Check file sizes
-      const oversizedFiles: string[] = [];
-      for (const file of files) {
-        const fileSizeMB = file.size / (1024 * 1024);
-        if (fileSizeMB > MAX_FILE_SIZE_MB) {
-          oversizedFiles.push(`${file.name} (${fileSizeMB.toFixed(1)}MB)`);
-        }
-      }
-      
       if (oversizedFiles.length > 0) {
         toast.error(
-          `⚠️ Files too large (max ${MAX_FILE_SIZE_MB}MB):\n${oversizedFiles.join(", ")}`,
+          `⚠️ Videos too large:\n${oversizedFiles.join(", ")}\n\nMax 10MB for video files.`,
           { duration: 5000 },
         );
         return;
@@ -2288,11 +2297,11 @@ export default function Messages() {
         }
 
         const MAX_FILE_SIZE =
-          kind === "video" ? 20 * 1024 * 1024 : kind === "image" ? 25 * 1024 * 1024 : 25 * 1024 * 1024;
+          kind === "video" ? 10 * 1024 * 1024 : kind === "image" ? 25 * 1024 * 1024 : 25 * 1024 * 1024;
         if (normalized.size > MAX_FILE_SIZE) {
           finishToast(toastId, {
             type: "error",
-            message: kind === "video" ? "Video too large (max 20MB)." : "File too large (max 25MB).",
+            message: kind === "video" ? "Video too large (max 10MB)." : "File too large (max 25MB).",
           });
           return;
         }
