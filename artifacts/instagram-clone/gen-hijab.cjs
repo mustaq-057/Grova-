@@ -52,7 +52,7 @@ for (const b of BUBBLES) {
   
   // Base bubble style
   css += `.bubble-${b.id} {
-  background: ${b.bg} !important;
+  background-color: ${b.bg} !important;
   color: ${b.color} !important;
   border: 1.5px solid ${b.border} !important;
   border-radius: 16px 16px 16px 4px !important;

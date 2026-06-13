@@ -113,11 +113,17 @@ export async function uploadMedia(dataUrl: string, contentType?: string, attempt
 
 /** Upload a File/Blob — binary path to Cloudinary (best for mobile camera, docs, video). */
 export async function uploadMediaFile(file: File | Blob, contentType?: string): Promise<string> {
-  const mime = normalizeUploadMime(
-    contentType ||
-      (file instanceof File ? file.type : "") ||
-      "application/octet-stream",
-  );
+  let inferred = contentType || (file instanceof File ? file.type : "") || "";
+  if (!inferred && file instanceof File && file.name) {
+    const ext = file.name.match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase();
+    if (ext && ["mp4", "mov", "webm", "mkv", "3gp", "m4v"].includes(ext)) {
+      inferred = `video/${ext === "mov" ? "quicktime" : ext}`;
+    } else if (ext && ["jpg", "jpeg", "png", "gif", "webp", "heic"].includes(ext)) {
+      inferred = `image/${ext === "jpg" ? "jpeg" : ext}`;
+    }
+  }
+
+  const mime = normalizeUploadMime(inferred || "application/octet-stream");
   const useBinary =
     file instanceof File ||
     mime.startsWith("video/") ||

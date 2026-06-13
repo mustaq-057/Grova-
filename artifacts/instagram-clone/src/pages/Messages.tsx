@@ -31,6 +31,7 @@ function unsendErrorMessage(err: unknown): string {
 }
 import { ChatInbox } from "@/components/ChatInbox";
 import { AppThemeModal } from "@/components/AppThemeModal";
+import { BubbleColorSelector } from "@/components/BubbleColorSelector";
 import { CameraOverlay } from "@/components/CameraOverlay";
 import { PendingMediaPreview } from "@/components/PendingMediaPreview";
 import { MessageContextMenu } from "@/components/MessageContextMenu";
@@ -87,7 +88,7 @@ import {
   hydrateNotifications,
   clearUnreadChatBadge,
 } from "@/lib/notifications-feed";
-import { isReadReceiptsEnabled, isShowPresenceEnabled, areNotificationsEnabled } from "@/lib/couple-sync";
+import { isReadReceiptsEnabled, isShowPresenceEnabled, areNotificationsEnabled, getCachedChatTheme } from "@/lib/couple-sync";
 import { isChatBlocked, setChatBlocked } from "@/lib/client-memory";
 import { hydrateQuickReactions } from "@/lib/quick-reactions";
 import {
@@ -180,7 +181,7 @@ export default function Messages() {
   const callLoggedStartRef = useRef(false);
   const activeCallTypeRef = useRef<"audio" | "video">("audio");
   const callRoleRef = useRef<"outgoing" | "incoming">("outgoing");
-  const endCallRef = useRef<(opts?: { fromRemote?: boolean }) => void>(() => {});
+  const endCallRef = useRef<(opts?: { fromRemote?: boolean }) => void>(() => { });
   const [partnerName, setPartnerName] = useState(() => partner?.name ?? "");
   const [partnerAvatar, setPartnerAvatar] = useState(() => partner?.avatar ?? "");
   const [partnerLastSeen, setPartnerLastSeen] = useState<number | undefined>();
@@ -197,6 +198,7 @@ export default function Messages() {
   const [isTyping, setIsTyping] = useState(false);
   const [appThemeId, setAppThemeId] = useState<AppThemeId>(() => getStoredAppTheme());
   const [showAppThemes, setShowAppThemes] = useState(false);
+  const [showBubbleColors, setShowBubbleColors] = useState(false);
   const [replyTo, setReplyTo] = useState<ApiMessage | null>(null);
   const [editingMessage, setEditingMessage] = useState<ApiMessage | null>(null);
   const [editText, setEditText] = useState("");
@@ -255,7 +257,7 @@ export default function Messages() {
   const cropSendInFlightRef = useRef(false);
   const shouldSendVoiceRef = useRef(false);
   const voiceSendInFlightRef = useRef(false);
-  const sendMsgRef = useRef<(partial: Partial<ApiMessage>) => Promise<void>>(async () => {});
+  const sendMsgRef = useRef<(partial: Partial<ApiMessage>) => Promise<void>>(async () => { });
   const userIdRef = useRef<string | undefined>(undefined);
   const prependScrollHeightRef = useRef<number | null>(null);
   const isPrependingRef = useRef(false);
@@ -364,12 +366,12 @@ export default function Messages() {
     closeDoodlePanel();
     if (!user) return;
     const tempId = crypto.randomUUID();
-    
+
     // Calculate absolute scroll position
     const container = messagesContainerRef.current;
     let absoluteX = data.canvasX;
     let absoluteY = data.canvasY;
-    
+
     if (container) {
       const rect = container.getBoundingClientRect();
       const style = window.getComputedStyle(container);
@@ -377,14 +379,14 @@ export default function Messages() {
       const paddingTop = parseFloat(style.paddingTop) || 0;
       const borderLeft = parseFloat(style.borderLeftWidth) || 0;
       const borderTop = parseFloat(style.borderTopWidth) || 0;
-      
+
       absoluteX = data.canvasX - rect.left - paddingLeft - borderLeft;
       absoluteY = data.canvasY - rect.top - paddingTop - borderTop + container.scrollTop;
     }
 
     // Encode position metadata into the text field as JSON
     const posText = JSON.stringify({ canvasX: absoluteX, canvasY: absoluteY, width: data.width, height: data.height });
-    
+
     pendingOutgoingRef.current.add(tempId);
     setMessages((prev) => [
       ...prev,
@@ -474,12 +476,12 @@ export default function Messages() {
         const { lastSeen, typing } = parsePresenceResponse(raw);
         if (lastSeen[partnerId] != null) setPartnerLastSeen(lastSeen[partnerId]);
         setIsTyping(Boolean(typing[partnerId]));
-      }).catch(() => {});
+      }).catch(() => { });
     };
-    api.heartbeat(user.id).catch(() => {});
+    api.heartbeat(user.id).catch(() => { });
     refreshPresence();
     const hb = setInterval(() => {
-      if (isShowPresenceEnabled()) api.heartbeat(user.id).catch(() => {});
+      if (isShowPresenceEnabled()) api.heartbeat(user.id).catch(() => { });
     }, 10_000);
     const poll = setInterval(() => {
       if (document.visibilityState === "visible") refreshPresence();
@@ -590,7 +592,7 @@ export default function Messages() {
         prependScrollHeightRef.current = null;
         return;
       }
-      
+
       prependScrollHeightRef.current = scrollHeightBefore;
 
       setMessages((prev) => {
@@ -658,7 +660,7 @@ export default function Messages() {
           if (typingTimeout) clearTimeout(typingTimeout);
           typingTimeout = setTimeout(() => setIsTyping(false), 4000);
         }
-      }).catch(() => {});
+      }).catch(() => { });
     };
 
     void hydrateQuickReactions();
@@ -795,14 +797,14 @@ export default function Messages() {
             return prev.map((m) =>
               m.id === msg.id
                 ? {
-                    ...m,
-                    ...msg,
-                    deleted: m.deleted || msg.deleted,
-                    text: m.deleted ? undefined : (msg.text ?? m.text),
-                    reaction: m.reaction ?? msg.reaction,
-                    imageUrl: m.deleted ? undefined : (msg.imageUrl ?? m.imageUrl),
-                    imageData: m.deleted ? undefined : (msg.imageData ?? m.imageData),
-                  }
+                  ...m,
+                  ...msg,
+                  deleted: m.deleted || msg.deleted,
+                  text: m.deleted ? undefined : (msg.text ?? m.text),
+                  reaction: m.reaction ?? msg.reaction,
+                  imageUrl: m.deleted ? undefined : (msg.imageUrl ?? m.imageUrl),
+                  imageData: m.deleted ? undefined : (msg.imageData ?? m.imageData),
+                }
                 : m,
             );
           });
@@ -1032,10 +1034,10 @@ export default function Messages() {
             prev.map((m) =>
               m.id === d.messageId
                 ? {
-                    ...m,
-                    mediaOpenedAt: d.userId === partnerId ? d.mediaOpenedAt : m.mediaOpenedAt,
-                    mediaOpenCount: d.userId === user.id ? d.mediaOpenCount : m.mediaOpenCount,
-                  }
+                  ...m,
+                  mediaOpenedAt: d.userId === partnerId ? d.mediaOpenedAt : m.mediaOpenedAt,
+                  mediaOpenCount: d.userId === user.id ? d.mediaOpenCount : m.mediaOpenCount,
+                }
                 : m,
             ),
           );
@@ -1045,7 +1047,7 @@ export default function Messages() {
       };
 
       const handleDuaAdded = () => { hydrateNotifications(); };
-      const handleDuaDeleted = () => { api.getDuas().catch(() => {}); };
+      const handleDuaDeleted = () => { api.getDuas().catch(() => { }); };
       const handlePrefsUpdated = () => { refreshCouplePrefs(); };
 
       es.addEventListener("new-message", handleNewMessage);
@@ -1299,14 +1301,14 @@ export default function Messages() {
     prependScrollHeightRef.current = null;
     const container = messagesContainerRef.current;
     if (!container) return;
-    
+
     let isRestored = false;
     const diff = container.scrollHeight - before;
     if (diff > 0) {
       container.scrollTop += diff;
       isRestored = true;
     }
-    
+
     requestAnimationFrame(() => {
       if (!isRestored) {
         const nextDiff = container.scrollHeight - before;
@@ -1744,13 +1746,13 @@ export default function Messages() {
           ...(kind === "image"
             ? { type: "image" as const, imageUrl: url, companionSticker: sticker }
             : {
-                type: "video" as const,
-                text: file.name || "Video",
-                fileData: url,
-                fileType: mime,
-                fileSize: file.size,
-                companionSticker: sticker,
-              }),
+              type: "video" as const,
+              text: file.name || "Video",
+              fileData: url,
+              fileType: mime,
+              fileSize: file.size,
+              companionSticker: sticker,
+            }),
         });
         const saved = await api.sendMessage(outgoing);
         const [display] = await normalizeMessages([saved]);
@@ -1784,10 +1786,10 @@ export default function Messages() {
           prev.map((m) =>
             m.id === msg.id
               ? {
-                  ...m,
-                  mediaOpenCount: opened.mediaOpenCount,
-                  mediaOpenedAt: opened.mediaOpenedAt ?? m.mediaOpenedAt,
-                }
+                ...m,
+                mediaOpenCount: opened.mediaOpenCount,
+                mediaOpenedAt: opened.mediaOpenedAt ?? m.mediaOpenedAt,
+              }
               : m,
           ),
         );
@@ -1833,10 +1835,10 @@ export default function Messages() {
     stopTyping();
     const replyMeta = replyTo
       ? {
-          replyToId: replyTo.id,
-          replyToText: replyPreviewLabel(replyTo).slice(0, 200),
-          replyToSenderId: replyTo.senderId,
-        }
+        replyToId: replyTo.id,
+        replyToText: replyPreviewLabel(replyTo).slice(0, 200),
+        replyToSenderId: replyTo.senderId,
+      }
       : {};
     setReplyTo(null);
     sendMsg({
@@ -1849,12 +1851,12 @@ export default function Messages() {
   // Debounced search handler
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    
+
     // Clear previous timeout
     if (searchDebounceRef.current) {
       clearTimeout(searchDebounceRef.current);
     }
-    
+
     // Set new timeout with 300ms debounce
     searchDebounceRef.current = setTimeout(() => {
       setSearchQuery(value);
@@ -2088,7 +2090,7 @@ export default function Messages() {
     return new Promise((resolve, reject) => {
       const img = new Image();
       const canvas = document.createElement('canvas');
-      
+
       img.onload = () => {
         canvas.width = img.width;
         canvas.height = img.height;
@@ -2101,9 +2103,9 @@ export default function Messages() {
         const webpDataUrl = canvas.toDataURL('image/webp', 0.8);
         resolve(webpDataUrl);
       };
-      
+
       img.onerror = () => reject(new Error('Failed to load image'));
-      
+
       const reader = new FileReader();
       reader.onload = (e) => {
         img.src = e.target?.result as string;
@@ -2261,7 +2263,7 @@ export default function Messages() {
       if (!pendingMediaPreview || !user || filePickInFlightRef.current) return;
       filePickInFlightRef.current = true;
       setMediaViewMode(viewMode);
-      
+
       const { clipboardItemType, kind, normalized } = pendingMediaPreview;
       setPendingMediaPreview(null);
       const isEphemeral = viewMode === "once" || viewMode === "twice";
@@ -2294,9 +2296,9 @@ export default function Messages() {
               fileSize: normalized.size,
               ...(isEphemeral
                 ? {
-                    companionSticker: mediaModeSticker(viewMode),
-                    mediaViewMode: viewMode,
-                  }
+                  companionSticker: mediaModeSticker(viewMode),
+                  mediaViewMode: viewMode,
+                }
                 : {}),
             },
             tempId,
@@ -2524,9 +2526,9 @@ export default function Messages() {
             const voiceFile = new File([blob], `voice-${Date.now()}.webm`, { type: voiceMime });
             const [url, outgoing] = await Promise.all([
               uploadMediaFile(voiceFile, voiceMime),
-              prepareOutgoingMessage({ 
-                senderId, 
-                type: "audio", 
+              prepareOutgoingMessage({
+                senderId,
+                type: "audio",
                 audioData: "",
               }),
             ]);
@@ -2631,7 +2633,7 @@ export default function Messages() {
 
   const rejectCall = useCallback(() => {
     if (user) {
-      api.sendCallSignal({ type: "reject", senderId: user.id }).catch(() => {});
+      api.sendCallSignal({ type: "reject", senderId: user.id }).catch(() => { });
     }
     setIncomingCall(null);
   }, [user]);
@@ -2805,19 +2807,19 @@ export default function Messages() {
 
   const filteredMessages = useMemo(() => {
     let filtered = visibleMessages;
-    
+
     // Apply search query
     if (searchQuery) {
       filtered = filtered.filter((msg) =>
         msg.text?.toLowerCase().includes(searchQuery.toLowerCase()),
       );
     }
-    
+
     // Apply message type filter
     if (searchFilters.messageType !== "all") {
       filtered = filtered.filter((msg) => msg.type === searchFilters.messageType);
     }
-    
+
     // Apply sender filter
     if (searchFilters.sender !== "all") {
       filtered = filtered.filter((msg) => {
@@ -2826,17 +2828,17 @@ export default function Messages() {
         return true;
       });
     }
-    
+
     // Apply reaction filter
     if (searchFilters.hasReaction) {
       filtered = filtered.filter((msg) => msg.reaction);
     }
-    
+
     // Apply pinned filter
     if (searchFilters.isPinned) {
       filtered = filtered.filter((msg) => msg.pinned);
     }
-    
+
     return filtered;
   }, [visibleMessages, searchQuery, searchFilters, user?.id]);
 
@@ -2888,210 +2890,123 @@ export default function Messages() {
           active
         />
       )}
-    <div
-      className={`chat-panel flex-1 min-w-0 h-full min-h-0 relative bg-black ${premiumChatClass ?? ""}`}
-    >
-
-
-      <div className="chat-panel-top shrink-0 z-20 flex flex-col relative">
-      {/* ── Header ── */}
-      <div className="chat-panel-header flex items-center gap-1.5 sm:gap-2 px-1.5 sm:px-3 py-1 sm:py-1.5 border-b shrink-0 text-white">
-        <div className="relative shrink-0">
-          <AvatarImage src={pAvatar} userId={partnerId} alt={pName} className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover" />
-          {presence.online && (
-            <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-background" />
-          )}
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="font-semibold text-sm" data-testid="chat-partner-name">{pName}</p>
-          <p className={`text-xs flex items-center ${isTyping ? "text-primary" : presence.online ? "text-green-400" : "text-muted-foreground"}`}>
-            {isTyping ? `${pName} is typing...` : presence.label}
-          </p>
-        </div>
-        <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
-          {isEncryptionReady() && (
-            <span className="hidden sm:flex items-center gap-1 text-[10px] text-green-400 bg-green-500/10 px-2 py-0.5 rounded-full border border-green-500/20 mr-1">
-              <Shield className="w-3 h-3" /> Encrypted
-            </span>
-          )}
-          <div className="hidden sm:flex items-center gap-1 px-2 py-1 rounded-full bg-secondary/60">
-            {online ? (
-              <Wifi className="w-3 h-3 text-green-400" />
-            ) : (
-              <WifiOff className="w-3 h-3 text-destructive" />
-            )}
-            <span className="text-xs text-muted-foreground">{presence.label}</span>
-          </div>
-
-
-          <button 
-            onClick={() => startCall("audio")} 
-            className="hidden sm:inline-flex p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 active:scale-95" 
-            data-testid="button-voice-call"
-            aria-label="Start audio call"
-          >
-            <Phone className="w-4 h-4" strokeWidth={1.5} />
-          </button>
-          <button 
-            onClick={() => startCall("video")} 
-            className="hidden sm:inline-flex p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 active:scale-95" 
-            data-testid="button-video-call"
-            aria-label="Start video call"
-          >
-            <Video className="w-4 h-4" strokeWidth={1.5} />
-          </button>
-          <button 
-            onClick={() => { setShowInfo(s => !s); setShowBubbleStyles(false); }}
-            className={`p-1.5 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 active:scale-95 ${showInfo ? "text-primary" : "text-muted-foreground hover:text-foreground hover:bg-secondary"}`} 
-            data-testid="button-info"
-            aria-label="Show chat info"
-          >
-            <Info className="w-4 h-4" strokeWidth={1.5} />
-          </button>
-        </div>
-      </div>
-      </div>
-
-      {/* ── Messages ── */}
       <div
-        className="chat-panel-messages relative z-[1] overflow-y-auto px-2 sm:px-3 py-2 md:py-3 md:px-4 flex flex-col gap-1 scrollbar-hide"
-        data-testid="messages-list"
-        ref={messagesContainerRef}
-        style={{ scrollBehavior: 'auto' }}
-        onClick={(e) => {
-          const t = e.target as HTMLElement;
-          if (t.closest("button, a, input, textarea, video, audio, img, [role='button']")) return;
-          if (!isNearBottomRef.current) return;
-          if (window.matchMedia("(max-width: 767px)").matches) return;
-          messageInputRef.current?.focus();
-        }}
+        className={`chat-panel flex-1 min-w-0 h-full min-h-0 relative bg-black ${premiumChatClass ?? ""}`}
       >
-        {/* New messages indicator */}
-        {hasNewMessages && !isNearBottom && (
-          <div className="flex justify-center mb-2 sticky top-0 z-10">
-            <button
-              onClick={() => {
-                scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
-                setHasNewMessages(false);
-              }}
-              className="px-3 py-1 bg-primary text-primary-foreground text-xs font-semibold rounded-full hover:bg-primary/90 transition-colors shadow-sm"
-            >
-              ↓ New messages
-            </button>
-          </div>
-        )}
 
-        {/* Load more indicator at top */}
-        <div ref={messagesStartRef} className="h-2" />
-        
-        {/* Pinned messages section */}
-        {pinnedMessages.length > 0 && (
-          <div className="mb-4 px-2">
-            <p className="text-[10px] text-muted-foreground/60 uppercase tracking-wider mb-2 font-semibold px-2">Pinned</p>
-            {pinnedMessages.map(msg => {
-              const isMe = msg.senderId === user?.id;
-              return (
-                <MessageItem
-                  key={msg.id}
-                  msg={msg}
-                  isMe={isMe}
-                  myId={user?.id ?? "me"}
-                  partnerName={pName}
 
-                  partnerAvatar={pAvatar}
-                  onDelete={deleteMessage}
-                  onLike={toggleLike}
-                  onReact={handleReact}
-                  onUnsend={handleUnsend}
-                  onPin={handlePin}
-                  onReply={startReply}
-                  onEdit={handleEdit}
-                  onOpenMenu={(m: ApiMessage, rect: DOMRect) => setContextMenu({ msg: m, top: rect.bottom + 4, left: rect.left })}
-                  onOpenMedia={openMediaMessage}
-                  seenLabel={buildSeenLabel(msg, isMe, lastSeenOutgoingId, partnerId)}
-                  onStartThread={handleStartThread}
-                  onReplyToThread={handleReplyToThread}
-                  onMediaLoad={scrollToBottomForMedia}
-                  onMediaCommitted={handleMediaCommitted}
-                  replySource={msg.replyToId ? messageById.get(msg.replyToId) : undefined}
-                  onJumpToMessage={jumpToMessage}
-                />
-              );
-            })}
-          </div>
-        )}
-        {loadingMore && messages.length > 0 && (
-          <div className="flex justify-center py-2">
-            <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-          </div>
-        )}
-
-        {/* Profile header — only when chat is empty so scroll stays on messages */}
-        {visibleMessages.length <= 3 && (
-          <div className="flex flex-col items-center gap-2 py-3 md:py-6 mb-1 shrink-0">
-            <AvatarImage src={pAvatar} userId={partnerId} alt={`Profile picture of ${pName}`} className="w-14 h-14 md:w-20 md:h-20 rounded-full object-cover" />
-            <p className="font-bold text-sm md:text-base">{pName}</p>
-            <span className="text-[10px] md:text-xs bg-secondary/60 px-3 py-1 rounded-full text-muted-foreground">Just the two of you ♥</span>
-          </div>
-        )}
-
-        {error && messages.length === 0 && visibleMessages.length === 0 && (
-          <div
-            className="flex flex-col items-center gap-3 py-8 text-center px-4 bg-destructive/5 border border-destructive/30 rounded-2xl mx-2"
-          >
-            <div className="w-12 h-12 rounded-full bg-destructive/15 flex items-center justify-center">
-              <AlertCircle className="w-6 h-6 text-destructive" />
+        <div className="chat-panel-top shrink-0 z-20 flex flex-col relative">
+          {/* ── Header ── */}
+          <div className="chat-panel-header flex items-center gap-1.5 sm:gap-2 px-1.5 sm:px-3 py-1 sm:py-1.5 border-b shrink-0 text-white">
+            <div className="relative shrink-0">
+              <AvatarImage src={pAvatar} userId={partnerId} alt={pName} className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover" />
+              {presence.online && (
+                <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-background" />
+              )}
             </div>
-            <div>
-              <p className="text-sm font-semibold text-foreground mb-1">Failed to load messages</p>
-              <p className="text-xs text-destructive/80">{error}</p>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-sm" data-testid="chat-partner-name">{pName}</p>
+              <p className={`text-xs flex items-center ${isTyping ? "text-primary" : presence.online ? "text-green-400" : "text-muted-foreground"}`}>
+                {isTyping ? `${pName} is typing...` : presence.label}
+              </p>
             </div>
-            <button 
-              onClick={() => { setError(null); loadMessages(); }} 
-              className="px-4 py-2 bg-destructive text-destructive-foreground rounded-lg text-sm font-semibold hover:bg-destructive/90 transition-colors active:scale-95"
-            >
-              Try Again
-            </button>
-          </div>
-        )}
+            <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
+              {isEncryptionReady() && (
+                <span className="hidden sm:flex items-center gap-1 text-[10px] text-green-400 bg-green-500/10 px-2 py-0.5 rounded-full border border-green-500/20 mr-1">
+                  <Shield className="w-3 h-3" /> Encrypted
+                </span>
+              )}
+              <div className="hidden sm:flex items-center gap-1 px-2 py-1 rounded-full bg-secondary/60">
+                {online ? (
+                  <Wifi className="w-3 h-3 text-green-400" />
+                ) : (
+                  <WifiOff className="w-3 h-3 text-destructive" />
+                )}
+                <span className="text-xs text-muted-foreground">{presence.label}</span>
+              </div>
 
-        {!error && visibleMessages.length === 0 && messages.length === 0 && (
-          <div className="flex flex-col items-center gap-2 py-8 text-center px-4">
-            <span className="text-4xl">💬</span>
-            {user && getChatClearedAt(user.id) ? (
-              <>
-                <p className="text-sm font-medium text-foreground">Chat cleared on your side</p>
-                <p className="text-xs text-muted-foreground">
-                  Older messages are hidden for you. {pName} may still see the full history — send a new message anytime.
-                </p>
-              </>
-            ) : (
-              <p className="text-sm text-muted-foreground">Say hi to {pName}!</p>
-            )}
-          </div>
-        )}
 
-        {groupedMessages.map((group, groupIndex) => (
-          <div key={`${group.dayKey}-${groupIndex}`}>
-            {group.label ? (
-              <p className="text-center text-[11px] text-muted-foreground/70 my-4 font-medium">{group.label}</p>
-            ) : null}
-            {group.msgs
-              .filter((msg: ApiMessage) => !msg.pinned)
-              .map((msg, i, arr) => {
-              const isMe = msg.senderId === user?.id;
-              const prevMsg = arr[i - 1];
-              const timeGap = shouldShowTimeGap(prevMsg, msg, user?.id);
-              return (
-                <div key={msg.id} className="chat-message-row">
-                  {timeGap && (
-                    <p className="text-center text-[10px] text-muted-foreground/60 my-3 font-medium">{timeGap}</p>
-                  )}
+              <button
+                onClick={() => { setShowBubbleColors(true); }}
+                className={`p-1.5 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 active:scale-95 ${showBubbleColors ? "text-primary" : "text-muted-foreground hover:text-foreground hover:bg-secondary"}`}
+                aria-label="Change bubble color"
+              >
+                <Palette className="w-4 h-4" strokeWidth={1.5} />
+              </button>
+              <button
+                onClick={() => startCall("audio")}
+                className="hidden sm:inline-flex p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 active:scale-95"
+                data-testid="button-voice-call"
+                aria-label="Start audio call"
+              >
+                <Phone className="w-4 h-4" strokeWidth={1.5} />
+              </button>
+              <button
+                onClick={() => startCall("video")}
+                className="hidden sm:inline-flex p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 active:scale-95"
+                data-testid="button-video-call"
+                aria-label="Start video call"
+              >
+                <Video className="w-4 h-4" strokeWidth={1.5} />
+              </button>
+              <button
+                onClick={() => { setShowInfo(s => !s); }}
+                className={`p-1.5 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 active:scale-95 ${showInfo ? "text-primary" : "text-muted-foreground hover:text-foreground hover:bg-secondary"}`}
+                data-testid="button-info"
+                aria-label="Show chat info"
+              >
+                <Info className="w-4 h-4" strokeWidth={1.5} />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Messages ── */}
+        <div
+          className="chat-panel-messages relative z-[1] overflow-y-auto px-2 sm:px-3 py-2 md:py-3 md:px-4 flex flex-col gap-1 scrollbar-hide"
+          data-testid="messages-list"
+          ref={messagesContainerRef}
+          style={{ scrollBehavior: 'auto' }}
+          onClick={(e) => {
+            const t = e.target as HTMLElement;
+            if (t.closest("button, a, input, textarea, video, audio, img, [role='button']")) return;
+            if (!isNearBottomRef.current) return;
+            if (window.matchMedia("(max-width: 767px)").matches) return;
+            messageInputRef.current?.focus();
+          }}
+        >
+          {/* New messages indicator */}
+          {hasNewMessages && !isNearBottom && (
+            <div className="flex justify-center mb-2 sticky top-0 z-10">
+              <button
+                onClick={() => {
+                  scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
+                  setHasNewMessages(false);
+                }}
+                className="px-3 py-1 bg-primary text-primary-foreground text-xs font-semibold rounded-full hover:bg-primary/90 transition-colors shadow-sm"
+              >
+                ↓ New messages
+              </button>
+            </div>
+          )}
+
+          {/* Load more indicator at top */}
+          <div ref={messagesStartRef} className="h-2" />
+
+          {/* Pinned messages section */}
+          {pinnedMessages.length > 0 && (
+            <div className="mb-4 px-2">
+              <p className="text-[10px] text-muted-foreground/60 uppercase tracking-wider mb-2 font-semibold px-2">Pinned</p>
+              {pinnedMessages.map(msg => {
+                const isMe = msg.senderId === user?.id;
+                return (
                   <MessageItem
+                    key={msg.id}
                     msg={msg}
                     isMe={isMe}
                     myId={user?.id ?? "me"}
                     partnerName={pName}
+
                     partnerAvatar={pAvatar}
                     onDelete={deleteMessage}
                     onLike={toggleLike}
@@ -3099,9 +3014,9 @@ export default function Messages() {
                     onUnsend={handleUnsend}
                     onPin={handlePin}
                     onReply={startReply}
+                    onEdit={handleEdit}
                     onOpenMenu={(m: ApiMessage, rect: DOMRect) => setContextMenu({ msg: m, top: rect.bottom + 4, left: rect.left })}
                     onOpenMedia={openMediaMessage}
-                    prevMsg={prevMsg}
                     seenLabel={buildSeenLabel(msg, isMe, lastSeenOutgoingId, partnerId)}
                     onStartThread={handleStartThread}
                     onReplyToThread={handleReplyToThread}
@@ -3110,251 +3025,355 @@ export default function Messages() {
                     replySource={msg.replyToId ? messageById.get(msg.replyToId) : undefined}
                     onJumpToMessage={jumpToMessage}
                   />
-                </div>
-              );
-            })}
-          </div>
-        ))}
+                );
+              })}
+            </div>
+          )}
+          {loadingMore && messages.length > 0 && (
+            <div className="flex justify-center py-2">
+              <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            </div>
+          )}
 
-        <div ref={bottomRef} className="h-8 shrink-0" aria-hidden />
-      </div>
+          {/* Profile header — only when chat is empty so scroll stays on messages */}
+          {visibleMessages.length <= 3 && (
+            <div className="flex flex-col items-center gap-2 py-3 md:py-6 mb-1 shrink-0">
+              <AvatarImage src={pAvatar} userId={partnerId} alt={`Profile picture of ${pName}`} className="w-14 h-14 md:w-20 md:h-20 rounded-full object-cover" />
+              <p className="font-bold text-sm md:text-base">{pName}</p>
+              <span className="text-[10px] md:text-xs bg-secondary/60 px-3 py-1 rounded-full text-muted-foreground">Just the two of you ♥</span>
+            </div>
+          )}
 
-      <div className="chat-panel-bottom shrink-0 relative z-10">
-        {showPartnerTyping && (
-          <div className="flex items-end gap-2 px-3 py-1.5 shrink-0 border-t border-white/5 bg-background/80 backdrop-blur-sm">
-            <AvatarImage src={pAvatar} userId={partnerId} alt="" className="w-6 h-6 rounded-full object-cover shrink-0" />
-            <div className="bg-secondary/80 rounded-2xl rounded-bl-md px-3 py-2 flex items-center gap-1.5">
-              <span className="text-xs text-muted-foreground">{partnerTypingLine(partnerId)}</span>
-              <TypingDots />
+          {error && messages.length === 0 && visibleMessages.length === 0 && (
+            <div
+              className="flex flex-col items-center gap-3 py-8 text-center px-4 bg-destructive/5 border border-destructive/30 rounded-2xl mx-2"
+            >
+              <div className="w-12 h-12 rounded-full bg-destructive/15 flex items-center justify-center">
+                <AlertCircle className="w-6 h-6 text-destructive" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-foreground mb-1">Failed to load messages</p>
+                <p className="text-xs text-destructive/80">{error}</p>
+              </div>
+              <button
+                onClick={() => { setError(null); loadMessages(); }}
+                className="px-4 py-2 bg-destructive text-destructive-foreground rounded-lg text-sm font-semibold hover:bg-destructive/90 transition-colors active:scale-95"
+              >
+                Try Again
+              </button>
+            </div>
+          )}
+
+          {!error && visibleMessages.length === 0 && messages.length === 0 && (
+            <div className="flex flex-col items-center gap-2 py-8 text-center px-4">
+              <span className="text-4xl">💬</span>
+              {user && getChatClearedAt(user.id) ? (
+                <>
+                  <p className="text-sm font-medium text-foreground">Chat cleared on your side</p>
+                  <p className="text-xs text-muted-foreground">
+                    Older messages are hidden for you. {pName} may still see the full history — send a new message anytime.
+                  </p>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">Say hi to {pName}!</p>
+              )}
+            </div>
+          )}
+
+          {groupedMessages.map((group, groupIndex) => (
+            <div key={`${group.dayKey}-${groupIndex}`}>
+              {group.label ? (
+                <p className="text-center text-[11px] text-muted-foreground/70 my-4 font-medium">{group.label}</p>
+              ) : null}
+              {group.msgs
+                .filter((msg: ApiMessage) => !msg.pinned)
+                .map((msg, i, arr) => {
+                  const isMe = msg.senderId === user?.id;
+                  const prevMsg = arr[i - 1];
+                  const timeGap = shouldShowTimeGap(prevMsg, msg, user?.id);
+                  return (
+                    <div key={msg.id} className="chat-message-row">
+                      {timeGap && (
+                        <p className="text-center text-[10px] text-muted-foreground/60 my-3 font-medium">{timeGap}</p>
+                      )}
+                      <MessageItem
+                        msg={msg}
+                        isMe={isMe}
+                        myId={user?.id ?? "me"}
+                        partnerName={pName}
+                        partnerAvatar={pAvatar}
+                        onDelete={deleteMessage}
+                        onLike={toggleLike}
+                        onReact={handleReact}
+                        onUnsend={handleUnsend}
+                        onPin={handlePin}
+                        onReply={startReply}
+                        onOpenMenu={(m: ApiMessage, rect: DOMRect) => setContextMenu({ msg: m, top: rect.bottom + 4, left: rect.left })}
+                        onOpenMedia={openMediaMessage}
+                        prevMsg={prevMsg}
+                        seenLabel={buildSeenLabel(msg, isMe, lastSeenOutgoingId, partnerId)}
+                        onStartThread={handleStartThread}
+                        onReplyToThread={handleReplyToThread}
+                        onMediaLoad={scrollToBottomForMedia}
+                        onMediaCommitted={handleMediaCommitted}
+                        replySource={msg.replyToId ? messageById.get(msg.replyToId) : undefined}
+                        onJumpToMessage={jumpToMessage}
+                      />
+                    </div>
+                  );
+                })}
+            </div>
+          ))}
+
+          <div ref={bottomRef} className="h-8 shrink-0" aria-hidden />
+        </div>
+
+        <div className="chat-panel-bottom shrink-0 relative z-10">
+          {showPartnerTyping && (
+            <div className="flex items-end gap-2 px-3 py-1.5 shrink-0 border-t border-white/5 bg-background/80 backdrop-blur-sm">
+              <AvatarImage src={pAvatar} userId={partnerId} alt="" className="w-6 h-6 rounded-full object-cover shrink-0" />
+              <div className="bg-secondary/80 rounded-2xl rounded-bl-md px-3 py-2 flex items-center gap-1.5">
+                <span className="text-xs text-muted-foreground">{partnerTypingLine(partnerId)}</span>
+                <TypingDots />
+              </div>
+            </div>
+          )}
+          {/* ── Edit Message Bar ── */}
+          {editingMessage && (
+            <EditMessageBar
+              value={editText}
+              onChange={setEditText}
+              onSave={handleSaveEdit}
+              onCancel={handleCancelEdit}
+              saving={editSaving}
+            />
+          )}
+
+          {doodleOpen && (
+            <DoodleCanvas
+              onClose={closeDoodlePanel}
+              onSend={handleDoodleSend}
+            />
+          )}
+
+          {/* ── Input Bar or Media Preview ── */}
+          {pendingMediaPreview ? (
+            <PendingMediaPreview
+              file={pendingMediaPreview.normalized}
+              onCancel={() => setPendingMediaPreview(null)}
+              onSend={processAndSendMedia}
+              disabled={!online || blocked}
+            />
+          ) : (
+            <MessageInput
+              ref={messageInputRef}
+              onInputActivity={handleInputActivity}
+              onSendMessage={sendText}
+              onShareLocation={handleShareLocation}
+              sharingLocation={sharingLocation}
+              replyPreview={
+                replyTo && user ? (
+                  <ReplyPreview
+                    replyTo={replyTo}
+                    myId={user.id}
+                    partnerName={pName}
+                    onCancel={() => setReplyTo(null)}
+                  />
+                ) : undefined
+              }
+              onStickerSelect={sendSticker}
+              onGifSelect={sendGif}
+              onGreetingSelect={sendGreeting}
+              onImageSelect={(file, itemType) => {
+                void handlePickedFile(file, itemType);
+              }}
+              onOpenCamera={() => setShowCamera(true)}
+              mediaViewMode={mediaViewMode}
+              onMediaViewModeChange={setMediaViewMode}
+              onDoodleOpen={openDoodlePanel}
+              doodleActive={doodleOpen}
+              onStartRecording={startRecording}
+              onCancelRecording={cancelRecording}
+              onSendRecording={sendVoiceRecording}
+              recording={recording}
+              recordingTime={recordingTime}
+              disabled={!online || blocked || editingMessage !== null}
+            />
+          )}
+          <BubbleColorSelector
+            show={showBubbleColors}
+            onClose={() => setShowBubbleColors(false)}
+            currentThemeId={user ? getCachedChatTheme() : "default"}
+            onSelect={(themeId) => {
+              api.updateCouplePrefs({ chatTheme: themeId }).then(() => {
+                if (refreshCouplePrefs) refreshCouplePrefs();
+              }).catch(console.error);
+            }}
+          />
+        </div>
+
+        <AppThemeModal
+          show={showAppThemes}
+          onClose={() => setShowAppThemes(false)}
+          current={appThemeId}
+          onSelect={(themeId) => {
+            setAppThemeId(themeId);
+            api.updateCouplePrefs({ appTheme: themeId }).then(refreshCouplePrefs).catch(console.error);
+          }}
+        />
+
+        {showCamera && (
+          <CameraOverlay
+            onClose={() => setShowCamera(false)}
+            onCapture={(file) => {
+              setShowCamera(false);
+              void handlePickedFile(file);
+            }}
+          />
+        )}
+
+        {/* ── Info Panel ── */}
+        <InfoPanel
+          show={showInfo}
+          onClose={() => setShowInfo(false)}
+          partnerName={pName}
+          partnerAvatar={pAvatar}
+          partnerLastSeen={partnerLastSeen}
+          online={online}
+          blocked={blocked}
+          onToggleBlock={() => {
+            setBlocked((prev) => {
+              const next = !prev;
+              setChatBlocked(next);
+              return next;
+            });
+          }}
+          onClearChat={() => setShowDeleteConfirm(true)}
+          onExportChat={exportChatHistory}
+          onAudioCall={() => startCall("audio")}
+          onVideoCall={() => startCall("video")}
+        />
+
+        {/* ── Delete confirm ── */}
+        {showDeleteConfirm && (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-6">
+            <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-xs" data-testid="delete-confirm">
+              <Trash2 className="w-8 h-8 text-destructive mx-auto mb-3" />
+              <h3 className="font-bold text-center mb-1">Clear chat for you?</h3>
+              <p className="text-sm text-muted-foreground text-center mb-5">
+                Messages disappear on your account only. {pName} will still see the full chat.
+              </p>
+              <div className="flex gap-2">
+                <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 py-2.5 bg-secondary rounded-xl text-sm font-semibold" data-testid="button-cancel-delete">Cancel</button>
+                <button onClick={handleDeleteChat} className="flex-1 py-2.5 bg-destructive text-white rounded-xl text-sm font-semibold" data-testid="button-confirm-delete">Delete</button>
+              </div>
             </div>
           </div>
         )}
-      {/* ── Edit Message Bar ── */}
-      {editingMessage && (
-        <EditMessageBar
-          value={editText}
-          onChange={setEditText}
-          onSave={handleSaveEdit}
-          onCancel={handleCancelEdit}
-          saving={editSaving}
-        />
-      )}
 
-      {doodleOpen && (
-        <DoodleCanvas
-          onClose={closeDoodlePanel}
-          onSend={handleDoodleSend}
-        />
-      )}
+        {/* ── Incoming call banner ── */}
+        {incomingCall && (
+          <IncomingCallOverlay
+            callerName={pName}
+            callerAvatar={pAvatar}
+            callType={incomingCall.type}
+            canAccept={Boolean(incomingCall.offer)}
+            onAccept={acceptCall}
+            onReject={rejectCall}
+          />
+        )}
 
-      {/* ── Input Bar or Media Preview ── */}
-      {pendingMediaPreview ? (
-        <PendingMediaPreview
-          file={pendingMediaPreview.normalized}
-          onCancel={() => setPendingMediaPreview(null)}
-          onSend={processAndSendMedia}
-          disabled={!online || blocked}
-        />
-      ) : (
-        <MessageInput
-          ref={messageInputRef}
-          onInputActivity={handleInputActivity}
-          onSendMessage={sendText}
-          onShareLocation={handleShareLocation}
-          sharingLocation={sharingLocation}
-          replyPreview={
-            replyTo && user ? (
-              <ReplyPreview
-                replyTo={replyTo}
-                myId={user.id}
-                partnerName={pName}
-                onCancel={() => setReplyTo(null)}
-              />
-            ) : undefined
-          }
-          onStickerSelect={sendSticker}
-          onGifSelect={sendGif}
-          onGreetingSelect={sendGreeting}
-          onImageSelect={(file, itemType) => {
-            void handlePickedFile(file, itemType);
-          }}
-          onOpenCamera={() => setShowCamera(true)}
-          mediaViewMode={mediaViewMode}
-          onMediaViewModeChange={setMediaViewMode}
-          onDoodleOpen={openDoodlePanel}
-          doodleActive={doodleOpen}
-          onStartRecording={startRecording}
-          onCancelRecording={cancelRecording}
-          onSendRecording={sendVoiceRecording}
-          recording={recording}
-          recordingTime={recordingTime}
-          disabled={!online || blocked || editingMessage !== null}
-        />
-      )}
-      </div>
+        {/* ── Active / Outgoing call screen ── */}
+        {callState && (
+          <CallScreen
+            call={callState}
+            partnerId={partnerId}
+            partnerName={pName}
+            partnerAvatar={pAvatar}
+            myId={user!.id}
+            onSendSignal={(data) => api.sendCallSignal(data)}
+            onConnected={onCallConnected}
+            onEnd={endCall}
+            incomingSignal={callSignal ?? undefined}
+          />
+        )}
 
-      <AppThemeModal
-        show={showAppThemes}
-        onClose={() => setShowAppThemes(false)}
-        current={appThemeId}
-        onSelect={(themeId) => {
-          setAppThemeId(themeId);
-          api.updateCouplePrefs({ appTheme: themeId }).then(refreshCouplePrefs).catch(console.error);
-        }}
-      />
-
-      {showCamera && (
-        <CameraOverlay
-          onClose={() => setShowCamera(false)}
-          onCapture={(file) => {
-            setShowCamera(false);
-            void handlePickedFile(file);
-          }}
-        />
-      )}
-
-      {/* ── Info Panel ── */}
-      <InfoPanel
-        show={showInfo}
-        onClose={() => setShowInfo(false)}
-        partnerName={pName}
-        partnerAvatar={pAvatar}
-        partnerLastSeen={partnerLastSeen}
-        online={online}
-        blocked={blocked}
-        onToggleBlock={() => {
-          setBlocked((prev) => {
-            const next = !prev;
-            setChatBlocked(next);
-            return next;
-          });
-        }}
-        onClearChat={() => setShowDeleteConfirm(true)}
-        onExportChat={exportChatHistory}
-        onAudioCall={() => startCall("audio")}
-        onVideoCall={() => startCall("video")}
-      />
-
-      {/* ── Delete confirm ── */}
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-6">
-          <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-xs" data-testid="delete-confirm">
-            <Trash2 className="w-8 h-8 text-destructive mx-auto mb-3" />
-            <h3 className="font-bold text-center mb-1">Clear chat for you?</h3>
-            <p className="text-sm text-muted-foreground text-center mb-5">
-              Messages disappear on your account only. {pName} will still see the full chat.
-            </p>
-            <div className="flex gap-2">
-              <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 py-2.5 bg-secondary rounded-xl text-sm font-semibold" data-testid="button-cancel-delete">Cancel</button>
-              <button onClick={handleDeleteChat} className="flex-1 py-2.5 bg-destructive text-white rounded-xl text-sm font-semibold" data-testid="button-confirm-delete">Delete</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Incoming call banner ── */}
-      {incomingCall && (
-        <IncomingCallOverlay
-          callerName={pName}
-          callerAvatar={pAvatar}
-          callType={incomingCall.type}
-          canAccept={Boolean(incomingCall.offer)}
-          onAccept={acceptCall}
-          onReject={rejectCall}
-        />
-      )}
-
-      {/* ── Active / Outgoing call screen ── */}
-      {callState && (
-        <CallScreen
-          call={callState}
-          partnerId={partnerId}
-          partnerName={pName}
-          partnerAvatar={pAvatar}
-          myId={user!.id}
-          onSendSignal={(data) => api.sendCallSignal(data)}
-          onConnected={onCallConnected}
-          onEnd={endCall}
-          incomingSignal={callSignal ?? undefined}
-        />
-      )}
-
-      {mediaViewer && (
-        <div
-          className="fixed inset-0 z-[120] bg-black/95 flex items-center justify-center p-4"
-          onContextMenu={(e) => e.preventDefault()}
-        >
-          <button
-            type="button"
-            onClick={() => setMediaViewer(null)}
-            className="absolute top-4 right-4 w-10 h-10 rounded-full bg-black/60 text-white flex items-center justify-center"
-            aria-label="Close media"
+        {mediaViewer && (
+          <div
+            className="fixed inset-0 z-[120] bg-black/95 flex items-center justify-center p-4"
+            onContextMenu={(e) => e.preventDefault()}
           >
-            <X className="w-5 h-5" />
-          </button>
-          {mediaViewer.timed && !mediaViewer.useVideoDuration && (
-            <div className="absolute top-4 left-4 px-3 py-1.5 rounded-full bg-primary/30 text-white text-sm font-semibold">
-              {mediaViewer.secondsLeft}s
-            </div>
-          )}
-          {mediaViewer.kind === "video" ? (
-            <video
-              src={mediaViewer.url}
-              controls={!mediaViewer.timed}
-              autoPlay
-              playsInline
-              onEnded={() => {
-                if (mediaViewer.timed) setMediaViewer(null);
-              }}
-              className="w-full h-full object-contain"
-            />
-          ) : (
-            <img src={mediaViewer.url} alt="Media Viewer" className="w-full h-full object-contain" />
-          )}
-        </div>
-      )}
+            <button
+              type="button"
+              onClick={() => setMediaViewer(null)}
+              className="absolute top-4 right-4 w-10 h-10 rounded-full bg-black/60 text-white flex items-center justify-center"
+              aria-label="Close media"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            {mediaViewer.timed && !mediaViewer.useVideoDuration && (
+              <div className="absolute top-4 left-4 px-3 py-1.5 rounded-full bg-primary/30 text-white text-sm font-semibold">
+                {mediaViewer.secondsLeft}s
+              </div>
+            )}
+            {mediaViewer.kind === "video" ? (
+              <video
+                src={mediaViewer.url}
+                controls={!mediaViewer.timed}
+                autoPlay
+                playsInline
+                onEnded={() => {
+                  if (mediaViewer.timed) setMediaViewer(null);
+                }}
+                className="w-full h-full object-contain"
+              />
+            ) : (
+              <img src={mediaViewer.url} alt="Media Viewer" className="w-full h-full object-contain" />
+            )}
+          </div>
+        )}
 
-      {contextMenu && user && (
-        <MessageContextMenu
-          msg={contextMenu.msg}
-          position={{ top: contextMenu.top, left: contextMenu.left }}
-          mode={contextMenu.msg.type === "audio" ? "audio" : "full"}
-          isMe={contextMenu.msg.senderId === user.id}
-          canEdit={canEditMessage(contextMenu.msg)}
-          onClose={() => setContextMenu(null)}
-          onReply={() => startReply(contextMenu.msg)}
-          onCopy={() => {
-            if (contextMenu.msg.text) navigator.clipboard.writeText(contextMenu.msg.text);
-          }}
-          onPin={() => handlePin(contextMenu.msg.id)}
-          onDeleteForMe={() => handleDeleteForMe(contextMenu.msg.id)}
-          onUnsend={
-            contextMenu.msg.senderId === user.id ? () => handleUnsend(contextMenu.msg.id) : undefined
-          }
-          onRemoveReaction={
-            typeof contextMenu.msg.reaction === "string" && contextMenu.msg.reaction.trim()
-              ? () => handleReact(contextMenu.msg.id, contextMenu.msg.reaction as string)
-              : undefined
-          }
-          onEdit={
-            canEditMessage(contextMenu.msg)
-              ? () => handleEdit(contextMenu.msg)
-              : undefined
-          }
-          onDownloadChat={contextMenu.msg.type !== "audio" ? downloadChatImages : undefined}
-        />
-      )}
+        {contextMenu && user && (
+          <MessageContextMenu
+            msg={contextMenu.msg}
+            position={{ top: contextMenu.top, left: contextMenu.left }}
+            mode={contextMenu.msg.type === "audio" ? "audio" : "full"}
+            isMe={contextMenu.msg.senderId === user.id}
+            canEdit={canEditMessage(contextMenu.msg)}
+            onClose={() => setContextMenu(null)}
+            onReply={() => startReply(contextMenu.msg)}
+            onCopy={() => {
+              if (contextMenu.msg.text) navigator.clipboard.writeText(contextMenu.msg.text);
+            }}
+            onPin={() => handlePin(contextMenu.msg.id)}
+            onDeleteForMe={() => handleDeleteForMe(contextMenu.msg.id)}
+            onUnsend={
+              contextMenu.msg.senderId === user.id ? () => handleUnsend(contextMenu.msg.id) : undefined
+            }
+            onRemoveReaction={
+              typeof contextMenu.msg.reaction === "string" && contextMenu.msg.reaction.trim()
+                ? () => handleReact(contextMenu.msg.id, contextMenu.msg.reaction as string)
+                : undefined
+            }
+            onEdit={
+              canEditMessage(contextMenu.msg)
+                ? () => handleEdit(contextMenu.msg)
+                : undefined
+            }
+            onDownloadChat={contextMenu.msg.type !== "audio" ? downloadChatImages : undefined}
+          />
+        )}
 
-      {imageToCrop && (
-        <ImageCropModal
-          imageSrc={imageToCrop}
-          title="Crop before sending"
-          onCancel={dismissImageCrop}
-          onApply={handleCroppedImage}
-        />
-      )}
+        {imageToCrop && (
+          <ImageCropModal
+            imageSrc={imageToCrop}
+            title="Crop before sending"
+            onCancel={dismissImageCrop}
+            onApply={handleCroppedImage}
+          />
+        )}
 
-    </div>
+      </div>
     </div>
   );
 }

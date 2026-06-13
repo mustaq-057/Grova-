@@ -20,6 +20,7 @@ import { tryRefreshSession } from "@/lib/api";
 import { MessageText } from "@/lib/linkify";
 import { resolveChatImageUrl, resolveChatVideoUrl, resolveChatAudioUrl } from "@/lib/media-url";
 import { useEffect } from "react";
+import { useChatTheme } from "@/hooks/useChatTheme";
 
 function isEmojiOnlyText(text?: string): boolean {
   if (!text) return false;
@@ -205,9 +206,11 @@ export const MessageItem = memo(function MessageItem({
     return partnerName;
   }, [hasReply, msg.replyToSenderId, myId, partnerName]);
 
+  const { theme } = useChatTheme();
+
   const defaultBubbleStyle = isMe
-    ? { backgroundColor: "var(--color-primary, #2563EB)", borderColor: "var(--color-primary, #2563EB)" }
-    : { backgroundColor: "color-mix(in srgb, var(--color-primary) 20%, var(--color-secondary, #374151))", borderColor: "color-mix(in srgb, var(--color-primary) 30%, var(--color-secondary, #374151))" };
+    ? { backgroundColor: theme.bubbleColor, borderColor: theme.bubbleBorder }
+    : { backgroundColor: getPartnerBubbleColors(theme).fill, borderColor: getPartnerBubbleColors(theme).border };
 
   const openReactionPicker = useCallback(() => {
     const anchor = bubbleWrapRef.current;
