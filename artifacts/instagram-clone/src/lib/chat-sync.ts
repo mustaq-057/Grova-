@@ -110,7 +110,7 @@ export function mergeMessagesById(existing: ApiMessage[], incoming: ApiMessage[]
       ...m,
       text,
       imageUrl,
-      imageData: (m.type === "doodle" || hasRemoteImage)
+      imageData: hasRemoteImage
         ? undefined
         : pickMediaUrl(m.imageData, prev.imageData),
       audioData: m.audioData ?? prev.audioData,

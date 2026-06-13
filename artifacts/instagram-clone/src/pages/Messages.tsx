@@ -52,6 +52,7 @@ import {
   clearChatForUser,
   applyHiddenMessageId,
   getHiddenMessageIds,
+  removeHiddenMessageId,
 } from "@/lib/hidden-messages";
 import { parsePresenceResponse, isPartnerActiveInChat } from "@/lib/presence-api";
 import {
@@ -152,10 +153,12 @@ function initialChatMessages(): ApiMessage[] {
   const cached = readChatCacheForCurrentUser();
   const userId = readSessionSnapshot()?.user?.id;
   if (!userId) return cached;
+  const hidden = getHiddenMessageIds(userId);
+  let visible = cached.filter((m) => !hidden.has(m.id));
   const clearedAt = getChatClearedAt(userId);
-  if (!clearedAt) return cached;
+  if (!clearedAt) return visible;
   const clearMs = new Date(clearedAt).getTime();
-  return cached.filter((m) => {
+  return visible.filter((m) => {
     if (!m.timestamp) return false;
     const msgMs = new Date(m.timestamp).getTime();
     return !Number.isNaN(msgMs) && !Number.isNaN(clearMs) && msgMs > clearMs;
@@ -2808,8 +2811,7 @@ export default function Messages() {
       try {
         await hideMessageForUser(user.id, id);
       } catch {
-        const set = getHiddenMessageIds(user.id);
-        set.delete(id);
+        removeHiddenMessageId(user.id, id);
         setHiddenTick((t) => t + 1);
         window.alert("Could not hide message — check your connection.");
       }

@@ -187,20 +187,26 @@ export default function DoodleCanvas({ onClose, onSend, onError }: DoodleCanvasP
     setHasStrokes(true);
   }, [saveHistory]);
 
-  const cropToContent = (sourceCanvas: HTMLCanvasElement): { x: number; y: number; w: number; h: number } => {
+  const cropToContent = (
+    sourceCanvas: HTMLCanvasElement,
+    width: number,
+    height: number,
+  ): { x: number; y: number; w: number; h: number } => {
+    const cssW = width > 0 ? width : sourceCanvas.width;
+    const cssH = height > 0 ? height : sourceCanvas.height;
+    if (cssW <= 0 || cssH <= 0) {
+      return { x: 0, y: 0, w: 40, h: 40 };
+    }
+
     const ctx = sourceCanvas.getContext("2d");
-    if (!ctx) return { x: 0, y: 0, w: sourceCanvas.width, h: sourceCanvas.height };
+    if (!ctx) return { x: 0, y: 0, w: cssW, h: cssH };
 
-    const cssW = sourceCanvas.clientWidth;
-    const cssH = sourceCanvas.clientHeight;
-
-    const tempCanvas = document.createElement("canvas");
-    tempCanvas.width = cssW;
-    tempCanvas.height = cssH;
-    const tempCtx = tempCanvas.getContext("2d")!;
-    tempCtx.drawImage(sourceCanvas, 0, 0, cssW, cssH);
-
-    const imageData = tempCtx.getImageData(0, 0, cssW, cssH);
+    let imageData: ImageData;
+    try {
+      imageData = ctx.getImageData(0, 0, cssW, cssH);
+    } catch {
+      return { x: 0, y: 0, w: Math.min(cssW, 280), h: Math.min(cssH, 280) };
+    }
     const data = imageData.data;
 
     const isDrawn = (offset: number) => {
@@ -295,9 +301,9 @@ export default function DoodleCanvas({ onClose, onSend, onError }: DoodleCanvasP
           fail("Could not prepare your doodle. Please try again.");
           return;
         }
-        fctx.drawImage(canvas, 0, 0, cssW, cssH);
+        fctx.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, cssW, cssH);
 
-        const crop = cropToContent(fullCanvas);
+        const crop = cropToContent(fullCanvas, cssW, cssH);
 
         const exportCanvas = document.createElement("canvas");
         exportCanvas.width = crop.w;
