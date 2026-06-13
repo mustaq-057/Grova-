@@ -1899,27 +1899,10 @@ export default function Messages() {
             secondsLeft: 10,
             mediaReady: false,
             allowDownload,
+            items,
+            initialIndex,
           });
-          const img = new Image();
-          img.onload = () => {
-            setMediaViewer({
-              messageId: msg.id,
-              url: displayUrl,
-              kind: "image",
-              timed: true,
-              useVideoDuration: false,
-              secondsLeft: 10,
-              mediaReady: true,
-              allowDownload,
-              expiresAt: Date.now() + 10_000,
-            });
-            applyOpenedState();
-          };
-          img.onerror = () => {
-            setOpeningMediaId(null);
-            toast.error("Could not load photo");
-          };
-          img.src = displayUrl;
+          applyOpenedState();
           return;
         }
 
@@ -1932,6 +1915,8 @@ export default function Messages() {
           secondsLeft: 0,
           mediaReady: true,
           allowDownload,
+          items,
+          initialIndex,
         });
         applyOpenedState();
         return;
@@ -1956,6 +1941,8 @@ export default function Messages() {
           secondsLeft: 0,
           mediaReady: true,
           allowDownload: true,
+          items,
+          initialIndex,
         });
         return;
       }
@@ -1969,22 +1956,9 @@ export default function Messages() {
         secondsLeft: 0,
         mediaReady: false,
         allowDownload: true,
+        items,
+        initialIndex,
       });
-      const img = new Image();
-      img.onload = () => {
-        setMediaViewer({
-          messageId: msg.id,
-          url: displayUrl,
-          kind: "image",
-          timed: false,
-          useVideoDuration: false,
-          secondsLeft: 0,
-          mediaReady: true,
-          allowDownload: true,
-        });
-      };
-      img.onerror = () => toast.error("Could not load photo");
-      img.src = displayUrl;
     } catch (err) {
       setOpeningMediaId(null);
       toast.error(err instanceof Error ? err.message : "Could not open media");

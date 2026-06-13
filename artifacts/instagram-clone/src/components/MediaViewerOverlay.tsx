@@ -41,6 +41,7 @@ export function MediaViewerOverlay({
   const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
+  const [internalReady, setInternalReady] = useState(mediaReady);
   
   const pinchRef = useRef<{ dist: number; scale: number } | null>(null);
   const panRef = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
@@ -52,7 +53,8 @@ export function MediaViewerOverlay({
   useEffect(() => {
     setScale(1);
     setOffset({ x: 0, y: 0 });
-  }, [currentIndex, currentItem?.url]);
+    setInternalReady(mediaReady);
+  }, [currentIndex, currentItem?.url, mediaReady]);
 
   const handleDownload = useCallback(async () => {
     if (!currentItem) return;
@@ -206,7 +208,7 @@ export function MediaViewerOverlay({
         </button>
       </div>
 
-      {timed && !useVideoDuration && mediaReady && (
+      {timed && !useVideoDuration && internalReady && (
         <div className="absolute top-4 left-4 px-3 py-1.5 rounded-full bg-primary/30 text-white text-sm font-semibold z-10">
           {secondsLeft}s
         </div>
@@ -216,7 +218,7 @@ export function MediaViewerOverlay({
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); setCurrentIndex(i => i - 1); }}
-          className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-black/40 text-white flex items-center justify-center hover:bg-black/60 transition-colors z-10 hidden sm:flex"
+          className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-black/40 text-white flex items-center justify-center hover:bg-black/60 transition-colors z-10"
         >
           <ChevronLeft className="w-8 h-8" />
         </button>
@@ -226,7 +228,7 @@ export function MediaViewerOverlay({
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); setCurrentIndex(i => i + 1); }}
-          className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-black/40 text-white flex items-center justify-center hover:bg-black/60 transition-colors z-10 hidden sm:flex"
+          className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-black/40 text-white flex items-center justify-center hover:bg-black/60 transition-colors z-10"
         >
           <ChevronRight className="w-8 h-8" />
         </button>
@@ -243,15 +245,18 @@ export function MediaViewerOverlay({
         </div>
       )}
 
-      {!mediaReady && currentItem.kind === "image" ? (
+      {!internalReady && currentItem.kind === "image" ? (
         <img
           src={currentItem.url}
           alt=""
           className="max-w-full max-h-full object-contain opacity-0"
-          onLoad={onMediaReady}
+          onLoad={() => {
+            setInternalReady(true);
+            onMediaReady?.();
+          }}
           draggable={false}
         />
-      ) : !mediaReady ? null : currentItem.kind === "video" ? (
+      ) : !internalReady ? null : currentItem.kind === "video" ? (
         <video
           src={currentItem.url}
           controls={!timed}
@@ -274,7 +279,10 @@ export function MediaViewerOverlay({
             style={{
               transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
             }}
-            onLoad={onMediaReady}
+            onLoad={() => {
+              setInternalReady(true);
+              onMediaReady?.();
+            }}
             draggable={false}
           />
         </div>
