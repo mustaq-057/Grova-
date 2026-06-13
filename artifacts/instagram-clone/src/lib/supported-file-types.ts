@@ -117,8 +117,8 @@ export const SUPPORTED_FILE_TYPES = {
   // Mobile
   mobile: {
     "application/vnd.android.package-archive": ".apk",
-    "application/octet-stream": ".aab",
-    "application/octet-stream": ".ipa",
+    "application/vnd.android.app-package-archive": ".aab",
+    "application/x-ipa": ".ipa",
   },
 
   // Executables
@@ -135,7 +135,7 @@ export const SUPPORTED_FILE_TYPES = {
     "image/vnd.adobe.photoshop": ".psd",
     "application/illustrator": ".ai",
     "application/x-xd": ".xd",
-    "application/json": ".fig",
+    "application/x-figma": ".fig",
     "application/x-blend": ".blend",
     "model/obj": ".obj",
     "model/x-gltf-binary": ".fbx",
