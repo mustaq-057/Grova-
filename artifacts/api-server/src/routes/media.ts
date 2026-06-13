@@ -257,8 +257,12 @@ router.post("/posts/:id/like", rateLimiters.messages, authenticate, async (req, 
         "INSERT INTO post_likes (post_id, user_id, created_at) VALUES ($1, $2, $3)",
         [postId, userId, new Date().toISOString()],
       );
-      const fromName = await profileDisplayName(userId);
-      await postCoupleActivity("like", userId, fromName, "liked your post", `/?post=${postId}`).catch(() => {});
+      const authorRow = await db.execute("SELECT author_id FROM posts WHERE id = $1", [postId]);
+      const authorId = authorRow.rows[0]?.author_id ? String(authorRow.rows[0].author_id) : null;
+      if (authorId && authorId !== userId) {
+        const fromName = await profileDisplayName(userId);
+        await postCoupleActivity("like", userId, fromName, "liked your post", `/?post=${postId}`).catch(() => {});
+      }
     }
     const post = await enrichSinglePost(postId, userId);
     if (post) broadcast("post-liked", post);

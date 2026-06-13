@@ -76,6 +76,12 @@ function isOwnActivity(n: Pick<AppNotification, "actorId" | "fromName">): boolea
   return false;
 }
 
+/** Chat-only events belong on the chat badge, not the bell feed. */
+function isChatOnlyActivity(n: Pick<AppNotification, "type" | "targetPath">): boolean {
+  if (n.targetPath?.startsWith("/chat")) return true;
+  return ["doodle", "file", "greeting", "reaction", "location", "call"].includes(n.type);
+}
+
 function filterForViewer(list: AppNotification[]): AppNotification[] {
   return list.filter((n) => !isOwnActivity(n));
 }
@@ -95,6 +101,7 @@ export async function hydrateNotifications(): Promise<void> {
     filterForViewer(
       notifications
         .filter((n) => !isSecretNoteActivity(n))
+        .filter((n) => !isChatOnlyActivity(n))
         .filter((n) => ["like", "comment", "story", "dua", "call", "location", "task", "reaction", "doodle", "file", "greeting", "calendar", "checkin"].includes(n.type))
         .filter((n) => n.type !== "message")
         .slice(0, 50),
@@ -109,6 +116,7 @@ export function addNotification(n: Omit<AppNotification, "id" | "read" | "timest
   if (!allowedTypes.includes(n.type)) return;
   if (n.type === "message") return;
   if (isSecretNoteActivity(n)) return;
+  if (isChatOnlyActivity(n)) return;
   if (isOwnActivity(n)) return;
 
   const item: AppNotification = {

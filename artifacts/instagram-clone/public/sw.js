@@ -47,15 +47,28 @@ self.addEventListener("fetch", (event) => {
 });
 
 self.addEventListener("push", (event) => {
+  let targetPath = "/chat";
+  let body = "New message";
+  if (event.data) {
+    try {
+      const payload = event.data.json();
+      if (typeof payload?.targetPath === "string") targetPath = payload.targetPath;
+      if (typeof payload?.body === "string") body = payload.body;
+    } catch {
+      body = event.data.text();
+    }
+  }
   const options = {
-    body: event.data ? event.data.text() : "New message",
+    body,
     icon: "/favicon.svg",
     badge: "/favicon.svg",
+    data: { targetPath },
   };
   event.waitUntil(self.registration.showNotification("Grova", options));
 });
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  event.waitUntil(clients.openWindow("/chat"));
+  const targetPath = event.notification.data?.targetPath || "/chat";
+  event.waitUntil(clients.openWindow(targetPath));
 });

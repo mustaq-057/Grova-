@@ -386,7 +386,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return {
         myId: me,
         partnerId,
-        partnerName: p?.name ?? (partnerId === "wife" ? "Sara" : "Mustaq"),
+        partnerName: p?.name ?? readSessionSnapshot()?.partner?.name ?? "",
         partnerAvatar: p?.avatar ?? "",
       };
     };

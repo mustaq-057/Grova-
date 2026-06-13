@@ -11,16 +11,17 @@ import { useAppSearchParams } from "@/lib/app-search";
 import { PARTNER_CHANGED } from "@/lib/couple-sync";
 import { parsePresenceResponse } from "@/lib/presence-api";
 import { USER_TIMEZONES } from "@/lib/timezones";
+import { readSessionSnapshot } from "@/lib/profile-cache";
 
 export default memo(function Home() {
   const { user, partner: authPartner } = useAuth();
   const searchParams = useAppSearchParams();
   const focusPostId = searchParams.get("post");
   const focusCommentId = searchParams.get("comment");
-  const [partner, setPartner] = useState<ApiUser | null>(authPartner);
+  const [partner, setPartner] = useState<ApiUser | null>(() => authPartner ?? readSessionSnapshot()?.partner ?? null);
   const [moroccoTime, setMoroccoTime] = useState("");
   const [indiaTime, setIndiaTime] = useState("");
-  const [loadingPartner, setLoadingPartner] = useState(() => !authPartner);
+  const [loadingPartner, setLoadingPartner] = useState(() => !authPartner && !readSessionSnapshot()?.partner);
 
   const partnerId = user?.id === "me" ? "wife" : "me";
 

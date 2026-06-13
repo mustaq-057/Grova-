@@ -308,6 +308,13 @@
   overflow: visible;
 }
 
+/* Keep composer above the fixed mobile bottom nav (Layout z-50 bar) */
+@media (max-width: 767px) {
+  .chat-panel-bottom {
+    padding-bottom: calc(4rem + env(safe-area-inset-bottom, 0px));
+  }
+}
+
 .chat-panel .chat-muted {
   color: hsl(0 0% 65%);
 }

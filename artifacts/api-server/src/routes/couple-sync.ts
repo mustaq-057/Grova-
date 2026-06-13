@@ -146,7 +146,12 @@ router.get("/couple/activity", rateLimiters.read, authenticate, async (req, res)
   try {
     const [result, profilesResult] = await Promise.all([
       db.execute(
-        "SELECT id, type, actor_id, from_name, text, timestamp, read, target_path FROM activity_feed WHERE actor_id != $1 ORDER BY timestamp DESC LIMIT 50",
+        `SELECT id, type, actor_id, from_name, text, timestamp, read, target_path
+         FROM activity_feed
+         WHERE actor_id != $1
+           AND (target_path IS NULL OR target_path NOT LIKE '/chat%')
+           AND type NOT IN ('doodle', 'file', 'greeting', 'reaction', 'location', 'call', 'message')
+         ORDER BY timestamp DESC LIMIT 50`,
         [userId],
       ),
       db.execute("SELECT id, name FROM profiles WHERE id IN ('me', 'wife')", []),

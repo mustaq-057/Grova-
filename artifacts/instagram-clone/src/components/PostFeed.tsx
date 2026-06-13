@@ -16,7 +16,7 @@ import { resolvePostMediaUrl } from "@/lib/media-url";
 
 async function waitForElement(
   selector: string,
-  maxAttempts = 20,
+  maxAttempts = 50,
   intervalMs = 100,
 ): Promise<Element | null> {
   for (let i = 0; i < maxAttempts; i++) {
@@ -225,6 +225,11 @@ export function PostFeed({
 
     let cancelled = false;
     void (async () => {
+      if (!posts.some((p) => p.id === focusPostId)) {
+        await loadPosts();
+        if (cancelled) return;
+      }
+
       await openComments(focusPostId);
       if (cancelled) return;
 
@@ -233,7 +238,7 @@ export function PostFeed({
       postEl?.scrollIntoView({ behavior: "auto", block: "center" });
 
       if (focusCommentId) {
-        for (let i = 0; i < 20; i++) {
+        for (let i = 0; i < 30; i++) {
           if (cancelled) return;
           if (commentHighlightRef.current) {
             commentHighlightRef.current.scrollIntoView({ behavior: "auto", block: "center" });
@@ -250,7 +255,7 @@ export function PostFeed({
     return () => {
       cancelled = true;
     };
-  }, [focusPostId, focusCommentId, posts.length, comments[focusPostId ?? ""]?.length]);
+  }, [focusPostId, focusCommentId, posts, comments[focusPostId ?? ""]?.length, loadPosts]);
 
   const submitComment = async (postId: string) => {
     if (!commentText.trim()) return;

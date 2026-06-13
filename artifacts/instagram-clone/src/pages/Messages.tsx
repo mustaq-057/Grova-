@@ -88,7 +88,6 @@ import {
   resolveGalleryPick,
 } from "@/lib/media-file";
 import {
-  addNotification,
   unreadCount,
   NOTIFY_CHANGED,
   hydrateNotifications,
@@ -202,8 +201,14 @@ export default function Messages() {
   const activeCallTypeRef = useRef<"audio" | "video">("audio");
   const callRoleRef = useRef<"outgoing" | "incoming">("outgoing");
   const endCallRef = useRef<(opts?: { fromRemote?: boolean }) => void>(() => { });
-  const [partnerName, setPartnerName] = useState(() => partner?.name ?? "");
-  const [partnerAvatar, setPartnerAvatar] = useState(() => partner?.avatar ?? "");
+  const [partnerName, setPartnerName] = useState(() => {
+    const snap = readSessionSnapshot()?.partner;
+    return partner?.name ?? snap?.name ?? "";
+  });
+  const [partnerAvatar, setPartnerAvatar] = useState(() => {
+    const snap = readSessionSnapshot()?.partner;
+    return partner?.avatar ?? snap?.avatar ?? "";
+  });
   const [partnerLastSeen, setPartnerLastSeen] = useState<number | undefined>();
   const [online, setOnline] = useState(isOnline());
 
@@ -452,7 +457,7 @@ export default function Messages() {
 
   // Define partner info early to avoid hoisting issues
   const pAvatar = partner?.avatar || partnerAvatar || defaultAvatar(partnerId);
-  const pName = partner?.name || partnerName || (partnerId === "wife" ? "Sara" : "Mustaq");
+  const pName = partner?.name || partnerName || readSessionSnapshot()?.partner?.name || "…";
   const lastMsg = useMemo(
     () => messages.filter((m) => !m.deleted).slice(-1)[0],
     [messages],
@@ -515,10 +520,11 @@ export default function Messages() {
         const keepIds = new Set(
           user?.id ? filterVisibleMessages(user.id, prev).map((m) => m.id) : prev.map((m) => m.id),
         );
-        const next = preserveDroppedMessages(prev, guarded, { keepIds });
-        messagesSigRef.current = messagesListSignature(next);
-        if (user?.id) writeChatCache(user.id, filterMessagesForCache(user.id, next));
-        return next;
+        const preserved = preserveDroppedMessages(prev, guarded, { keepIds });
+        const visible = user?.id ? filterVisibleMessages(user.id, preserved) : preserved;
+        messagesSigRef.current = messagesListSignature(visible);
+        if (user?.id) writeChatCache(user.id, filterMessagesForCache(user.id, visible));
+        return visible;
       });
       if (
         (isNearBottomRef.current || isInitialLoadRef.current) &&
@@ -681,7 +687,14 @@ export default function Messages() {
     const cached = messages.length === 0 ? readChatCache(user.id) : messages;
     const tailIds = (cached ?? []).slice(-12).map((m) => m.id);
     const savedAnchor = readChatScrollAnchor(user.id);
-    const restoreAnchor = shouldRestoreScrollAnchor(savedAnchor, tailIds);
+    const navEntry = typeof performance !== "undefined"
+      ? performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined
+      : undefined;
+    const isPageReload = navEntry?.type === "reload";
+    const restoreAnchor =
+      !highlightParam &&
+      isPageReload &&
+      shouldRestoreScrollAnchor(savedAnchor, tailIds);
 
     if (restoreAnchor && savedAnchor) {
       pendingScrollRestoreRef.current = savedAnchor;
@@ -734,7 +747,8 @@ export default function Messages() {
             user?.id ? filterVisibleMessages(user.id, prev).map((m) => m.id) : prev.map((m) => m.id),
           );
           const preserved = preserveDroppedMessages(prev, guarded, { keepIds });
-          const next = mergeMessagesIfChanged(prev, preserved, (_, m) => m);
+          const visible = user?.id ? filterVisibleMessages(user.id, preserved) : preserved;
+          const next = mergeMessagesIfChanged(prev, visible, (_, m) => m);
           if (!next) {
             scrollPreserveRef.current = null;
             return prev;
@@ -799,17 +813,6 @@ export default function Messages() {
             }
             return [...prev, preview];
           });
-
-          if (preview.senderId === partnerId) {
-            if (preview.type === "doodle") {
-              addNotification({ type: "doodle", fromName: pName, text: "shared a doodle", actorId: partnerId, targetPath: `/chat?highlight=${preview.id}` });
-            } else if (preview.type === "image") {
-              addNotification({ type: "file", fromName: pName, text: "shared a photo", actorId: partnerId, targetPath: `/chat?highlight=${preview.id}` });
-            } else if (preview.type === "video" || preview.type === "file") {
-              addNotification({ type: "file", fromName: pName, text: `shared a ${preview.type === "video" ? "video" : "file"}`, actorId: partnerId, targetPath: `/chat?highlight=${preview.id}` });
-            }
-            void hydrateNotifications();
-          }
 
           void normalizeMessages([raw]).then(([msg]) => {
             if (!mounted) return;
@@ -889,6 +892,11 @@ export default function Messages() {
           const d = JSON.parse(e.data) as { userId: string; messageId: string };
           if (d.userId !== user.id) return;
           applyHiddenMessageId(user.id, d.messageId);
+          setMessages((prev) => {
+            const next = prev.filter((m) => m.id !== d.messageId);
+            writeChatCache(user.id, filterMessagesForCache(user.id, next));
+            return next;
+          });
           setHiddenTick((t) => t + 1);
         } catch (err) {
           console.error("Failed to handle message hidden:", err);
@@ -1167,8 +1175,11 @@ export default function Messages() {
         es.close();
         es = null;
       }
+      if (user?.id && !highlightParam) {
+        clearChatScrollAnchor(user.id);
+      }
     };
-  }, [user?.id, partnerId, loadMessages, refreshCouplePrefs]);
+  }, [user?.id, partnerId, loadMessages, refreshCouplePrefs, highlightParam]);
 
   // Keep chat in sync across tabs/devices (SSE can miss events while backgrounded)
   useEffect(() => {
@@ -1192,7 +1203,8 @@ export default function Messages() {
             user?.id ? filterVisibleMessages(user.id, prev).map((m) => m.id) : prev.map((m) => m.id),
           );
           const preserved = preserveDroppedMessages(prev, guarded, { keepIds });
-          const next = mergeMessagesIfChanged(prev, preserved, (_, m) => m);
+          const visible = user?.id ? filterVisibleMessages(user.id, preserved) : preserved;
+          const next = mergeMessagesIfChanged(prev, visible, (_, m) => m);
           if (!next) {
             scrollPreserveRef.current = null;
             return prev;
@@ -1344,11 +1356,10 @@ export default function Messages() {
     }
 
     if (firstPaint) {
-      isInitialLoadRef.current = false;
       initialLoadTimeRef.current = Date.now();
     }
     previousMessagesLengthRef.current = messages.length;
-  }, [messages, user?.id, partnerId]);
+  }, [messages, user?.id, partnerId, highlightParam]);
 
   // Restore scroll position after prepending older messages (load more / jump-to-memory)
   useLayoutEffect(() => {

@@ -24,7 +24,7 @@ import {
   setNotificationViewer,
   type AppNotification,
 } from "@/lib/notifications-feed";
-import { navigateWithSearch } from "@/lib/app-search";
+import { navigateWithSearch, SEARCH_CHANGED } from "@/lib/app-search";
 import { useAuth } from "@/lib/auth";
 
 function formatRelativeTime(iso: string): string {
@@ -117,12 +117,12 @@ export default memo(function Notifications() {
   const openNotification = useCallback(
     (n: AppNotification) => {
       const path = n.targetPath || defaultPath(n.type);
+      const route = path.split("?")[0] || "/";
       if (path.includes("?")) {
         navigateWithSearch(path);
-        setLocation(path.split("?")[0] || "/");
-      } else {
-        setLocation(path);
+        window.dispatchEvent(new Event(SEARCH_CHANGED));
       }
+      setLocation(route);
     },
     [setLocation],
   );
