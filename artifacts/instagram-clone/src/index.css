@@ -1063,18 +1063,18 @@ html[data-photo-theme="true"] .app-chrome [class*="bg-card"] {
 }
 
 /* Reply quote box — dark bg → cream bg */
-.creamy-minimal-chat button[class*="bg-\\[\\#262626\\]"],
-.creamy-minimal-chat div[class*="bg-\\[\\#262626\\]"] {
+.creamy-minimal-chat button[class*="bg-[#262626]"],
+.creamy-minimal-chat div[class*="bg-[#262626]"] {
   background-color: #E6DACE !important;
   border-color: #DDD0BE !important;
   color: #3D2E1F !important;
 }
 
 /* Reply text white → brown */
-.creamy-minimal-chat [class*="text-white\\/80"],
-.creamy-minimal-chat [class*="text-white\\/70"],
-.creamy-minimal-chat [class*="text-white\\/60"],
-.creamy-minimal-chat [class*="text-white\\/50"] {
+.creamy-minimal-chat [class*="text-white/80"],
+.creamy-minimal-chat [class*="text-white/70"],
+.creamy-minimal-chat [class*="text-white/60"],
+.creamy-minimal-chat [class*="text-white/50"] {
   color: #3D2E1F !important;
 }
 
@@ -1102,7 +1102,7 @@ html[data-photo-theme="true"] .app-chrome [class*="bg-card"] {
 }
 
 /* Typing indicator bar */
-.creamy-minimal-chat .border-t.border-white\\/5 {
+.creamy-minimal-chat .border-t[class*="border-white/5"] {
   border-color: #DDD0BE !important;
 }
 
@@ -1145,8 +1145,8 @@ html[data-photo-theme="true"] .app-chrome [class*="bg-card"] {
 .dark .creamy-minimal-chat [class*="border-white"] {
   border-color: #3A3228 !important;
 }
-.dark .creamy-minimal-chat button[class*="bg-\\[\\#262626\\]"],
-.dark .creamy-minimal-chat div[class*="bg-\\[\\#262626\\]"] {
+.dark .creamy-minimal-chat button[class*="bg-[#262626]"],
+.dark .creamy-minimal-chat div[class*="bg-[#262626]"] {
   background-color: #3A3228 !important;
   border-color: #4A4238 !important;
   color: #E8DFD3 !important;
