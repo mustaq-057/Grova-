@@ -192,27 +192,8 @@ export default function DoodleCanvas({ onClose, onSend }: DoodleCanvasProps) {
     setSending(true);
 
     // Get the canvas drawing area minus white background
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    
-    // We send the whole canvas, but we make the white transparent
-    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const data = imgData.data;
-    for (let i = 0; i < data.length; i += 4) {
-      if (data[i] === 255 && data[i+1] === 255 && data[i+2] === 255) {
-        data[i+3] = 0; // Make white pixels transparent
-      }
-    }
-    
-    // Create new canvas to put transparent image
-    const exp = document.createElement("canvas");
-    exp.width = canvas.width;
-    exp.height = canvas.height;
-    const oct = exp.getContext("2d")!;
-    oct.putImageData(imgData, 0, 0);
-
     onSend({ 
-      imageData: exp.toDataURL("image/png"), 
+      imageData: canvas.toDataURL("image/png"), 
       canvasX: 0, 
       canvasY: 0, 
       width: canvas.clientWidth, 

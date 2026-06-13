@@ -1,6 +1,6 @@
 import { memo, useRef, useState, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
 import { createPortal } from "react-dom";
-import { Smile, Mic, Send, Sticker, Paperclip, X, MessageCircle, MapPin, PenTool, Zap, Plus, Image as ImageIcon, Camera, PlusCircle, Sparkles, FileText, Palette } from "lucide-react";
+import { Smile, Mic, Send, Sticker, Paperclip, X, MessageCircle, MapPin, PenTool, Zap, Plus, Image as ImageIcon, Camera, PlusCircle, Sparkles, FileText, Palette, File as FileIcon } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import EmojiPicker from "@/components/EmojiPicker";
 import StickerPicker from "@/components/StickerPicker";
@@ -64,6 +64,7 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
   const [openPicker, setOpenPicker] = useState<OpenPicker>(null);
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const genericFileInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useImperativeHandle(ref, () => inputRef.current as HTMLInputElement);
@@ -131,6 +132,11 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
   const handleImageClick = useCallback(() => {
     setShowAttachmentMenu(false);
     fileInputRef.current?.click();
+  }, []);
+
+  const handleGenericFileClick = useCallback(() => {
+    setShowAttachmentMenu(false);
+    genericFileInputRef.current?.click();
   }, []);
 
   const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -323,6 +329,18 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
               <span>Doodle</span>
             </button>
 
+            <button
+              type="button"
+              onClick={handleGenericFileClick}
+              className="flex items-center gap-[20px] px-[24px] py-[15px] text-[17px] font-normal hover:bg-white/5 transition-colors w-full text-left text-white"
+              disabled={disabled}
+            >
+              <div className="w-[28px] h-[28px] flex items-center justify-center shrink-0">
+                <FileIcon className="w-[24px] h-[24px] text-white opacity-80" strokeWidth={1.5} />
+              </div>
+              <span>File</span>
+            </button>
+
 
 
           </motion.div>
@@ -343,6 +361,16 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
         className="hidden"
         onChange={handleFileChange}
         aria-label="Upload any file"
+      />
+
+      <input
+        ref={genericFileInputRef}
+        type="file"
+        multiple
+        accept="*/*"
+        className="hidden"
+        onChange={handleFileChange}
+        aria-label="Upload document or file"
       />
 
       {openPicker === "greeting" && (

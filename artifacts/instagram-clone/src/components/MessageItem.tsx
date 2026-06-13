@@ -108,7 +108,7 @@ export const MessageItem = memo(function MessageItem({
   const isEmojiOnly = useMemo(() => (msg.type === "text" || msg.type === "heart") && isEmojiOnlyText(msg.text), [msg.type, msg.text]);
   const isSticker = useMemo(() => msg.type === "sticker", [msg.type]);
   const isGif = useMemo(() => msg.type === "gif", [msg.type]);
-  const isImage = useMemo(() => msg.type === "image", [msg.type]);
+  const isImage = useMemo(() => msg.type === "image" || msg.type === "doodle", [msg.type]);
   const isDoodle = useMemo(() => msg.type === "doodle", [msg.type]);
   const isFile = useMemo(() => msg.type === "file", [msg.type]);
   const isVideo = useMemo(() => msg.type === "video", [msg.type]);

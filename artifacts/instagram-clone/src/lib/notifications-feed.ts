@@ -25,7 +25,7 @@ function chatOpenedKey(userId: string) {
 export function getChatOpenedAt(): string | null {
   if (!viewer?.id) return null;
   try {
-    return sessionStorage.getItem(chatOpenedKey(viewer.id));
+    return localStorage.getItem(chatOpenedKey(viewer.id));
   } catch {
     return null;
   }
@@ -35,7 +35,7 @@ export function getChatOpenedAt(): string | null {
 export function markChatOpened() {
   if (!viewer?.id) return;
   try {
-    sessionStorage.setItem(chatOpenedKey(viewer.id), new Date().toISOString());
+    localStorage.setItem(chatOpenedKey(viewer.id), new Date().toISOString());
   } catch {
     /* ignore */
   }
@@ -44,7 +44,7 @@ export function markChatOpened() {
 
 function persistBadgeCount(userId: string, count: number) {
   try {
-    sessionStorage.setItem(badgeStorageKey(userId), String(Math.max(0, count)));
+    localStorage.setItem(badgeStorageKey(userId), String(Math.max(0, count)));
   } catch {
     /* ignore */
   }
@@ -52,7 +52,7 @@ function persistBadgeCount(userId: string, count: number) {
 
 function readPersistedBadgeCount(userId: string): number {
   try {
-    const n = parseInt(sessionStorage.getItem(badgeStorageKey(userId)) ?? "0", 10);
+    const n = parseInt(localStorage.getItem(badgeStorageKey(userId)) ?? "0", 10);
     return Number.isFinite(n) && n > 0 ? n : 0;
   } catch {
     return 0;
