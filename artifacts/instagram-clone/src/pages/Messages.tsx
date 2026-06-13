@@ -807,7 +807,12 @@ export default function Messages() {
               if (optimisticIdx >= 0) {
                 pendingOutgoingRef.current.delete(prev[optimisticIdx]!.id);
                 const next = [...prev];
-                next[optimisticIdx] = preview;
+                const oldMsg = prev[optimisticIdx]!;
+                next[optimisticIdx] = {
+                  ...preview,
+                  clientUniqueId: oldMsg.clientUniqueId || oldMsg.id,
+                  text: preview.text ?? oldMsg.text,
+                };
                 return next;
               }
             }
