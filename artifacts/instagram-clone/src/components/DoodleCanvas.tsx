@@ -269,15 +269,23 @@ export default function DoodleCanvas({ onClose, onSend, canvasHeight, onExpandCa
     const canvas = canvasRef.current;
     if (!canvas) return;
 
+    // Get the actual CSS dimensions and DPR
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const cssW = canvas.width / dpr;
+    const cssH = canvas.height / dpr;
+
     const exportCanvas = document.createElement("canvas");
-    exportCanvas.width = canvas.width;
-    exportCanvas.height = canvas.height;
+    exportCanvas.width = cssW;
+    exportCanvas.height = cssH;
     const octx = exportCanvas.getContext("2d");
     if (!octx) return;
 
+    // Fill white background
     octx.fillStyle = "#ffffff";
     octx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
-    octx.drawImage(canvas, 0, 0);
+    
+    // Draw the original canvas at its actual size without DPR scaling
+    octx.drawImage(canvas, 0, 0, cssW, cssH);
 
     onSend(exportCanvas.toDataURL("image/jpeg", 0.82));
     onClose();

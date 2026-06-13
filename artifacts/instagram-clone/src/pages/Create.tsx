@@ -5,7 +5,7 @@ import { useAuth } from "@/lib/auth";
 import { useLocation } from "wouter";
 import { savePost, getPosts, clearLegacyLocalMedia } from "@/lib/local-posts";
 import { uploadMedia } from "@/lib/media-upload";
-import { isAcceptedGalleryImage, normalizeGalleryFile, prepareImageForUpload } from "@/lib/media-file";
+import { isAcceptedGalleryImage, prepareImageForUpload, resolveGalleryPick } from "@/lib/media-file";
 import { ImageCropModal } from "@/components/ImageCropModal";
 import { countPostImages } from "@/lib/post-media";
 
@@ -45,17 +45,21 @@ export default memo(function Create() {
 
   const addFiles = async (files: FileList | File[]) => {
     const list: File[] = [];
+    let lastError: string | null = null;
     for (const raw of Array.from(files)) {
       try {
-        const normalized = normalizeGalleryFile(raw);
-        if (!isAcceptedGalleryImage(normalized)) continue;
-        list.push(await prepareImageForUpload(normalized));
-      } catch {
-        /* skip unreadable picks */
+        const resolved = await resolveGalleryPick(raw);
+        if (!isAcceptedGalleryImage(resolved)) {
+          lastError = "Only photos are supported.";
+          continue;
+        }
+        list.push(await prepareImageForUpload(resolved));
+      } catch (err) {
+        lastError = err instanceof Error ? err.message : "Could not read photo.";
       }
     }
     if (list.length === 0) {
-      alert("Only photos are supported.");
+      alert(lastError ?? "Only photos are supported.");
       return;
     }
     const roomInGrid = MAX_PHOTOS - savedPhotoCount - queue.length;

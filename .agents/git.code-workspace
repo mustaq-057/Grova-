@@ -1,0 +1,37 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../.cursor"
+		},
+		{
+			"path": "../.git"
+		},
+		{
+			"path": "../.local"
+		},
+		{
+			"path": "../api"
+		},
+		{
+			"path": "../artifacts"
+		},
+		{
+			"path": "../dist"
+		},
+		{
+			"path": "../docs"
+		},
+		{
+			"path": "../lib"
+		},
+		{
+			"path": "../node_modules"
+		},
+		{
+			"path": "../scripts"
+		}
+	]
+}

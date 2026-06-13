@@ -2,7 +2,7 @@ import { randomUUID } from "crypto";
 import db from "./db";
 import { broadcast } from "./sse";
 
-export type ActivityType = "like" | "comment" | "story" | "dua" | "call" | "location" | "message";
+export type ActivityType = "like" | "comment" | "story" | "dua" | "call" | "location" | "message" | "task";
 
 export async function postCoupleActivity(
   type: ActivityType,

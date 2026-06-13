@@ -4,6 +4,7 @@ import db from "../lib/db";
 import { broadcast } from "../lib/sse";
 import { authenticate } from "../lib/auth-middleware";
 import { rateLimiters } from "../lib/security";
+import { postCoupleActivity, profileDisplayName } from "../lib/activity-feed";
 
 interface Task {
   id: string;
@@ -68,6 +69,24 @@ router.post("/tasks", rateLimiters.messages, authenticate, async (req, res) => {
     
     // Broadcast new task to all clients
     broadcast("task-added", task);
+
+    const [fromName, mustaqName, saraName] = await Promise.all([
+      profileDisplayName(author),
+      profileDisplayName("me"),
+      profileDisplayName("wife"),
+    ]);
+    const assigneeNames =
+      assignedTo === "both"
+        ? `${mustaqName} & ${saraName}`
+        : assignedTo === "me"
+          ? mustaqName
+          : saraName;
+    void postCoupleActivity(
+      "task",
+      author,
+      fromName,
+      `assigned ${assigneeNames}: ${title}`,
+    ).catch(() => {});
 
     res.json(task);
   } catch (err) {
