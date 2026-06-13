@@ -45,7 +45,7 @@ function mergeOptimisticWithServer(optimistic: ApiMessage, server: ApiMessage): 
     text: server.text ?? optimistic.text,
     gifUrl: server.gifUrl || optimistic.gifUrl,
     imageUrl,
-    imageData: (server.type === "doodle" || hasRemoteImage)
+    imageData: hasRemoteImage
       ? undefined
       : pickMediaUrl(server.imageData, optimistic.imageData),
     fileData: remoteVideoReady

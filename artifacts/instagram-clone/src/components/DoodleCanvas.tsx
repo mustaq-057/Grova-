@@ -271,24 +271,6 @@ export default function DoodleCanvas({ onClose, onSend, onError }: DoodleCanvasP
     setSending(true);
 
     const gen = ++exportGenRef.current;
-    const cssW = canvas.clientWidth;
-    const cssH = canvas.clientHeight;
-
-    const fullCanvas = document.createElement("canvas");
-    fullCanvas.width = cssW;
-    fullCanvas.height = cssH;
-    const fctx = fullCanvas.getContext("2d")!;
-    fctx.drawImage(canvas, 0, 0, cssW, cssH);
-
-    const crop = cropToContent(fullCanvas);
-
-    const exportCanvas = document.createElement("canvas");
-    exportCanvas.width = crop.w;
-    exportCanvas.height = crop.h;
-    const ectx = exportCanvas.getContext("2d")!;
-    ectx.fillStyle = "#FFFFFF";
-    ectx.fillRect(0, 0, crop.w, crop.h);
-    ectx.drawImage(fullCanvas, crop.x, crop.y, crop.w, crop.h, 0, 0, crop.w, crop.h);
 
     const fail = (msg: string) => {
       if (exportGenRef.current !== gen) return;
@@ -296,42 +278,82 @@ export default function DoodleCanvas({ onClose, onSend, onError }: DoodleCanvasP
       onError?.(msg);
     };
 
-    const blobTimeout = setTimeout(() => {
-      fail("Doodle export took too long. Try again with a simpler drawing.");
-    }, 12000);
-
-    exportCanvas.toBlob(
-      (blob) => {
-        clearTimeout(blobTimeout);
-        if (exportGenRef.current !== gen) return;
-        if (!blob) {
-          fail("Could not export your doodle. Please try again.");
+    const runExport = () => {
+      try {
+        const cssW = canvas.clientWidth;
+        const cssH = canvas.clientHeight;
+        if (cssW <= 0 || cssH <= 0) {
+          fail("Canvas is not ready. Please try again.");
           return;
         }
 
-        const reader = new FileReader();
-        reader.onload = () => {
-          if (exportGenRef.current !== gen) return;
-          setSending(false);
-          onSend({
-            imageData: reader.result as string,
-            blob,
-            width: crop.w,
-            height: crop.h,
-          });
-        };
-        reader.onerror = () => fail("Could not read doodle data. Please try again.");
-        reader.readAsDataURL(blob);
-      },
-      "image/png",
-      0.92,
-    );
+        const fullCanvas = document.createElement("canvas");
+        fullCanvas.width = cssW;
+        fullCanvas.height = cssH;
+        const fctx = fullCanvas.getContext("2d");
+        if (!fctx) {
+          fail("Could not prepare your doodle. Please try again.");
+          return;
+        }
+        fctx.drawImage(canvas, 0, 0, cssW, cssH);
+
+        const crop = cropToContent(fullCanvas);
+
+        const exportCanvas = document.createElement("canvas");
+        exportCanvas.width = crop.w;
+        exportCanvas.height = crop.h;
+        const ectx = exportCanvas.getContext("2d");
+        if (!ectx) {
+          fail("Could not prepare your doodle. Please try again.");
+          return;
+        }
+        ectx.fillStyle = "#FFFFFF";
+        ectx.fillRect(0, 0, crop.w, crop.h);
+        ectx.drawImage(fullCanvas, crop.x, crop.y, crop.w, crop.h, 0, 0, crop.w, crop.h);
+
+        const blobTimeout = setTimeout(() => {
+          fail("Doodle export took too long. Try again with a simpler drawing.");
+        }, 15000);
+
+        exportCanvas.toBlob(
+          (blob) => {
+            clearTimeout(blobTimeout);
+            if (exportGenRef.current !== gen) return;
+            if (!blob) {
+              fail("Could not export your doodle. Please try again.");
+              return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = () => {
+              if (exportGenRef.current !== gen) return;
+              setSending(false);
+              onSend({
+                imageData: reader.result as string,
+                blob,
+                width: crop.w,
+                height: crop.h,
+              });
+            };
+            reader.onerror = () => fail("Could not read doodle data. Please try again.");
+            reader.readAsDataURL(blob);
+          },
+          "image/png",
+          0.92,
+        );
+      } catch (err) {
+        console.error("Doodle export failed:", err);
+        fail("Could not export your doodle. Please try again.");
+      }
+    };
+
+    requestAnimationFrame(runExport);
   }, [hasStrokes, sending, onSend, onError]);
 
   return createPortal(
-    <div className="fixed inset-0 z-[600] flex flex-col bg-[#12081a] text-white overflow-hidden">
+    <div className="fixed inset-0 z-[600] flex flex-col bg-[#0b101e] text-white overflow-hidden">
       <div
-        className="flex items-center justify-between px-4 py-3 shrink-0 border-b border-pink-500/10"
+        className="flex items-center justify-between px-4 py-3 shrink-0 border-b border-white/5"
         style={{ paddingTop: "max(12px, env(safe-area-inset-top))" }}
       >
         <button
@@ -342,12 +364,12 @@ export default function DoodleCanvas({ onClose, onSend, onError }: DoodleCanvasP
           <ChevronLeft className="w-6 h-6" />
         </button>
 
-        <span className="font-semibold text-[15px] text-pink-100">Draw a doodle</span>
+        <span className="font-semibold text-[15px]">Draw a doodle</span>
 
         <button
           onClick={handleSend}
           disabled={!hasStrokes || sending}
-          className="flex items-center gap-1.5 px-4 py-2 bg-pink-500 rounded-full text-sm font-semibold hover:bg-pink-400 transition-colors disabled:opacity-40"
+          className="flex items-center gap-1.5 px-4 py-2 bg-primary rounded-full text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-40"
         >
           {sending ? (
             <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -362,7 +384,7 @@ export default function DoodleCanvas({ onClose, onSend, onError }: DoodleCanvasP
 
       <div
         ref={containerRef}
-        className="flex-1 min-h-0 relative bg-[#1a1028] m-3 rounded-2xl overflow-hidden shadow-[inset_0_0_40px_rgba(255,77,141,0.08)]"
+        className="flex-1 min-h-0 relative bg-[#161c2d] m-3 rounded-2xl overflow-hidden"
       >
         <canvas
           ref={canvasRef}
@@ -370,17 +392,17 @@ export default function DoodleCanvas({ onClose, onSend, onError }: DoodleCanvasP
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerUp}
-          className="absolute inset-0 touch-none w-full h-full cursor-crosshair"
+          className="absolute inset-0 touch-none w-full h-full cursor-crosshair bg-white"
         />
         {!hasStrokes && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <p className="text-pink-200/40 text-sm font-medium">Draw something cute ✨</p>
+            <p className="text-muted-foreground/50 text-sm font-medium">Draw something cute ✨</p>
           </div>
         )}
       </div>
 
       <div
-        className="shrink-0 border-t border-pink-500/10 bg-[#12081a] px-4 pt-3"
+        className="shrink-0 border-t border-white/5 bg-[#0b101e] px-4 pt-3"
         style={{ paddingBottom: "max(16px, env(safe-area-inset-bottom))" }}
       >
         <div className="flex items-center gap-2 mb-3 overflow-x-auto scrollbar-hide pb-1">
@@ -390,7 +412,7 @@ export default function DoodleCanvas({ onClose, onSend, onError }: DoodleCanvasP
               onClick={() => setColor(c)}
               className={cn(
                 "relative rounded-full w-9 h-9 shrink-0 transition-transform hover:scale-110",
-                color === c && "ring-2 ring-pink-400 ring-offset-2 ring-offset-[#12081a]",
+                color === c && "ring-2 ring-primary ring-offset-2 ring-offset-[#0b101e]",
               )}
               style={{
                 backgroundColor: c,
@@ -409,7 +431,7 @@ export default function DoodleCanvas({ onClose, onSend, onError }: DoodleCanvasP
                 onClick={() => setBrushSize(s)}
                 className={cn(
                   "flex items-center justify-center w-9 h-9 rounded-full transition-colors",
-                  brushSize === s ? "bg-pink-500/25 ring-1 ring-pink-400" : "hover:bg-white/10",
+                  brushSize === s ? "bg-primary/25 ring-1 ring-primary" : "hover:bg-white/10",
                 )}
                 aria-label={`Brush size ${s}`}
               >
@@ -433,7 +455,7 @@ export default function DoodleCanvas({ onClose, onSend, onError }: DoodleCanvasP
             <button
               onClick={clear}
               disabled={!hasStrokes}
-              className="p-2.5 hover:bg-pink-500/20 text-pink-300 rounded-full transition-colors disabled:opacity-30"
+              className="p-2.5 hover:bg-white/10 rounded-full transition-colors disabled:opacity-30"
               aria-label="Clear canvas"
             >
               <Eraser className="w-5 h-5" />

@@ -141,87 +141,77 @@ export default memo(function Home() {
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.2, duration: 0.3 }}
-              className="relative mt-8 mb-2 w-full max-w-[340px] mx-auto rounded-3xl overflow-hidden cursor-pointer active:scale-[0.98] transition-transform"
-              style={{
-                background: "linear-gradient(160deg, #3d1528 0%, #1f0a14 45%, #2a0f1c 100%)",
-                boxShadow: "0 8px 32px rgba(255, 77, 141, 0.15), inset 0 1px 0 rgba(255,255,255,0.06)",
-              }}
+              className="relative flex items-center justify-center gap-5 sm:gap-7 mt-8 mb-6 w-full max-w-[340px] mx-auto cursor-pointer active:scale-[0.98] transition-transform"
             >
-              <div className="px-6 pt-7 pb-5">
-                <div className="relative flex items-center justify-center gap-0">
-                  {/* Glowing wavy connection line */}
-                  <div className="absolute inset-x-4 top-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none z-0">
-                    <svg viewBox="0 0 200 24" className="w-full h-6" preserveAspectRatio="none" aria-hidden>
-                      <defs>
-                        <filter id="glow">
-                          <feGaussianBlur stdDeviation="2" result="blur" />
-                          <feMerge>
-                            <feMergeNode in="blur" />
-                            <feMergeNode in="SourceGraphic" />
-                          </feMerge>
-                        </filter>
-                      </defs>
-                      <path
-                        d="M 0,14 Q 50,4 100,12 T 200,10"
-                        fill="none"
-                        stroke="rgba(255, 120, 160, 0.35)"
-                        strokeWidth="10"
-                        filter="blur(4px)"
-                      />
-                      <path
-                        d="M 0,14 Q 50,4 100,12 T 200,10"
-                        fill="none"
-                        stroke="rgba(255, 140, 175, 0.7)"
-                        strokeWidth="2"
-                        filter="url(#glow)"
-                      />
-                    </svg>
-                  </div>
+              {/* Wavy connection line — passes through the heart center */}
+              <div className="absolute inset-x-2 sm:inset-x-0 top-1/2 -translate-y-1/2 z-[8] pointer-events-none">
+                <svg viewBox="0 0 300 28" className="w-full h-7" preserveAspectRatio="none" aria-hidden>
+                  <path
+                    d="M 0,16 Q 75,6 150,14 T 300,12"
+                    fill="none"
+                    className="stroke-primary/25"
+                    strokeWidth="12"
+                    filter="blur(6px)"
+                  />
+                  <path
+                    d="M 0,16 Q 75,6 150,14 T 300,12"
+                    fill="none"
+                    className="stroke-primary/60"
+                    strokeWidth="3"
+                    filter="blur(1px)"
+                  />
+                  <path
+                    d="M 0,16 Q 75,6 150,14 T 300,12"
+                    fill="none"
+                    className="stroke-primary"
+                    strokeWidth="2"
+                  />
+                </svg>
+              </div>
 
-                  <div className="relative z-10">
-                    <AvatarImage
-                      src={user?.avatar}
-                      userId={user?.id ?? "me"}
-                      alt=""
-                      className="w-[72px] h-[72px] sm:w-20 sm:h-20 rounded-full object-cover border-[2.5px] border-pink-300/50 shadow-[0_0_16px_rgba(255,120,160,0.3)] bg-[#1f0a14]"
-                    />
-                    <div className="absolute bottom-0.5 right-0.5 w-4 h-4 sm:w-5 sm:h-5 bg-green-500 rounded-full border-[2.5px] border-[#2a0f1c] z-20" aria-label="You are online" />
-                  </div>
+              <div className="relative z-10">
+                <AvatarImage
+                  src={user?.avatar}
+                  userId={user?.id ?? "me"}
+                  alt=""
+                  className="w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-[3px] border-primary/40 shadow-[0_0_20px_rgba(var(--primary),0.25)] bg-background"
+                />
+                <div className="absolute bottom-0 right-0 w-5 h-5 sm:w-6 sm:h-6 bg-green-500 rounded-full border-[3px] border-background z-20 shadow-sm" aria-label="You are online" />
+              </div>
 
-                  <motion.div
-                    animate={{ scale: [1, 1.12, 1] }}
-                    transition={{ repeat: Infinity, duration: 2.2, ease: "easeInOut" }}
-                    className="relative z-10 mx-1 sm:mx-2 -mt-1"
-                    style={{ filter: "drop-shadow(0 0 10px rgba(255, 100, 150, 0.9))" }}
-                    aria-hidden
-                  >
-                    <Heart className="w-7 h-7 sm:w-8 sm:h-8 text-pink-400 fill-pink-400" />
-                  </motion.div>
+              <motion.div
+                animate={{ scale: [1, 1.15, 1] }}
+                transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
+                className="relative z-[7]"
+                style={{ filter: "drop-shadow(0 0 12px rgba(var(--primary), 0.7))" }}
+                aria-hidden
+              >
+                <Heart className="w-8 h-8 sm:w-10 sm:h-10 text-primary fill-primary" />
+              </motion.div>
 
-                  <div className="relative z-10">
-                    <AvatarImage
-                      src={partner.avatar}
-                      userId={partner.id}
-                      alt=""
-                      className="w-[72px] h-[72px] sm:w-20 sm:h-20 rounded-full object-cover border-[2.5px] border-pink-300/50 shadow-[0_0_16px_rgba(255,120,160,0.3)] bg-[#1f0a14]"
-                    />
-                    <div
-                      className={`absolute bottom-0.5 right-0.5 w-4 h-4 sm:w-5 sm:h-5 rounded-full border-[2.5px] border-[#2a0f1c] z-20 ${partnerOnline ? "bg-green-500" : "bg-gray-400"}`}
-                      aria-label={partnerOnline ? "Partner is online" : "Partner is offline"}
-                    />
-                  </div>
-                </div>
-
-                <p className="text-center text-[15px] sm:text-base font-medium mt-5 text-white/90 flex items-center justify-center gap-1.5">
-                  You & {partner.name}
-                  <Heart className="w-4 h-4 text-pink-400" strokeWidth={2} fill="none" />
-                </p>
+              <div className="relative z-10">
+                <AvatarImage
+                  src={partner.avatar}
+                  userId={partner.id}
+                  alt=""
+                  className="w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-[3px] border-primary/40 shadow-[0_0_20px_rgba(var(--primary),0.25)] bg-background"
+                />
+                <div
+                  className={`absolute bottom-0 right-0 w-5 h-5 sm:w-6 sm:h-6 rounded-full border-[3px] border-background z-20 shadow-sm ${partnerOnline ? "bg-green-500" : "bg-gray-400"}`}
+                  aria-label={partnerOnline ? "Partner is online" : "Partner is offline"}
+                />
               </div>
             </motion.div>
           </Link>
         )}
         {partner && (
-          <p className="text-xs text-muted-foreground/70 mt-2 mb-4">Tap to open chat</p>
+          <p className="text-base sm:text-lg font-medium mt-2 drop-shadow-sm flex items-center justify-center gap-1.5 text-foreground/90">
+            You & {partner.name}
+            <Heart className="w-4 h-4 text-primary" strokeWidth={2.5} />
+          </p>
+        )}
+        {partner && (
+          <p className="text-xs text-muted-foreground/70 mt-1 mb-4">Tap to open chat</p>
         )}
         {!partner && !loadingPartner && (
           <p className="text-base sm:text-lg font-medium mt-4 drop-shadow-sm text-foreground/90">

@@ -381,8 +381,15 @@ export default function Messages() {
   const closeDoodlePanel = useCallback(() => setDoodleOpen(false), []);
 
   const handleDoodleSend = useCallback((data: DoodleData) => {
+    if (!user) {
+      toast.error("You must be signed in to send a doodle.", { duration: 4000 });
+      return;
+    }
+    if (!online) {
+      toast.error("You're offline. Reconnect to send your doodle.", { duration: 4000 });
+      return;
+    }
     closeDoodlePanel();
-    if (!user) return;
     const tempId = crypto.randomUUID();
     const posText = JSON.stringify({ width: data.width, height: data.height });
 
@@ -428,7 +435,7 @@ export default function Messages() {
         toast.error(`Failed to send doodle: ${errorMsg}`, { duration: 5000 });
       }
     })();
-  }, [closeDoodlePanel, user, requestStickToBottom, partner, partnerName, partnerId]);
+  }, [closeDoodlePanel, user, online, requestStickToBottom, partner, partnerName, partnerId]);
 
   // Define partner info early to avoid hoisting issues
   const pAvatar = partner?.avatar || partnerAvatar || defaultAvatar(partnerId);
