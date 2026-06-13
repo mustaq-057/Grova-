@@ -186,27 +186,89 @@ export default function DoodleCanvas({ onClose, onSend }: DoodleCanvasProps) {
     setHasStrokes(true);
   }, [saveHistory]);
 
+  const cropToContent = (sourceCanvas: HTMLCanvasElement): { x: number; y: number; w: number; h: number } => {
+    const ctx = sourceCanvas.getContext("2d");
+    if (!ctx) return { x: 0, y: 0, w: sourceCanvas.width, h: sourceCanvas.height };
+
+    const dpr = window.devicePixelRatio || 1;
+    const cssW = sourceCanvas.clientWidth;
+    const cssH = sourceCanvas.clientHeight;
+    
+    // Get image data at CSS pixel size
+    const tempCanvas = document.createElement("canvas");
+    tempCanvas.width = cssW;
+    tempCanvas.height = cssH;
+    const tempCtx = tempCanvas.getContext("2d")!;
+    tempCtx.drawImage(sourceCanvas, 0, 0, cssW, cssH);
+    
+    const imageData = tempCtx.getImageData(0, 0, cssW, cssH);
+    const data = imageData.data;
+    
+    let minX = cssW, maxX = 0, minY = cssH, maxY = 0;
+    let hasContent = false;
+    
+    // Find bounding box of non-white pixels
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
+      // Skip white (255,255,255) and transparent pixels
+      if (a > 128 && !(r === 255 && g === 255 && b === 255)) {
+        hasContent = true;
+        const pixelIndex = i / 4;
+        const y = Math.floor(pixelIndex / cssW);
+        const x = pixelIndex % cssW;
+        minX = Math.min(minX, x);
+        maxX = Math.max(maxX, x);
+        minY = Math.min(minY, y);
+        maxY = Math.max(maxY, y);
+      }
+    }
+    
+    // If no content found, return full canvas
+    if (!hasContent) {
+      return { x: 0, y: 0, w: cssW, h: cssH };
+    }
+    
+    // Add 8px padding around the content
+    const padding = 8;
+    const cropX = Math.max(0, minX - padding);
+    const cropY = Math.max(0, minY - padding);
+    const cropW = Math.min(cssW - cropX, maxX - minX + padding * 2);
+    const cropH = Math.min(cssH - cropY, maxY - minY + padding * 2);
+    
+    return { x: cropX, y: cropY, w: cropW, h: cropH };
+  };
+
   const handleSend = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas || !hasStrokes || sending) return;
     setSending(true);
 
-    // Downscale from DPR-scaled canvas to CSS pixel size for a reasonable file size.
-    // On a 3x phone a 400px canvas is 1200px internally → huge PNG. Export at 1x CSS size.
     const cssW = canvas.clientWidth;
     const cssH = canvas.clientHeight;
+    
+    // Export at full size first
+    const fullCanvas = document.createElement("canvas");
+    fullCanvas.width = cssW;
+    fullCanvas.height = cssH;
+    const fctx = fullCanvas.getContext("2d")!;
+    fctx.drawImage(canvas, 0, 0, cssW, cssH);
+    
+    // Detect drawn area
+    const crop = cropToContent(fullCanvas);
+    
+    // Create cropped export
     const exportCanvas = document.createElement("canvas");
-    exportCanvas.width = cssW;
-    exportCanvas.height = cssH;
+    exportCanvas.width = crop.w;
+    exportCanvas.height = crop.h;
     const ectx = exportCanvas.getContext("2d")!;
-    ectx.drawImage(canvas, 0, 0, cssW, cssH);
+    ectx.drawImage(fullCanvas, crop.x, crop.y, crop.w, crop.h, 0, 0, crop.w, crop.h);
 
     onSend({ 
       imageData: exportCanvas.toDataURL("image/png"), 
-      canvasX: 0, 
-      canvasY: 0, 
-      width: cssW, 
-      height: cssH 
+      canvasX: crop.x, 
+      canvasY: crop.y, 
+      width: crop.w, 
+      height: crop.h 
     });
   }, [hasStrokes, sending, onSend]);
 

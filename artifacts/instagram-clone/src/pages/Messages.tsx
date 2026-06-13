@@ -88,6 +88,9 @@ import {
   hydrateNotifications,
   clearUnreadChatBadge,
   getChatOpenedAt,
+  notifyMessageReaction,
+  notifyDoodleShared,
+  notifyFileShared,
 } from "@/lib/notifications-feed";
 import { isReadReceiptsEnabled, isShowPresenceEnabled, areNotificationsEnabled, getCachedChatTheme } from "@/lib/couple-sync";
 import { isChatBlocked, setChatBlocked } from "@/lib/client-memory";
@@ -432,6 +435,9 @@ export default function Messages() {
           writeChatCache(user.id, next);
           return next;
         });
+        // Notify partner that we shared a doodle
+        const partnerDisplayName = partner?.name || partnerName || (partnerId === "wife" ? "Sara" : "Mustaq");
+        notifyDoodleShared(partnerDisplayName);
         requestStickToBottom();
       } catch (err) {
         pendingOutgoingRef.current.delete(tempId);
@@ -440,7 +446,7 @@ export default function Messages() {
         toast.error(raw || "Doodle upload failed. Please try again.", { duration: 5000 });
       }
     })();
-  }, [closeDoodlePanel, user, requestStickToBottom]);
+  }, [closeDoodlePanel, user, requestStickToBottom, partner, partnerName, partnerId]);
 
   // Define partner info early to avoid hoisting issues
   const pAvatar = partner?.avatar || partnerAvatar || defaultAvatar(partnerId);
@@ -874,6 +880,12 @@ export default function Messages() {
           const list = Array.isArray(d.reactions) ? d.reactions : [];
           const myReaction = list.find((r) => r.userId === user.id)?.emoji;
           const partnerReaction = list.find((r) => r.userId === partnerId)?.emoji;
+          
+          // Notify when partner reacts
+          if (d.byUserId === partnerId && partnerReaction && !myReaction) {
+            notifyMessageReaction(pName, partnerReaction);
+          }
+          
           setMessages((prev) => {
             const found = prev.find(m => m.id === d.messageId);
             if (!found) return prev;
@@ -1714,6 +1726,8 @@ export default function Messages() {
           writeChatCache(user.id, next);
           return next;
         });
+        // Notify partner that we shared a photo
+        notifyFileShared(pName, "photo");
         requestAnimationFrame(() => URL.revokeObjectURL(localPreview));
       } catch (err) {
         URL.revokeObjectURL(localPreview);
@@ -1723,7 +1737,7 @@ export default function Messages() {
         throw err;
       }
     },
-    [user, mediaViewMode],
+    [user, mediaViewMode, pName],
   );
 
   const uploadAndSendEphemeralMedia = useCallback(
@@ -2170,6 +2184,8 @@ export default function Messages() {
         const [display] = await normalizeMessages([saved]);
         pendingOutgoingRef.current.delete(tempId);
         setMessages((prev) => replaceOptimisticMessage(prev, tempId, display, user.id));
+        // Notify partner that we shared a file
+        notifyFileShared(pName, "file");
         scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
       } catch (uploadError) {
         console.error("File upload failed:", uploadError);
@@ -2183,7 +2199,7 @@ export default function Messages() {
         );
       }
     },
-    [user],
+    [user, pName],
   );
 
   const mediaModeSticker = useCallback(
@@ -2359,6 +2375,8 @@ export default function Messages() {
               writeChatCache(user.id, next);
               return next;
             });
+            // Notify partner that we shared a video
+            notifyFileShared(pName, "video");
             requestStickToBottom();
           } catch (videoErr) {
             pendingOutgoingRef.current.delete(tempId);
@@ -2381,7 +2399,7 @@ export default function Messages() {
         filePickInFlightRef.current = false;
       }
     },
-    [uploadAndSendFile, uploadAndSendGalleryImage, uploadAndSendEphemeralMedia, mediaModeSticker, user, pendingMediaPreview],
+    [uploadAndSendFile, uploadAndSendGalleryImage, uploadAndSendEphemeralMedia, mediaModeSticker, user, pendingMediaPreview, pName],
   );
 
   const handleFileChange = useCallback(

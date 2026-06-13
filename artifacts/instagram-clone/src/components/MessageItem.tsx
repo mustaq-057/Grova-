@@ -274,32 +274,62 @@ export const MessageItem = memo(function MessageItem({
     return <DeletedMessageNotice isMe={isMe} partnerName={partnerName} />;
   }
 
-  // ── Doodle: rendered inline as an absolute overlay ──────────────────
+  // ── Doodle: rendered as regular message bubble ──────────────────
   if (isDoodle) {
     const src = resolveChatImageUrl(msg.imageUrl || msg.imageData);
-    let pos = { canvasX: 0, canvasY: 0, width: 100, height: 100 };
+    let pos = { canvasX: 0, canvasY: 0, width: 200, height: 200 };
     try {
       if (msg.text) pos = JSON.parse(msg.text);
     } catch(e) {}
 
     return (
-      <div 
-        className="absolute pointer-events-auto"
-        style={{
-           left: pos.canvasX,
-           top: pos.canvasY,
-           width: pos.width,
-           height: pos.height,
-           zIndex: 20,
-        }}
+      <motion.div
+        data-testid={`message-${msg.id}`}
+        initial={{ opacity: 0, scale: 0.8 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.8 }}
+        transition={{ type: "spring", stiffness: 200, damping: 20 }}
+        className={cn(
+          "group flex gap-2 items-end mb-3 transition-all duration-200",
+          isMe ? "justify-end" : "justify-start",
+        )}
       >
-        <DoodleMessageOverlay
-          msg={msg}
-          src={src}
-          isMe={isMe}
-          onUnsend={() => onUnsend?.(msg.id)}
-        />
-      </div>
+        {!isMe && partnerAvatar && (
+          <img
+            src={partnerAvatar}
+            alt={partnerName}
+            className="w-6 h-6 rounded-full object-cover shrink-0 mt-2"
+          />
+        )}
+
+        <div
+          className={cn(
+            "relative group/bubble max-w-[min(320px,85vw)]",
+            isMe && "flex flex-col items-end",
+          )}
+        >
+          <DoodleMessageBubble
+            msg={msg}
+            src={src}
+            isMe={isMe}
+            onUnsend={() => onUnsend?.(msg.id)}
+            doodleWidth={Math.max(120, Math.min(280, pos.width))}
+            doodleHeight={Math.max(120, Math.min(280, pos.height))}
+          />
+
+          {isMe && seenLabel && (
+            <p
+              className={`text-[11px] mt-0.5 pr-1 font-medium transition-all duration-300 ${
+                seenLabel === "Just seen"
+                  ? "text-primary animate-pulse"
+                  : "text-muted-foreground/80"
+              }`}
+            >
+              {seenLabel}
+            </p>
+          )}
+        </div>
+      </motion.div>
     );
   }
 
@@ -478,7 +508,7 @@ export const MessageItem = memo(function MessageItem({
 
   if (isCallLog && msg.text) {
     return (
-      <div className="flex justify-center my-3 px-4" data-testid={`message-${msg.id}`} role="listitem">
+      <div className="flex justify-center my-3 px-4" data-testid={`message-${msg.id}`}>
         <p className="text-xs text-muted-foreground/90 text-center font-medium bg-secondary/40 px-4 py-2 rounded-full">
           {msg.text}
         </p>
@@ -615,6 +645,72 @@ export const MessageItem = memo(function MessageItem({
   );
 });
 
+// ─── Doodle message bubble ──────────────────────────────────────────────────────
+
+interface DoodleBubbleProps {
+  msg: ApiMessage;
+  src: string | undefined;
+  isMe: boolean;
+  onUnsend?: () => void;
+  doodleWidth?: number;
+  doodleHeight?: number;
+}
+
+const DoodleMessageBubble = memo(function DoodleMessageBubble({
+  msg, src, isMe, onUnsend, doodleWidth = 200, doodleHeight = 200,
+}: DoodleBubbleProps) {
+  const [showSheet, setShowSheet] = useState(false);
+  const imgRef = useRef<HTMLImageElement>(null);
+
+  return (
+    <div
+      className="relative group/doodle"
+    >
+      {src ? (
+        <button
+          type="button"
+          onClick={() => setShowSheet(true)}
+          className={cn(
+            "block active:opacity-80 transition-opacity rounded-2xl overflow-hidden",
+            isMe ? "bg-primary/10" : "bg-secondary/50",
+          )}
+          style={{
+            width: doodleWidth,
+            height: doodleHeight,
+          }}
+          aria-label="Tap to manage doodle"
+        >
+          <img
+            ref={imgRef}
+            src={src}
+            alt="Doodle"
+            className="w-full h-full object-contain drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]"
+            draggable={false}
+          />
+        </button>
+      ) : (
+        <div 
+          className="bg-white/10 animate-pulse rounded-2xl"
+          style={{
+            width: doodleWidth,
+            height: doodleHeight,
+          }}
+        />
+      )}
+
+      {showSheet && (
+        <DoodleSheet
+          onClose={() => setShowSheet(false)}
+          onUnsend={() => {
+            setShowSheet(false);
+            onUnsend?.();
+          }}
+        />
+      )}
+    </div>
+  );
+});
+
 // ─── Doodle chat bubble (always inline) ──────────────────────────────────────
 
 interface DoodleOverlayProps {
@@ -634,7 +730,6 @@ const DoodleMessageOverlay = memo(function DoodleMessageOverlay({
     <div
       className="w-full h-full relative"
       data-testid={`message-${msg.id}`}
-      role="listitem"
     >
       {src ? (
         <button

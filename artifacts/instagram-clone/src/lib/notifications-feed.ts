@@ -105,7 +105,7 @@ export async function hydrateNotifications(): Promise<void> {
 }
 
 export function addNotification(n: Omit<AppNotification, "id" | "read" | "timestamp">) {
-  const allowedTypes = ["like", "comment", "share", "story", "dua", "call", "location", "task"];
+  const allowedTypes = ["like", "comment", "share", "story", "dua", "call", "location", "task", "reaction", "doodle", "file"];
   if (!allowedTypes.includes(n.type)) return;
   if (n.type === "message") return;
   if (isSecretNoteActivity(n)) return;
@@ -204,3 +204,33 @@ function dedupeActivities(list: AppNotification[]): AppNotification[] {
 }
 
 export { readUnreadChatBadge as getUnreadChatBadge };
+
+/** Notify when partner reacts to a message */
+export function notifyMessageReaction(partnerName: string, emoji: string) {
+  addNotification({
+    type: "reaction",
+    fromName: partnerName,
+    text: `reacted with ${emoji}`,
+    actorId: "",
+  });
+}
+
+/** Notify when partner shares a doodle */
+export function notifyDoodleShared(partnerName: string) {
+  addNotification({
+    type: "doodle",
+    fromName: partnerName,
+    text: "shared a doodle",
+    actorId: "",
+  });
+}
+
+/** Notify when partner shares a file/photo */
+export function notifyFileShared(partnerName: string, fileType: string) {
+  addNotification({
+    type: "file",
+    fromName: partnerName,
+    text: `shared a ${fileType}`,
+    actorId: "",
+  });
+}
