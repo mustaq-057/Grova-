@@ -43,7 +43,7 @@ import { EditMessageBar } from "@/components/EditMessageBar";
 import { defaultAvatar } from "@/lib/avatars";
 import { AvatarImage } from "@/components/AvatarImage";
 import { saveMemoryFromMessage, removeMemory } from "@/lib/memories";
-import { APP_THEME_CHANGED, getStoredAppTheme, isMoonlightSagaTheme, getPremiumChatThemeClass, isPremiumAnimatedTheme, type AppThemeId } from "@/lib/app-theme";
+import { APP_THEME_CHANGED, getStoredAppTheme, isMoonlightSagaTheme, isCreamyMinimalTheme, getCreamyChatClass, getPremiumChatThemeClass, isPremiumAnimatedTheme, type AppThemeId } from "@/lib/app-theme";
 import { ChatAuroraLayer } from "@/components/ChatAuroraLayer";
 
 import {
@@ -2966,6 +2966,8 @@ export default function Messages() {
 
   const showChatAurora = isMoonlightSagaTheme(appThemeId);
   const premiumChatClass = "";
+  const isCreamyMinimal = isCreamyMinimalTheme(appThemeId);
+  const creamyChatClass = getCreamyChatClass(appThemeId);
 
   if (blocked) {
     return (
@@ -2992,13 +2994,13 @@ export default function Messages() {
         />
       )}
       <div
-        className={`chat-panel flex-1 min-w-0 h-full min-h-0 relative bg-black ${premiumChatClass ?? ""}`}
+        className={`chat-panel flex-1 min-w-0 h-full min-h-0 relative ${isCreamyMinimal ? '' : 'bg-black'} ${premiumChatClass ?? ""} ${creamyChatClass ?? ""}`}
       >
 
 
         <div className="chat-panel-top shrink-0 z-20 flex flex-col relative">
           {/* ── Header ── */}
-          <div className="chat-panel-header flex items-center gap-1.5 sm:gap-2 px-1.5 sm:px-3 py-1 sm:py-1.5 border-b shrink-0 text-white">
+          <div className={`chat-panel-header flex items-center gap-1.5 sm:gap-2 px-1.5 sm:px-3 py-1 sm:py-1.5 border-b shrink-0 ${isCreamyMinimal ? 'text-[#3D2E1F]' : 'text-white'}`}>
             <div className="relative shrink-0">
               <AvatarImage src={pAvatar} userId={partnerId} alt={pName} className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover" />
               {presence.online && (
@@ -3028,9 +3030,11 @@ export default function Messages() {
 
 
               <button
-                onClick={() => setShowBubbleColors(true)}
-                className={`p-1.5 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 active:scale-95 text-muted-foreground hover:text-foreground hover:bg-secondary`}
+                onClick={() => !isCreamyMinimal && setShowBubbleColors(true)}
+                disabled={isCreamyMinimal}
+                className={`p-1.5 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 active:scale-95 text-muted-foreground hover:text-foreground hover:bg-secondary ${isCreamyMinimal ? 'opacity-30 cursor-not-allowed' : ''}`}
                 aria-label="Chat Colors"
+                title={isCreamyMinimal ? 'Bubble colors are set by the Creamy Minimal theme' : 'Chat Colors'}
               >
                 <Palette className="w-4 h-4" strokeWidth={1.5} />
               </button>
