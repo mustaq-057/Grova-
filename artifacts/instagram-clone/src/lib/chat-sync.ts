@@ -32,7 +32,7 @@ function pickMediaUrl(incoming?: string, prev?: string): string | undefined {
   return incoming;
 }
 
-function mergeOptimisticWithServer(optimistic: ApiMessage, server: ApiMessage): ApiMessage {
+export function mergeOptimisticWithServer(optimistic: ApiMessage, server: ApiMessage): ApiMessage {
   const remoteVideoReady =
     server.type === "video" &&
     isRemoteMediaUrl(server.fileData) &&
@@ -108,6 +108,7 @@ export function mergeMessagesById(existing: ApiMessage[], incoming: ApiMessage[]
     const hasRemoteImage = isRemoteMediaUrl(imageUrl) || isRemoteMediaUrl(m.imageUrl);
     map.set(m.id, {
       ...m,
+      clientUniqueId: prev.clientUniqueId || m.clientUniqueId,
       text,
       imageUrl,
       imageData: hasRemoteImage

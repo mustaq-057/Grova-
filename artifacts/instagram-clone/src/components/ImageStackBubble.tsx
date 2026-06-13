@@ -64,7 +64,7 @@ export const ImageStackBubble = memo(function ImageStackBubble({
                 className="w-full h-full object-cover"
                 loading="eager"
                 decoding="async"
-                fetchPriority={isTop ? "high" : "auto"}
+                fetchPriority={layer.z === layers.length - 1 ? "high" : "auto"}
                 onLoad={onMediaLoad}
               />
             ) : (

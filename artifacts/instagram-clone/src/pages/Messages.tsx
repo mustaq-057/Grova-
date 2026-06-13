@@ -67,6 +67,7 @@ import {
   preserveDroppedMessages,
   reconcilePendingOptimistics,
   replaceOptimisticMessage,
+  mergeOptimisticWithServer,
   tombstoneMessage,
 } from "@/lib/chat-sync";
 import { mergeMessagesIfChanged, messagesListSignature } from "@/lib/message-list-perf";
@@ -810,11 +811,7 @@ export default function Messages() {
                 pendingOutgoingRef.current.delete(prev[optimisticIdx]!.id);
                 const next = [...prev];
                 const oldMsg = prev[optimisticIdx]!;
-                next[optimisticIdx] = {
-                  ...preview,
-                  clientUniqueId: oldMsg.clientUniqueId || oldMsg.id,
-                  text: preview.text ?? oldMsg.text,
-                };
+                next[optimisticIdx] = mergeOptimisticWithServer(oldMsg, preview);
                 return next;
               }
             }

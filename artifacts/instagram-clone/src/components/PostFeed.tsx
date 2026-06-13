@@ -228,7 +228,7 @@ export function PostFeed({
       if (!posts.some((p) => p.id === focusPostId)) {
         try {
           const post = await api.getPostById(focusPostId);
-          setPosts(prev => [...prev, post].sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
+          setPosts(prev => [...prev, post].sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
         } catch {
           await loadPosts();
         }
