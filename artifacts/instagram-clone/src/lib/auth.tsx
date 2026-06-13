@@ -351,11 +351,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             id,
           );
           if (d.avatar != null && avatar !== prev?.avatar) bumpAvatarVersion(id);
+          const snap = readSessionSnapshot()?.partner;
           const p: ApiUser = {
             id: id as "me" | "wife",
-            username: d.username ?? prev?.username ?? (id === "wife" ? "sara" : "mustaq"),
-            name: d.name ?? prev?.name ?? (id === "wife" ? "Sara" : "Mustaq"),
-            bio: d.bio ?? prev?.bio ?? "",
+            username: d.username ?? prev?.username ?? snap?.username ?? (id === "wife" ? "sara" : "mustaq"),
+            name: d.name ?? prev?.name ?? snap?.name ?? (id === "wife" ? "Sara" : "Mustaq"),
+            bio: d.bio ?? prev?.bio ?? snap?.bio ?? "",
             avatar,
           };
           setPartner(p);

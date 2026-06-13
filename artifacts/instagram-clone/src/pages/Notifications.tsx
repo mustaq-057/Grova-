@@ -117,12 +117,12 @@ export default memo(function Notifications() {
   const openNotification = useCallback(
     (n: AppNotification) => {
       const path = n.targetPath || defaultPath(n.type);
-      const route = path.split("?")[0] || "/";
       if (path.includes("?")) {
         navigateWithSearch(path);
-        window.dispatchEvent(new Event(SEARCH_CHANGED));
+        setLocation(path);
+      } else {
+        setLocation(path);
       }
-      setLocation(route);
     },
     [setLocation],
   );

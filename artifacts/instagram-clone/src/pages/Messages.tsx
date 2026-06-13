@@ -1490,6 +1490,7 @@ export default function Messages() {
       if (debounceTimer) clearTimeout(debounceTimer);
       if (scrollAnchorSaveRef.current) clearTimeout(scrollAnchorSaveRef.current);
       if (mediaScrollTimerRef.current) clearTimeout(mediaScrollTimerRef.current);
+      if (userIdRef.current) clearChatScrollAnchor(userIdRef.current);
     };
   }, []);
 
@@ -3331,7 +3332,7 @@ export default function Messages() {
           <div ref={bottomRef} className="h-8 shrink-0" aria-hidden />
         </div>
 
-        <div className="chat-panel-bottom shrink-0 relative z-10">
+        <div className="chat-panel-bottom shrink-0 relative z-50">
           {showPartnerTyping && (
             <div className="flex items-end gap-2 px-3 py-1.5 shrink-0 border-t border-white/5 bg-background/80 backdrop-blur-sm">
               <AvatarImage src={pAvatar} userId={partnerId} alt="" className="w-6 h-6 rounded-full object-cover shrink-0" />

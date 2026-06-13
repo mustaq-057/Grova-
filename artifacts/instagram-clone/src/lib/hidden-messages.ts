@@ -92,11 +92,11 @@ export async function clearChatForUser(userId: string): Promise<string> {
 }
 
 export async function hideMessageForUser(userId: string, messageId: string): Promise<void> {
-  await api.hideMessage(userId, messageId);
   const set = ensureHiddenSet(userId);
   set.add(messageId);
   hiddenByUser.set(userId, set);
   persistHiddenIds(userId, set);
+  await api.hideMessage(userId, messageId);
 }
 
 export function applyHiddenMessageId(userId: string, messageId: string): void {
