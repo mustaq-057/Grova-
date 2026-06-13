@@ -115,7 +115,7 @@ export const MessageItem = memo(function MessageItem({
   const isCallLog = useMemo(() => isCallLogMessage(msg.text), [msg.text]);
   const isDua = useMemo(() => msg.type === "text" && msg.companionSticker === "🤲", [msg.type, msg.companionSticker]);
   const isText = useMemo(() => msg.type === "text" || msg.type === "heart", [msg.type]);
-  const customBubbleStyle = useMemo(() => msg.variant && msg.variant !== "default" ? msg.variant : null, [msg.variant]);
+  const customBubbleStyle = null;
   const rtl = useMemo(() => hasArabic(msg.text), [msg.text]);
   const imageDisplaySrc = useMemo(() => {
     const base = displayImageSrc;
