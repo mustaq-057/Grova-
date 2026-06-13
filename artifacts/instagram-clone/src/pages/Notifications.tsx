@@ -1,11 +1,103 @@
-import { memo, useState, useEffect } from "react";
-import { Link } from "wouter";
-import { ChevronLeft, Heart, MessageCircle, BookOpen, Phone, MapPin, ListTodo, PenTool, Paperclip, Smile, Zap } from "lucide-react";
-import { getNotifications, markAllRead, hydrateNotifications, NOTIFY_CHANGED, setNotificationViewer } from "@/lib/notifications-feed";
+import { memo, useState, useEffect, useCallback } from "react";
+import { Link, useLocation } from "wouter";
+import {
+  ChevronLeft,
+  Heart,
+  MessageSquare,
+  BookOpen,
+  Phone,
+  MapPin,
+  ListTodo,
+  PenTool,
+  ImageIcon,
+  Smile,
+  Zap,
+  Calendar as CalendarIcon,
+  Sparkles,
+  Bell,
+} from "lucide-react";
+import {
+  getNotifications,
+  markAllRead,
+  hydrateNotifications,
+  NOTIFY_CHANGED,
+  setNotificationViewer,
+  type AppNotification,
+} from "@/lib/notifications-feed";
 import { useAuth } from "@/lib/auth";
+
+function formatRelativeTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 1) return "Just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(diff / 3_600_000);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(diff / 86_400_000);
+  if (days < 7) return `${days}d ago`;
+  return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function notificationIcon(type: AppNotification["type"]) {
+  switch (type) {
+    case "like":
+      return { Icon: Heart, className: "text-rose-500 bg-rose-500/15" };
+    case "comment":
+      return { Icon: MessageSquare, className: "text-sky-500 bg-sky-500/15" };
+    case "dua":
+      return { Icon: BookOpen, className: "text-emerald-500 bg-emerald-500/15" };
+    case "call":
+      return { Icon: Phone, className: "text-green-500 bg-green-500/15" };
+    case "location":
+      return { Icon: MapPin, className: "text-amber-500 bg-amber-500/15" };
+    case "task":
+      return { Icon: ListTodo, className: "text-violet-500 bg-violet-500/15" };
+    case "doodle":
+      return { Icon: PenTool, className: "text-pink-500 bg-pink-500/15" };
+    case "file":
+      return { Icon: ImageIcon, className: "text-blue-500 bg-blue-500/15" };
+    case "reaction":
+      return { Icon: Smile, className: "text-yellow-500 bg-yellow-500/15" };
+    case "greeting":
+      return { Icon: Zap, className: "text-primary bg-primary/15" };
+    case "calendar":
+      return { Icon: CalendarIcon, className: "text-orange-500 bg-orange-500/15" };
+    case "checkin":
+      return { Icon: Sparkles, className: "text-fuchsia-500 bg-fuchsia-500/15" };
+    default:
+      return { Icon: Bell, className: "text-primary bg-primary/15" };
+  }
+}
+
+function defaultPath(type: AppNotification["type"]): string {
+  switch (type) {
+    case "dua":
+      return "/dua";
+    case "task":
+      return "/tasks";
+    case "calendar":
+      return "/calendar";
+    case "checkin":
+      return "/checkin";
+    case "doodle":
+    case "file":
+    case "reaction":
+    case "greeting":
+    case "location":
+    case "call":
+      return "/chat";
+    case "comment":
+    case "like":
+    case "story":
+      return "/";
+    default:
+      return "/notifications";
+  }
+}
 
 export default memo(function Notifications() {
   const { user } = useAuth();
+  const [, setLocation] = useLocation();
   const [items, setItems] = useState(() => getNotifications());
 
   useEffect(() => {
@@ -21,8 +113,16 @@ export default memo(function Notifications() {
     setItems(getNotifications());
   };
 
+  const openNotification = useCallback(
+    (n: AppNotification) => {
+      const path = n.targetPath || defaultPath(n.type);
+      setLocation(path);
+    },
+    [setLocation],
+  );
+
   return (
-    <div className="max-w-[600px] mx-auto pb-20 md:pb-6">
+    <div className="max-w-[600px] mx-auto pb-20 md:pb-6 min-h-full">
       <div className="flex items-center gap-3 px-4 py-4 border-b border-border sticky top-0 bg-background/95 backdrop-blur z-10">
         <Link href="/settings">
           <button type="button" className="p-2 hover:bg-secondary rounded-full" aria-label="Back">
@@ -37,48 +137,41 @@ export default memo(function Notifications() {
         )}
       </div>
 
-      <div className="divide-y divide-border">
+      <div className="px-3 py-3 space-y-2">
         {items.length === 0 ? (
-          <p className="text-center text-muted-foreground text-sm py-16">No notifications yet</p>
-        ) : (
-          items.map((n) => (
-            <div
-              key={n.id}
-              className={`flex items-start gap-3 px-4 py-3 ${n.read ? "" : "bg-primary/5"}`}
-            >
-              <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center shrink-0">
-                {n.type === "like" ? (
-                  <Heart className="w-5 h-5 text-red-500 fill-red-500" />
-                ) : n.type === "dua" ? (
-                  <BookOpen className="w-5 h-5 text-primary" />
-                ) : n.type === "call" ? (
-                  <Phone className="w-5 h-5 text-green-500" />
-                ) : n.type === "location" ? (
-                  <MapPin className="w-5 h-5 text-amber-500" />
-                ) : n.type === "task" ? (
-                  <ListTodo className="w-5 h-5 text-violet-500" />
-                ) : n.type === "doodle" ? (
-                  <PenTool className="w-5 h-5 text-pink-400" />
-                ) : n.type === "file" ? (
-                  <Paperclip className="w-5 h-5 text-blue-400" />
-                ) : n.type === "reaction" ? (
-                  <Smile className="w-5 h-5 text-yellow-400" />
-                ) : n.type === "greeting" ? (
-                  <Zap className="w-5 h-5 text-primary" />
-                ) : (
-                  <MessageCircle className="w-5 h-5 text-primary" />
-                )}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm">
-                  <span className="font-semibold">{n.fromName}</span> {n.text}
-                </p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {new Date(n.timestamp).toLocaleString()}
-                </p>
-              </div>
+          <div className="text-center py-20">
+            <div className="w-14 h-14 mx-auto rounded-2xl bg-secondary/60 flex items-center justify-center mb-3">
+              <Bell className="w-7 h-7 text-muted-foreground" />
             </div>
-          ))
+            <p className="text-sm font-medium">All caught up</p>
+            <p className="text-xs text-muted-foreground mt-1">Likes, comments, doodles, and more show up here</p>
+          </div>
+        ) : (
+          items.map((n) => {
+            const { Icon, className } = notificationIcon(n.type);
+            return (
+              <button
+                key={n.id}
+                type="button"
+                onClick={() => openNotification(n)}
+                className={`w-full flex items-start gap-3 px-3 py-3.5 rounded-2xl text-left transition-colors hover:bg-secondary/40 active:bg-secondary/60 ${
+                  n.read ? "bg-card/30" : "bg-primary/8 border border-primary/15"
+                }`}
+              >
+                <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${className}`}>
+                  <Icon className="w-5 h-5" strokeWidth={2} />
+                </div>
+                <div className="flex-1 min-w-0 pt-0.5">
+                  <p className="text-sm leading-snug">
+                    <span className="font-semibold">{n.fromName}</span>{" "}
+                    <span className="text-foreground/90">{n.text}</span>
+                  </p>
+                  <p className="text-[11px] text-muted-foreground mt-1">{formatRelativeTime(n.timestamp)}</p>
+                </div>
+                {!n.read && <span className="w-2 h-2 rounded-full bg-primary shrink-0 mt-2" />}
+              </button>
+            );
+          })
         )}
       </div>
     </div>

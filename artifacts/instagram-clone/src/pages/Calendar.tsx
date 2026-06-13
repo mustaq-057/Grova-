@@ -22,8 +22,12 @@ export default function Calendar() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  const [highlightEventId, setHighlightEventId] = useState<string | null>(null);
+
   useEffect(() => {
     loadEvents();
+    const id = new URLSearchParams(window.location.search).get("event");
+    if (id) setHighlightEventId(id);
   }, []);
 
   const loadEvents = async () => {
@@ -36,6 +40,14 @@ export default function Calendar() {
       finishLoading();
     }
   };
+
+  useEffect(() => {
+    if (!highlightEventId || events.length === 0) return;
+    const el = document.querySelector(`[data-testid="event-${highlightEventId}"]`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.classList.add("ring-2", "ring-primary", "ring-offset-2");
+  }, [events, highlightEventId]);
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();

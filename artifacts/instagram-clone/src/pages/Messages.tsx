@@ -9,8 +9,9 @@ import { MessageInput } from "@/components/MessageInput";
 import { InfoPanel } from "@/components/InfoPanel";
 import { Link } from "wouter";
 import type { GreetingTemplate } from "@/lib/greeting-messages";
-import { normalizeMessages, prepareOutgoingMessage, buildOptimisticMessage, buildSeenLabel, findLastSeenOutgoingId, messagePreview, replyPreviewLabel, collectImageStack } from "@/lib/message-utils";
+import { normalizeMessages, previewMessagesForDisplay, prepareOutgoingMessage, buildOptimisticMessage, buildSeenLabel, findLastSeenOutgoingId, messagePreview, replyPreviewLabel, collectImageStack, parseMediaViewMode } from "@/lib/message-utils";
 import { ImageStackBubble } from "@/components/ImageStackBubble";
+import { MediaViewerOverlay } from "@/components/MediaViewerOverlay";
 import { callStartedText, callEndedText, isCallLogMessage } from "@/lib/call-chat-log";
 import { usePresenceLabel } from "@/hooks/usePresenceLabel";
 import { groupByDay, shouldShowTimeGap } from "@/lib/message-helpers";
@@ -234,6 +235,8 @@ export default function Messages() {
     useVideoDuration: boolean;
     secondsLeft: number;
     mediaReady: boolean;
+    allowDownload: boolean;
+    expiresAt?: number;
   } | null>(null);
   const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [activeThread, setActiveThread] = useState<string | null>(null);
@@ -306,14 +309,13 @@ export default function Messages() {
   }, []);
 
   const scrollToBottomForMedia = useCallback((messageId?: string) => {
-    const isInitialWindow = Date.now() - initialLoadTimeRef.current < 2500;
-    if (messageId && !recentTailIdsRef.current.has(messageId) && !isInitialWindow) return;
-    if (!isNearBottomRef.current && !stickToBottomRef.current && !isInitialWindow) return;
+    if (!isNearBottomRef.current && !stickToBottomRef.current) return;
+    if (messageId && !recentTailIdsRef.current.has(messageId)) return;
     if (mediaScrollTimerRef.current) clearTimeout(mediaScrollTimerRef.current);
     mediaScrollTimerRef.current = setTimeout(() => {
-      if (!isNearBottomRef.current && !stickToBottomRef.current && !isInitialWindow) return;
-      scrollChatToBottomSoft(messagesContainerRef.current, bottomRef.current);
-    }, 150);
+      if (!isNearBottomRef.current && !stickToBottomRef.current) return;
+      scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
+    }, 80);
   }, []);
 
   const handleMediaCommitted = useCallback(
@@ -485,15 +487,18 @@ export default function Messages() {
 
   const applyMessageBatch = useCallback((raw: ApiMessage[]) => {
     if (raw.length === 0) return;
-    const container = messagesContainerRef.current;
-    const readingHistory = !isNearBottomRef.current && !stickToBottomRef.current && !pendingScrollRestoreRef.current;
-    if (readingHistory && container) {
-      scrollPreserveRef.current = {
-        top: container.scrollTop,
-        height: container.scrollHeight,
-      };
-    }
+    const readingHistory =
+      !isNearBottomRef.current &&
+      !stickToBottomRef.current &&
+      !pendingScrollRestoreRef.current;
     void normalizeMessages(raw).then((fromServer) => {
+      const container = messagesContainerRef.current;
+      if (readingHistory && container) {
+        scrollPreserveRef.current = {
+          top: container.scrollTop,
+          height: container.scrollHeight,
+        };
+      }
       setMessages((prev) => {
         const merged = reconcilePendingOptimistics(prev, fromServer, pendingOutgoingRef.current);
         const guarded = enforceUnsentMessages(merged, unsentIdsRef.current);
@@ -505,10 +510,12 @@ export default function Messages() {
         if (user?.id) writeChatCache(user.id, filterMessagesForCache(user.id, next));
         return next;
       });
-      if ((isNearBottomRef.current || isInitialLoadRef.current) && !pendingScrollRestoreRef.current && !initialUnreadHandledRef.current) {
+      if (
+        (isNearBottomRef.current || isInitialLoadRef.current) &&
+        !pendingScrollRestoreRef.current &&
+        !initialUnreadHandledRef.current
+      ) {
         stickToBottomRef.current = true;
-      } else if (readingHistory) {
-        stickToBottomRef.current = false;
       }
     });
   }, [user?.id]);
@@ -699,6 +706,14 @@ export default function Messages() {
       void api.getMessages().then(async (data) => {
         const raw = data.messages ?? [];
         if (raw.length === 0) return;
+        const readingHistory = !isNearBottomRef.current && !stickToBottomRef.current;
+        const container = messagesContainerRef.current;
+        if (readingHistory && container) {
+          scrollPreserveRef.current = {
+            top: container.scrollTop,
+            height: container.scrollHeight,
+          };
+        }
         const fresh = await normalizeMessages(raw);
         if (!mounted) return;
         setMessages((prev) => {
@@ -751,30 +766,46 @@ export default function Messages() {
         if (!mounted) return;
         try {
           const raw = JSON.parse(e.data) as ApiMessage;
-          const [msg] = await normalizeMessages([raw]);
+          const [preview] = previewMessagesForDisplay([raw]);
           if (!mounted) return;
 
           setMessages((prev) => {
-            if (prev.some((m) => m.id === msg.id)) {
-              return prev.map((m) => (m.id === msg.id ? { ...m, ...msg, text: msg.text ?? m.text } : m));
+            if (prev.some((m) => m.id === preview.id)) {
+              return prev.map((m) => (m.id === preview.id ? { ...m, ...preview, text: preview.text ?? m.text } : m));
             }
-            if (msg.senderId === user?.id) {
+            if (preview.senderId === user?.id) {
               const optimisticIdx = prev.findIndex(
                 (m) =>
                   pendingOutgoingRef.current.has(m.id) &&
-                  findOptimisticMatch(m, [msg], { allowBlobMatch: true }) !== undefined,
+                  findOptimisticMatch(m, [preview], { allowBlobMatch: true }) !== undefined,
               );
               if (optimisticIdx >= 0) {
                 pendingOutgoingRef.current.delete(prev[optimisticIdx]!.id);
                 const next = [...prev];
-                next[optimisticIdx] = msg;
+                next[optimisticIdx] = preview;
                 return next;
               }
             }
-            return [...prev, msg];
+            return [...prev, preview];
           });
 
-          if (msg.senderId === partnerId && !isNearBottomRef.current) {
+          if (preview.senderId === partnerId) {
+            if (preview.type === "doodle") {
+              addNotification({ type: "doodle", fromName: pName, text: "shared a doodle", actorId: partnerId, targetPath: `/chat?highlight=${preview.id}` });
+            } else if (preview.type === "image") {
+              addNotification({ type: "file", fromName: pName, text: "shared a photo", actorId: partnerId, targetPath: `/chat?highlight=${preview.id}` });
+            } else if (preview.type === "video" || preview.type === "file") {
+              addNotification({ type: "file", fromName: pName, text: `shared a ${preview.type === "video" ? "video" : "file"}`, actorId: partnerId, targetPath: `/chat?highlight=${preview.id}` });
+            }
+            void hydrateNotifications();
+          }
+
+          void normalizeMessages([raw]).then(([msg]) => {
+            if (!mounted) return;
+            setMessages((prev) => prev.map((m) => (m.id === msg.id ? { ...m, ...msg } : m)));
+          });
+
+          if (preview.senderId === partnerId && !isNearBottomRef.current) {
             setHasNewMessages(true);
           } else {
             stickToBottomRef.current = true;
@@ -1295,17 +1326,13 @@ export default function Messages() {
       !initialUnreadHandledRef.current &&
       (stickToBottomRef.current ||
         (firstPaint && !restoreAnchor) ||
-        (isOwnLast && tailChanged && isNearBottomRef.current) ||
-        (isNearBottomRef.current && tailChanged));
+        (isOwnLast && tailChanged && isNearBottomRef.current));
 
     if (shouldStick) {
-      scrollChatToBottomAfterPaint(
-        messagesContainerRef.current,
-        bottomRef.current,
-        false,
-      );
+      scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
       setHasNewMessages(false);
       stickToBottomRef.current = false;
+      if (firstPaint) isInitialLoadRef.current = false;
     } else if (
       !firstPaint &&
       tailChanged &&
@@ -1393,7 +1420,6 @@ export default function Messages() {
         setIsNearBottom(isNear);
         if (isNear) {
           setHasNewMessages(false);
-          initialUnreadHandledRef.current = false;
           if (userIdRef.current) clearChatScrollAnchor(userIdRef.current);
         } else {
           const uid = userIdRef.current;
@@ -1788,7 +1814,9 @@ export default function Messages() {
   );
 
   const openMediaMessage = useCallback(async (msg: ApiMessage) => {
-    const timed = msg.mediaViewMode === "once" || msg.mediaViewMode === "twice";
+    const viewMode = msg.mediaViewMode ?? parseMediaViewMode(msg.companionSticker);
+    const timed = viewMode === "once" || viewMode === "twice";
+    const allowDownload = false;
     try {
       if (timed) {
         const opened = await api.openMediaMessage(msg.id);
@@ -1810,6 +1838,16 @@ export default function Messages() {
         const displayUrl = openedDisplay ?? opened.url;
 
         if (opened.kind === "image") {
+          setMediaViewer({
+            messageId: msg.id,
+            url: displayUrl,
+            kind: "image",
+            timed: true,
+            useVideoDuration: false,
+            secondsLeft: 10,
+            mediaReady: false,
+            allowDownload,
+          });
           const img = new Image();
           img.onload = () => {
             setMediaViewer({
@@ -1820,11 +1858,11 @@ export default function Messages() {
               useVideoDuration: false,
               secondsLeft: 10,
               mediaReady: true,
+              allowDownload,
+              expiresAt: Date.now() + 10_000,
             });
           };
-          img.onerror = () => {
-            toast.error("Could not load photo");
-          };
+          img.onerror = () => toast.error("Could not load photo");
           img.src = displayUrl;
           return;
         }
@@ -1837,6 +1875,7 @@ export default function Messages() {
           useVideoDuration: true,
           secondsLeft: 0,
           mediaReady: true,
+          allowDownload,
         });
         return;
       }
@@ -1855,6 +1894,7 @@ export default function Messages() {
         useVideoDuration: false,
         secondsLeft: 0,
         mediaReady: true,
+        allowDownload: true,
       });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not open media");
@@ -2457,16 +2497,19 @@ export default function Messages() {
   }, [user, blocked, handlePickedFile, recording]);
 
   useEffect(() => {
-    if (!mediaViewer?.timed || mediaViewer.useVideoDuration || !mediaViewer.mediaReady) return;
-    const interval = setInterval(() => {
+    if (!mediaViewer?.timed || mediaViewer.useVideoDuration || !mediaViewer.mediaReady || !mediaViewer.expiresAt) return;
+    const tick = () => {
       setMediaViewer((prev) => {
-        if (!prev || !prev.timed || prev.useVideoDuration) return prev;
-        if (prev.secondsLeft <= 1) return null;
-        return { ...prev, secondsLeft: prev.secondsLeft - 1 };
+        if (!prev?.expiresAt) return prev;
+        const left = Math.max(0, Math.ceil((prev.expiresAt - Date.now()) / 1000));
+        if (left <= 0) return null;
+        return { ...prev, secondsLeft: left };
       });
-    }, 1000);
+    };
+    tick();
+    const interval = setInterval(tick, 100);
     return () => clearInterval(interval);
-  }, [mediaViewer?.timed, mediaViewer?.useVideoDuration, mediaViewer?.mediaReady, mediaViewer?.messageId]);
+  }, [mediaViewer?.timed, mediaViewer?.useVideoDuration, mediaViewer?.mediaReady, mediaViewer?.messageId, mediaViewer?.expiresAt]);
 
   useEffect(() => {
     if (!mediaViewer?.timed) return;
@@ -3380,40 +3423,19 @@ export default function Messages() {
         )}
 
         {mediaViewer && (
-          <div
-            className="fixed inset-0 z-[120] bg-black/95 flex items-center justify-center p-4"
-            onContextMenu={(e) => e.preventDefault()}
-          >
-            <button
-              type="button"
-              onClick={() => setMediaViewer(null)}
-              className="absolute top-4 right-4 w-10 h-10 rounded-full bg-black/60 text-white flex items-center justify-center"
-              aria-label="Close media"
-            >
-              <X className="w-5 h-5" />
-            </button>
-            {mediaViewer.timed && !mediaViewer.useVideoDuration && mediaViewer.mediaReady && (
-              <div className="absolute top-4 left-4 px-3 py-1.5 rounded-full bg-primary/30 text-white text-sm font-semibold">
-                {mediaViewer.secondsLeft}s
-              </div>
-            )}
-            {!mediaViewer.mediaReady ? (
-              <div className="w-12 h-12 border-3 border-white/20 border-t-white rounded-full animate-spin" />
-            ) : mediaViewer.kind === "video" ? (
-              <video
-                src={mediaViewer.url}
-                controls={!mediaViewer.timed}
-                autoPlay
-                playsInline
-                onEnded={() => {
-                  if (mediaViewer.timed) setMediaViewer(null);
-                }}
-                className="w-full h-full object-contain"
-              />
-            ) : (
-              <img src={mediaViewer.url} alt="Media Viewer" className="w-full h-full object-contain" />
-            )}
-          </div>
+          <MediaViewerOverlay
+            url={mediaViewer.url}
+            kind={mediaViewer.kind}
+            timed={mediaViewer.timed}
+            useVideoDuration={mediaViewer.useVideoDuration}
+            secondsLeft={mediaViewer.secondsLeft}
+            mediaReady={mediaViewer.mediaReady}
+            allowDownload={mediaViewer.allowDownload}
+            onClose={() => setMediaViewer(null)}
+            onVideoEnded={() => {
+              if (mediaViewer.timed) setMediaViewer(null);
+            }}
+          />
         )}
 
         {contextMenu && user && (

@@ -434,7 +434,10 @@ export async function initDb() {
       )
     `);
 
-    for (const sql of ["ALTER TABLE activity_feed ADD COLUMN actor_id TEXT"]) {
+    for (const sql of [
+      "ALTER TABLE activity_feed ADD COLUMN actor_id TEXT",
+      "ALTER TABLE activity_feed ADD COLUMN target_path TEXT",
+    ]) {
       try {
         await db.execute(sql);
       } catch {

@@ -4,6 +4,7 @@ import db from "../lib/db";
 import { broadcast } from "../lib/sse";
 import { authenticate } from "../lib/auth-middleware";
 import { rateLimiters } from "../lib/security";
+import { postCoupleActivity, profileDisplayName } from "../lib/activity-feed";
 
 interface Event {
   id: string;
@@ -73,6 +74,15 @@ router.post("/calendar/events", rateLimiters.messages, authenticate, async (req,
     
     // Broadcast new event to all clients
     broadcast("event-added", event);
+
+    const fromName = await profileDisplayName(author);
+    void postCoupleActivity(
+      "calendar",
+      author,
+      fromName,
+      `added a new event in calendar: ${title.trim()}`,
+      `/calendar?event=${id}`,
+    ).catch(() => {});
 
     res.json(event);
   } catch (err) {

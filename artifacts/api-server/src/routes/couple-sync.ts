@@ -145,7 +145,7 @@ router.get("/couple/activity", rateLimiters.read, authenticate, async (_req, res
   try {
     const [result, profilesResult] = await Promise.all([
       db.execute(
-        "SELECT id, type, actor_id, from_name, text, timestamp, read FROM activity_feed ORDER BY timestamp DESC LIMIT 50",
+        "SELECT id, type, actor_id, from_name, text, timestamp, read, target_path FROM activity_feed ORDER BY timestamp DESC LIMIT 50",
         [],
       ),
       db.execute("SELECT id, name FROM profiles WHERE id IN ('me', 'wife')", []),
@@ -168,6 +168,7 @@ router.get("/couple/activity", rateLimiters.read, authenticate, async (_req, res
           text: r.text,
           timestamp: r.timestamp,
           read: r.read === 1 || r.read === true,
+          targetPath: r.target_path ? String(r.target_path) : undefined,
         };
       }),
     });

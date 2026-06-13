@@ -70,22 +70,13 @@ router.post("/tasks", rateLimiters.messages, authenticate, async (req, res) => {
     // Broadcast new task to all clients
     broadcast("task-added", task);
 
-    const [fromName, mustaqName, saraName] = await Promise.all([
-      profileDisplayName(author),
-      profileDisplayName("me"),
-      profileDisplayName("wife"),
-    ]);
-    const assigneeNames =
-      assignedTo === "both"
-        ? `${mustaqName} & ${saraName}`
-        : assignedTo === "me"
-          ? mustaqName
-          : saraName;
+    const fromName = await profileDisplayName(author);
     void postCoupleActivity(
       "task",
       author,
       fromName,
-      `assigned ${assigneeNames}: ${title}`,
+      `added a new task: ${title}`,
+      "/tasks",
     ).catch(() => {});
 
     res.json(task);

@@ -253,7 +253,10 @@ export default memo(function Home() {
         })}
       </motion.div>
 
-      <PostFeed />
+      <PostFeed
+        focusPostId={typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("post") : null}
+        focusCommentId={typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("comment") : null}
+      />
     </div>
   );
 });

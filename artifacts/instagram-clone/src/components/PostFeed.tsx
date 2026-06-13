@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { useFeatureLoading } from "@/hooks/useFeatureLoading";
-import { Heart, MessageCircle, Send, MapPin, Trash2 } from "lucide-react";
+import { Heart, MessageSquare, Send, MapPin, Trash2, Reply } from "lucide-react";
 import { motion } from "framer-motion";
 import { Link } from "wouter";
 import { toast } from "sonner";
@@ -14,7 +14,13 @@ import { PostCarousel } from "@/components/PostCarousel";
 import { getPostMediaUrls } from "@/lib/post-media";
 import { resolvePostMediaUrl } from "@/lib/media-url";
 
-export function PostFeed() {
+export function PostFeed({
+  focusPostId,
+  focusCommentId,
+}: {
+  focusPostId?: string | null;
+  focusCommentId?: string | null;
+} = {}) {
   const { user, partner } = useAuth();
   const partnerId = user?.id === "me" ? "wife" : "me";
   const [posts, setPosts] = useState<ApiPost[]>([]);
@@ -24,6 +30,8 @@ export function PostFeed() {
   const [comments, setComments] = useState<Record<string, ApiPostComment[]>>({});
   const [deletePostId, setDeletePostId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null);
+  const commentHighlightRef = useRef<HTMLDivElement | null>(null);
 
   const loadPosts = useCallback(async () => {
     try {
@@ -98,6 +106,18 @@ export function PostFeed() {
         loadPosts();
       }
     });
+    source.addEventListener("post-comment-deleted", (e) => {
+      try {
+        const { id, postId } = JSON.parse((e as MessageEvent).data) as { id: string; postId: string };
+        setComments((prev) => ({
+          ...prev,
+          [postId]: (prev[postId] ?? []).filter((c) => c.id !== id),
+        }));
+        loadPosts();
+      } catch {
+        loadPosts();
+      }
+    });
     }
 
     const poll = setInterval(loadPosts, 60_000);
@@ -107,6 +127,23 @@ export function PostFeed() {
       clearInterval(poll);
     };
   }, [user?.id, loadPosts, finishLoading]);
+
+  const deleteComment = async (postId: string, commentId: string) => {
+    setDeletingCommentId(commentId);
+    try {
+      await api.deletePostComment(postId, commentId);
+      setComments((prev) => ({
+        ...prev,
+        [postId]: (prev[postId] ?? []).filter((c) => c.id !== commentId),
+      }));
+      loadPosts();
+      toast.success("Comment deleted");
+    } catch {
+      toast.error("Could not delete comment");
+    } finally {
+      setDeletingCommentId(null);
+    }
+  };
 
   const toggleLike = async (postId: string) => {
     const snapshot = posts.find((p) => p.id === postId);
@@ -161,6 +198,16 @@ export function PostFeed() {
       }
     }
   };
+
+  useEffect(() => {
+    if (!focusPostId) return;
+    void openComments(focusPostId);
+    if (!focusCommentId) return;
+    const t = window.setTimeout(() => {
+      commentHighlightRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 500);
+    return () => window.clearTimeout(t);
+  }, [focusPostId, focusCommentId]);
 
   const submitComment = async (postId: string) => {
     if (!commentText.trim()) return;
@@ -276,8 +323,8 @@ export function PostFeed() {
                     <Heart className={`w-5 h-5 ${post.likedByMe ? "fill-red-500 text-red-500" : ""}`} />
                     <span>{post.likeCount ?? 0}</span>
                   </button>
-                  <button type="button" onClick={() => openComments(post.id)} className="flex items-center gap-1.5 text-sm">
-                    <MessageCircle className="w-5 h-5" />
+                  <button type="button" onClick={() => openComments(post.id)} className="flex items-center gap-1.5 text-sm hover:text-primary transition-colors">
+                    <MessageSquare className="w-5 h-5" />
                     <span>{post.commentCount ?? 0}</span>
                   </button>
                   {/* Removed share to chat button per user request */}
@@ -289,27 +336,58 @@ export function PostFeed() {
                   </p>
                 ) : null}
                 {commentPostId === post.id && (
-                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="px-4 pt-3 space-y-2">
-                    {(comments[post.id] ?? []).map((c) => (
-                      <p key={c.id} className="text-xs">
-                        <span className="font-semibold">{c.authorId === user?.id ? "You" : partner?.name?.split(" ")[0]}</span>{" "}
-                        {c.text}
-                      </p>
-                    ))}
-                    <div className="flex gap-2">
+                  <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="px-4 pt-3 space-y-2.5">
+                    {(comments[post.id] ?? []).map((c) => {
+                      const isMine = c.authorId === user?.id;
+                      const authorLabel = isMine ? "You" : partner?.name?.split(" ")[0] ?? "Partner";
+                      const isFocused = focusCommentId === c.id;
+                      return (
+                        <div
+                          key={c.id}
+                          ref={isFocused ? commentHighlightRef : undefined}
+                          className={`flex gap-2.5 items-start rounded-xl px-2.5 py-2 ${isFocused ? "bg-primary/10 ring-1 ring-primary/25" : "bg-secondary/30"}`}
+                        >
+                          <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${isMine ? "bg-primary/15 text-primary" : "bg-sky-500/15 text-sky-600"}`}>
+                            <Reply className="w-3.5 h-3.5" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs leading-relaxed">
+                              <span className="font-semibold">{authorLabel}</span>{" "}
+                              <span className="text-foreground/90">{c.text}</span>
+                            </p>
+                          </div>
+                          {isMine ? (
+                            <button
+                              type="button"
+                              onClick={() => deleteComment(post.id, c.id)}
+                              disabled={deletingCommentId === c.id}
+                              className="p-1.5 text-muted-foreground hover:text-destructive rounded-lg hover:bg-destructive/10 shrink-0"
+                              aria-label="Delete comment"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                    <div className="flex gap-2 items-center pt-1">
+                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                        <MessageSquare className="w-4 h-4 text-primary" />
+                      </div>
                       <input
                         value={commentText}
                         onChange={(e) => setCommentText(e.target.value)}
-                        placeholder="Add a comment…"
-                        className="flex-1 text-sm px-3 py-2 bg-secondary/50 rounded-full border border-border/50 outline-none"
+                        placeholder="Write a comment…"
+                        className="flex-1 text-sm px-3 py-2.5 bg-secondary/50 rounded-full border border-border/50 outline-none focus:border-primary/40"
                         onKeyDown={(e) => e.key === "Enter" && submitComment(post.id)}
                       />
                       <button
                         type="button"
                         onClick={() => submitComment(post.id)}
-                        className="px-3 py-2 bg-primary text-primary-foreground text-xs font-semibold rounded-full"
+                        className="w-9 h-9 bg-primary text-primary-foreground flex items-center justify-center rounded-full shrink-0"
+                        aria-label="Post comment"
                       >
-                        Post
+                        <Send className="w-4 h-4" />
                       </button>
                     </div>
                   </motion.div>

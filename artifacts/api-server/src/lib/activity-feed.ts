@@ -14,21 +14,33 @@ export type ActivityType =
   | "reaction"
   | "doodle"
   | "file"
-  | "greeting";
+  | "greeting"
+  | "calendar"
+  | "checkin";
 
 export async function postCoupleActivity(
   type: ActivityType,
   actorId: string,
   fromName: string,
   text: string,
+  targetPath?: string,
 ): Promise<void> {
   const id = randomUUID();
   const timestamp = new Date().toISOString();
   await db.execute(
-    "INSERT INTO activity_feed (id, type, actor_id, from_name, text, timestamp, read) VALUES ($1, $2, $3, $4, $5, $6, 0)",
-    [id, type, actorId, fromName, text, timestamp],
+    "INSERT INTO activity_feed (id, type, actor_id, from_name, text, timestamp, read, target_path) VALUES ($1, $2, $3, $4, $5, $6, 0, $7)",
+    [id, type, actorId, fromName, text, timestamp, targetPath ?? null],
   );
-  broadcast("activity-added", { id, type, actorId, fromName, text, timestamp, read: false });
+  broadcast("activity-added", {
+    id,
+    type,
+    actorId,
+    fromName,
+    text,
+    timestamp,
+    read: false,
+    targetPath: targetPath ?? undefined,
+  });
 }
 
 export async function profileDisplayName(userId: string): Promise<string> {

@@ -40,10 +40,22 @@ export default function DailyCheckin() {
   const [submitting, setSubmitting] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
 
+  const [highlightId, setHighlightId] = useState<string | null>(null);
+
   useEffect(() => {
     loadCheckins();
     setQuestion(dailyQuestions[currentIndex]);
+    const id = new URLSearchParams(window.location.search).get("highlight");
+    if (id) setHighlightId(id);
   }, []);
+
+  useEffect(() => {
+    if (!highlightId || checkins.length === 0) return;
+    const el = document.querySelector(`[data-testid="checkin-${highlightId}"]`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.classList.add("ring-2", "ring-primary", "ring-offset-2");
+  }, [checkins, highlightId]);
 
   const loadCheckins = async () => {
     try {

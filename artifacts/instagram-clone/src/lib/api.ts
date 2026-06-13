@@ -306,12 +306,15 @@ export type AppNotification = {
     | "reaction"
     | "doodle"
     | "file"
-    | "greeting";
+    | "greeting"
+    | "calendar"
+    | "checkin";
   actorId?: string;
   fromName: string;
   text: string;
   timestamp: string;
   read: boolean;
+  targetPath?: string;
 };
 
 export type { CouplePrefs } from "./types";
@@ -595,6 +598,9 @@ export const api = {
 
   addPostComment: (postId: string, text: string) =>
     apiFetch<ApiPostComment>(`/posts/${postId}/comments`, { method: "POST", body: JSON.stringify({ text }) }),
+
+  deletePostComment: (postId: string, commentId: string) =>
+    apiFetch<{ success: boolean }>(`/posts/${postId}/comments/${commentId}`, { method: "DELETE" }),
 
   getStories: () => apiFetch<ApiStory[]>("/stories"),
 

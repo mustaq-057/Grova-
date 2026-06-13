@@ -494,15 +494,15 @@ router.post("/messages", authenticate, validateBody({
 
     const fromName = await profileDisplayName(senderId!);
     if (companionSticker === "🤲") {
-      await postCoupleActivity("dua", senderId!, fromName, "shared a dua with you 🤲").catch(() => {});
+      await postCoupleActivity("dua", senderId!, fromName, "shared a dua with you 🤲", "/dua").catch(() => {});
     } else if (type === "location") {
       await postCoupleActivity("location", senderId!, fromName, "shared a location").catch(() => {});
     } else if (type === "doodle") {
-      await postCoupleActivity("doodle", senderId!, fromName, "shared a doodle").catch(() => {});
+      await postCoupleActivity("doodle", senderId!, fromName, "shared a doodle", `/chat?highlight=${id}`).catch(() => {});
     } else if (type === "image") {
-      await postCoupleActivity("file", senderId!, fromName, "shared a photo").catch(() => {});
+      await postCoupleActivity("file", senderId!, fromName, "shared a photo", `/chat?highlight=${id}`).catch(() => {});
     } else if (type === "video") {
-      await postCoupleActivity("file", senderId!, fromName, "shared a video").catch(() => {});
+      await postCoupleActivity("file", senderId!, fromName, "shared a video", `/chat?highlight=${id}`).catch(() => {});
     } else if (type === "file") {
       await postCoupleActivity("file", senderId!, fromName, "shared a file").catch(() => {});
     } else if (type === "sticker") {

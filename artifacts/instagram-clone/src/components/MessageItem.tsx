@@ -128,6 +128,10 @@ export const MessageItem = memo(function MessageItem({
   useEffect(() => {
     const remote = remoteImageSrc;
     if (!remote) return;
+    if (!isMe) {
+      setDisplayImageSrc(remote);
+      return;
+    }
     if (remote.startsWith("blob:") || remote.startsWith("data:")) {
       setDisplayImageSrc(remote);
       return;
@@ -137,9 +141,10 @@ export const MessageItem = memo(function MessageItem({
       const currentIsLocal = current.startsWith("blob:") || current.startsWith("data:");
       return currentIsLocal ? current : remote;
     });
-  }, [remoteImageSrc]);
+  }, [remoteImageSrc, isMe]);
 
   useEffect(() => {
+    if (!isMe) return;
     const remote = remoteImageSrc;
     if (!remote || remote.startsWith("blob:") || remote.startsWith("data:")) return;
     const showingLocal =
@@ -164,7 +169,7 @@ export const MessageItem = memo(function MessageItem({
     return () => {
       cancelled = true;
     };
-  }, [remoteImageSrc, displayImageSrc, msg.id, msg.imageUrl, onMediaCommitted]);
+  }, [remoteImageSrc, displayImageSrc, msg.id, msg.imageUrl, onMediaCommitted, isMe]);
   const videoDisplaySrc = useMemo(
     () => resolveChatVideoUrl(msg.fileData, msg.text, msg.fileType),
     [msg.fileData, msg.text, msg.fileType],

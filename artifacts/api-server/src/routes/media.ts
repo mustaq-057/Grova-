@@ -305,10 +305,36 @@ router.post("/posts/:id/comments", rateLimiters.messages, authenticate, async (r
     const comment = { id, postId, authorId: userId, text: text.trim(), createdAt };
     broadcast("post-commented", comment);
     const fromName = await profileDisplayName(userId);
-    await postCoupleActivity("comment", userId, fromName, text.trim().slice(0, 80)).catch(() => {});
+    await postCoupleActivity("comment", userId, fromName, `commented: ${text.trim().slice(0, 80)}`, `/?post=${postId}&comment=${id}`).catch(() => {});
     res.json(comment);
   } catch {
     res.status(500).json({ error: "Failed to add comment" });
+  }
+});
+
+router.delete("/posts/:postId/comments/:commentId", rateLimiters.messages, authenticate, async (req, res) => {
+  const userId = (req as { user?: { id: string } }).user!.id;
+  const postId = String(req.params.postId);
+  const commentId = String(req.params.commentId);
+  try {
+    const existing = await db.execute(
+      "SELECT author_id FROM post_comments WHERE id = $1 AND post_id = $2",
+      [commentId, postId],
+    );
+    const row = existing.rows[0] as { author_id?: string } | undefined;
+    if (!row) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    if (row.author_id !== userId) {
+      res.status(403).json({ error: "Forbidden" });
+      return;
+    }
+    await db.execute("DELETE FROM post_comments WHERE id = $1", [commentId]);
+    broadcast("post-comment-deleted", { id: commentId, postId });
+    res.json({ success: true });
+  } catch {
+    res.status(500).json({ error: "Failed to delete comment" });
   }
 });
 
