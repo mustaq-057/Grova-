@@ -37,12 +37,16 @@ function mergeOptimisticWithServer(optimistic: ApiMessage, server: ApiMessage): 
     server.type === "video" &&
     isRemoteMediaUrl(server.fileData) &&
     isLocalMediaUrl(optimistic.fileData);
+  const imageUrl = pickMediaUrl(server.imageUrl, optimistic.imageUrl);
+  const hasRemoteImage = isRemoteMediaUrl(imageUrl) || isRemoteMediaUrl(server.imageUrl);
   return {
     ...server,
     text: server.text ?? optimistic.text,
     gifUrl: server.gifUrl || optimistic.gifUrl,
-    imageUrl: pickMediaUrl(server.imageUrl, optimistic.imageUrl),
-    imageData: pickMediaUrl(server.imageData, optimistic.imageData),
+    imageUrl,
+    imageData: (server.type === "doodle" || hasRemoteImage)
+      ? undefined
+      : pickMediaUrl(server.imageData, optimistic.imageData),
     fileData: remoteVideoReady
       ? server.fileData
       : pickMediaUrl(server.fileData, optimistic.fileData),
@@ -91,11 +95,15 @@ export function mergeMessagesById(existing: ApiMessage[], incoming: ApiMessage[]
     const prevText = prev.text ?? "";
     const text =
       incomingText === "…" && prevText && prevText !== "…" ? prevText : m.text ?? prev.text;
+    const imageUrl = pickMediaUrl(m.imageUrl, prev.imageUrl);
+    const hasRemoteImage = isRemoteMediaUrl(imageUrl) || isRemoteMediaUrl(m.imageUrl);
     map.set(m.id, {
       ...m,
       text,
-      imageUrl: pickMediaUrl(m.imageUrl, prev.imageUrl),
-      imageData: pickMediaUrl(m.imageData, prev.imageData),
+      imageUrl,
+      imageData: (m.type === "doodle" || hasRemoteImage)
+        ? undefined
+        : pickMediaUrl(m.imageData, prev.imageData),
       audioData: m.audioData ?? prev.audioData,
       fileData: pickMediaUrl(m.fileData, prev.fileData),
       fileType: m.fileType ?? prev.fileType,

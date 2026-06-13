@@ -9,6 +9,24 @@ import type { AuthenticatedRequest } from "../types";
 import { rateLimiters } from "../lib/security";
 import { validators, validateBody } from "../lib/validation";
 import { getChatClearedAtForUser } from "../lib/chat-clear";
+import { uploadMedia } from "../lib/storage";
+import { extForContentType } from "../lib/file-mime";
+
+async function autoUploadBase64Field(dataUrl: string | undefined): Promise<string | undefined> {
+  if (!dataUrl || !dataUrl.startsWith("data:")) return dataUrl;
+  try {
+    const match = dataUrl.match(/^data:([^;]+);base64,/);
+    const mime = match?.[1] || "application/octet-stream";
+    const base64Data = dataUrl.replace(/^data:[^;]+;base64,/, "");
+    const buffer = Buffer.from(base64Data, "base64");
+    const key = `${randomUUID()}.${extForContentType(mime)}`;
+    const url = await uploadMedia(key, buffer, mime);
+    return url;
+  } catch (error) {
+    console.error("Auto upload of base64 field failed:", error);
+    throw new Error("Failed to upload media content to Cloudinary: " + (error instanceof Error ? error.message : String(error)));
+  }
+}
 
 export interface Message {
   id: string;
@@ -392,6 +410,24 @@ router.post("/messages", authenticate, validateBody({
 
   if (fileData && fileData.length > 28_000_000) {
     res.status(400).json({ error: "file data is too large (max 20MB)" });
+    return;
+  }
+
+  // Auto-upload base64 fields to Cloudinary
+  try {
+    if (imageData && imageData.startsWith("data:")) {
+      imageUrl = await autoUploadBase64Field(imageData);
+      imageData = undefined;
+    }
+    if (audioData && audioData.startsWith("data:")) {
+      audioData = await autoUploadBase64Field(audioData);
+    }
+    if (fileData && fileData.startsWith("data:")) {
+      fileData = await autoUploadBase64Field(fileData);
+    }
+  } catch (err) {
+    console.error("Auto upload failed:", err);
+    res.status(500).json({ error: err instanceof Error ? err.message : "Media upload failed" });
     return;
   }
 
