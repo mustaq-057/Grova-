@@ -190,7 +190,6 @@ export default function DoodleCanvas({ onClose, onSend }: DoodleCanvasProps) {
     const ctx = sourceCanvas.getContext("2d");
     if (!ctx) return { x: 0, y: 0, w: sourceCanvas.width, h: sourceCanvas.height };
 
-    const dpr = window.devicePixelRatio || 1;
     const cssW = sourceCanvas.clientWidth;
     const cssH = sourceCanvas.clientHeight;
     
@@ -203,31 +202,57 @@ export default function DoodleCanvas({ onClose, onSend }: DoodleCanvasProps) {
     
     const imageData = tempCtx.getImageData(0, 0, cssW, cssH);
     const data = imageData.data;
-    
-    let minX = cssW, maxX = 0, minY = cssH, maxY = 0;
-    let hasContent = false;
-    
-    // Find bounding box of non-white pixels
-    for (let i = 0; i < data.length; i += 4) {
-      const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
-      // Skip white (255,255,255) and transparent pixels
-      if (a > 128 && !(r === 255 && g === 255 && b === 255)) {
-        hasContent = true;
-        const pixelIndex = i / 4;
-        const y = Math.floor(pixelIndex / cssW);
-        const x = pixelIndex % cssW;
-        minX = Math.min(minX, x);
-        maxX = Math.max(maxX, x);
-        minY = Math.min(minY, y);
-        maxY = Math.max(maxY, y);
+
+    const isNonWhite = (offset: number) => {
+      const a = data[offset + 3];
+      return a > 128 && !(data[offset] === 255 && data[offset + 1] === 255 && data[offset + 2] === 255);
+    };
+
+    // Scan from edges inward (fast)
+    let minX = cssW, maxX = -1, minY = cssH, maxY = -1;
+
+    // Scan top to bottom (find minY and maxY)
+    outer: for (let y = 0; y < cssH; y++) {
+      for (let x = 0; x < cssW; x++) {
+        if (isNonWhite((y * cssW + x) * 4)) {
+          minY = y;
+          break outer;
+        }
       }
     }
-    
-    // If no content found, return full canvas
-    if (!hasContent) {
-      return { x: 0, y: 0, w: cssW, h: cssH };
+
+    if (minY === cssH) return { x: 0, y: 0, w: cssW, h: cssH }; // No content
+
+    // Scan bottom to top (find maxY)
+    outer: for (let y = cssH - 1; y >= minY; y--) {
+      for (let x = 0; x < cssW; x++) {
+        if (isNonWhite((y * cssW + x) * 4)) {
+          maxY = y;
+          break outer;
+        }
+      }
     }
-    
+
+    // Scan left to right (find minX)
+    outer: for (let x = 0; x < cssW; x++) {
+      for (let y = minY; y <= maxY; y++) {
+        if (isNonWhite((y * cssW + x) * 4)) {
+          minX = x;
+          break outer;
+        }
+      }
+    }
+
+    // Scan right to left (find maxX)
+    outer: for (let x = cssW - 1; x >= minX; x--) {
+      for (let y = minY; y <= maxY; y++) {
+        if (isNonWhite((y * cssW + x) * 4)) {
+          maxX = x;
+          break outer;
+        }
+      }
+    }
+
     // Add 8px padding around the content
     const padding = 8;
     const cropX = Math.max(0, minX - padding);
@@ -253,7 +278,7 @@ export default function DoodleCanvas({ onClose, onSend }: DoodleCanvasProps) {
     const fctx = fullCanvas.getContext("2d")!;
     fctx.drawImage(canvas, 0, 0, cssW, cssH);
     
-    // Detect drawn area
+    // Detect drawn area (fast edge-scanning)
     const crop = cropToContent(fullCanvas);
     
     // Create cropped export
@@ -263,13 +288,26 @@ export default function DoodleCanvas({ onClose, onSend }: DoodleCanvasProps) {
     const ectx = exportCanvas.getContext("2d")!;
     ectx.drawImage(fullCanvas, crop.x, crop.y, crop.w, crop.h, 0, 0, crop.w, crop.h);
 
-    onSend({ 
-      imageData: exportCanvas.toDataURL("image/png"), 
-      canvasX: crop.x, 
-      canvasY: crop.y, 
-      width: crop.w, 
-      height: crop.h 
-    });
+    // Use toBlob for better performance (async, non-blocking)
+    exportCanvas.toBlob((blob) => {
+      if (!blob) {
+        setSending(false);
+        return;
+      }
+      
+      const reader = new FileReader();
+      reader.onload = () => {
+        onSend({ 
+          imageData: reader.result as string, 
+          canvasX: crop.x, 
+          canvasY: crop.y, 
+          width: crop.w, 
+          height: crop.h 
+        });
+        setSending(false);
+      };
+      reader.readAsDataURL(blob);
+    }, "image/png", 0.95);
   }, [hasStrokes, sending, onSend]);
 
   return createPortal(
