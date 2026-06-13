@@ -134,6 +134,42 @@ router.get("/posts", rateLimiters.read, authenticate, async (req, res) => {
   }
 });
 
+router.get("/posts/:id", rateLimiters.read, authenticate, async (req, res) => {
+  const userId = (req as { user?: { id: string } }).user!.id;
+  const postId = String(req.params.id);
+  try {
+    const result = await db.execute("SELECT * FROM posts WHERE id = $1", [postId]);
+    if (result.rows.length === 0) {
+      res.status(404).json({ error: "Post not found" });
+      return;
+    }
+    const row = result.rows[0] as Record<string, unknown>;
+    const id = String(row.id);
+    const likes = await db.execute("SELECT user_id FROM post_likes WHERE post_id = $1", [id]);
+    const comments = await db.execute("SELECT COUNT(*) as cnt FROM post_comments WHERE post_id = $1", [id]);
+    const likeRows = likes.rows as { user_id: string }[];
+    const commentCount = Number((comments.rows[0] as { cnt?: number })?.cnt ?? 0);
+    const reactionsResult = await db.execute("SELECT emoji, user_id FROM post_reactions WHERE post_id = $1", [id]);
+    const reactionRows = reactionsResult.rows as { emoji: string; user_id: string }[];
+    const reactionCounts: Record<string, number> = {};
+    for (const r of reactionRows) {
+      reactionCounts[r.emoji] = (reactionCounts[r.emoji] ?? 0) + 1;
+    }
+    const myReaction = reactionRows.find((r) => r.user_id === userId)?.emoji;
+    const post = rowToPostPayload(row, {
+      likeCount: likeRows.length,
+      likedByMe: likeRows.some((l) => l.user_id === userId),
+      commentCount,
+      myReaction,
+      reactionCounts,
+    });
+    res.json(post);
+  } catch (err) {
+    console.error("Failed to fetch post:", err);
+    res.status(500).json({ error: "Failed to fetch post" });
+  }
+});
+
 router.post("/posts", rateLimiters.messages, authenticate, async (req, res) => {
   const userId = (req as { user?: { id: string } }).user!.id;
   const { mediaUrl, mediaUrls, caption, location, aspectRatio } = req.body as {

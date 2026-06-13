@@ -157,8 +157,13 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
   }, []);
 
   const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
+    let files = Array.from(e.target.files || []);
     if (files.length === 0) return;
+    
+    if (files.length > 10) {
+      toast.error("You can only send up to 10 files at a time.");
+      files = files.slice(0, 10);
+    }
     
     // Validate all files before processing
     const unsupportedFiles: string[] = [];

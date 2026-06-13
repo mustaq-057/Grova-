@@ -1,13 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Download, X } from "lucide-react";
+import { Download, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { tryRefreshSession } from "@/lib/api";
-import { isMobileDevice } from "@/lib/file-view";
 import { resolveMediaDownloadUrl } from "@/lib/media-url";
 
-type Props = {
+type MediaItem = {
   url: string;
   kind: "image" | "video";
+};
+
+type Props = {
+  url?: string;
+  kind?: "image" | "video";
+  items?: MediaItem[];
+  initialIndex?: number;
   timed: boolean;
   useVideoDuration: boolean;
   secondsLeft: number;
@@ -21,6 +27,8 @@ type Props = {
 export function MediaViewerOverlay({
   url,
   kind,
+  items,
+  initialIndex = 0,
   timed,
   useVideoDuration,
   secondsLeft,
@@ -32,16 +40,23 @@ export function MediaViewerOverlay({
 }: Props) {
   const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [currentIndex, setCurrentIndex] = useState(initialIndex);
+  
   const pinchRef = useRef<{ dist: number; scale: number } | null>(null);
   const panRef = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
+  const swipeRef = useRef<{ startX: number; startY: number } | null>(null);
+
+  const activeItems = items || (url && kind ? [{ url, kind }] : []);
+  const currentItem = activeItems[currentIndex];
 
   useEffect(() => {
     setScale(1);
     setOffset({ x: 0, y: 0 });
-  }, [url]);
+  }, [currentIndex, currentItem?.url]);
 
   const handleDownload = useCallback(async () => {
-    const fileBase = `grova-${kind}-${Date.now()}`;
+    if (!currentItem) return;
+    const fileBase = `grova-${currentItem.kind}-${Date.now()}`;
 
     const extFromBlob = (blob: Blob): string => {
       const ct = blob.type.toLowerCase();
@@ -50,7 +65,7 @@ export function MediaViewerOverlay({
       if (ct.includes("gif")) return "gif";
       if (ct.includes("mp4") || ct.includes("video")) return "mp4";
       if (ct.includes("jpeg") || ct.includes("jpg")) return "jpg";
-      return kind === "video" ? "mp4" : "jpg";
+      return currentItem.kind === "video" ? "mp4" : "jpg";
     };
 
     const saveBlob = (blob: Blob) => {
@@ -68,12 +83,12 @@ export function MediaViewerOverlay({
     };
 
     const fetchBlob = async (): Promise<Blob> => {
-      let downloadUrl = resolveMediaDownloadUrl(url, kind);
+      let downloadUrl = resolveMediaDownloadUrl(currentItem.url, currentItem.kind);
       let res = await fetch(downloadUrl, { credentials: "include" });
       if (res.status === 401) {
         const refreshed = await tryRefreshSession();
         if (refreshed) {
-          downloadUrl = resolveMediaDownloadUrl(url, kind);
+          downloadUrl = resolveMediaDownloadUrl(currentItem.url, currentItem.kind);
           res = await fetch(downloadUrl, { credentials: "include" });
         }
       }
@@ -83,22 +98,11 @@ export function MediaViewerOverlay({
 
     try {
       const blob = await fetchBlob();
-      if (
-        isMobileDevice() &&
-        navigator.share &&
-        navigator.canShare?.({
-          files: [new File([blob], `${fileBase}.${extFromBlob(blob)}`, { type: blob.type || "application/octet-stream" })],
-        })
-      ) {
-        await navigator.share({
-          files: [new File([blob], `${fileBase}.${extFromBlob(blob)}`, { type: blob.type || "application/octet-stream" })],
-        });
-        return;
-      }
+      // REMOVED navigator.share logic to force direct download
       saveBlob(blob);
     } catch {
       try {
-        const downloadUrl = resolveMediaDownloadUrl(url, kind);
+        const downloadUrl = resolveMediaDownloadUrl(currentItem.url, currentItem.kind);
         const a = document.createElement("a");
         a.href = downloadUrl;
         a.download = fileBase;
@@ -111,7 +115,7 @@ export function MediaViewerOverlay({
         toast.error("Download failed");
       }
     }
-  }, [url, kind]);
+  }, [currentItem]);
 
   const onTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length === 2) {
@@ -119,11 +123,16 @@ export function MediaViewerOverlay({
       const dist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
       pinchRef.current = { dist, scale };
       panRef.current = null;
+      swipeRef.current = null;
       return;
     }
-    if (e.touches.length === 1 && scale > 1) {
+    if (e.touches.length === 1) {
       const t = e.touches[0]!;
-      panRef.current = { x: t.clientX, y: t.clientY, ox: offset.x, oy: offset.y };
+      if (scale > 1) {
+        panRef.current = { x: t.clientX, y: t.clientY, ox: offset.x, oy: offset.y };
+      } else {
+        swipeRef.current = { startX: t.clientX, startY: t.clientY };
+      }
     }
   };
 
@@ -135,7 +144,7 @@ export function MediaViewerOverlay({
       setScale(next);
       return;
     }
-    if (e.touches.length === 1 && panRef.current && scale > 1) {
+    if (e.touches.length === 1 && scale > 1 && panRef.current) {
       const t = e.touches[0]!;
       setOffset({
         x: panRef.current.ox + (t.clientX - panRef.current.x),
@@ -144,14 +153,32 @@ export function MediaViewerOverlay({
     }
   };
 
-  const onTouchEnd = () => {
+  const onTouchEnd = (e: React.TouchEvent) => {
+    if (scale === 1 && swipeRef.current) {
+      const t = e.changedTouches[0];
+      if (t) {
+        const dx = t.clientX - swipeRef.current.startX;
+        const dy = t.clientY - swipeRef.current.startY;
+        if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) {
+          if (dx > 0 && currentIndex > 0) {
+            setCurrentIndex((i) => i - 1);
+          } else if (dx < 0 && currentIndex < activeItems.length - 1) {
+            setCurrentIndex((i) => i + 1);
+          }
+        }
+      }
+    }
+    
     pinchRef.current = null;
     panRef.current = null;
+    swipeRef.current = null;
     if (scale < 1.05) {
       setScale(1);
       setOffset({ x: 0, y: 0 });
     }
   };
+
+  if (!currentItem) return null;
 
   return (
     <div
@@ -163,7 +190,7 @@ export function MediaViewerOverlay({
           <button
             type="button"
             onClick={() => void handleDownload()}
-            className="w-10 h-10 rounded-full bg-black/60 text-white flex items-center justify-center"
+            className="w-10 h-10 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80 transition-colors"
             aria-label="Download"
           >
             <Download className="w-5 h-5" />
@@ -172,7 +199,7 @@ export function MediaViewerOverlay({
         <button
           type="button"
           onClick={onClose}
-          className="w-10 h-10 rounded-full bg-black/60 text-white flex items-center justify-center"
+          className="w-10 h-10 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80 transition-colors"
           aria-label="Close media"
         >
           <X className="w-5 h-5" />
@@ -185,17 +212,48 @@ export function MediaViewerOverlay({
         </div>
       )}
 
-      {!mediaReady && kind === "image" ? (
+      {activeItems.length > 1 && currentIndex > 0 && (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); setCurrentIndex(i => i - 1); }}
+          className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-black/40 text-white flex items-center justify-center hover:bg-black/60 transition-colors z-10 hidden sm:flex"
+        >
+          <ChevronLeft className="w-8 h-8" />
+        </button>
+      )}
+
+      {activeItems.length > 1 && currentIndex < activeItems.length - 1 && (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); setCurrentIndex(i => i + 1); }}
+          className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-black/40 text-white flex items-center justify-center hover:bg-black/60 transition-colors z-10 hidden sm:flex"
+        >
+          <ChevronRight className="w-8 h-8" />
+        </button>
+      )}
+
+      {activeItems.length > 1 && (
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-2 z-10">
+          {activeItems.map((_, idx) => (
+            <div
+              key={idx}
+              className={`w-2 h-2 rounded-full transition-colors ${idx === currentIndex ? 'bg-white' : 'bg-white/30'}`}
+            />
+          ))}
+        </div>
+      )}
+
+      {!mediaReady && currentItem.kind === "image" ? (
         <img
-          src={url}
+          src={currentItem.url}
           alt=""
           className="max-w-full max-h-full object-contain opacity-0"
           onLoad={onMediaReady}
           draggable={false}
         />
-      ) : !mediaReady ? null : kind === "video" ? (
+      ) : !mediaReady ? null : currentItem.kind === "video" ? (
         <video
-          src={url}
+          src={currentItem.url}
           controls={!timed}
           autoPlay
           playsInline
@@ -210,7 +268,7 @@ export function MediaViewerOverlay({
           onTouchEnd={onTouchEnd}
         >
           <img
-            src={url}
+            src={currentItem.url}
             alt="Media Viewer"
             className="max-w-full max-h-full object-contain transition-transform duration-75"
             style={{

@@ -5,7 +5,7 @@ import { resolveChatImageUrl } from "@/lib/media-url";
 type Props = {
   messages: ApiMessage[];
   isMe: boolean;
-  onOpenMedia?: (msg: ApiMessage) => void;
+  onOpenMedia?: (msg: ApiMessage, stack?: ApiMessage[]) => void;
   onMediaLoad?: () => void;
 };
 
@@ -44,7 +44,7 @@ export const ImageStackBubble = memo(function ImageStackBubble({
           <button
             key={layer.msg.id}
             type="button"
-            onClick={() => onOpenMedia?.(layer.msg)}
+            onClick={() => onOpenMedia?.(layer.msg, messages)}
             className="absolute rounded-2xl overflow-hidden shadow-2xl border border-white/15 bg-[#1a1a1a] transition-transform active:scale-[0.98]"
             style={{
               width: 152,
@@ -64,6 +64,7 @@ export const ImageStackBubble = memo(function ImageStackBubble({
                 className="w-full h-full object-cover"
                 loading="eager"
                 decoding="async"
+                fetchPriority={isTop ? "high" : "auto"}
                 onLoad={onMediaLoad}
               />
             ) : (

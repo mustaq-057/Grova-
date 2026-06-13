@@ -579,6 +579,8 @@ export const api = {
 
   getPosts: () => apiFetch<ApiPost[]>("/posts"),
 
+  getPostById: (id: string) => apiFetch<ApiPost>(`/posts/${id}`),
+
   addPost: (post: {
     mediaUrl: string;
     mediaUrls?: string[];

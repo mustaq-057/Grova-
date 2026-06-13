@@ -226,7 +226,12 @@ export function PostFeed({
     let cancelled = false;
     void (async () => {
       if (!posts.some((p) => p.id === focusPostId)) {
-        await loadPosts();
+        try {
+          const post = await api.getPostById(focusPostId);
+          setPosts(prev => [...prev, post].sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
+        } catch {
+          await loadPosts();
+        }
         if (cancelled) return;
       }
 
@@ -244,7 +249,7 @@ export function PostFeed({
             commentHighlightRef.current.scrollIntoView({ behavior: "auto", block: "center" });
             break;
           }
-          await new Promise((r) => window.setTimeout(r, 100));
+          await new Promise((r) => window.setTimeout(r, 10));
         }
       }
 

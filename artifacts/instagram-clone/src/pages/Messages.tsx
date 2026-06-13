@@ -241,6 +241,8 @@ export default function Messages() {
     messageId: string;
     url: string;
     kind: "image" | "video";
+    items?: { url: string; kind: "image" | "video"; id: string }[];
+    initialIndex?: number;
     timed: boolean;
     useVideoDuration: boolean;
     secondsLeft: number;
@@ -1849,10 +1851,23 @@ export default function Messages() {
     [user, online, requestStickToBottom],
   );
 
-  const openMediaMessage = useCallback(async (msg: ApiMessage) => {
+  const openMediaMessage = useCallback(async (msg: ApiMessage, stack?: ApiMessage[]) => {
     const viewMode = msg.mediaViewMode ?? parseMediaViewMode(msg.companionSticker);
     const timed = viewMode === "once" || viewMode === "twice";
     const allowDownload = false;
+    
+    let items: { url: string; kind: "image" | "video"; id: string }[] | undefined;
+    let initialIndex = 0;
+    if (stack && stack.length > 1 && !timed) {
+      items = stack.map((s) => {
+        const sRaw = s.type === "image" ? s.imageUrl || s.imageData : s.fileData;
+        const sDisplay = s.type === "video" ? resolveChatVideoUrl(sRaw, s.text, s.fileType) : resolveChatImageUrl(sRaw);
+        return { url: sDisplay ?? sRaw ?? "", kind: s.type as "image" | "video", id: s.id };
+      }).filter(s => !!s.url);
+      initialIndex = items.findIndex((s) => s.id === msg.id);
+      if (initialIndex < 0) initialIndex = 0;
+    }
+    
     setOpeningMediaId(msg.id);
     try {
       if (timed) {
@@ -3509,6 +3524,8 @@ export default function Messages() {
           <MediaViewerOverlay
             url={mediaViewer.url}
             kind={mediaViewer.kind}
+            items={mediaViewer.items}
+            initialIndex={mediaViewer.initialIndex}
             timed={mediaViewer.timed}
             useVideoDuration={mediaViewer.useVideoDuration}
             secondsLeft={mediaViewer.secondsLeft}
