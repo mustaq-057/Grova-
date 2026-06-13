@@ -83,8 +83,13 @@ export async function uploadMedia(dataUrl: string, contentType?: string, attempt
   const base64Data = dataUrl.replace(/^data:[^;]+;base64,/, "");
   const approxBytes = Math.floor((base64Data.length * 3) / 4);
   if (approxBytes >= BINARY_UPLOAD_MIN_BYTES) {
-    const bin = Uint8Array.from(atob(base64Data), (c) => c.charCodeAt(0));
-    return uploadMediaBinary(new Blob([bin], { type: mime }), mime);
+    const binaryString = atob(base64Data);
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    return uploadMediaBinary(new Blob([bytes], { type: mime }), mime);
   }
 
   const res = await fetch("/api/media/upload", {

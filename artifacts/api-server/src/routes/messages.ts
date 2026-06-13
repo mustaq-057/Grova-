@@ -14,7 +14,7 @@ export interface Message {
   id: string;
   senderId: string;
   text?: string;
-  type: "text" | "audio" | "heart" | "sticker" | "gif" | "image" | "video" | "file" | "location";
+  type: "text" | "audio" | "heart" | "sticker" | "gif" | "image" | "video" | "file" | "location" | "doodle";
   audioData?: string;
   gifUrl?: string;
   imageData?: string;
@@ -48,7 +48,7 @@ const router = Router();
 
 // Input validation
 function validateMessageType(type: string): type is Message["type"] {
-  return ["text", "audio", "heart", "sticker", "gif", "image", "video", "file", "location"].includes(type);
+  return ["text", "audio", "heart", "sticker", "gif", "image", "video", "file", "location", "doodle"].includes(type);
 }
 
 function validateVariant(variant: unknown): variant is Message["variant"] {
@@ -108,7 +108,7 @@ function rowToMessage(
     liked: row.liked === 1 || row.liked === true,
     deleted: row.deleted === 1 || row.deleted === true,
     deletedAt: row.deleted_at ? String(row.deleted_at) : undefined,
-    variant: row.variant ? String(row.variant) : undefined,
+    variant: validateVariant(row.variant) ? row.variant : undefined,
     companionSticker: row.companion_sticker ? String(row.companion_sticker) : undefined,
     reaction: displayReactionForViewer(row, viewerId),
     replyToId: row.reply_to_id ? String(row.reply_to_id) : undefined,
@@ -347,7 +347,7 @@ router.get("/messages/unread-count", authenticate, async (req, res) => {
 
 router.post("/messages", authenticate, validateBody({
   senderId: validators.nonEmptyString,
-  type: validators.enum(["text", "audio", "heart", "sticker", "gif", "image", "video", "file", "location"]),
+  type: validators.enum(["text", "audio", "heart", "sticker", "gif", "image", "video", "file", "location", "doodle"]),
 }), async (req, res) => {
   const body = req.body as Partial<Message>;
   const authenticatedUserId = (req as AuthenticatedRequest).user!.id;
