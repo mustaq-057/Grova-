@@ -700,6 +700,7 @@ const DoodleMessageBubble = memo(function DoodleMessageBubble({
 
       {showSheet && (
         <DoodleSheet
+          isMe={isMe}
           onClose={() => setShowSheet(false)}
           onUnsend={() => {
             setShowSheet(false);

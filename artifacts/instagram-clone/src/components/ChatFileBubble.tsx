@@ -61,7 +61,7 @@ export const ChatFileBubble = memo(function ChatFileBubble({ msg, isMe }: Props)
       >
         <div
           className={`flex items-center gap-3 ${!uploading && url ? "cursor-pointer" : ""}`}
-          role={!uploading && url ? "button" : undefined}
+          {...(!uploading && url ? { role: "button" } : {})}
           tabIndex={!uploading && url ? 0 : undefined}
           onClick={!uploading && url ? openView : undefined}
           onKeyDown={
