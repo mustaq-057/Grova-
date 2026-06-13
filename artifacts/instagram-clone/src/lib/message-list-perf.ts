@@ -9,7 +9,8 @@ function mediaUrlSig(url?: string): string {
 function messageRowSig(m: ApiMessage): string {
   const img = mediaUrlSig(m.imageUrl ?? m.imageData);
   const file = mediaUrlSig(m.fileData);
-  return `${m.id}:${m.timestamp}:${m.type}:${m.text?.length ?? 0}:${img}:${file}:${m.audioData ? 1 : 0}:${m.reaction ?? ""}:${m.deleted ? 1 : 0}:${m.seenByPartner ? 1 : 0}:${m.readAt ?? ""}:${m.read ? 1 : 0}`;
+  const vm = m.mediaViewMode ?? m.companionSticker ?? "";
+  return `${m.id}:${m.timestamp}:${m.type}:${m.text?.length ?? 0}:${img}:${file}:${m.audioData ? 1 : 0}:${m.reaction ?? ""}:${m.deleted ? 1 : 0}:${m.seenByPartner ? 1 : 0}:${m.readAt ?? ""}:${m.read ? 1 : 0}:${vm}:${m.mediaOpenCount ?? 0}:${m.mediaOpenedAt ?? ""}`;
 }
 
 /** Cheap signature to skip redundant list updates after polling. */

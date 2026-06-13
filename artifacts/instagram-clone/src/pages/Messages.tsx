@@ -43,7 +43,8 @@ import { EditMessageBar } from "@/components/EditMessageBar";
 import { defaultAvatar } from "@/lib/avatars";
 import { AvatarImage } from "@/components/AvatarImage";
 import { saveMemoryFromMessage, removeMemory } from "@/lib/memories";
-import { APP_THEME_CHANGED, getStoredAppTheme, isMoonlightSagaTheme, isCreamyMinimalTheme, getCreamyChatClass, getPremiumChatThemeClass, isPremiumAnimatedTheme, type AppThemeId } from "@/lib/app-theme";
+import { APP_THEME_CHANGED, getStoredAppTheme, isMoonlightSagaTheme, getPremiumChatThemeClass, isPremiumAnimatedTheme, type AppThemeId } from "@/lib/app-theme";
+import { useAppSearchParams } from "@/lib/app-search";
 import { ChatAuroraLayer } from "@/components/ChatAuroraLayer";
 
 import {
@@ -216,6 +217,10 @@ export default function Messages() {
   });
   const [isTyping, setIsTyping] = useState(false);
   const [appThemeId, setAppThemeId] = useState<AppThemeId>(() => getStoredAppTheme());
+  const searchParams = useAppSearchParams();
+  const highlightParam = searchParams.get("highlight");
+  const [chatAnimationsEnabled, setChatAnimationsEnabled] = useState(false);
+  const [openingMediaId, setOpeningMediaId] = useState<string | null>(null);
   const [showAppThemes, setShowAppThemes] = useState(false);
   const [showBubbleColors, setShowBubbleColors] = useState(false);
   const [replyTo, setReplyTo] = useState<ApiMessage | null>(null);
@@ -1077,8 +1082,8 @@ export default function Messages() {
               m.id === d.messageId
                 ? {
                   ...m,
-                  mediaOpenedAt: d.userId === partnerId ? d.mediaOpenedAt : m.mediaOpenedAt,
-                  mediaOpenCount: d.userId === user.id ? d.mediaOpenCount : m.mediaOpenCount,
+                  mediaOpenedAt: d.mediaOpenedAt ?? m.mediaOpenedAt,
+                  mediaOpenCount: d.mediaOpenCount ?? m.mediaOpenCount,
                 }
                 : m,
             ),
@@ -1218,6 +1223,12 @@ export default function Messages() {
   }, [user?.id]);
 
   useEffect(() => {
+    if (chatAnimationsEnabled) return;
+    const t = window.setTimeout(() => setChatAnimationsEnabled(true), 500);
+    return () => window.clearTimeout(t);
+  }, [chatAnimationsEnabled]);
+
+  useEffect(() => {
     const onTheme = () => setAppThemeId(getStoredAppTheme());
     window.addEventListener(APP_THEME_CHANGED, onTheme);
     return () => window.removeEventListener(APP_THEME_CHANGED, onTheme);
@@ -1270,14 +1281,21 @@ export default function Messages() {
     const firstPaint = isInitialLoadRef.current;
     const isOwnLast = last?.senderId === user?.id;
 
-    if (firstPaint && !pendingScrollRestoreRef.current && !firstPaintScrollDoneRef.current) {
+    if (firstPaint && !pendingScrollRestoreRef.current && !firstPaintScrollDoneRef.current && !highlightParam) {
       firstPaintScrollDoneRef.current = true;
       const container = messagesContainerRef.current;
       if (container) {
         scrollChatToBottom(container, bottomRef.current);
         isNearBottomRef.current = true;
         setHasNewMessages(false);
+        window.requestAnimationFrame(() => {
+          scrollChatToBottom(container, bottomRef.current);
+          isInitialLoadRef.current = false;
+        });
       }
+    } else if (firstPaint && highlightParam) {
+      firstPaintScrollDoneRef.current = true;
+      isInitialLoadRef.current = false;
     }
 
     const restoreAnchor = pendingScrollRestoreRef.current;
@@ -1358,19 +1376,17 @@ export default function Messages() {
 
   // Jump to pinned memory from /chat?highlight=<messageId>
   useEffect(() => {
-    if (!user) return;
-    const highlightId = new URLSearchParams(window.location.search).get("highlight");
-    if (!highlightId) return;
-    if (highlightHandledRef.current === highlightId) return;
+    if (!user || !highlightParam) return;
+    if (highlightHandledRef.current === highlightParam) return;
     if (messages.length === 0) return;
 
-    void scrollToHighlightedMessage(highlightId).then((found) => {
+    void scrollToHighlightedMessage(highlightParam).then((found) => {
       if (found) {
-        highlightHandledRef.current = highlightId;
+        highlightHandledRef.current = highlightParam;
         window.history.replaceState({}, "", "/chat");
       }
     });
-  }, [user, messages.length, scrollToHighlightedMessage]);
+  }, [user, messages.length, highlightParam, scrollToHighlightedMessage]);
 
   // Re-pin to bottom when message list height grows (images, decrypt, replies)
   useEffect(() => {
@@ -1378,6 +1394,7 @@ export default function Messages() {
     if (!container) return;
     let raf = 0;
     const ro = new ResizeObserver(() => {
+      if (isInitialLoadRef.current) return;
       if (!isNearBottomRef.current && !stickToBottomRef.current) return;
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(() => {
@@ -1819,20 +1836,24 @@ export default function Messages() {
     const viewMode = msg.mediaViewMode ?? parseMediaViewMode(msg.companionSticker);
     const timed = viewMode === "once" || viewMode === "twice";
     const allowDownload = false;
+    setOpeningMediaId(msg.id);
     try {
       if (timed) {
         const opened = await api.openMediaMessage(msg.id);
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === msg.id
-              ? {
-                ...m,
-                mediaOpenCount: opened.mediaOpenCount,
-                mediaOpenedAt: opened.mediaOpenedAt ?? m.mediaOpenedAt,
-              }
-              : m,
-          ),
-        );
+        const applyOpenedState = () => {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === msg.id
+                ? {
+                  ...m,
+                  mediaOpenCount: opened.mediaOpenCount,
+                  mediaOpenedAt: opened.mediaOpenedAt ?? m.mediaOpenedAt,
+                }
+                : m,
+            ),
+          );
+          setOpeningMediaId(null);
+        };
         const openedDisplay =
           opened.kind === "video"
             ? resolveChatVideoUrl(opened.url, msg.text, msg.fileType)
@@ -1863,8 +1884,12 @@ export default function Messages() {
               allowDownload,
               expiresAt: Date.now() + 10_000,
             });
+            applyOpenedState();
           };
-          img.onerror = () => toast.error("Could not load photo");
+          img.onerror = () => {
+            setOpeningMediaId(null);
+            toast.error("Could not load photo");
+          };
           img.src = displayUrl;
           return;
         }
@@ -1879,9 +1904,11 @@ export default function Messages() {
           mediaReady: true,
           allowDownload,
         });
+        applyOpenedState();
         return;
       }
 
+      setOpeningMediaId(null);
       const raw = msg.type === "image" ? msg.imageUrl || msg.imageData : msg.fileData;
       if (!raw) return;
       const display =
@@ -1930,6 +1957,7 @@ export default function Messages() {
       img.onerror = () => toast.error("Could not load photo");
       img.src = displayUrl;
     } catch (err) {
+      setOpeningMediaId(null);
       toast.error(err instanceof Error ? err.message : "Could not open media");
     }
   }, []);
@@ -2998,9 +3026,7 @@ export default function Messages() {
   }, [messages]);
 
   const showChatAurora = isMoonlightSagaTheme(appThemeId);
-  const premiumChatClass = "";
-  const isCreamyMinimal = isCreamyMinimalTheme(appThemeId);
-  const creamyChatClass = getCreamyChatClass(appThemeId);
+  const premiumChatClass = getPremiumChatThemeClass(appThemeId) ?? "";
 
   if (blocked) {
     return (
@@ -3027,13 +3053,13 @@ export default function Messages() {
         />
       )}
       <div
-        className={`chat-panel flex-1 min-w-0 h-full min-h-0 relative ${isCreamyMinimal ? '' : 'bg-black'} ${premiumChatClass ?? ""} ${creamyChatClass ?? ""}`}
+        className={`chat-panel flex-1 min-w-0 h-full min-h-0 relative bg-black ${premiumChatClass}`}
       >
 
 
         <div className="chat-panel-top shrink-0 z-20 flex flex-col relative">
           {/* ── Header ── */}
-          <div className={`chat-panel-header flex items-center gap-1.5 sm:gap-2 px-1.5 sm:px-3 py-1 sm:py-1.5 border-b shrink-0 ${isCreamyMinimal ? 'text-[#3D2E1F]' : 'text-white'}`}>
+          <div className="chat-panel-header flex items-center gap-1.5 sm:gap-2 px-1.5 sm:px-3 py-1 sm:py-1.5 border-b shrink-0 text-white">
             <div className="relative shrink-0">
               <AvatarImage src={pAvatar} userId={partnerId} alt={pName} className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover" />
               {presence.online && (
@@ -3063,11 +3089,10 @@ export default function Messages() {
 
 
               <button
-                onClick={() => !isCreamyMinimal && setShowBubbleColors(true)}
-                disabled={isCreamyMinimal}
-                className={`p-1.5 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 active:scale-95 text-muted-foreground hover:text-foreground hover:bg-secondary ${isCreamyMinimal ? 'opacity-30 cursor-not-allowed' : ''}`}
+                onClick={() => setShowBubbleColors(true)}
+                className="p-1.5 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 active:scale-95 text-muted-foreground hover:text-foreground hover:bg-secondary"
                 aria-label="Chat Colors"
-                title={isCreamyMinimal ? 'Bubble colors are set by the Creamy Minimal theme' : 'Chat Colors'}
+                title="Chat Colors"
               >
                 <Palette className="w-4 h-4" strokeWidth={1.5} />
               </button>
@@ -3163,6 +3188,8 @@ export default function Messages() {
                     onMediaCommitted={handleMediaCommitted}
                     replySource={msg.replyToId ? messageById.get(msg.replyToId) : undefined}
                     onJumpToMessage={jumpToMessage}
+                    animateEntrance={chatAnimationsEnabled}
+                    openingMedia={openingMediaId === msg.id}
                   />
                 );
               })}
@@ -3277,6 +3304,8 @@ export default function Messages() {
                           onMediaCommitted={handleMediaCommitted}
                           replySource={msg.replyToId ? messageById.get(msg.replyToId) : undefined}
                           onJumpToMessage={jumpToMessage}
+                          animateEntrance={chatAnimationsEnabled}
+                          openingMedia={openingMediaId === msg.id}
                         />
                       </div>,
                     );

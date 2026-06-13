@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useFeatureLoading } from "@/hooks/useFeatureLoading";
+import { useAppSearchParams } from "@/lib/app-search";
 import { Heart, MessageCircle, ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
 import { api, type ApiCheckin } from "@/lib/api";
@@ -39,22 +40,21 @@ export default function DailyCheckin() {
   const [mood, setMood] = useState<"happy" | "neutral" | "sad">("happy");
   const [submitting, setSubmitting] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
-
-  const [highlightId, setHighlightId] = useState<string | null>(null);
+  const searchParams = useAppSearchParams();
+  const highlightId = searchParams.get("highlight");
 
   useEffect(() => {
     loadCheckins();
     setQuestion(dailyQuestions[currentIndex]);
-    const id = new URLSearchParams(window.location.search).get("highlight");
-    if (id) setHighlightId(id);
   }, []);
 
   useEffect(() => {
     if (!highlightId || checkins.length === 0) return;
     const el = document.querySelector(`[data-testid="checkin-${highlightId}"]`);
     if (!el) return;
-    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.scrollIntoView({ behavior: "auto", block: "center" });
     el.classList.add("ring-2", "ring-primary", "ring-offset-2");
+    window.history.replaceState({}, "", "/checkin");
   }, [checkins, highlightId]);
 
   const loadCheckins = async () => {

@@ -12,6 +12,7 @@ type EphemeralMediaBubbleProps = {
   sentAt: string;
   onOpen?: () => void;
   disabled?: boolean;
+  opening?: boolean;
 };
 
 function formatBubbleTime(ts: string): string {
@@ -53,14 +54,15 @@ export const EphemeralMediaBubble = memo(function EphemeralMediaBubble({
   sentAt,
   onOpen,
   disabled,
+  opening = false,
 }: EphemeralMediaBubbleProps) {
   const label = kind === "photo" ? "Photo" : "Video";
   const count = viewMode === "once" ? 1 : 2;
 
-  const isOpenedState = isMe ? wasOpened : viewsRemaining <= 0;
-  const canOpen = !isMe && viewsRemaining > 0 && !disabled;
+  const isOpenedState = opening ? false : isMe ? wasOpened : viewsRemaining <= 0;
+  const canOpen = !isMe && viewsRemaining > 0 && !disabled && !opening;
 
-  const title = isOpenedState ? "Opened" : label;
+  const title = opening ? "Opening…" : isOpenedState ? "Opened" : label;
 
   const timeLabel = formatBubbleTime(isOpenedState && openedAt ? openedAt : sentAt);
 
@@ -89,7 +91,7 @@ export const EphemeralMediaBubble = memo(function EphemeralMediaBubble({
         {isMe && wasOpened && openedAt && (
           <p className="text-[11px] text-white/45 mt-0.5">Opened {formatBubbleTime(openedAt)}</p>
         )}
-        {!isMe && !isOpenedState && viewsRemaining > 0 && (
+        {!isMe && !isOpenedState && !opening && viewsRemaining > 0 && (
           <p className="text-[11px] text-[#00a884]/90 mt-0.5 font-medium">
             {viewsRemaining} {viewsRemaining === 1 ? "view" : "views"} left · tap to open
           </p>

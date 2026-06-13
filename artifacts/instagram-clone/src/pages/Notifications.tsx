@@ -117,7 +117,7 @@ export default memo(function Notifications() {
   const openNotification = useCallback(
     (n: AppNotification) => {
       const path = n.targetPath || defaultPath(n.type);
-      if (path.startsWith("/?") || (path.includes("?post="))) {
+      if (path.includes("?")) {
         navigateWithSearch(path);
         setLocation(path.split("?")[0] || "/");
       } else {

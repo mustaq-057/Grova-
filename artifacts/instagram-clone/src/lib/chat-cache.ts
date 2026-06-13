@@ -1,4 +1,5 @@
 import type { ApiMessage } from "./api";
+import { isEphemeralMedia } from "./message-utils";
 import { readSessionSnapshot } from "./profile-cache";
 
 const CACHE_VERSION = 1;
@@ -24,6 +25,7 @@ function keepUrlField(value?: string): string | undefined {
 
 /** Strip heavy blobs so sessionStorage stays small and fast to parse. */
 function slimMessage(m: ApiMessage): ApiMessage {
+  const ephemeral = isEphemeralMedia(m);
   return {
     id: m.id,
     senderId: m.senderId,
@@ -39,10 +41,10 @@ function slimMessage(m: ApiMessage): ApiMessage {
     replyToText: m.replyToText,
     replyToSenderId: m.replyToSenderId,
     gifUrl: m.gifUrl,
-    imageUrl: keepUrlField(m.imageUrl),
-    imageData: keepUrlField(m.imageData),
+    imageUrl: ephemeral ? undefined : keepUrlField(m.imageUrl),
+    imageData: ephemeral ? undefined : keepUrlField(m.imageData),
     audioData: keepUrlField(m.audioData),
-    fileData: keepUrlField(m.fileData),
+    fileData: ephemeral ? undefined : keepUrlField(m.fileData),
     fileType: m.fileType,
     fileSize: m.fileSize,
     location: m.location,
@@ -51,6 +53,7 @@ function slimMessage(m: ApiMessage): ApiMessage {
     pinned: m.pinned,
     mediaViewMode: m.mediaViewMode,
     mediaOpenCount: m.mediaOpenCount,
+    mediaOpenedAt: m.mediaOpenedAt,
   };
 }
 

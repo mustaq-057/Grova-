@@ -76,7 +76,7 @@ router.post("/tasks", rateLimiters.messages, authenticate, async (req, res) => {
       author,
       fromName,
       `added a new task: ${title}`,
-      "/tasks",
+      `/tasks?highlight=${id}`,
     ).catch(() => {});
 
     res.json(task);

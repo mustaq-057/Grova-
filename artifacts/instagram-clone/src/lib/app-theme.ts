@@ -5,8 +5,7 @@ import { loadPersistedDarkMode, persistDarkMode } from "./couple-prefs-persist";
 export type AppThemeId =
   | "sakura-fall"
   | "sara-lavender"
-  | "moonlight-saga"
-  | "creamy-minimal";
+  | "moonlight-saga";
 
 const PREMIUM_ANIMATED_THEMES: AppThemeId[] = ["moonlight-saga"];
 
@@ -17,6 +16,7 @@ const RETIRED_THEME_ALIASES: Record<string, AppThemeId> = {
   "moonlit-blossom": "moonlight-saga",
   "book-bouquet": "sara-lavender",
   grova: "sara-lavender",
+  "creamy-minimal": "sara-lavender",
 };
 
 const THEME_BACKGROUNDS: Partial<Record<AppThemeId, string>> = {
@@ -100,28 +100,7 @@ export const APP_THEMES: {
         "--app-border": "210 18% 85%",
       },
     },
-    {
-      id: "creamy-minimal",
-      name: "Creamy Minimal",
-      description: "Simple. Clean. Elegant. \u{1F90E}",
-      swatch: "bg-gradient-to-br from-amber-100 via-orange-50 to-yellow-50",
-      dark: {
-        "--app-background": "30 15% 10%",
-        "--app-foreground": "35 25% 90%",
-        "--app-primary": "32 40% 60%",
-        "--app-card": "30 12% 14%",
-        "--app-secondary": "30 10% 18%",
-        "--app-border": "30 8% 22%",
-      },
-      light: {
-        "--app-background": "32 30% 93%",
-        "--app-foreground": "25 30% 18%",
-        "--app-primary": "32 35% 64%",
-        "--app-card": "35 40% 97%",
-        "--app-secondary": "33 25% 90%",
-        "--app-border": "30 18% 84%",
-      },
-    },
+
   ];
 
 let currentAppTheme: AppThemeId = "sara-lavender";
@@ -209,14 +188,6 @@ export function getPremiumChatThemeClass(themeId?: AppThemeId): string | null {
 
 export function isSaraLavenderTheme(themeId?: AppThemeId): boolean {
   return (themeId ?? getStoredAppTheme()) === "sara-lavender";
-}
-
-export function isCreamyMinimalTheme(themeId?: AppThemeId): boolean {
-  return (themeId ?? getStoredAppTheme()) === "creamy-minimal";
-}
-
-export function getCreamyChatClass(themeId?: AppThemeId): string | null {
-  return isCreamyMinimalTheme(themeId) ? "creamy-minimal-chat" : null;
 }
 
 export function getThemeBackgroundUrl(themeId?: AppThemeId): string | null {

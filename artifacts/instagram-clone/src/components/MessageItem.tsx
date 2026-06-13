@@ -57,6 +57,8 @@ export interface MessageItemProps {
   onOpenMedia?: (msg: ApiMessage) => void;
   replySource?: ApiMessage;
   onJumpToMessage?: (messageId: string) => void;
+  animateEntrance?: boolean;
+  openingMedia?: boolean;
 }
 
 export const MessageItem = memo(function MessageItem({
@@ -80,6 +82,8 @@ export const MessageItem = memo(function MessageItem({
   onOpenMedia,
   replySource,
   onJumpToMessage,
+  animateEntrance = true,
+  openingMedia = false,
 }: MessageItemProps) {
   const sameSender = prevMsg?.senderId === msg.senderId;
   const [showReactions, setShowReactions] = useState(false);
@@ -282,7 +286,7 @@ export const MessageItem = memo(function MessageItem({
   const mediaLimit = viewMode === "once" ? 1 : viewMode === "twice" ? 2 : 0;
   const mediaOpenedCount = msg.mediaOpenCount ?? 0;
   const mediaRemaining = Math.max(0, mediaLimit - mediaOpenedCount);
-  const showEphemeralBubble = mediaLimit > 0 && (isImage || isVideo);
+  const showEphemeralBubble = isEphemeralMedia(msg) && (isImage || isVideo);
   const mediaWasOpened = Boolean(msg.mediaOpenedAt);
 
   const bubbleContent = (
@@ -310,6 +314,7 @@ export const MessageItem = memo(function MessageItem({
             wasOpened={mediaWasOpened}
             openedAt={msg.mediaOpenedAt}
             sentAt={msg.timestamp}
+            opening={openingMedia}
             onOpen={() => onOpenMedia?.(msg)}
           />
         ) : imageDisplaySrc && !imageLoadFailed ? (
@@ -354,6 +359,7 @@ export const MessageItem = memo(function MessageItem({
             wasOpened={mediaWasOpened}
             openedAt={msg.mediaOpenedAt}
             sentAt={msg.timestamp}
+            opening={openingMedia}
             onOpen={() => onOpenMedia?.(msg)}
           />
         ) : videoDisplaySrc?.startsWith("blob:") ? (
@@ -466,9 +472,9 @@ export const MessageItem = memo(function MessageItem({
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.95, y: 15 }}
+      initial={animateEntrance ? { opacity: 0, scale: 0.95, y: 15 } : false}
       animate={{ opacity: 1, scale: 1, y: 0 }}
-      transition={{ type: "spring", stiffness: 400, damping: 28 }}
+      transition={animateEntrance ? { type: "spring", stiffness: 400, damping: 28 } : { duration: 0 }}
       className={`group flex items-end gap-2 mb-1 min-w-0 max-w-full ${isMe ? "flex-row-reverse" : "flex-row"}`}
       data-testid={`message-${msg.id}`}
       onMouseEnter={() => setHovered(true)}

@@ -141,12 +141,13 @@ router.put("/couple/notes", rateLimiters.messages, authenticate, async (req: Aut
 });
 
 /** Shared activity feed / notifications for both partners. */
-router.get("/couple/activity", rateLimiters.read, authenticate, async (_req, res) => {
+router.get("/couple/activity", rateLimiters.read, authenticate, async (req, res) => {
+  const userId = (req as { user?: { id: string } }).user!.id;
   try {
     const [result, profilesResult] = await Promise.all([
       db.execute(
-        "SELECT id, type, actor_id, from_name, text, timestamp, read, target_path FROM activity_feed ORDER BY timestamp DESC LIMIT 50",
-        [],
+        "SELECT id, type, actor_id, from_name, text, timestamp, read, target_path FROM activity_feed WHERE actor_id != $1 ORDER BY timestamp DESC LIMIT 50",
+        [userId],
       ),
       db.execute("SELECT id, name FROM profiles WHERE id IN ('me', 'wife')", []),
     ]);

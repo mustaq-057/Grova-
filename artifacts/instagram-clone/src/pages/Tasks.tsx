@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useFeatureLoading } from "@/hooks/useFeatureLoading";
+import { useAppSearchParams } from "@/lib/app-search";
 import { Plus, Trash2, CheckCircle2, Circle, ListTodo, X, ChevronDown } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -102,10 +103,24 @@ export default function Tasks() {
   const [assignedTo, setAssignedTo] = useState<string>("both");
   const [priority, setPriority] = useState<"low" | "medium" | "high">("medium");
   const [submitting, setSubmitting] = useState(false);
+  const searchParams = useAppSearchParams();
+  const highlightId = searchParams.get("highlight");
+  const highlightHandledRef = useRef<string | null>(null);
 
   useEffect(() => {
     loadTasks();
   }, []);
+
+  useEffect(() => {
+    if (!highlightId || tasks.length === 0) return;
+    if (highlightHandledRef.current === highlightId) return;
+    const el = document.querySelector(`[data-testid="task-${highlightId}"]`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "auto", block: "center" });
+    el.classList.add("ring-2", "ring-primary", "ring-offset-2");
+    highlightHandledRef.current = highlightId;
+    window.history.replaceState({}, "", "/tasks");
+  }, [tasks, highlightId]);
 
   const loadTasks = async () => {
     try {

@@ -1,4 +1,4 @@
-import { useEffect, useState, memo } from "react";
+import { useEffect, useState, memo, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { useShowPresence } from "@/hooks/usePresenceLabel";
 import { Home, MessageCircle, PlusSquare, Settings, BookOpen, Heart, Bell, Calendar as CalendarIcon, Sparkles, ListTodo, Star, Shield, Menu } from "lucide-react";
@@ -90,6 +90,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (location === "/chat") markChatOpened();
+  }, [location]);
+
+  const mainScrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (location === "/chat") return;
+    mainScrollRef.current?.scrollTo({ top: 0, left: 0, behavior: "auto" });
   }, [location]);
 
   // Warm chat cache before opening /chat so messages paint instantly
@@ -190,14 +196,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Main content area */}
       {isChat ? (
-        <main className="flex-1 overflow-hidden relative pb-16 sm:pb-14 md:pb-0">
+        <main className="flex-1 overflow-hidden relative min-h-0 h-full md:pb-0">
           {children}
         </main>
       ) : (
         <main
           className={`flex-1 overflow-hidden relative z-10 ${showThemeBg ? "bg-background/88 backdrop-blur-sm" : ""}`}
         >
-          <div className="h-full overflow-y-auto pb-20 sm:pb-16 md:pb-0 scrollbar-thin scrollbar-thumb-primary/40 scrollbar-track-transparent">
+          <div ref={mainScrollRef} className="h-full overflow-y-auto pb-20 sm:pb-16 md:pb-0 scrollbar-thin scrollbar-thumb-primary/40 scrollbar-track-transparent">
             {children}
           </div>
         </main>

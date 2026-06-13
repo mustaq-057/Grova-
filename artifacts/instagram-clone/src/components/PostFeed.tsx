@@ -230,13 +230,13 @@ export function PostFeed({
 
       const postEl = await waitForElement(`[data-testid="post-${focusPostId}"]`);
       if (cancelled) return;
-      postEl?.scrollIntoView({ behavior: "smooth", block: "center" });
+      postEl?.scrollIntoView({ behavior: "auto", block: "center" });
 
       if (focusCommentId) {
         for (let i = 0; i < 20; i++) {
           if (cancelled) return;
           if (commentHighlightRef.current) {
-            commentHighlightRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+            commentHighlightRef.current.scrollIntoView({ behavior: "auto", block: "center" });
             break;
           }
           await new Promise((r) => window.setTimeout(r, 100));

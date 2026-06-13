@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useFeatureLoading } from "@/hooks/useFeatureLoading";
+import { useAppSearchParams } from "@/lib/app-search";
 import { Plus, Trash2, Calendar as CalendarIcon, Clock, Heart, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { motion } from "framer-motion";
 import { api, type ApiEvent } from "@/lib/api";
@@ -23,12 +24,16 @@ export default function Calendar() {
   const [deleting, setDeleting] = useState(false);
 
   const [highlightEventId, setHighlightEventId] = useState<string | null>(null);
+  const searchParams = useAppSearchParams();
+  const eventParam = searchParams.get("event");
 
   useEffect(() => {
     loadEvents();
-    const id = new URLSearchParams(window.location.search).get("event");
-    if (id) setHighlightEventId(id);
   }, []);
+
+  useEffect(() => {
+    if (eventParam) setHighlightEventId(eventParam);
+  }, [eventParam]);
 
   const loadEvents = async () => {
     try {
@@ -45,8 +50,9 @@ export default function Calendar() {
     if (!highlightEventId || events.length === 0) return;
     const el = document.querySelector(`[data-testid="event-${highlightEventId}"]`);
     if (!el) return;
-    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.scrollIntoView({ behavior: "auto", block: "center" });
     el.classList.add("ring-2", "ring-primary", "ring-offset-2");
+    window.history.replaceState({}, "", "/calendar");
   }, [events, highlightEventId]);
 
   const handleAdd = async (e: React.FormEvent) => {
