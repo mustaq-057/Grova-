@@ -56,6 +56,7 @@ export function mergeOptimisticWithServer(optimistic: ApiMessage, server: ApiMes
     fileSize: server.fileSize ?? optimistic.fileSize,
     companionSticker: server.companionSticker ?? optimistic.companionSticker,
     mediaViewMode: server.mediaViewMode ?? optimistic.mediaViewMode,
+    fontStyle: server.fontStyle ?? optimistic.fontStyle,
   };
 }
 
@@ -122,6 +123,7 @@ export function mergeMessagesById(existing: ApiMessage[], incoming: ApiMessage[]
       readAt: prev.readAt ?? m.readAt,
       seenByPartner: m.seenByPartner || prev.seenByPartner,
       reaction: m.reaction ?? prev.reaction,
+      fontStyle: m.fontStyle ?? prev.fontStyle,
     });
   }
   return Array.from(map.values()).sort(
