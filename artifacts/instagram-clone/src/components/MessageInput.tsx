@@ -43,7 +43,7 @@ interface MessageInputProps {
 
 type OpenPicker = "emoji" | "sticker" | "greeting" | null;
 
-export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>(function MessageInput({
+export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputProps>(function MessageInput({
   onSendMessage,
   onInputActivity,
   onShareLocation,
@@ -71,11 +71,11 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const genericFileInputRef = useRef<HTMLInputElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const lastSentTimeRef = useRef<number>(0);
   const { theme } = useChatTheme();
 
-  useImperativeHandle(ref, () => inputRef.current as HTMLInputElement);
+  useImperativeHandle(ref, () => inputRef.current as HTMLTextAreaElement);
 
   // Avoid auto-focus on mobile — it pops the keyboard and causes scroll flicker.
   useEffect(() => {
@@ -94,11 +94,16 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
     lastSentTimeRef.current = now;
 
     setInput("");
+    if (inputRef.current) inputRef.current.style.height = 'auto';
     onSendMessage(text, fontStyle);
   }, [input, disabled, recording, onSendMessage, fontStyle]);
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
+      const isMobile = window.matchMedia("(max-width: 767px)").matches;
+      if (isMobile) {
+        return; // Allow newline on mobile
+      }
       if (e.repeat) return; // Guard against Enter keydown repeat
       e.preventDefault();
       submitMessage();
@@ -106,7 +111,7 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
   }, [submitMessage]);
 
   const handlePaste = useCallback(
-    (e: React.ClipboardEvent<HTMLInputElement>) => {
+    (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
       if (recording || disabled) return;
 
       const runPicked = (picked: { file: File; itemType?: string }[]) => {
@@ -138,10 +143,13 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   }, []);
 
-  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
     setInput(value);
     onInputActivity?.(value);
+    
+    e.target.style.height = 'auto';
+    e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
   }, [setInput, onInputActivity]);
 
   const handleImageClick = useCallback(() => {
@@ -305,23 +313,27 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
   );
 
   const textInput = (
-    <input
+    <textarea
       ref={inputRef}
-      type="text"
       inputMode="text"
-      enterKeyHint="enter"
       autoComplete="off"
       autoCorrect="on"
+      rows={1}
       value={input}
       onChange={handleInputChange}
       onKeyDown={handleKeyDown}
       onPaste={handlePaste}
       onClick={() => inputRef.current?.focus()}
       placeholder="Message..."
-      className={`flex-1 w-0 min-w-0 bg-transparent text-[17px] placeholder-[#888] text-white focus:outline-none border-none ${
+      className={`flex-1 w-0 min-w-0 bg-transparent text-[17px] placeholder-[#888] text-white focus:outline-none border-none resize-none m-0 p-0 block overflow-y-auto ${
         disabled || recording ? "opacity-60 cursor-not-allowed" : ""
       }`}
-      style={getFontStyleStyles(fontStyle) ?? { fontFamily: "inherit" }}
+      style={{
+        ...(getFontStyleStyles(fontStyle) ?? { fontFamily: "inherit" }),
+        minHeight: '24px',
+        maxHeight: '120px',
+        lineHeight: '24px'
+      }}
       disabled={disabled || recording}
       aria-label="Message input"
     />
