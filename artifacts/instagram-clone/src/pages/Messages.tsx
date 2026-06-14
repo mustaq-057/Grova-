@@ -340,7 +340,12 @@ export default function Messages() {
       field: "imageUrl" | "imageData" | "fileData",
       remoteUrl: string,
     ) => {
-      setMessages((prev) => commitRemoteMediaUrl(prev, messageId, field, remoteUrl));
+      setMessages((prev) => {
+        const next = commitRemoteMediaUrl(prev, messageId, field, remoteUrl);
+        const uid = userIdRef.current;
+        if (uid) writeChatCache(uid, filterMessagesForCache(uid, next));
+        return next;
+      });
       if (isNearBottomRef.current || stickToBottomRef.current) {
         requestAnimationFrame(() => {
           scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
