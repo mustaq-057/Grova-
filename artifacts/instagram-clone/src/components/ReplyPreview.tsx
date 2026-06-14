@@ -49,7 +49,16 @@ export const ReplyPreview = memo(function ReplyPreview({
           <p className="text-[11px] font-semibold text-primary uppercase tracking-wide">
             Replying to {who}
           </p>
-          <p className="text-[13px] text-white/75 mt-0.5 whitespace-pre-wrap break-words line-clamp-2">
+          <p 
+            className="text-[13px] text-white/75 mt-0.5 whitespace-pre-wrap break-words line-clamp-2"
+            style={
+              replyTo.fontStyle === "edo" 
+                ? { fontFamily: "'Edo SZ', 'Edo', sans-serif", fontStyle: "normal", fontWeight: "normal" } 
+                : replyTo.fontStyle === "italian" 
+                  ? { fontFamily: "'Playfair Display', serif", fontStyle: "italic", fontWeight: 700 } 
+                  : undefined
+            }
+          >
             {preview}
           </p>
         </div>

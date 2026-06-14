@@ -568,7 +568,16 @@ export const MessageItem = memo(function MessageItem({
                     <span className="text-base opacity-60">📷</span>
                   </div>
                 ) : null}
-                <span className="flex-1 min-w-0 text-[13px] sm:text-[14px] text-white/80 whitespace-pre-wrap break-words line-clamp-3">
+                <span 
+                  className="flex-1 min-w-0 text-[13px] sm:text-[14px] text-white/80 whitespace-pre-wrap break-words line-clamp-3"
+                  style={
+                    replySource?.fontStyle === "edo" 
+                      ? { fontFamily: "'Edo SZ', 'Edo', sans-serif", fontStyle: "normal", fontWeight: "normal" } 
+                      : replySource?.fontStyle === "italian" 
+                        ? { fontFamily: "'Playfair Display', serif", fontStyle: "italic", fontWeight: 700 } 
+                        : undefined
+                  }
+                >
                   {replySource ? replyPreviewLabel(replySource) : quotedText}
                 </span>
               </div>
