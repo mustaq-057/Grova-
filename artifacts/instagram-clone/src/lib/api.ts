@@ -163,6 +163,8 @@ export type ApiMessage = {
   replyToId?: string;
   replyToText?: string;
   replyToSenderId?: string;
+  replyToImageUrl?: string;
+  replyToFontStyle?: string;
   pinned?: boolean;
   threadId?: string;
   threadParentId?: string;
