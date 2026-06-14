@@ -215,11 +215,12 @@ export function PostFeed({
 
 
   useEffect(() => {
-    focusHandledRef.current = null;
-  }, [focusPostId, focusCommentId]);
+    if (!focusPostId) {
+      focusHandledRef.current = null;
+      return;
+    }
+    if (posts.length === 0) return;
 
-  useEffect(() => {
-    if (!focusPostId || posts.length === 0) return;
     const focusKey = `${focusPostId}:${focusCommentId ?? ""}`;
     if (focusHandledRef.current === focusKey) return;
 
@@ -235,7 +236,9 @@ export function PostFeed({
         if (cancelled) return;
       }
 
-      await openComments(focusPostId);
+      if (focusCommentId) {
+        await openComments(focusPostId);
+      }
       if (cancelled) return;
 
       const postEl = await waitForElement(`[data-testid="post-${focusPostId}"]`);

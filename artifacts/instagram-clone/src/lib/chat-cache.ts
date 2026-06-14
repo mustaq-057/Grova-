@@ -55,6 +55,8 @@ function slimMessage(m: ApiMessage): ApiMessage {
     mediaOpenCount: m.mediaOpenCount,
     mediaOpenedAt: m.mediaOpenedAt,
     fontStyle: m.fontStyle,
+    replyToFontStyle: m.replyToFontStyle,
+    replyToImageUrl: m.replyToImageUrl,
   };
 }
 

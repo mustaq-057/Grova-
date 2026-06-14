@@ -172,6 +172,8 @@ export type ApiMessage = {
   mediaOpenedAt?: string;
   clientUniqueId?: string;
   fontStyle?: "default" | "edo" | "italian" | "allura";
+  replyToFontStyle?: "default" | "edo" | "italian" | "allura";
+  replyToImageUrl?: string;
 };
 
 export type ApiDua = {

@@ -202,10 +202,14 @@ export const MessageItem = memo(function MessageItem({
   const hasReply = Boolean(quotedText);
 
   const replyThumbSrc = useMemo(() => {
-    if (!replySource || (replySource.type !== "image" && replySource.type !== "doodle")) return undefined;
-    if (isEphemeralMedia(replySource)) return undefined;
-    return resolveChatImageUrl(replySource.imageUrl || replySource.imageData);
-  }, [replySource]);
+    const rawUrl = replySource
+      ? (replySource.imageUrl || replySource.imageData)
+      : msg.replyToImageUrl;
+    const type = replySource ? replySource.type : (msg.replyToImageUrl ? "image" : undefined);
+    if (!rawUrl || (type !== "image" && type !== "doodle")) return undefined;
+    if (replySource && isEphemeralMedia(replySource)) return undefined;
+    return resolveChatImageUrl(rawUrl);
+  }, [replySource, msg.replyToImageUrl]);
 
   const showReplyPhoto = Boolean(replyThumbSrc);
 

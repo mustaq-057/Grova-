@@ -58,6 +58,8 @@ export interface Message {
   mediaOpenCount?: number;
   mediaOpenedAt?: string;
   fontStyle?: "default" | "edo" | "italian" | "allura";
+  replyToFontStyle?: "default" | "edo" | "italian" | "allura";
+  replyToImageUrl?: string;
 }
 
 const router = Router();
@@ -142,6 +144,8 @@ function rowToMessage(
     readAt: partnerRead,
     seenByPartner: Boolean(partnerRead),
     fontStyle: row.font_style ? (row.font_style as Message["fontStyle"]) : undefined,
+    replyToFontStyle: row.reply_to_font_style ? (row.reply_to_font_style as Message["replyToFontStyle"]) : undefined,
+    replyToImageUrl: row.reply_to_image_url ? String(row.reply_to_image_url) : undefined,
   };
 }
 
@@ -389,6 +393,8 @@ router.post("/messages", authenticate, validateBody({
     replyToText,
     replyToSenderId,
     fontStyle,
+    replyToFontStyle,
+    replyToImageUrl,
   } = body;
 
   if (senderId !== authenticatedUserId) {
@@ -445,8 +451,8 @@ router.post("/messages", authenticate, validateBody({
 
   try {
     await db.execute(
-      `INSERT INTO messages (id, sender_id, text, type, audio_data, gif_url, image_data, image_url, file_data, file_type, file_size, location, timestamp, liked, deleted, variant, companion_sticker, reply_to_id, reply_to_text, reply_to_sender_id, font_style)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO messages (id, sender_id, text, type, audio_data, gif_url, image_data, image_url, file_data, file_type, file_size, location, timestamp, liked, deleted, variant, companion_sticker, reply_to_id, reply_to_text, reply_to_sender_id, font_style, reply_to_font_style, reply_to_image_url)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         senderId!,
@@ -469,6 +475,8 @@ router.post("/messages", authenticate, validateBody({
         encryptedReplyText ?? null,
         replyToSenderId ?? null,
         fontStyle ?? null,
+        replyToFontStyle ?? null,
+        replyToImageUrl ?? null,
       ]
     );
     const msg: Message = {
@@ -492,6 +500,8 @@ router.post("/messages", authenticate, validateBody({
       replyToText,
       replyToSenderId,
       fontStyle,
+      replyToFontStyle,
+      replyToImageUrl,
     };
 
     const partnerId = senderId === "me" ? "wife" : "me";

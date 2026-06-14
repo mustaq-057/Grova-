@@ -117,6 +117,8 @@ export async function prepareOutgoingMessage(
     replyToText: partial.replyToText,
     replyToSenderId: partial.replyToSenderId,
     fontStyle: partial.fontStyle,
+    replyToFontStyle: partial.replyToFontStyle,
+    replyToImageUrl: partial.replyToImageUrl,
   };
 }
 
@@ -156,7 +158,7 @@ export function collectImageStack(
     if (isEphemeralMedia(m)) break;
     const prev = stack[stack.length - 1]!;
     const gap = new Date(m.timestamp).getTime() - new Date(prev.timestamp).getTime();
-    if (gap > 5_000) break;
+    if (gap > 30_000) break;
     stack.push(m);
     i++;
     if (stack.length >= 10) break;
@@ -206,6 +208,8 @@ export function buildOptimisticMessage(
     replyToSenderId: partial.replyToSenderId,
     mediaViewMode: ephemeral ? mediaViewMode : partial.mediaViewMode,
     fontStyle: partial.fontStyle,
+    replyToFontStyle: partial.replyToFontStyle,
+    replyToImageUrl: partial.replyToImageUrl,
   };
 }
 

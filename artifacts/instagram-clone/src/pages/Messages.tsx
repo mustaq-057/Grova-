@@ -1976,6 +1976,8 @@ export default function Messages() {
         replyToId: replyTo.id,
         replyToText: replyPreviewLabel(replyTo).slice(0, 200),
         replyToSenderId: replyTo.senderId,
+        replyToFontStyle: replyTo.fontStyle,
+        replyToImageUrl: replyTo.type === "image" || replyTo.type === "doodle" ? (replyTo.imageUrl || replyTo.imageData) : undefined,
       }
       : {};
     setReplyTo(null);
@@ -2174,22 +2176,55 @@ export default function Messages() {
 
   const deleteMessage = useCallback(async (id: string) => {
     try {
-      const deleted = await api.deleteMessage(id);
+      const index = messages.findIndex(m => m.id === id);
+      if (index === -1) return;
+      const targetMsg = messages[index];
+      let idsToDelete = [id];
+      if (targetMsg.type === "image" && !targetMsg.pinned && !targetMsg.replyToId && !targetMsg.deleted) {
+        const { stack } = collectImageStack(messages, index);
+        if (stack.length > 1) {
+          idsToDelete = stack.map(m => m.id);
+        }
+      }
+
+      const results = await Promise.all(
+        idsToDelete.map(async (msgId) => {
+          const deleted = await api.deleteMessage(msgId);
+          return { id: msgId, deleted };
+        })
+      );
+
       setMessages((prev) => {
-        const found = prev.find(m => m.id === id);
-        if (!found) return prev;
-        return prev.map((m) =>
-          m.id === id ? { ...m, ...deleted, deleted: true, text: undefined, audioData: undefined } : m,
-        );
+        const next = prev.map((m) => {
+          const res = results.find(r => r.id === m.id);
+          if (res) {
+            return {
+              ...m,
+              ...res.deleted,
+              deleted: true,
+              text: undefined,
+              audioData: undefined,
+              imageUrl: undefined,
+              imageData: undefined,
+            };
+          }
+          return m;
+        });
+        if (user?.id) writeChatCache(user.id, filterMessagesForCache(user.id, next));
+        return next;
       });
     } catch (err) {
       const message = unsendErrorMessage(err);
       if (err instanceof Error && /not found/i.test(err.message)) {
-        setMessages((prev) => prev.filter((m) => m.id !== id));
+        setMessages((prev) => {
+          const next = prev.filter((m) => m.id !== id);
+          if (user?.id) writeChatCache(user.id, filterMessagesForCache(user.id, next));
+          return next;
+        });
       }
       window.alert(message);
     }
-  }, []);
+  }, [messages, user?.id]);
 
   const sendHeart = useCallback(() => sendMsg({ text: "♥", type: "heart" }), [sendMsg]);
 
