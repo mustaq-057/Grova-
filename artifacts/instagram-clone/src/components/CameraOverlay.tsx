@@ -100,7 +100,7 @@ export function CameraOverlay({ onClose, onCapture }: CameraOverlayProps) {
     }
     
     if (vintageMode) {
-      ctx.filter = "sepia(0.8) contrast(1.4) saturate(0.5) brightness(0.9) hue-rotate(-15deg)";
+      ctx.filter = "sepia(0.4) contrast(1.1) saturate(1.2) brightness(1.05) hue-rotate(-5deg)";
     }
     
     ctx.drawImage(video, sx, sy, cw, ch, 0, 0, cw, ch);
@@ -109,9 +109,9 @@ export function CameraOverlay({ onClose, onCapture }: CameraOverlayProps) {
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.filter = "none";
       
-      const gradient = ctx.createRadialGradient(cw/2, ch/2, cw * 0.3, cw/2, ch/2, Math.max(cw, ch) * 0.7);
+      const gradient = ctx.createRadialGradient(cw/2, ch/2, cw * 0.4, cw/2, ch/2, Math.max(cw, ch) * 0.8);
       gradient.addColorStop(0, "rgba(0,0,0,0)");
-      gradient.addColorStop(1, "rgba(0,0,0,0.7)");
+      gradient.addColorStop(1, "rgba(0,0,0,0.3)");
       ctx.fillStyle = gradient;
       ctx.fillRect(0, 0, cw, ch);
 
@@ -122,11 +122,6 @@ export function CameraOverlay({ onClose, onCapture }: CameraOverlayProps) {
       ctx.fillStyle = "rgba(0, 0, 0, 0.08)";
       for (let i = 0; i < 1500; i++) {
         ctx.fillRect(Math.random() * cw, Math.random() * ch, 3, 3);
-      }
-
-      ctx.fillStyle = "rgba(0, 0, 0, 0.1)";
-      for (let y = 0; y < ch; y += 4) {
-        ctx.fillRect(0, y, cw, 2);
       }
 
       ctx.fillStyle = "#ff9900";
@@ -194,12 +189,11 @@ export function CameraOverlay({ onClose, onCapture }: CameraOverlayProps) {
                 playsInline
                 muted
                 className={`absolute inset-0 w-full h-full object-cover transition-all duration-300 ${facingMode === "user" ? "scale-x-[-1]" : ""}`}
-                style={vintageMode ? { filter: "sepia(0.8) contrast(1.4) saturate(0.5) brightness(0.9) hue-rotate(-15deg)" } : undefined}
+                style={vintageMode ? { filter: "sepia(0.4) contrast(1.1) saturate(1.2) brightness(1.05) hue-rotate(-5deg)" } : undefined}
               />
               {vintageMode && (
                 <>
-                  <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(circle, rgba(0,0,0,0) 30%, rgba(0,0,0,0.7) 100%)" }} />
-                  <div className="absolute inset-0 pointer-events-none" style={{ background: "repeating-linear-gradient(rgba(0,0,0,0.1) 0, rgba(0,0,0,0.1) 2px, transparent 2px, transparent 4px)" }} />
+                  <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(circle, rgba(0,0,0,0) 40%, rgba(0,0,0,0.3) 100%)" }} />
                   <div className="absolute bottom-6 right-6 font-mono text-2xl font-bold text-[#ff9900] tracking-widest pointer-events-none" style={{ textShadow: "0 0 10px rgba(255,153,0,0.5)" }}>
                     '{String(new Date().getFullYear()).slice(-2)} {String(new Date().getMonth() + 1).padStart(2, '0')} {String(new Date().getDate()).padStart(2, '0')}
                   </div>
