@@ -140,6 +140,7 @@ export function collectImageStack(
 
   const canStack =
     first.type === "image" &&
+    !first.deleted &&
     !first.pinned &&
     !first.replyToId &&
     !isEphemeralMedia(first);
@@ -150,7 +151,7 @@ export function collectImageStack(
   let i = startIndex + 1;
   while (i < msgs.length) {
     const m = msgs[i];
-    if (m.pinned || m.replyToId) break;
+    if (m.pinned || m.replyToId || m.deleted) break;
     if (m.senderId !== first.senderId || m.type !== "image") break;
     if (isEphemeralMedia(m)) break;
     const prev = stack[stack.length - 1]!;
@@ -350,4 +351,17 @@ export function findLastSeenOutgoingId(messages: ApiMessage[], myId: string | un
     if (m.senderId === myId && m.seenByPartner) return m.id;
   }
   return null;
+}
+
+export function getFontStyleStyles(fontStyle?: string): React.CSSProperties | undefined {
+  if (fontStyle === "edo") {
+    return { fontFamily: "'Edo SZ', 'Edo', sans-serif", fontStyle: "normal", fontWeight: "normal" };
+  }
+  if (fontStyle === "italian") {
+    return { fontFamily: "'Playfair Display', serif", fontStyle: "italic", fontWeight: 700 };
+  }
+  if (fontStyle === "allura") {
+    return { fontFamily: "'Allura', cursive", fontStyle: "normal", fontWeight: "normal", fontSize: "1.45em", lineHeight: "1.1" };
+  }
+  return undefined;
 }

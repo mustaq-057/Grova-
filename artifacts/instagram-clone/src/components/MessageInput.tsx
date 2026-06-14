@@ -9,6 +9,7 @@ import { extractClipboardFiles, readClipboardFilesAsync } from "@/lib/media-file
 import { useChatTheme } from "@/hooks/useChatTheme";
 import { isSupportedFileType, MAX_FILE_SIZE_MB, DOCUMENTS_ONLY_ACCEPT } from "@/lib/supported-file-types";
 import { toast } from "sonner";
+import { getFontStyleStyles } from "@/lib/message-utils";
 
 const CustomLocationIcon = () => <MapPin className="w-[26px] h-[26px] text-white" strokeWidth={1.6} />;
 const CustomQuickChatIcon = () => <MessageSquarePlus className="w-[26px] h-[26px] text-white" strokeWidth={1.6} />;
@@ -18,7 +19,7 @@ const CustomFileIcon = () => <FileIcon className="w-[26px] h-[26px] text-white" 
 
 interface MessageInputProps {
   /** Called with trimmed text when user sends (input state stays inside this component for perf). */
-  onSendMessage: (text: string, fontStyle?: "default" | "edo" | "italian") => void;
+  onSendMessage: (text: string, fontStyle?: "default" | "edo" | "italian" | "allura") => void;
   onInputActivity?: (value: string) => void;
   onShareLocation?: () => void;
   sharingLocation?: boolean;
@@ -65,7 +66,7 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
   replyPreview,
 }, ref) {
   const [input, setInput] = useState("");
-  const [fontStyle, setFontStyle] = useState<"default" | "edo" | "italian">("default");
+  const [fontStyle, setFontStyle] = useState<"default" | "edo" | "italian" | "allura">("default");
   const [openPicker, setOpenPicker] = useState<OpenPicker>(null);
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -213,7 +214,7 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
   }, [onDoodleOpen]);
 
   const toggleFontStyle = useCallback(() => {
-    setFontStyle(prev => prev === "default" ? "italian" : prev === "italian" ? "edo" : "default");
+    setFontStyle(prev => prev === "default" ? "italian" : prev === "italian" ? "edo" : prev === "edo" ? "allura" : "default");
     setShowAttachmentMenu(false);
   }, []);
 
@@ -322,13 +323,7 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
       className={`flex-1 w-0 min-w-0 bg-transparent text-[17px] placeholder-[#888] text-white focus:outline-none border-none ${
         disabled || recording ? "opacity-60 cursor-not-allowed" : ""
       }`}
-      style={
-        fontStyle === "edo" 
-          ? { fontFamily: "'Edo SZ', 'Edo', sans-serif" } 
-          : fontStyle === "italian" 
-            ? { fontFamily: "'Playfair Display', serif", fontStyle: "italic", fontWeight: 700 } 
-            : { fontFamily: "inherit" }
-      }
+      style={getFontStyleStyles(fontStyle) ?? { fontFamily: "inherit" }}
       disabled={disabled || recording}
       aria-label="Message input"
     />
@@ -409,15 +404,11 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
               disabled={disabled}
             >
               <div className="w-[28px] h-[28px] flex items-center justify-center shrink-0">
-                <span className="text-[22px] font-bold text-white" style={
-                  fontStyle === "edo" ? { fontFamily: "'Edo SZ', 'Edo', sans-serif", fontStyle: "normal" } :
-                  fontStyle === "italian" ? { fontFamily: "'Playfair Display', serif", fontStyle: "italic" } :
-                  { fontFamily: "inherit" }
-                }>A</span>
+                <span className="text-[22px] font-bold text-white" style={getFontStyleStyles(fontStyle) ?? { fontFamily: "inherit" }}>A</span>
               </div>
               <span className="flex-1">Font Style</span>
               <span className="text-[13px] text-white/50 bg-white/10 px-2 py-0.5 rounded-full capitalize shrink-0">
-                {fontStyle === "default" ? "Default" : fontStyle === "edo" ? "Edo SZ" : "Italian"}
+                {fontStyle === "default" ? "Default" : fontStyle === "edo" ? "Edo SZ" : fontStyle === "italian" ? "Italian" : "Allura"}
               </span>
             </button>
 

@@ -171,7 +171,7 @@ export type ApiMessage = {
   mediaOpenCount?: number;
   mediaOpenedAt?: string;
   clientUniqueId?: string;
-  fontStyle?: "default" | "edo" | "italian";
+  fontStyle?: "default" | "edo" | "italian" | "allura";
 };
 
 export type ApiDua = {

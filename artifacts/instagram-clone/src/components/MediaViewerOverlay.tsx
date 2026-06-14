@@ -267,7 +267,7 @@ export function MediaViewerOverlay({
         >
           <img
             src={currentItem.url}
-            alt="Media Viewer"
+            alt=""
             className={`max-w-full max-h-full object-contain transition-transform duration-75 ${timed && !internalReady ? "opacity-0" : ""}`}
             style={{
               transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,

@@ -57,7 +57,7 @@ export interface Message {
   mediaViewMode?: "keep" | "once" | "twice";
   mediaOpenCount?: number;
   mediaOpenedAt?: string;
-  fontStyle?: "default" | "edo" | "italian";
+  fontStyle?: "default" | "edo" | "italian" | "allura";
 }
 
 const router = Router();

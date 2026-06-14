@@ -2,7 +2,7 @@ import { memo } from "react";
 import { X, Camera, ImageIcon } from "lucide-react";
 import type { ApiMessage } from "@/lib/api";
 import { resolveChatImageUrl } from "@/lib/media-url";
-import { isEphemeralMedia, replyPreviewLabel } from "@/lib/message-utils";
+import { isEphemeralMedia, replyPreviewLabel, getFontStyleStyles } from "@/lib/message-utils";
 
 type Props = {
   replyTo: ApiMessage;
@@ -51,13 +51,7 @@ export const ReplyPreview = memo(function ReplyPreview({
           </p>
           <p 
             className="text-[13px] text-white/75 mt-0.5 whitespace-pre-wrap break-words line-clamp-2"
-            style={
-              replyTo.fontStyle === "edo" 
-                ? { fontFamily: "'Edo SZ', 'Edo', sans-serif", fontStyle: "normal", fontWeight: "normal" } 
-                : replyTo.fontStyle === "italian" 
-                  ? { fontFamily: "'Playfair Display', serif", fontStyle: "italic", fontWeight: 700 } 
-                  : undefined
-            }
+            style={getFontStyleStyles(replyTo.fontStyle)}
           >
             {preview}
           </p>

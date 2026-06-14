@@ -1967,7 +1967,7 @@ export default function Messages() {
 
 
 
-  const sendText = useCallback((rawText: string, fontStyle?: "default" | "edo" | "italian") => {
+  const sendText = useCallback((rawText: string, fontStyle?: "default" | "edo" | "italian" | "allura") => {
     const text = rawText.trim();
     if (!text) return;
     stopTyping();
@@ -2400,9 +2400,7 @@ export default function Messages() {
       };
 
       try {
-        for (const f of files) {
-          await processSingleFile(f);
-        }
+        await Promise.all(files.map((f) => processSingleFile(f)));
       } finally {
         filePickInFlightRef.current = false;
         clearTimeout(unlockTimer);

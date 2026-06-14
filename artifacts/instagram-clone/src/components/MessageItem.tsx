@@ -16,7 +16,7 @@ import type { ApiMessage } from "@/lib/api";
 import { isCallLogMessage } from "@/lib/call-chat-log";
 import { getPartnerBubbleColors } from "@/lib/themes";
 import { getQuickReactions, onQuickReactionsChanged } from "@/lib/quick-reactions";
-import { isEphemeralMedia, isReplyPhotoPlaceholder, parseLegacyReply, parseMediaViewMode, replyPreviewLabel } from "@/lib/message-utils";
+import { isEphemeralMedia, isReplyPhotoPlaceholder, parseLegacyReply, parseMediaViewMode, replyPreviewLabel, getFontStyleStyles } from "@/lib/message-utils";
 import { tryRefreshSession } from "@/lib/api";
 import { MessageText } from "@/lib/linkify";
 import { resolveChatImageUrl, resolveChatVideoUrl, resolveChatAudioUrl } from "@/lib/media-url";
@@ -471,10 +471,10 @@ export const MessageItem = memo(function MessageItem({
         )}
         style={
           customBubbleStyle 
-            ? (msg.fontStyle === "edo" ? { fontFamily: "'Edo SZ', 'Edo', sans-serif", fontStyle: "normal", fontWeight: "normal" } : msg.fontStyle === "italian" ? { fontFamily: "'Playfair Display', serif", fontStyle: "italic", fontWeight: 700 } : undefined)
+            ? getFontStyleStyles(msg.fontStyle)
             : { 
                 ...defaultBubbleStyle, 
-                ...(msg.fontStyle === "edo" ? { fontFamily: "'Edo SZ', 'Edo', sans-serif", fontStyle: "normal", fontWeight: "normal" } : msg.fontStyle === "italian" ? { fontFamily: "'Playfair Display', serif", fontStyle: "italic", fontWeight: 700 } : {})
+                ...getFontStyleStyles(msg.fontStyle)
               }
         }
       >
@@ -570,13 +570,7 @@ export const MessageItem = memo(function MessageItem({
                 ) : null}
                 <span 
                   className="flex-1 min-w-0 text-[13px] sm:text-[14px] text-white/80 whitespace-pre-wrap break-words line-clamp-3"
-                  style={
-                    replySource?.fontStyle === "edo" 
-                      ? { fontFamily: "'Edo SZ', 'Edo', sans-serif", fontStyle: "normal", fontWeight: "normal" } 
-                      : replySource?.fontStyle === "italian" 
-                        ? { fontFamily: "'Playfair Display', serif", fontStyle: "italic", fontWeight: 700 } 
-                        : undefined
-                  }
+                  style={getFontStyleStyles(replySource?.fontStyle)}
                 >
                   {replySource ? replyPreviewLabel(replySource) : quotedText}
                 </span>
