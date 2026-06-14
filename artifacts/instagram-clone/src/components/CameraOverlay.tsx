@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { X, Image as ImageIcon, RefreshCcw, Zap, ZapOff, Aperture } from "lucide-react";
+import { X, Image as ImageIcon, RefreshCcw, Zap, ZapOff, Film } from "lucide-react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -100,7 +100,7 @@ export function CameraOverlay({ onClose, onCapture }: CameraOverlayProps) {
     }
     
     if (vintageMode) {
-      ctx.filter = "sepia(0.6) contrast(1.2) brightness(0.9) saturate(0.8) hue-rotate(-10deg)";
+      ctx.filter = "sepia(0.8) contrast(1.4) saturate(0.5) brightness(0.9) hue-rotate(-15deg)";
     }
     
     ctx.drawImage(video, sx, sy, cw, ch, 0, 0, cw, ch);
@@ -115,13 +115,18 @@ export function CameraOverlay({ onClose, onCapture }: CameraOverlayProps) {
       ctx.fillStyle = gradient;
       ctx.fillRect(0, 0, cw, ch);
 
-      ctx.fillStyle = "rgba(255, 255, 255, 0.04)";
-      for (let i = 0; i < 3000; i++) {
+      ctx.fillStyle = "rgba(255, 255, 255, 0.05)";
+      for (let i = 0; i < 4000; i++) {
         ctx.fillRect(Math.random() * cw, Math.random() * ch, 2, 2);
       }
-      ctx.fillStyle = "rgba(0, 0, 0, 0.06)";
-      for (let i = 0; i < 3000; i++) {
+      ctx.fillStyle = "rgba(0, 0, 0, 0.08)";
+      for (let i = 0; i < 4000; i++) {
         ctx.fillRect(Math.random() * cw, Math.random() * ch, 3, 3);
+      }
+
+      ctx.fillStyle = "rgba(0, 0, 0, 0.1)";
+      for (let y = 0; y < ch; y += 4) {
+        ctx.fillRect(0, y, cw, 2);
       }
 
       ctx.fillStyle = "#ff9900";
@@ -189,12 +194,13 @@ export function CameraOverlay({ onClose, onCapture }: CameraOverlayProps) {
                 playsInline
                 muted
                 className={`absolute inset-0 w-full h-full object-cover transition-all duration-300 ${facingMode === "user" ? "scale-x-[-1]" : ""}`}
-                style={vintageMode ? { filter: "sepia(0.6) contrast(1.2) brightness(0.9) saturate(0.8) hue-rotate(-10deg)" } : undefined}
+                style={vintageMode ? { filter: "sepia(0.8) contrast(1.4) saturate(0.5) brightness(0.9) hue-rotate(-15deg)" } : undefined}
               />
               {vintageMode && (
                 <>
                   <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(circle, rgba(0,0,0,0) 30%, rgba(0,0,0,0.7) 100%)" }} />
-                  <div className="absolute inset-0 pointer-events-none opacity-20 mix-blend-overlay" style={{ backgroundImage: "url('data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.65%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E')" }} />
+                  <div className="absolute inset-0 pointer-events-none opacity-30 mix-blend-overlay" style={{ backgroundImage: "url('data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.8%22 numOctaves=%224%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E')" }} />
+                  <div className="absolute inset-0 pointer-events-none" style={{ background: "repeating-linear-gradient(rgba(0,0,0,0.1) 0, rgba(0,0,0,0.1) 2px, transparent 2px, transparent 4px)" }} />
                   <div className="absolute bottom-6 right-6 font-mono text-2xl font-bold text-[#ff9900] tracking-widest pointer-events-none" style={{ textShadow: "0 0 10px rgba(255,153,0,0.5)" }}>
                     '{String(new Date().getFullYear()).slice(-2)} {String(new Date().getMonth() + 1).padStart(2, '0')} {String(new Date().getDate()).padStart(2, '0')}
                   </div>
@@ -216,10 +222,11 @@ export function CameraOverlay({ onClose, onCapture }: CameraOverlayProps) {
             {/* Vintage Mode Toggle */}
             <button
               onClick={() => setVintageMode(v => !v)}
-              className={`absolute -left-16 w-10 h-10 rounded-full flex items-center justify-center transition-all ${vintageMode ? "bg-[#ff9900]/20 text-[#ff9900] border-2 border-[#ff9900]/50" : "bg-black/40 text-white/70 border border-white/20 hover:bg-white/10"}`}
+              className={`absolute -right-16 w-11 h-11 rounded-full flex flex-col items-center justify-center transition-all ${vintageMode ? "bg-[#ff9900]/20 text-[#ff9900] border-2 border-[#ff9900]/50" : "bg-black/40 text-white/70 border border-white/20 hover:bg-white/10"}`}
               title="Vintage Camera"
             >
-              <Aperture className="w-5 h-5" />
+              <Film className="w-5 h-5 mb-0.5" />
+              <span className="text-[8px] font-bold uppercase tracking-wider">90s</span>
             </button>
 
             {/* Capture button */}
