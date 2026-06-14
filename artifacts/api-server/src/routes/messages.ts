@@ -57,6 +57,7 @@ export interface Message {
   mediaViewMode?: "keep" | "once" | "twice";
   mediaOpenCount?: number;
   mediaOpenedAt?: string;
+  fontStyle?: "default" | "edo" | "italian";
 }
 
 const router = Router();
@@ -140,6 +141,7 @@ function rowToMessage(
     mediaOpenedAt,
     readAt: partnerRead,
     seenByPartner: Boolean(partnerRead),
+    fontStyle: row.font_style ? (row.font_style as Message["fontStyle"]) : undefined,
   };
 }
 
@@ -386,6 +388,7 @@ router.post("/messages", authenticate, validateBody({
     replyToId,
     replyToText,
     replyToSenderId,
+    fontStyle,
   } = body;
 
   if (senderId !== authenticatedUserId) {
@@ -442,8 +445,8 @@ router.post("/messages", authenticate, validateBody({
 
   try {
     await db.execute(
-      `INSERT INTO messages (id, sender_id, text, type, audio_data, gif_url, image_data, image_url, file_data, file_type, file_size, location, timestamp, liked, deleted, variant, companion_sticker, reply_to_id, reply_to_text, reply_to_sender_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO messages (id, sender_id, text, type, audio_data, gif_url, image_data, image_url, file_data, file_type, file_size, location, timestamp, liked, deleted, variant, companion_sticker, reply_to_id, reply_to_text, reply_to_sender_id, font_style)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         senderId!,
@@ -465,6 +468,7 @@ router.post("/messages", authenticate, validateBody({
         replyToId ?? null,
         encryptedReplyText ?? null,
         replyToSenderId ?? null,
+        fontStyle ?? null,
       ]
     );
     const msg: Message = {
@@ -487,6 +491,7 @@ router.post("/messages", authenticate, validateBody({
       replyToId,
       replyToText,
       replyToSenderId,
+      fontStyle,
     };
 
     const partnerId = senderId === "me" ? "wife" : "me";

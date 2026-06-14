@@ -262,6 +262,7 @@ export async function initDb() {
       "ALTER TABLE messages ADD COLUMN IF NOT EXISTS reply_to_id TEXT",
       "ALTER TABLE messages ADD COLUMN IF NOT EXISTS reply_to_text TEXT",
       "ALTER TABLE messages ADD COLUMN IF NOT EXISTS reply_to_sender_id TEXT",
+      "ALTER TABLE messages ADD COLUMN IF NOT EXISTS font_style TEXT",
     ]) {
       try {
         await db.execute(sql);

@@ -117,9 +117,9 @@ export default memo(function Notifications() {
   const openNotification = useCallback(
     (n: AppNotification) => {
       const path = n.targetPath || defaultPath(n.type);
-      if (path.includes("?")) {
+      const url = new URL(path, window.location.origin);
+      if (url.pathname === window.location.pathname) {
         navigateWithSearch(path);
-        setLocation(path);
       } else {
         setLocation(path);
       }
