@@ -1,6 +1,6 @@
 import { memo, useRef, useState, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
 import { createPortal } from "react-dom";
-import { Smile, Mic, Send, Sticker, Paperclip, X, MessageCircle, MapPin, PenTool, Zap, Plus, Image as ImageIcon, PlusCircle, Sparkles, FileText, Palette, File as FileIcon, AlertCircle, Camera, MessageSquarePlus } from "lucide-react";
+import { Smile, Mic, Send, Sticker, Paperclip, X, MessageCircle, MapPin, PenTool, Zap, Plus, Image as ImageIcon, PlusCircle, Sparkles, FileText, Palette, File as FileIcon, AlertCircle, Camera, MessageSquarePlus, Type } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import EmojiPicker from "@/components/EmojiPicker";
 import StickerPicker from "@/components/StickerPicker";
@@ -18,7 +18,7 @@ const CustomFileIcon = () => <FileIcon className="w-[26px] h-[26px] text-white" 
 
 interface MessageInputProps {
   /** Called with trimmed text when user sends (input state stays inside this component for perf). */
-  onSendMessage: (text: string) => void;
+  onSendMessage: (text: string, fontStyle?: "default" | "edo" | "italian") => void;
   onInputActivity?: (value: string) => void;
   onShareLocation?: () => void;
   sharingLocation?: boolean;
@@ -65,6 +65,7 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
   replyPreview,
 }, ref) {
   const [input, setInput] = useState("");
+  const [fontStyle, setFontStyle] = useState<"default" | "edo" | "italian">("default");
   const [openPicker, setOpenPicker] = useState<OpenPicker>(null);
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -92,8 +93,8 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
     lastSentTimeRef.current = now;
 
     setInput("");
-    onSendMessage(text);
-  }, [input, disabled, recording, onSendMessage]);
+    onSendMessage(text, fontStyle);
+  }, [input, disabled, recording, onSendMessage, fontStyle]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -211,6 +212,11 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
     onDoodleOpen?.();
   }, [onDoodleOpen]);
 
+  const toggleFontStyle = useCallback(() => {
+    setFontStyle(prev => prev === "default" ? "italian" : prev === "italian" ? "edo" : "default");
+    setShowAttachmentMenu(false);
+  }, []);
+
   const toggleEmojiPicker = useCallback(() => {
     setOpenPicker((p) => (p === "emoji" ? null : "emoji"));
     setShowAttachmentMenu(false);
@@ -313,9 +319,16 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
       onPaste={handlePaste}
       onClick={() => inputRef.current?.focus()}
       placeholder="Message..."
-      className={`flex-1 w-0 min-w-0 bg-transparent text-[17px] placeholder-[#888] text-white focus:outline-none border-none font-[inherit] ${
+      className={`flex-1 w-0 min-w-0 bg-transparent text-[17px] placeholder-[#888] text-white focus:outline-none border-none ${
         disabled || recording ? "opacity-60 cursor-not-allowed" : ""
       }`}
+      style={
+        fontStyle === "edo" 
+          ? { fontFamily: "'Edo SZ', 'Edo', sans-serif" } 
+          : fontStyle === "italian" 
+            ? { fontFamily: "'Playfair Display', serif", fontStyle: "italic", fontWeight: 700 } 
+            : { fontFamily: "inherit" }
+      }
       disabled={disabled || recording}
       aria-label="Message input"
     />
@@ -389,6 +402,24 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
               </button>
             )}
 
+            <button
+              type="button"
+              onClick={toggleFontStyle}
+              className="flex items-center gap-[20px] px-[24px] py-[15px] text-[17px] font-normal hover:bg-white/5 transition-colors w-full text-left text-white"
+              disabled={disabled}
+            >
+              <div className="w-[28px] h-[28px] flex items-center justify-center shrink-0">
+                <span className="text-[22px] font-bold text-white" style={
+                  fontStyle === "edo" ? { fontFamily: "'Edo SZ', 'Edo', sans-serif", fontStyle: "normal" } :
+                  fontStyle === "italian" ? { fontFamily: "'Playfair Display', serif", fontStyle: "italic" } :
+                  { fontFamily: "inherit" }
+                }>A</span>
+              </div>
+              <span className="flex-1">Font Style</span>
+              <span className="text-[13px] text-white/50 bg-white/10 px-2 py-0.5 rounded-full capitalize shrink-0">
+                {fontStyle === "default" ? "Default" : fontStyle === "edo" ? "Edo SZ" : "Italian"}
+              </span>
+            </button>
 
 
           </motion.div>

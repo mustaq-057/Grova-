@@ -1967,7 +1967,7 @@ export default function Messages() {
 
 
 
-  const sendText = useCallback((rawText: string) => {
+  const sendText = useCallback((rawText: string, fontStyle?: "default" | "edo" | "italian") => {
     const text = rawText.trim();
     if (!text) return;
     stopTyping();
@@ -1982,6 +1982,7 @@ export default function Messages() {
     sendMsg({
       text,
       type: "text",
+      fontStyle: fontStyle === "default" ? undefined : fontStyle,
       ...replyMeta,
     });
   }, [sendMsg, replyTo, stopTyping]);

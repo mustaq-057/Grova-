@@ -469,7 +469,14 @@ export const MessageItem = memo(function MessageItem({
           customBubbleStyle ? `bubble-${customBubbleStyle}` : "bubble-default",
           !customBubbleStyle && (isMe ? "rounded-br-md text-white" : "rounded-bl-md text-white")
         )}
-        style={customBubbleStyle ? undefined : defaultBubbleStyle}
+        style={
+          customBubbleStyle 
+            ? (msg.fontStyle === "edo" ? { fontFamily: "'Edo SZ', 'Edo', sans-serif", fontStyle: "normal", fontWeight: "normal" } : msg.fontStyle === "italian" ? { fontFamily: "'Playfair Display', serif", fontStyle: "italic", fontWeight: 700 } : undefined)
+            : { 
+                ...defaultBubbleStyle, 
+                ...(msg.fontStyle === "edo" ? { fontFamily: "'Edo SZ', 'Edo', sans-serif", fontStyle: "normal", fontWeight: "normal" } : msg.fontStyle === "italian" ? { fontFamily: "'Playfair Display', serif", fontStyle: "italic", fontWeight: 700 } : {})
+              }
+        }
       >
         {bubbleContent}
       </div>
