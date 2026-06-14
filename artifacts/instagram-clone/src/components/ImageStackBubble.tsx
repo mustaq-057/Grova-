@@ -60,7 +60,7 @@ export const ImageStackBubble = memo(function ImageStackBubble({
               <img
                 src={layer.src}
                 alt=""
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover text-transparent"
                 loading="eager"
                 decoding="async"
                 fetchPriority={layer.z === layers.length - 1 ? "high" : "auto"}

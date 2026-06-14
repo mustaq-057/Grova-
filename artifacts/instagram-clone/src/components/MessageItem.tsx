@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { ChatFileBubble } from "@/components/ChatFileBubble";
 import { DeletedMessageNotice } from "@/components/DeletedMessageNotice";
 import { DuaMessage } from "@/components/DuaMessage";
-import { EphemeralMediaBubble } from "@/components/EphemeralMediaBubble";
+import { EphemeralMediaBubble, ViewOnceIcon } from "@/components/EphemeralMediaBubble";
 import { ImageStackBubble } from "@/components/ImageStackBubble";
 import { AvatarImage } from "@/components/AvatarImage";
 import { EmojiReactionsModal } from "@/components/EmojiReactionsModal";
@@ -567,7 +567,17 @@ export const MessageItem = memo(function MessageItem({
                     className="w-10 h-10 rounded-lg object-cover shrink-0 bg-black/30 border border-white/10"
                     loading="lazy"
                   />
-                ) : isReplyPhotoPlaceholder(quotedText) || (replySource && isEphemeralMedia(replySource)) ? (
+                ) : (replySource && isEphemeralMedia(replySource)) || (quotedText?.includes("view once") || quotedText?.includes("view twice")) ? (
+                  (() => {
+                    const count = replySource ? (replySource.mediaViewMode === "twice" || parseMediaViewMode(replySource.companionSticker) === "twice" ? 2 : 1) : (quotedText?.includes("twice") ? 2 : 1);
+                    const isOpenedState = replySource ? (replySource.senderId === myId ? replySource.mediaOpenCount! > 0 : (replySource.mediaOpenCount || 0) >= count) : false;
+                    return (
+                      <div className="w-10 h-10 rounded-lg bg-[#1f2c34] border border-white/5 flex items-center justify-center shrink-0 p-0.5 scale-75 origin-left">
+                        <ViewOnceIcon count={count as 1 | 2} opened={isOpenedState} />
+                      </div>
+                    );
+                  })()
+                ) : isReplyPhotoPlaceholder(quotedText) ? (
                   <div className="w-10 h-10 rounded-lg bg-white/8 border border-white/10 flex items-center justify-center shrink-0">
                     <span className="text-base opacity-60">📷</span>
                   </div>

@@ -481,22 +481,6 @@ export default function Calendar() {
                         Finished
                       </span>
                     </div>
-                    <div className="flex items-center gap-1 ml-2">
-                      <button
-                        onClick={() => startEdit(ev)}
-                        className="p-1.5 hover:bg-secondary rounded-lg transition-colors text-muted-foreground hover:text-foreground"
-                        aria-label="Edit event"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => setDeleteId(ev.id)}
-                        className="p-1.5 hover:bg-destructive/10 rounded-lg transition-colors text-muted-foreground hover:text-destructive"
-                        aria-label="Delete event"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
                   </div>
                 </motion.div>
               ))}

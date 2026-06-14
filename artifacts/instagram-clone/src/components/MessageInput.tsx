@@ -215,7 +215,6 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
 
   const toggleFontStyle = useCallback(() => {
     setFontStyle(prev => prev === "default" ? "italian" : prev === "italian" ? "edo" : prev === "edo" ? "allura" : "default");
-    setShowAttachmentMenu(false);
   }, []);
 
   const toggleEmojiPicker = useCallback(() => {

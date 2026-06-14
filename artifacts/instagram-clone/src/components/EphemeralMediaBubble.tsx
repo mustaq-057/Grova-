@@ -21,7 +21,7 @@ function formatBubbleTime(ts: string): string {
   return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true });
 }
 
-function ViewOnceIcon({ count, opened }: { count: 1 | 2; opened: boolean }) {
+export function ViewOnceIcon({ count, opened }: { count: 1 | 2; opened: boolean }) {
   const accent = opened ? "#8696a0" : "#00a884";
   return (
     <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden className="shrink-0">

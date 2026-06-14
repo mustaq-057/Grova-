@@ -86,7 +86,18 @@ export function MediaViewerOverlay({
 
     const fetchBlob = async (): Promise<Blob> => {
       let downloadUrl = resolveMediaDownloadUrl(currentItem.url, currentItem.kind);
-      let res = await fetch(downloadUrl, { credentials: "include" });
+      
+      let res: Response;
+      try {
+        res = await fetch(downloadUrl, { credentials: "omit" });
+      } catch {
+        res = await fetch(downloadUrl, { credentials: "include" });
+      }
+      
+      if (!res.ok) {
+        res = await fetch(downloadUrl, { credentials: "include" });
+      }
+
       if (res.status === 401) {
         const refreshed = await tryRefreshSession();
         if (refreshed) {

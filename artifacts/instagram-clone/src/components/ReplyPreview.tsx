@@ -2,7 +2,8 @@ import { memo } from "react";
 import { X, Camera, ImageIcon } from "lucide-react";
 import type { ApiMessage } from "@/lib/api";
 import { resolveChatImageUrl } from "@/lib/media-url";
-import { isEphemeralMedia, replyPreviewLabel, getFontStyleStyles } from "@/lib/message-utils";
+import { isEphemeralMedia, replyPreviewLabel, getFontStyleStyles, parseMediaViewMode } from "@/lib/message-utils";
+import { ViewOnceIcon } from "@/components/EphemeralMediaBubble";
 
 type Props = {
   replyTo: ApiMessage;
@@ -26,13 +27,16 @@ export const ReplyPreview = memo(function ReplyPreview({
       ? resolveChatImageUrl(replyTo.imageUrl || replyTo.imageData)
       : undefined;
 
+  const count = ephemeral ? (replyTo.mediaViewMode === "twice" || parseMediaViewMode(replyTo.companionSticker) === "twice" ? 2 : 1) : 1;
+  const isOpenedState = ephemeral ? (replyTo.senderId === myId ? replyTo.mediaOpenCount! > 0 : (replyTo.mediaOpenCount || 0) >= count) : false;
+
   return (
     <div className="mx-3 mb-2 flex items-stretch gap-0 rounded-2xl bg-[#1a1a1a] border border-white/10 overflow-hidden">
       <div className="w-1 shrink-0 bg-primary" aria-hidden />
       <div className="flex-1 min-w-0 py-3 px-3 flex gap-3 items-center">
         {ephemeral ? (
-          <div className="w-12 h-12 rounded-xl bg-white/8 border border-white/10 flex items-center justify-center shrink-0">
-            <Camera className="w-5 h-5 text-white/50" strokeWidth={1.75} />
+          <div className="w-12 h-12 rounded-xl bg-[#1f2c34] border border-white/5 flex items-center justify-center shrink-0 p-1 scale-75 origin-left">
+            <ViewOnceIcon count={count as 1 | 2} opened={isOpenedState} />
           </div>
         ) : thumbSrc ? (
           <img
