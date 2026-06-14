@@ -1,8 +1,8 @@
 import { getAuthHeaders } from "./session";
 import { tryRefreshSession } from "./api";
 
-/** Always prefer raw binary upload (no base64 bloat). */
-const BINARY_UPLOAD_MIN_BYTES = 0;
+/** Use binary upload for files > 5MB to avoid base64 bloat; smaller files use base64 for better compatibility in strict WebViews. */
+const BINARY_UPLOAD_MIN_BYTES = 5 * 1024 * 1024;
 
 const RETRYABLE_STATUS = new Set([408, 429, 502, 503, 504]);
 
@@ -119,23 +119,10 @@ export async function uploadMedia(dataUrl: string, contentType?: string, attempt
 
 /** Upload a File/Blob — binary path to Cloudinary (best for mobile camera, docs, video). */
 export async function uploadMediaFile(file: File | Blob, contentType?: string): Promise<string> {
-  let inferred = contentType || (file instanceof File ? file.type : "") || "";
-  if (!inferred && file instanceof File && file.name) {
-    const ext = file.name.match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase();
-    if (ext && ["mp4", "mov", "webm", "mkv", "3gp", "m4v"].includes(ext)) {
-      inferred = `video/${ext === "mov" ? "quicktime" : ext}`;
-    } else if (ext && ["jpg", "jpeg", "png", "gif", "webp", "heic"].includes(ext)) {
-      inferred = `image/${ext === "jpg" ? "jpeg" : ext}`;
-    }
-  }
+  const mime =
+    normalizeUploadMime(contentType || (file instanceof File ? file.type : "") || "application/octet-stream");
 
-  const mime = normalizeUploadMime(inferred || "application/octet-stream");
-  const useBinary =
-    file instanceof File ||
-    mime.startsWith("video/") ||
-    mime.startsWith("audio/") ||
-    mime.startsWith("application/") ||
-    file.size >= BINARY_UPLOAD_MIN_BYTES;
+  const useBinary = file.size >= BINARY_UPLOAD_MIN_BYTES;
   if (useBinary) {
     return uploadMediaBinary(file, mime);
   }

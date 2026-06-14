@@ -168,6 +168,10 @@ function outgoingContentMatches(optimistic: ApiMessage, server: ApiMessage): boo
     }
     return false;
   }
+  if (optimistic.type === "file") {
+    const optText = (optimistic.text ?? "").replace(/ · Uploading…$/, "");
+    return optText === (server.text ?? "");
+  }
   return (optimistic.text ?? "") === (server.text ?? "");
 }
 
