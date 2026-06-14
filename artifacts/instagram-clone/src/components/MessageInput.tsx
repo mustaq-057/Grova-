@@ -240,7 +240,6 @@ export const MessageInput = memo(forwardRef<HTMLInputElement, MessageInputProps>
 
   const handleEmojiSelect = useCallback((emoji: string) => {
     setInput((i) => i + emoji);
-    setOpenPicker(null);
   }, []);
 
   const handleStickerSelect = useCallback((sticker: string) => {
