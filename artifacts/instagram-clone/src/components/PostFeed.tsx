@@ -83,55 +83,55 @@ export function PostFeed({
     });
 
     function wirePostEvents(source: EventSource) {
-    source.addEventListener("post-added", () => loadPosts());
-    source.addEventListener("post-liked", (e) => {
-      try {
-        const updated = JSON.parse((e as MessageEvent).data) as ApiPost;
-        setPosts((prev) => prev.map((p) => (p.id === updated.id ? { ...p, ...updated } : p)));
-      } catch {
-        loadPosts();
-      }
-    });
-    source.addEventListener("post-reacted", (e) => {
-      try {
-        const updated = JSON.parse((e as MessageEvent).data) as ApiPost;
-        setPosts((prev) => prev.map((p) => (p.id === updated.id ? { ...p, ...updated } : p)));
-      } catch {
-        loadPosts();
-      }
-    });
-    source.addEventListener("post-deleted", (e) => {
-      try {
-        const { id } = JSON.parse((e as MessageEvent).data) as { id: string };
-        setPosts((prev) => prev.filter((p) => p.id !== id));
-      } catch {
-        loadPosts();
-      }
-    });
-    source.addEventListener("post-commented", (e) => {
-      try {
-        const c = JSON.parse((e as MessageEvent).data) as ApiPostComment;
-        setComments((prev) => ({
-          ...prev,
-          [c.postId]: [...(prev[c.postId] ?? []), c],
-        }));
-        loadPosts();
-      } catch {
-        loadPosts();
-      }
-    });
-    source.addEventListener("post-comment-deleted", (e) => {
-      try {
-        const { id, postId } = JSON.parse((e as MessageEvent).data) as { id: string; postId: string };
-        setComments((prev) => ({
-          ...prev,
-          [postId]: (prev[postId] ?? []).filter((c) => c.id !== id),
-        }));
-        loadPosts();
-      } catch {
-        loadPosts();
-      }
-    });
+      source.addEventListener("post-added", () => loadPosts());
+      source.addEventListener("post-liked", (e) => {
+        try {
+          const updated = JSON.parse((e as MessageEvent).data) as ApiPost;
+          setPosts((prev) => prev.map((p) => (p.id === updated.id ? { ...p, ...updated } : p)));
+        } catch {
+          loadPosts();
+        }
+      });
+      source.addEventListener("post-reacted", (e) => {
+        try {
+          const updated = JSON.parse((e as MessageEvent).data) as ApiPost;
+          setPosts((prev) => prev.map((p) => (p.id === updated.id ? { ...p, ...updated } : p)));
+        } catch {
+          loadPosts();
+        }
+      });
+      source.addEventListener("post-deleted", (e) => {
+        try {
+          const { id } = JSON.parse((e as MessageEvent).data) as { id: string };
+          setPosts((prev) => prev.filter((p) => p.id !== id));
+        } catch {
+          loadPosts();
+        }
+      });
+      source.addEventListener("post-commented", (e) => {
+        try {
+          const c = JSON.parse((e as MessageEvent).data) as ApiPostComment;
+          setComments((prev) => ({
+            ...prev,
+            [c.postId]: [...(prev[c.postId] ?? []), c],
+          }));
+          loadPosts();
+        } catch {
+          loadPosts();
+        }
+      });
+      source.addEventListener("post-comment-deleted", (e) => {
+        try {
+          const { id, postId } = JSON.parse((e as MessageEvent).data) as { id: string; postId: string };
+          setComments((prev) => ({
+            ...prev,
+            [postId]: (prev[postId] ?? []).filter((c) => c.id !== id),
+          }));
+          loadPosts();
+        } catch {
+          loadPosts();
+        }
+      });
     }
 
     const poll = setInterval(loadPosts, 60_000);
@@ -215,12 +215,11 @@ export function PostFeed({
 
 
   useEffect(() => {
-    if (!focusPostId) {
-      focusHandledRef.current = null;
-      return;
-    }
-    if (posts.length === 0) return;
+    focusHandledRef.current = null;
+  }, [focusPostId, focusCommentId]);
 
+  useEffect(() => {
+    if (!focusPostId || posts.length === 0) return;
     const focusKey = `${focusPostId}:${focusCommentId ?? ""}`;
     if (focusHandledRef.current === focusKey) return;
 
@@ -229,16 +228,14 @@ export function PostFeed({
       if (!posts.some((p) => p.id === focusPostId)) {
         try {
           const post = await api.getPostById(focusPostId);
-          setPosts(prev => [...prev, post].sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+          setPosts(prev => [...prev, post].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
         } catch {
           await loadPosts();
         }
         if (cancelled) return;
       }
 
-      if (focusCommentId) {
-        await openComments(focusPostId);
-      }
+      await openComments(focusPostId);
       if (cancelled) return;
 
       const postEl = await waitForElement(`[data-testid="post-${focusPostId}"]`);

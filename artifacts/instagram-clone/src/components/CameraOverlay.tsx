@@ -116,11 +116,11 @@ export function CameraOverlay({ onClose, onCapture }: CameraOverlayProps) {
       ctx.fillRect(0, 0, cw, ch);
 
       ctx.fillStyle = "rgba(255, 255, 255, 0.05)";
-      for (let i = 0; i < 4000; i++) {
+      for (let i = 0; i < 1500; i++) {
         ctx.fillRect(Math.random() * cw, Math.random() * ch, 2, 2);
       }
       ctx.fillStyle = "rgba(0, 0, 0, 0.08)";
-      for (let i = 0; i < 4000; i++) {
+      for (let i = 0; i < 1500; i++) {
         ctx.fillRect(Math.random() * cw, Math.random() * ch, 3, 3);
       }
 
@@ -147,7 +147,7 @@ export function CameraOverlay({ onClose, onCapture }: CameraOverlayProps) {
       if (!blob) return;
       const file = new File([blob], `capture-${Date.now()}.jpg`, { type: "image/jpeg" });
       onCapture(file);
-    }, "image/jpeg", 0.9);
+    }, "image/jpeg", 0.7);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -222,19 +222,26 @@ export function CameraOverlay({ onClose, onCapture }: CameraOverlayProps) {
             {/* Vintage Mode Toggle */}
             <button
               onClick={() => setVintageMode(v => !v)}
-              className={`absolute -right-16 w-11 h-11 rounded-full flex flex-col items-center justify-center transition-all ${vintageMode ? "bg-[#ff9900]/20 text-[#ff9900] border-2 border-[#ff9900]/50" : "bg-black/40 text-white/70 border border-white/20 hover:bg-white/10"}`}
-              title="Vintage Camera"
+              className="absolute -right-16 w-11 h-11 rounded-full flex flex-col items-center justify-center transition-all bg-black/40 border border-white/20 hover:bg-white/10 overflow-hidden"
+              title="Toggle Vintage Camera"
             >
-              <Film className="w-5 h-5 mb-0.5" />
-              <span className="text-[8px] font-bold uppercase tracking-wider">90s</span>
+              {vintageMode ? (
+                <div className="w-5 h-5 rounded-full border-2 border-white" />
+              ) : (
+                <img src="/vintage-camera.png" alt="Vintage" className="w-full h-full object-cover" />
+              )}
             </button>
 
             {/* Capture button */}
             <button 
               onClick={handleCapture}
-              className={`w-20 h-20 rounded-full border-4 flex items-center justify-center active:scale-90 transition-all ${vintageMode ? "border-[#ff9900]/80 shadow-[0_0_20px_rgba(255,153,0,0.4)]" : "border-white"}`}
+              className={`w-20 h-20 rounded-full border-4 flex items-center justify-center active:scale-90 transition-all ${vintageMode ? "border-[#ff9900]/80 shadow-[0_0_20px_rgba(255,153,0,0.4)] p-0.5" : "border-white"}`}
             >
-              <div className={`w-16 h-16 rounded-full transition-colors ${vintageMode ? "bg-gradient-to-br from-[#ff9900] to-[#cc7a00]" : "bg-white"}`} />
+              {vintageMode ? (
+                <img src="/vintage-camera.png" alt="Vintage Camera" className="w-full h-full rounded-full object-cover" />
+              ) : (
+                <div className="w-16 h-16 rounded-full transition-colors bg-white" />
+              )}
             </button>
           </div>
 

@@ -19,7 +19,7 @@ function mergeAbortSignal(userSignal: AbortSignal | null | undefined, timeoutMs:
   }
   if (userSignal.aborted) {
     clearTimeout(timer);
-    return { signal: userSignal, cleanup: () => {} };
+    return { signal: userSignal, cleanup: () => { } };
   }
   const merged = new AbortController();
   const onAbort = () => merged.abort();
@@ -172,8 +172,6 @@ export type ApiMessage = {
   mediaOpenedAt?: string;
   clientUniqueId?: string;
   fontStyle?: "default" | "edo" | "italian" | "allura";
-  replyToFontStyle?: "default" | "edo" | "italian" | "allura";
-  replyToImageUrl?: string;
 };
 
 export type ApiDua = {
@@ -298,20 +296,20 @@ type SessionResponse = {
 export type AppNotification = {
   id: string;
   type:
-    | "like"
-    | "comment"
-    | "story"
-    | "dua"
-    | "call"
-    | "location"
-    | "message"
-    | "task"
-    | "reaction"
-    | "doodle"
-    | "file"
-    | "greeting"
-    | "calendar"
-    | "checkin";
+  | "like"
+  | "comment"
+  | "story"
+  | "dua"
+  | "call"
+  | "location"
+  | "message"
+  | "task"
+  | "reaction"
+  | "doodle"
+  | "file"
+  | "greeting"
+  | "calendar"
+  | "checkin";
   actorId?: string;
   fromName: string;
   text: string;
