@@ -1,6 +1,6 @@
 import { useState, memo, useCallback, useMemo, useRef, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
-import { Smile, MoreHorizontal, Trash2 } from "lucide-react";
+import { Smile, MoreHorizontal, Trash2, Download } from "lucide-react";
 import { motion } from "framer-motion";
 import { AudioMessage } from "@/components/AudioMessage";
 import { cn } from "@/lib/utils";
@@ -19,7 +19,7 @@ import { getQuickReactions, onQuickReactionsChanged } from "@/lib/quick-reaction
 import { isEphemeralMedia, isReplyPhotoPlaceholder, parseLegacyReply, parseMediaViewMode, replyPreviewLabel, getFontStyleStyles } from "@/lib/message-utils";
 import { tryRefreshSession } from "@/lib/api";
 import { MessageText } from "@/lib/linkify";
-import { resolveChatImageUrl, resolveChatVideoUrl, resolveChatAudioUrl } from "@/lib/media-url";
+import { resolveChatImageUrl, resolveChatVideoUrl, resolveChatAudioUrl, resolveMediaDownloadUrl } from "@/lib/media-url";
 import { useEffect } from "react";
 import { useChatTheme } from "@/hooks/useChatTheme";
 
@@ -332,28 +332,56 @@ export const MessageItem = memo(function MessageItem({
             onMediaLoad={() => onMediaLoad?.(msg.id)}
           />
         ) : imageDisplaySrc && !imageLoadFailed ? (
-          <img
-            src={imageDisplaySrc}
-            alt={isDoodle ? "Doodle" : ""}
-            className={cn(
-              "max-w-[min(280px,92vw)] max-h-[340px] min-h-[72px] w-auto h-auto object-contain rounded-2xl block cursor-pointer bg-black/15",
-              isDoodle && "shadow-sm",
+          <div className="relative group/media inline-block max-w-full">
+            <img
+              src={imageDisplaySrc}
+              alt={isDoodle ? "Doodle" : ""}
+              className={cn(
+                "max-w-[min(280px,92vw)] max-h-[340px] min-h-[72px] w-auto h-auto object-contain rounded-2xl block cursor-pointer bg-black/15",
+                isDoodle && "shadow-sm",
+              )}
+              loading="eager"
+              decoding="async"
+              referrerPolicy="no-referrer"
+              onLoad={(e) => {
+                onMediaLoad?.(msg.id);
+                const img = e.currentTarget;
+                if (img.getBoundingClientRect().bottom > window.innerHeight - 300) {
+                  img.scrollIntoView({ behavior: 'smooth', block: 'end' });
+                }
+              }}
+              onError={() => {
+                if (imageRetry < 2) {
+                  void tryRefreshSession().finally(() => {
+                    setImageRetry((n) => n + 1);
+                  });
+                } else {
+                  setImageLoadFailed(true);
+                }
+              }}
+              onClick={() => onOpenMedia?.(msg)}
+            />
+            {!isEphemeralMedia(msg) && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const a = document.createElement("a");
+                  a.href = resolveMediaDownloadUrl(msg.imageUrl || msg.imageData || imageDisplaySrc, msg.type);
+                  a.download = `grova-${msg.type}-${Date.now()}.jpg`;
+                  a.target = "_blank";
+                  a.rel = "noopener noreferrer";
+                  document.body.appendChild(a);
+                  a.click();
+                  a.remove();
+                }}
+                className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center opacity-0 group-hover/media:opacity-100 transition-opacity z-10 hover:bg-black/70"
+                aria-label="Download image"
+              >
+                <Download className="w-4 h-4" />
+              </button>
             )}
-            loading="eager"
-            decoding="async"
-            referrerPolicy="no-referrer"
-            onLoad={() => onMediaLoad?.(msg.id)}
-            onError={() => {
-              if (imageRetry < 2) {
-                void tryRefreshSession().finally(() => {
-                  setImageRetry((n) => n + 1);
-                });
-              } else {
-                setImageLoadFailed(true);
-              }
-            }}
-            onClick={() => onOpenMedia?.(msg)}
-          />
+          </div>
         ) : (
           <button
             type="button"

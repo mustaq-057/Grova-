@@ -198,11 +198,7 @@ export function MediaViewerOverlay({
       className="fixed inset-0 z-[120] bg-black/95 flex items-center justify-center p-4"
       onContextMenu={(e) => e.preventDefault()}
     >
-      {!internalReady && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
-          <div className="w-10 h-10 border-4 border-white/20 border-t-white rounded-full animate-spin" />
-        </div>
-      )}
+
       <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
         {allowDownload && mediaReady && (
           <button

@@ -18,10 +18,7 @@ export function CameraOverlay({ onClose, onCapture }: CameraOverlayProps) {
   const [aspectRatio, setAspectRatio] = useState<"Full" | "16:9" | "4:3" | "1:1">("Full");
   const [error, setError] = useState<string | null>(null);
   const [vintageMode, setVintageMode] = useState(false);
-  const [isSwapping, setIsSwapping] = useState(false);
-
   const startCamera = useCallback(async (mode: "user" | "environment") => {
-    setIsSwapping(true);
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(t => t.stop());
       streamRef.current = null;
@@ -39,8 +36,6 @@ export function CameraOverlay({ onClose, onCapture }: CameraOverlayProps) {
     } catch (err) {
       console.error("Camera access failed", err);
       setError("Camera access denied or unavailable.");
-    } finally {
-      setIsSwapping(false);
     }
   }, []);
 
@@ -187,14 +182,9 @@ export function CameraOverlay({ onClose, onCapture }: CameraOverlayProps) {
                 autoPlay
                 playsInline
                 muted
-                className={`absolute inset-0 w-full h-full object-cover transition-all duration-300 ${facingMode === "user" ? "scale-x-[-1]" : ""} ${isSwapping ? "opacity-0 blur-sm scale-105" : "opacity-100 blur-0 scale-100"}`}
+                className={`absolute inset-0 w-full h-full object-cover transition-all duration-300 ${facingMode === "user" ? "scale-x-[-1]" : ""}`}
                 style={vintageMode ? { filter: "sepia(0.4) contrast(1.1) saturate(1.2) brightness(1.05) hue-rotate(-5deg)" } : undefined}
               />
-              {isSwapping && (
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
-                  <RefreshCcw className="w-8 h-8 text-white/50 animate-spin" />
-                </div>
-              )}
               {vintageMode && (
                 <>
                   <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(circle, rgba(0,0,0,0) 40%, rgba(0,0,0,0.3) 100%)" }} />
