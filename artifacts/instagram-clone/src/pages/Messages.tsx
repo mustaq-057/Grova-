@@ -362,21 +362,38 @@ export default function Messages() {
       window.setTimeout(() => el.classList.remove("message-highlight-flash"), 2600);
     };
 
-    const tryScroll = (): boolean => {
-      const el = document.querySelector(
-        `[data-testid="message-${messageId}"]`,
-      ) as HTMLElement | null;
+    const tryScroll = async (): Promise<boolean> => {
+      let el = document.querySelector(`[data-testid="message-${messageId}"]`) as HTMLElement | null;
+      
+      // Wait up to ~400ms for React to render the element if it's not immediately there
+      if (!el) {
+        for (let i = 0; i < 25; i++) {
+          await new Promise((r) => requestAnimationFrame(r));
+          el = document.querySelector(`[data-testid="message-${messageId}"]`) as HTMLElement | null;
+          if (el) break;
+        }
+      }
+
       if (!el) return false;
+
       const container = messagesContainerRef.current;
       scrollMessageIntoCenter(container, el, "auto");
-      requestAnimationFrame(() => {
-        scrollMessageIntoCenter(container, el, "auto");
-        flash(el);
-      });
+      flash(el);
+      
+      // Ensure it stays centered after any immediate layout shifts (images loading)
+      let frames = 0;
+      const keepCentered = () => {
+        if (!el || !messagesContainerRef.current) return;
+        scrollMessageIntoCenter(messagesContainerRef.current, el, "auto");
+        frames++;
+        if (frames < 30) requestAnimationFrame(keepCentered); // Half a second of adjustment
+      };
+      requestAnimationFrame(keepCentered);
+      
       return true;
     };
 
-    if (tryScroll()) return true;
+    if (await tryScroll()) return true;
 
     try {
       const data = await api.getMessageContext(messageId, 35);
@@ -389,7 +406,6 @@ export default function Messages() {
       setMessages((prev) => mergeMessagesById(prev, batch));
       setHasMore(data.pagination?.hasMoreBefore ?? hasMore);
 
-      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
       return tryScroll();
     } catch {
       return false;
