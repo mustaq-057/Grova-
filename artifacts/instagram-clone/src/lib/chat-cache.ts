@@ -54,6 +54,7 @@ function slimMessage(m: ApiMessage): ApiMessage {
     mediaViewMode: m.mediaViewMode,
     mediaOpenCount: m.mediaOpenCount,
     mediaOpenedAt: m.mediaOpenedAt,
+    fontStyle: m.fontStyle,
   };
 }
 
