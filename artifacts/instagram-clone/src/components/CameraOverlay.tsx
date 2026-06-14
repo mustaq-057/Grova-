@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { X, Image as ImageIcon, RefreshCcw, Zap, ZapOff } from "lucide-react";
+import { X, Image as ImageIcon, RefreshCcw, Zap, ZapOff, Aperture } from "lucide-react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -16,6 +16,7 @@ export function CameraOverlay({ onClose, onCapture }: CameraOverlayProps) {
   const [flashOn, setFlashOn] = useState(false);
   const [aspectRatio, setAspectRatio] = useState<"Full" | "16:9" | "4:3" | "1:1">("Full");
   const [error, setError] = useState<string | null>(null);
+  const [vintageMode, setVintageMode] = useState(false);
 
   const startCamera = useCallback(async (mode: "user" | "environment") => {
     if (stream) {
@@ -98,7 +99,44 @@ export function CameraOverlay({ onClose, onCapture }: CameraOverlayProps) {
       ctx.scale(-1, 1);
     }
     
+    if (vintageMode) {
+      ctx.filter = "sepia(0.6) contrast(1.2) brightness(0.9) saturate(0.8) hue-rotate(-10deg)";
+    }
+    
     ctx.drawImage(video, sx, sy, cw, ch, 0, 0, cw, ch);
+    
+    if (vintageMode) {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.filter = "none";
+      
+      const gradient = ctx.createRadialGradient(cw/2, ch/2, cw * 0.3, cw/2, ch/2, Math.max(cw, ch) * 0.7);
+      gradient.addColorStop(0, "rgba(0,0,0,0)");
+      gradient.addColorStop(1, "rgba(0,0,0,0.7)");
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, cw, ch);
+
+      ctx.fillStyle = "rgba(255, 255, 255, 0.04)";
+      for (let i = 0; i < 3000; i++) {
+        ctx.fillRect(Math.random() * cw, Math.random() * ch, 2, 2);
+      }
+      ctx.fillStyle = "rgba(0, 0, 0, 0.06)";
+      for (let i = 0; i < 3000; i++) {
+        ctx.fillRect(Math.random() * cw, Math.random() * ch, 3, 3);
+      }
+
+      ctx.fillStyle = "#ff9900";
+      ctx.font = "bold 32px 'Courier New', Courier, monospace";
+      ctx.textAlign = "right";
+      ctx.textBaseline = "bottom";
+      ctx.shadowColor = "rgba(255, 153, 0, 0.5)";
+      ctx.shadowBlur = 10;
+      
+      const now = new Date();
+      const yy = String(now.getFullYear()).slice(-2);
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+      ctx.fillText(`'${yy} ${mm} ${dd}`, cw - 30, ch - 30);
+    }
     
     canvas.toBlob((blob) => {
       if (!blob) return;
@@ -150,8 +188,18 @@ export function CameraOverlay({ onClose, onCapture }: CameraOverlayProps) {
                 autoPlay
                 playsInline
                 muted
-                className={`absolute inset-0 w-full h-full object-cover ${facingMode === "user" ? "scale-x-[-1]" : ""}`}
+                className={`absolute inset-0 w-full h-full object-cover transition-all duration-300 ${facingMode === "user" ? "scale-x-[-1]" : ""}`}
+                style={vintageMode ? { filter: "sepia(0.6) contrast(1.2) brightness(0.9) saturate(0.8) hue-rotate(-10deg)" } : undefined}
               />
+              {vintageMode && (
+                <>
+                  <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(circle, rgba(0,0,0,0) 30%, rgba(0,0,0,0.7) 100%)" }} />
+                  <div className="absolute inset-0 pointer-events-none opacity-20 mix-blend-overlay" style={{ backgroundImage: "url('data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.65%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E')" }} />
+                  <div className="absolute bottom-6 right-6 font-mono text-2xl font-bold text-[#ff9900] tracking-widest pointer-events-none" style={{ textShadow: "0 0 10px rgba(255,153,0,0.5)" }}>
+                    '{String(new Date().getFullYear()).slice(-2)} {String(new Date().getMonth() + 1).padStart(2, '0')} {String(new Date().getDate()).padStart(2, '0')}
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -164,13 +212,22 @@ export function CameraOverlay({ onClose, onCapture }: CameraOverlayProps) {
             <ImageIcon className="w-6 h-6" />
           </button>
           
-          <div className="relative flex flex-col items-center gap-4">
+          <div className="relative flex items-center justify-center">
+            {/* Vintage Mode Toggle */}
+            <button
+              onClick={() => setVintageMode(v => !v)}
+              className={`absolute -left-16 w-10 h-10 rounded-full flex items-center justify-center transition-all ${vintageMode ? "bg-[#ff9900]/20 text-[#ff9900] border-2 border-[#ff9900]/50" : "bg-black/40 text-white/70 border border-white/20 hover:bg-white/10"}`}
+              title="Vintage Camera"
+            >
+              <Aperture className="w-5 h-5" />
+            </button>
+
             {/* Capture button */}
             <button 
               onClick={handleCapture}
-              className="w-20 h-20 rounded-full border-4 border-white flex items-center justify-center active:scale-90 transition-transform"
+              className={`w-20 h-20 rounded-full border-4 flex items-center justify-center active:scale-90 transition-all ${vintageMode ? "border-[#ff9900]/80 shadow-[0_0_20px_rgba(255,153,0,0.4)]" : "border-white"}`}
             >
-              <div className="w-16 h-16 rounded-full bg-white" />
+              <div className={`w-16 h-16 rounded-full transition-colors ${vintageMode ? "bg-gradient-to-br from-[#ff9900] to-[#cc7a00]" : "bg-white"}`} />
             </button>
           </div>
 
