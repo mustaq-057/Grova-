@@ -243,6 +243,15 @@ export function PostFeed({
       postEl?.scrollIntoView({ behavior: "smooth", block: "center" });
 
       if (focusCommentId) {
+        setCommentPostId(focusPostId);
+        if (!comments[focusPostId]) {
+          try {
+            const list = await api.getPostComments(focusPostId);
+            setComments((prev) => ({ ...prev, [focusPostId]: list }));
+          } catch {
+            /* ignore */
+          }
+        }
         for (let i = 0; i < 30; i++) {
           if (cancelled) return;
           if (commentHighlightRef.current) {
@@ -390,58 +399,67 @@ export function PostFeed({
                   </p>
                 ) : null}
                 {commentPostId === post.id && (
-                  <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="px-4 pt-3 space-y-2.5">
+                  <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="px-4 pt-4 pb-2 space-y-4 border-t border-border/40 mt-3">
                     {(comments[post.id] ?? []).map((c) => {
                       const isMine = c.authorId === user?.id;
                       const authorLabel = isMine ? "You" : partner?.name?.split(" ")[0] ?? "Partner";
+                      const commentUser = isMine ? user : partner;
                       const isFocused = focusCommentId === c.id;
                       return (
                         <div
                           key={c.id}
                           ref={isFocused ? commentHighlightRef : undefined}
-                          className={`flex gap-2.5 items-start rounded-xl px-2.5 py-2 ${isFocused ? "bg-primary/10 ring-1 ring-primary/25" : "bg-secondary/30"}`}
+                          className={`flex gap-3 items-end ${isFocused ? "animate-pulse" : ""}`}
                         >
-                          <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${isMine ? "bg-primary/15 text-primary" : "bg-sky-500/15 text-sky-600"}`}>
-                            <Reply className="w-3.5 h-3.5" />
+                          {!isMine && (
+                            <AvatarImage user={commentUser} className="w-8 h-8 shrink-0 mb-1 shadow-sm border border-border/50" />
+                          )}
+                          
+                          <div className={`flex flex-col ${isMine ? "items-end ml-auto" : "items-start mr-auto"}`}>
+                            <span className="text-[10px] text-muted-foreground font-medium mb-1 px-1">{authorLabel}</span>
+                            <div className="flex items-center gap-2 group/comment">
+                              {isMine && (
+                                <button
+                                  type="button"
+                                  onClick={() => deleteComment(post.id, c.id)}
+                                  disabled={deletingCommentId === c.id}
+                                  className="p-1.5 text-red-500/60 hover:text-red-500 bg-red-500/5 hover:bg-red-500/15 rounded-full shrink-0 transition-colors disabled:opacity-50"
+                                  aria-label="Delete comment"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              )}
+                              
+                              <div className={`px-4 py-2.5 rounded-2xl max-w-[240px] sm:max-w-[300px] break-words shadow-sm ${
+                                isMine 
+                                  ? "bg-primary text-primary-foreground rounded-br-sm" 
+                                  : "bg-secondary text-secondary-foreground rounded-bl-sm"
+                              }`}>
+                                <p className="text-sm leading-relaxed">{c.text}</p>
+                              </div>
+                            </div>
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs leading-relaxed">
-                              <span className="font-semibold">{authorLabel}</span>{" "}
-                              <span className="text-foreground/90">{c.text}</span>
-                            </p>
-                          </div>
-                          {isMine ? (
-                            <button
-                              type="button"
-                              onClick={() => deleteComment(post.id, c.id)}
-                              disabled={deletingCommentId === c.id}
-                              className="p-1.5 text-muted-foreground hover:text-destructive rounded-lg hover:bg-destructive/10 shrink-0"
-                              aria-label="Delete comment"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          ) : null}
                         </div>
                       );
                     })}
-                    <div className="flex gap-2 items-center pt-1">
-                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                        <MessageSquare className="w-4 h-4 text-primary" />
-                      </div>
+                    
+                    <div className="flex gap-2.5 items-center pt-3 border-t border-border/30 mt-2">
+                      <AvatarImage user={user} className="w-8 h-8 shrink-0 shadow-sm border border-border/50" />
                       <input
                         value={commentText}
                         onChange={(e) => setCommentText(e.target.value)}
-                        placeholder="Write a comment…"
-                        className="flex-1 text-sm px-3 py-2.5 bg-secondary/50 rounded-full border border-border/50 outline-none focus:border-primary/40"
+                        placeholder="Add a comment..."
+                        className="flex-1 text-sm px-4 py-2.5 bg-secondary/50 rounded-full border border-border/50 outline-none focus:border-primary/50 focus:bg-secondary transition-colors"
                         onKeyDown={(e) => e.key === "Enter" && submitComment(post.id)}
                       />
                       <button
                         type="button"
                         onClick={() => submitComment(post.id)}
-                        className="w-9 h-9 bg-primary text-primary-foreground flex items-center justify-center rounded-full shrink-0"
+                        disabled={!commentText.trim()}
+                        className="w-10 h-10 bg-primary text-primary-foreground flex items-center justify-center rounded-full shrink-0 disabled:opacity-50 shadow-sm hover:scale-105 active:scale-95 transition-all"
                         aria-label="Post comment"
                       >
-                        <Send className="w-4 h-4" />
+                        <Send className="w-4 h-4 translate-x-[1px]" />
                       </button>
                     </div>
                   </motion.div>
