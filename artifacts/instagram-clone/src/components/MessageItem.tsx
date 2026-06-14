@@ -375,7 +375,7 @@ export const MessageItem = memo(function MessageItem({
                   a.click();
                   a.remove();
                 }}
-                className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center opacity-0 group-hover/media:opacity-100 transition-opacity z-10 hover:bg-black/70"
+                className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/40 text-white flex items-center justify-center transition-opacity z-10 hover:bg-black/70 shadow-sm"
                 aria-label="Download image"
               >
                 <Download className="w-4 h-4" />

@@ -1851,7 +1851,7 @@ export default function Messages() {
   const openMediaMessage = useCallback(async (msg: ApiMessage, stack?: ApiMessage[]) => {
     const viewMode = msg.mediaViewMode ?? parseMediaViewMode(msg.companionSticker);
     const timed = viewMode === "once" || viewMode === "twice";
-    const allowDownload = false;
+    const allowDownload = !timed;
     
     let items: { url: string; kind: "image" | "video"; id: string }[] | undefined;
     let initialIndex = 0;

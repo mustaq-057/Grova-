@@ -200,7 +200,7 @@ export function MediaViewerOverlay({
     >
 
       <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
-        {allowDownload && mediaReady && (
+        {allowDownload && internalReady && (
           <button
             type="button"
             onClick={() => void handleDownload()}
