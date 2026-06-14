@@ -1,5 +1,45 @@
 import { getAccessToken } from "./session";
 
+const localBlobMap = new Map<string, string>();
+
+export function registerLocalBlobUrl(remoteUrl: string | undefined, localBlobUrl: string | undefined) {
+  if (!remoteUrl || !localBlobUrl) return;
+  localBlobMap.set(remoteUrl, localBlobUrl);
+
+  // Index by both full proxy URL and clean upstream URL if possible
+  if (remoteUrl.includes("/api/media/inline")) {
+    try {
+      const origin = typeof window !== "undefined" ? window.location.origin : "http://local.grova";
+      const inner = new URL(remoteUrl, origin).searchParams.get("url");
+      if (inner) localBlobMap.set(inner, localBlobUrl);
+    } catch {
+      // ignore
+    }
+  }
+}
+
+export function getLocalBlobUrl(url: string | undefined): string | undefined {
+  if (!url) return undefined;
+  if (url.startsWith("blob:") || url.startsWith("data:")) return url;
+
+  let matched = localBlobMap.get(url);
+  if (matched) return matched;
+
+  if (url.startsWith("/api/media/inline")) {
+    try {
+      const origin = typeof window !== "undefined" ? window.location.origin : "http://local.grova";
+      const inner = new URL(url, origin).searchParams.get("url");
+      if (inner) {
+        matched = localBlobMap.get(inner);
+        if (matched) return matched;
+      }
+    } catch {
+      // ignore
+    }
+  }
+  return undefined;
+}
+
 /** Backblaze B2 S3 URLs are not public — load through /api/media/inline (same as avatars). */
 export function needsStorageProxy(url: string): boolean {
   try {
@@ -16,6 +56,9 @@ export function resolveStorageMediaUrl(
 ): string | undefined {
   if (!url?.trim()) return undefined;
   const trimmed = url.trim();
+
+  const local = getLocalBlobUrl(trimmed);
+  if (local) return local;
 
   if (trimmed.startsWith("blob:") || trimmed.startsWith("data:")) return trimmed;
 

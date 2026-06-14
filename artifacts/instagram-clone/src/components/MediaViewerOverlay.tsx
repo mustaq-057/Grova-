@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Download, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { Download, X, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { tryRefreshSession } from "@/lib/api";
 import { resolveMediaDownloadUrl } from "@/lib/media-url";
@@ -254,6 +254,12 @@ export function MediaViewerOverlay({
               className={`w-2 h-2 rounded-full transition-colors ${idx === currentIndex ? 'bg-white' : 'bg-white/30'}`}
             />
           ))}
+        </div>
+      )}
+
+      {!internalReady && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
+          <Loader2 className="w-10 h-10 text-white/50 animate-spin" />
         </div>
       )}
 

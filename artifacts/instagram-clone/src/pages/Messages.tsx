@@ -115,7 +115,7 @@ import {
   saveChatScrollAnchor,
   shouldRestoreScrollAnchor,
 } from "@/lib/chat-scroll-anchor";
-import { resolveChatImageUrl, resolveChatVideoUrl } from "@/lib/media-url";
+import { resolveChatImageUrl, resolveChatVideoUrl, registerLocalBlobUrl } from "@/lib/media-url";
 import DoodleCanvas, { type DoodleData } from "@/components/DoodleCanvas";
 import { ImageCropModal } from "@/components/ImageCropModal";
 import { partnerTypingLine } from "@/lib/partner-words";
@@ -261,6 +261,8 @@ export default function Messages() {
   const [unreadChat, setUnreadChat] = useState(0);
   const [isNearBottom, setIsNearBottom] = useState(true);
   const isNearBottomRef = useRef(true);
+  const lastScrollTopRef = useRef(0);
+  const lastScrollHeightRef = useRef(0);
   const [hasNewMessages, setHasNewMessages] = useState(false);
 
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -431,6 +433,7 @@ export default function Messages() {
       try {
         const url = await uploadMediaFile(data.blob, "image/png");
         if (!url?.trim()) throw new Error("Upload returned empty URL");
+        registerLocalBlobUrl(url, data.imageData);
 
         const outgoing = await prepareOutgoingMessage({
           senderId: user.id,
@@ -1451,11 +1454,27 @@ export default function Messages() {
     const container = messagesContainerRef.current;
     if (!container) return;
 
+    lastScrollTopRef.current = container.scrollTop;
+    lastScrollHeightRef.current = container.scrollHeight;
+
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
     const handleScroll = () => {
       const { scrollHeight, scrollTop, clientHeight } = container;
-      const isNear = scrollHeight - (scrollTop + clientHeight) < 100;
+      
+      // If scrollTop didn't change (or changed very little), but scrollHeight changed,
+      // this is likely a layout shift (like an image loading).
+      const isLayoutShift = Math.abs(scrollTop - lastScrollTopRef.current) < 5 && scrollHeight !== lastScrollHeightRef.current;
+      
+      lastScrollTopRef.current = scrollTop;
+      lastScrollHeightRef.current = scrollHeight;
+
+      if (isLayoutShift) {
+        // Do not update the near bottom states during a layout shift!
+        return;
+      }
+
+      const isNear = scrollHeight - (scrollTop + clientHeight) < 150;
       isNearBottomRef.current = isNear;
       if (!isNear) stickToBottomRef.current = false;
 
@@ -1756,6 +1775,7 @@ export default function Messages() {
       requestStickToBottom();
       try {
         const url = await uploadMediaFile(file, mime);
+        registerLocalBlobUrl(url, localPreview);
         const sticker =
           mediaViewMode === "once" ? "__vm:once" : mediaViewMode === "twice" ? "__vm:twice" : undefined;
         const outgoing = await prepareOutgoingMessage({
@@ -1773,7 +1793,6 @@ export default function Messages() {
           writeChatCache(user.id, next);
           return next;
         });
-        requestAnimationFrame(() => URL.revokeObjectURL(localPreview));
       } catch (err) {
         URL.revokeObjectURL(localPreview);
         pendingOutgoingRef.current.delete(tempId);
@@ -1822,6 +1841,7 @@ export default function Messages() {
 
       try {
         const url = await uploadMediaFile(file, mime);
+        registerLocalBlobUrl(url, localPreview);
         const outgoing = await prepareOutgoingMessage({
           senderId: user.id,
           ...(kind === "image"
@@ -1847,12 +1867,13 @@ export default function Messages() {
         requestStickToBottom();
       } catch (err) {
         console.error("Failed to send ephemeral media:", err);
+        if (localPreview) {
+          try { URL.revokeObjectURL(localPreview); } catch {}
+        }
         pendingOutgoingRef.current.delete(tempId);
         setMessages((prev) => prev.filter((m) => m.id !== tempId));
         setError("Message did not send. Check your connection and try again.");
         throw err;
-      } finally {
-        if (localPreview) URL.revokeObjectURL(localPreview);
       }
     },
     [user, online, requestStickToBottom],
@@ -2513,6 +2534,7 @@ export default function Messages() {
             }
 
             const url = await uploadMediaFile(normalized, mime);
+            registerLocalBlobUrl(url, previewUrl);
 
             const sticker = mediaModeSticker(viewMode);
             const outgoing = await prepareOutgoingMessage({
@@ -2535,14 +2557,13 @@ export default function Messages() {
             });
             requestStickToBottom();
           } catch (videoErr) {
+            try { URL.revokeObjectURL(previewUrl); } catch {}
             pendingOutgoingRef.current.delete(tempId);
             setMessages((prev) => prev.filter((m) => m.id !== tempId));
             toast.error(
               videoErr instanceof Error ? videoErr.message : "Failed to send video.",
               { duration: 4000 },
             );
-          } finally {
-            URL.revokeObjectURL(previewUrl);
           }
         }
       } catch (error) {
@@ -2877,9 +2898,11 @@ export default function Messages() {
     messagesSigRef.current = "0";
     clearChatCache(user.id);
     clearChatScrollAnchor(user.id);
+    const clearPromise = clearChatForUser(user.id);
     setHiddenTick((t) => t + 1);
     try {
-      await clearChatForUser(user.id);
+      await clearPromise;
+      setHiddenTick((t) => t + 1);
       writeChatCache(user.id, []);
     } catch (err) {
       console.error("Failed to clear chat:", err);
