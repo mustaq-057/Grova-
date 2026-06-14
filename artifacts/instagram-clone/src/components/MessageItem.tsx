@@ -367,7 +367,7 @@ export const MessageItem = memo(function MessageItem({
                 onClick={(e) => {
                   e.stopPropagation();
                   const a = document.createElement("a");
-                  a.href = resolveMediaDownloadUrl(msg.imageUrl || msg.imageData || imageDisplaySrc, msg.type);
+                  a.href = resolveMediaDownloadUrl(msg.imageUrl || msg.imageData || imageDisplaySrc, "image");
                   a.download = `grova-${msg.type}-${Date.now()}.jpg`;
                   a.target = "_blank";
                   a.rel = "noopener noreferrer";
