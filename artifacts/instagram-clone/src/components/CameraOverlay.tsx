@@ -199,7 +199,6 @@ export function CameraOverlay({ onClose, onCapture }: CameraOverlayProps) {
               {vintageMode && (
                 <>
                   <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(circle, rgba(0,0,0,0) 30%, rgba(0,0,0,0.7) 100%)" }} />
-                  <div className="absolute inset-0 pointer-events-none opacity-30 mix-blend-overlay" style={{ backgroundImage: "url('data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.8%22 numOctaves=%224%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E')" }} />
                   <div className="absolute inset-0 pointer-events-none" style={{ background: "repeating-linear-gradient(rgba(0,0,0,0.1) 0, rgba(0,0,0,0.1) 2px, transparent 2px, transparent 4px)" }} />
                   <div className="absolute bottom-6 right-6 font-mono text-2xl font-bold text-[#ff9900] tracking-widest pointer-events-none" style={{ textShadow: "0 0 10px rgba(255,153,0,0.5)" }}>
                     '{String(new Date().getFullYear()).slice(-2)} {String(new Date().getMonth() + 1).padStart(2, '0')} {String(new Date().getDate()).padStart(2, '0')}
@@ -228,7 +227,7 @@ export function CameraOverlay({ onClose, onCapture }: CameraOverlayProps) {
               {vintageMode ? (
                 <div className="w-5 h-5 rounded-full border-2 border-white" />
               ) : (
-                <img src="/vintage-camera.png" alt="Vintage" className="w-full h-full object-cover" />
+                <img src="/vintage-camera.png" alt="Vintage" loading="eager" fetchPriority="high" className="w-full h-full object-cover bg-neutral-800" />
               )}
             </button>
 
@@ -238,7 +237,7 @@ export function CameraOverlay({ onClose, onCapture }: CameraOverlayProps) {
               className={`w-20 h-20 rounded-full border-4 flex items-center justify-center active:scale-90 transition-all ${vintageMode ? "border-[#ff9900]/80 shadow-[0_0_20px_rgba(255,153,0,0.4)] p-0.5" : "border-white"}`}
             >
               {vintageMode ? (
-                <img src="/vintage-camera.png" alt="Vintage Camera" className="w-full h-full rounded-full object-cover" />
+                <img src="/vintage-camera.png" alt="Vintage Camera" loading="eager" fetchPriority="high" className="w-full h-full rounded-full object-cover bg-neutral-800" />
               ) : (
                 <div className="w-16 h-16 rounded-full transition-colors bg-white" />
               )}
