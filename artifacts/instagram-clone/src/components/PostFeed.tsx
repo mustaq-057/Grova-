@@ -412,7 +412,7 @@ export function PostFeed({
                           className={`flex gap-3 items-end ${isFocused ? "animate-pulse" : ""}`}
                         >
                           {!isMine && (
-                            <AvatarImage user={commentUser} className="w-8 h-8 shrink-0 mb-1 shadow-sm border border-border/50" />
+                            <AvatarImage src={commentUser?.avatar} userId={commentUser?.id ?? ""} alt={commentUser?.name ?? "User"} className="w-8 h-8 shrink-0 mb-1 shadow-sm border border-border/50" />
                           )}
                           
                           <div className={`flex flex-col ${isMine ? "items-end ml-auto" : "items-start mr-auto"}`}>
@@ -444,7 +444,7 @@ export function PostFeed({
                     })}
                     
                     <div className="flex gap-2.5 items-center pt-3 border-t border-border/30 mt-2">
-                      <AvatarImage user={user} className="w-8 h-8 shrink-0 shadow-sm border border-border/50" />
+                      <AvatarImage src={user?.avatar} userId={user?.id ?? ""} alt={user?.name ?? "You"} className="w-8 h-8 shrink-0 shadow-sm border border-border/50" />
                       <input
                         value={commentText}
                         onChange={(e) => setCommentText(e.target.value)}

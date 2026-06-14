@@ -82,13 +82,23 @@ export function getChatClearedAt(userId: string): string | null {
 }
 
 export async function clearChatForUser(userId: string): Promise<string> {
-  const res = await api.clearChatForMe();
-  const clearedAt = res.clearedAt || new Date().toISOString();
-  clearedAtByUser.set(userId, clearedAt);
-  persistClearedAt(userId, clearedAt);
+  const optimisticClearedAt = new Date().toISOString();
+  clearedAtByUser.set(userId, optimisticClearedAt);
+  persistClearedAt(userId, optimisticClearedAt);
   hiddenByUser.set(userId, new Set());
   persistHiddenIds(userId, new Set());
-  return clearedAt;
+  
+  try {
+    const res = await api.clearChatForMe();
+    if (res.clearedAt) {
+      clearedAtByUser.set(userId, res.clearedAt);
+      persistClearedAt(userId, res.clearedAt);
+      return res.clearedAt;
+    }
+  } catch (err) {
+    console.error("clearChatForMe API failed, relying on optimistic local clear:", err);
+  }
+  return optimisticClearedAt;
 }
 
 export async function hideMessageForUser(userId: string, messageId: string): Promise<void> {
