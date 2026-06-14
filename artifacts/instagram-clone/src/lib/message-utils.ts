@@ -116,6 +116,7 @@ export async function prepareOutgoingMessage(
     replyToId: partial.replyToId,
     replyToText: partial.replyToText,
     replyToSenderId: partial.replyToSenderId,
+    fontStyle: partial.fontStyle,
   };
 }
 
@@ -203,6 +204,7 @@ export function buildOptimisticMessage(
     replyToText: partial.replyToText,
     replyToSenderId: partial.replyToSenderId,
     mediaViewMode: ephemeral ? mediaViewMode : partial.mediaViewMode,
+    fontStyle: partial.fontStyle,
   };
 }
 
