@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { X, Image as ImageIcon, RefreshCcw, Zap, ZapOff, Film } from "lucide-react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import vintageCameraImg from "../vintage-camera.png";
 
 interface CameraOverlayProps {
   onClose: () => void;
@@ -224,7 +225,7 @@ export function CameraOverlay({ onClose, onCapture }: CameraOverlayProps) {
               {vintageMode ? (
                 <div className="w-5 h-5 rounded-full border-2 border-white" />
               ) : (
-                <img src="/vintage-camera.png" alt="Vintage" loading="eager" fetchPriority="high" className="w-full h-full object-cover bg-neutral-800" />
+                <img src={vintageCameraImg} alt="Vintage" loading="eager" fetchPriority="high" className="w-full h-full object-cover bg-neutral-800" />
               )}
             </button>
 
@@ -234,7 +235,7 @@ export function CameraOverlay({ onClose, onCapture }: CameraOverlayProps) {
               className={`w-20 h-20 rounded-full border-4 flex items-center justify-center active:scale-90 transition-all ${vintageMode ? "border-[#ff9900]/80 shadow-[0_0_20px_rgba(255,153,0,0.4)] p-0.5" : "border-white"}`}
             >
               {vintageMode ? (
-                <img src="/vintage-camera.png" alt="Vintage Camera" loading="eager" fetchPriority="high" className="w-full h-full rounded-full object-cover bg-neutral-800" />
+                <img src={vintageCameraImg} alt="Vintage Camera" loading="eager" fetchPriority="high" className="w-full h-full rounded-full object-cover bg-neutral-800" />
               ) : (
                 <div className="w-16 h-16 rounded-full transition-colors bg-white" />
               )}
