@@ -46,6 +46,7 @@ export function PostFeed({
   const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null);
   const commentHighlightRef = useRef<HTMLDivElement | null>(null);
   const focusHandledRef = useRef<string | null>(null);
+  const activeFocusKeyRef = useRef<string | null>(null);
 
   const loadPosts = useCallback(async () => {
     try {
@@ -215,6 +216,9 @@ export function PostFeed({
 
 
   useEffect(() => {
+    if (!focusPostId) {
+      activeFocusKeyRef.current = null;
+    }
     focusHandledRef.current = null;
   }, [focusPostId, focusCommentId]);
 
@@ -222,54 +226,49 @@ export function PostFeed({
     if (!focusPostId || posts.length === 0) return;
     const focusKey = `${focusPostId}:${focusCommentId ?? ""}`;
     if (focusHandledRef.current === focusKey) return;
+    if (activeFocusKeyRef.current === focusKey) return;
 
-    let cancelled = false;
+    activeFocusKeyRef.current = focusKey;
+
     void (async () => {
+      const isCurrent = () => activeFocusKeyRef.current === focusKey;
+
       if (!posts.some((p) => p.id === focusPostId)) {
         try {
           const post = await api.getPostById(focusPostId);
+          if (!isCurrent()) return;
           setPosts(prev => [...prev, post].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
         } catch {
+          if (!isCurrent()) return;
           await loadPosts();
         }
-        if (cancelled) return;
+        if (!isCurrent()) return;
       }
 
       await openComments(focusPostId);
-      if (cancelled) return;
+      if (!isCurrent()) return;
 
       const postEl = await waitForElement(`[data-testid="post-${focusPostId}"]`);
-      if (cancelled) return;
+      if (!isCurrent()) return;
       postEl?.scrollIntoView({ behavior: "smooth", block: "center" });
 
       if (focusCommentId) {
-        setCommentPostId(focusPostId);
-        if (!comments[focusPostId]) {
-          try {
-            const list = await api.getPostComments(focusPostId);
-            setComments((prev) => ({ ...prev, [focusPostId]: list }));
-          } catch {
-            /* ignore */
-          }
-        }
         for (let i = 0; i < 30; i++) {
-          if (cancelled) return;
+          if (!isCurrent()) return;
           if (commentHighlightRef.current) {
             commentHighlightRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
             break;
           }
-          await new Promise((r) => window.setTimeout(r, 10));
+          await new Promise((r) => window.setTimeout(r, 20));
         }
       }
 
+      if (!isCurrent()) return;
       focusHandledRef.current = focusKey;
+      activeFocusKeyRef.current = null;
       window.history.replaceState({}, "", "/");
       window.dispatchEvent(new Event("grova-search-changed"));
     })();
-
-    return () => {
-      cancelled = true;
-    };
   }, [focusPostId, focusCommentId, posts, comments[focusPostId ?? ""]?.length, loadPosts]);
 
   const submitComment = async (postId: string) => {
