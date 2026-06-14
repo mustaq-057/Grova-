@@ -343,9 +343,14 @@ export async function authenticateBearerOrQuery(
 // Optional authentication - doesn't fail if no token
 export async function optionalAuth(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
   const authHeader = req.headers.authorization;
-  
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    const token = authHeader.substring(7);
+  const cookieToken =
+    req && typeof (req as unknown as { cookies?: Record<string, string> }).cookies?.grova_token === "string"
+      ? (req as unknown as { cookies: Record<string, string> }).cookies.grova_token
+      : undefined;
+
+  const token = authHeader?.startsWith("Bearer ") ? authHeader.substring(7) : cookieToken;
+
+  if (token) {
     const session = await validateSession(token);
     
     if (session) {

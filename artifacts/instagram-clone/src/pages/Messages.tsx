@@ -280,6 +280,7 @@ export default function Messages() {
   const pendingRequestsRef = useRef<Map<string, Promise<any>>>(new Map());
   const previousMessagesLengthRef = useRef(0);
   const isInitialLoadRef = useRef(true);
+  const initialServerFetchDoneRef = useRef(false);
   const initialLoadTimeRef = useRef(Date.now());
   const stickToBottomRef = useRef(false);
   const lastMessageTailRef = useRef("");
@@ -584,6 +585,7 @@ export default function Messages() {
         }
       })
       .finally(() => {
+        initialServerFetchDoneRef.current = true;
         pendingRequestsRef.current.delete(requestId);
       });
 
@@ -1297,21 +1299,29 @@ export default function Messages() {
     const firstPaint = isInitialLoadRef.current;
     const isOwnLast = last?.senderId === user?.id;
 
-    if (firstPaint && !pendingScrollRestoreRef.current && !firstPaintScrollDoneRef.current && !highlightParam) {
-      firstPaintScrollDoneRef.current = true;
-      const container = messagesContainerRef.current;
-      if (container) {
-        scrollChatToBottom(container, bottomRef.current);
-        isNearBottomRef.current = true;
-        setHasNewMessages(false);
-        window.requestAnimationFrame(() => {
+    if (firstPaint && !pendingScrollRestoreRef.current && !highlightParam) {
+      if (messages.length > 0 && !firstPaintScrollDoneRef.current) {
+        const container = messagesContainerRef.current;
+        if (container) {
           scrollChatToBottom(container, bottomRef.current);
-          isInitialLoadRef.current = false;
-        });
+          isNearBottomRef.current = true;
+          setHasNewMessages(false);
+          if (initialServerFetchDoneRef.current) {
+            firstPaintScrollDoneRef.current = true;
+          }
+          window.requestAnimationFrame(() => {
+            scrollChatToBottom(container, bottomRef.current);
+            if (initialServerFetchDoneRef.current) {
+              isInitialLoadRef.current = false;
+            }
+          });
+        }
       }
     } else if (firstPaint && highlightParam) {
-      firstPaintScrollDoneRef.current = true;
-      isInitialLoadRef.current = false;
+      if (initialServerFetchDoneRef.current) {
+        firstPaintScrollDoneRef.current = true;
+        isInitialLoadRef.current = false;
+      }
     }
 
     const restoreAnchor = pendingScrollRestoreRef.current;
