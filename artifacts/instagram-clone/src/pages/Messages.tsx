@@ -3151,8 +3151,8 @@ export default function Messages() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="font-semibold text-sm" data-testid="chat-partner-name">{pName}</p>
-              <p className={`text-xs flex items-center ${isTyping ? "text-primary" : presence.online ? "text-green-400" : "text-muted-foreground"}`}>
-                {isTyping ? `${pName} is typing...` : presence.label}
+              <p className={`text-xs flex items-center ${presence.online ? "text-green-400" : "text-muted-foreground"}`}>
+                {presence.label}
               </p>
             </div>
             <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
