@@ -389,6 +389,15 @@ html[data-photo-theme="true"] .app-chrome [class*="bg-card"] {
   background-color: hsl(var(--card));
 }
 
+html[data-photo-theme="true"] .chat-panel {
+  background-color: transparent !important;
+}
+
+html[data-photo-theme="true"] .chat-inbox {
+  background-color: hsl(var(--background) / 0.92) !important;
+  backdrop-filter: blur(12px);
+}
+
 /* Glass morphism effects */
 .glass-input {
   background: rgba(255, 255, 255, 0.05);

@@ -196,7 +196,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Main content area */}
       {isChat ? (
-        <main className="flex-1 overflow-hidden relative min-h-0 h-full md:pb-0">
+        <main className="flex-1 overflow-hidden relative z-10 min-h-0 h-full md:pb-0">
           {children}
         </main>
       ) : (

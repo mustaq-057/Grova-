@@ -28,7 +28,7 @@ export const ChatInbox = memo(function ChatInbox({
   const presence = usePresenceLabel(partnerLastSeen);
 
   return (
-    <aside className="hidden lg:flex flex-col w-[280px] border-r border-border bg-background shrink-0 h-full">
+    <aside className="chat-inbox hidden lg:flex flex-col w-[280px] border-r border-border shrink-0 h-full relative z-10">
       <div className="flex items-center justify-between px-4 py-3 border-b border-border">
         <span className="font-semibold text-base truncate">{userName}</span>
       </div>

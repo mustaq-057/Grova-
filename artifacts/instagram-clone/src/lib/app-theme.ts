@@ -227,7 +227,7 @@ export function themeUsesPhotoBackground(themeId?: AppThemeId): boolean {
 export function getThemeBackgroundOpacity(themeId?: AppThemeId): number {
   const id = themeId ?? getStoredAppTheme();
   if (id === "sara-lavender") return 0.32;
-  if (id === "floura") return 0.65;
+  if (id === "floura") return 1.0;
   return 0.28;
 }
 
@@ -244,8 +244,8 @@ export function getPhotoScrimGradient(themeId: AppThemeId, dark: boolean): strin
   }
   if (themeId === "floura") {
     return dark
-      ? "linear-gradient(180deg, rgba(30,40,25,0.4) 0%, rgba(30,40,25,0.75) 100%)"
-      : "linear-gradient(180deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.6) 100%)";
+      ? "linear-gradient(180deg, rgba(30,40,25,0.1) 0%, rgba(30,40,25,0.4) 100%)"
+      : "linear-gradient(180deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.3) 100%)";
   }
   return dark
     ? "linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.88) 100%)"
