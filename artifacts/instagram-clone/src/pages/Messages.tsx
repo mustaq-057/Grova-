@@ -1290,9 +1290,10 @@ export default function Messages() {
 
   useEffect(() => {
     if (chatAnimationsEnabled) return;
-    const t = window.setTimeout(() => setChatAnimationsEnabled(true), 500);
+    if (messages.length === 0) return; // Wait until initial messages are rendered
+    const t = window.setTimeout(() => setChatAnimationsEnabled(true), 100);
     return () => window.clearTimeout(t);
-  }, [chatAnimationsEnabled]);
+  }, [chatAnimationsEnabled, messages.length]);
 
   useEffect(() => {
     const onTheme = () => setAppThemeId(getStoredAppTheme());
