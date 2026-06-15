@@ -4,7 +4,7 @@ export type LiveChannel =
   | { mode: "sse"; eventSource: EventSource }
   | { mode: "poll"; intervalMs: number; stop: () => void };
 
-export function startPollChannel(onPoll: () => void, intervalMs = 1_000): LiveChannel {
+export function startPollChannel(onPoll: () => void, intervalMs = 5_000): LiveChannel {
   const id = window.setInterval(onPoll, intervalMs);
   window.setTimeout(onPoll, 350);
   return {
@@ -30,7 +30,7 @@ export async function openLiveChannel(
     if (contentType.includes("application/json")) {
       const body = (await probe.json()) as { mode?: string; pollIntervalMs?: number };
       if (body.mode === "poll") {
-        return startPollChannel(onPoll, body.pollIntervalMs ?? 1_000);
+        return startPollChannel(onPoll, body.pollIntervalMs ?? 5_000);
       }
     } else {
       controller.abort();

@@ -800,7 +800,7 @@ export default function Messages() {
 
       if (channel.mode === "poll") {
         livePollStop = channel.stop;
-        presencePollId = window.setInterval(syncPresenceFromServer, 1_000);
+        presencePollId = window.setInterval(syncPresenceFromServer, 5_000);
         void syncPresenceFromServer();
         return;
       }
@@ -1169,7 +1169,7 @@ export default function Messages() {
           void openLiveChannel(user!.id, pollSyncMessages, { forcePoll: true }).then((channel) => {
             if (!mounted || !channel || channel.mode !== "poll") return;
             livePollStop = channel.stop;
-            presencePollId = window.setInterval(syncPresenceFromServer, 1_000);
+            presencePollId = window.setInterval(syncPresenceFromServer, 5_000);
             void syncPresenceFromServer();
           });
           return;
