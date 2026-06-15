@@ -41,6 +41,18 @@ export const SUPPORTED_FILE_TYPES = {
     "image/tiff": ".tiff",
     "image/x-icon": ".ico",
     "image/heic": ".heic",
+    "image/heif": ".heif",
+  },
+
+  // Videos
+  videos: {
+    "video/mp4": ".mp4",
+    "video/webm": ".webm",
+    "video/quicktime": ".mov",
+    "video/x-m4v": ".m4v",
+    "video/x-matroska": ".mkv",
+    "video/3gpp": ".3gp",
+    "video/x-msvideo": ".avi",
   },
 
   // Audio
