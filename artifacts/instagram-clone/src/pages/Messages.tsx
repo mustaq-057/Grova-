@@ -1468,7 +1468,6 @@ export default function Messages() {
     if (!container) return;
     let raf = 0;
     const ro = new ResizeObserver(() => {
-      if (isInitialLoadRef.current) return;
       if (!isNearBottomRef.current && !stickToBottomRef.current) return;
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(() => {
