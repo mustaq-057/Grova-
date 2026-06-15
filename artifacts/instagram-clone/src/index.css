@@ -393,6 +393,18 @@ html[data-photo-theme="true"] .chat-panel {
   background-color: transparent !important;
 }
 
+html[data-photo-theme="true"] .chat-panel-top,
+html[data-photo-theme="true"] .chat-panel-input {
+  background: transparent !important;
+  backdrop-filter: none !important;
+}
+
+html[data-photo-theme="true"] .message-input-pill {
+  background: rgba(255, 255, 255, 0.08) !important;
+  backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
 html[data-photo-theme="true"] .chat-inbox {
   background-color: hsl(var(--background) / 0.92) !important;
   backdrop-filter: blur(12px);

@@ -41,7 +41,7 @@ export const ThemeBackgroundOverlay = memo(function ThemeBackgroundOverlay({ the
       aria-hidden
       style={{
         backgroundImage: `url(${url})`,
-        backgroundSize: "cover",
+        backgroundSize: themeId === "floura" ? "100% 100%" : "cover",
         backgroundPosition: "center",
         opacity,
         filter: "brightness(0.9) saturate(1.05)",
