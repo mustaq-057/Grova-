@@ -692,12 +692,28 @@ export default function Messages() {
     let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
     let livePollStop: (() => void) | null = null;
     let presencePollId: number | null = null;
+    let localPartnerLastSeen = 0;
+    let presenceTickCount = 0;
+    let pollTickCount = 0;
 
     const syncPresenceFromServer = () => {
       if (!mounted) return;
+      if (document.visibilityState !== "visible" || !navigator.onLine) return;
+
+      const partnerActive = (Date.now() - localPartnerLastSeen) < 60_000;
+      if (!partnerActive) {
+        presenceTickCount++;
+        if (presenceTickCount % 5 !== 0) return;
+      } else {
+        presenceTickCount = 0;
+      }
+
       void api.getPresence().then((raw) => {
         const { lastSeen, typing } = parsePresenceResponse(raw);
-        if (lastSeen[partnerId] != null) setPartnerLastSeen(lastSeen[partnerId]);
+        if (lastSeen[partnerId] != null) {
+          setPartnerLastSeen(lastSeen[partnerId]);
+          localPartnerLastSeen = lastSeen[partnerId];
+        }
         const partnerTyping = Boolean(typing[partnerId]);
         setIsTyping(partnerTyping);
         if (partnerTyping) {
@@ -743,6 +759,16 @@ export default function Messages() {
 
     const pollSyncMessages = () => {
       if (!mounted) return;
+      if (document.visibilityState !== "visible" || !navigator.onLine) return;
+
+      const partnerActive = (Date.now() - localPartnerLastSeen) < 60_000;
+      if (!partnerActive) {
+        pollTickCount++;
+        if (pollTickCount % 5 !== 0) return;
+      } else {
+        pollTickCount = 0;
+      }
+
       const container = messagesContainerRef.current;
       const readingHistory = !isNearBottomRef.current && !stickToBottomRef.current;
       if (readingHistory && container) {
@@ -977,7 +1003,10 @@ export default function Messages() {
         if (!mounted) return;
         try {
           const d = JSON.parse(e.data) as { userId: string; lastSeen: number };
-          if (d.userId === partnerId) setPartnerLastSeen(d.lastSeen);
+          if (d.userId === partnerId) {
+            setPartnerLastSeen(d.lastSeen);
+            localPartnerLastSeen = d.lastSeen;
+          }
         } catch (err) {
           console.error("Failed to handle presence:", err);
         }

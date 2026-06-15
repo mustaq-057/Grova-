@@ -5,8 +5,16 @@ export type LiveChannel =
   | { mode: "poll"; intervalMs: number; stop: () => void };
 
 export function startPollChannel(onPoll: () => void, intervalMs = 1_000): LiveChannel {
-  const id = window.setInterval(onPoll, intervalMs);
-  window.setTimeout(onPoll, 350);
+  const id = window.setInterval(() => {
+    if (document.visibilityState === "visible" && navigator.onLine) {
+      onPoll();
+    }
+  }, intervalMs);
+  window.setTimeout(() => {
+    if (document.visibilityState === "visible" && navigator.onLine) {
+      onPoll();
+    }
+  }, 350);
   return {
     mode: "poll",
     intervalMs,
