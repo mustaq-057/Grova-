@@ -5,7 +5,8 @@ import { loadPersistedDarkMode, persistDarkMode } from "./couple-prefs-persist";
 export type AppThemeId =
   | "sakura-fall"
   | "sara-lavender"
-  | "moonlight-saga";
+  | "moonlight-saga"
+  | "floura";
 
 const PREMIUM_ANIMATED_THEMES: AppThemeId[] = ["moonlight-saga"];
 
@@ -21,6 +22,7 @@ const RETIRED_THEME_ALIASES: Record<string, AppThemeId> = {
 
 const THEME_BACKGROUNDS: Partial<Record<AppThemeId, string>> = {
   "sara-lavender": "/themes/sara-lilies.jpg",
+  "floura": "/themes/saralikedtheme.png",
 };
 
 export const APP_THEME_CHANGED = "grova-app-theme-changed";
@@ -33,6 +35,28 @@ export const APP_THEMES: {
   dark: Record<string, string>;
   light: Record<string, string>;
 }[] = [
+    {
+      id: "floura",
+      name: "Floura",
+      description: "A beautiful floral landscape ♡",
+      swatch: "bg-gradient-to-br from-pink-300 via-green-200 to-green-600",
+      dark: {
+        "--app-background": "100 20% 12%",
+        "--app-foreground": "0 0% 98%",
+        "--app-primary": "330 75% 78%",
+        "--app-card": "100 22% 16%",
+        "--app-secondary": "100 18% 20%",
+        "--app-border": "100 14% 28%",
+      },
+      light: {
+        "--app-background": "100 30% 98%",
+        "--app-foreground": "100 25% 16%",
+        "--app-primary": "330 65% 52%",
+        "--app-card": "0 0% 100%",
+        "--app-secondary": "100 28% 95%",
+        "--app-border": "100 22% 88%",
+      },
+    },
     {
       id: "sara-lavender",
       name: "Sara",
@@ -203,6 +227,7 @@ export function themeUsesPhotoBackground(themeId?: AppThemeId): boolean {
 export function getThemeBackgroundOpacity(themeId?: AppThemeId): number {
   const id = themeId ?? getStoredAppTheme();
   if (id === "sara-lavender") return 0.32;
+  if (id === "floura") return 0.65;
   return 0.28;
 }
 
@@ -216,6 +241,11 @@ export function getPhotoScrimGradient(themeId: AppThemeId, dark: boolean): strin
     return dark
       ? "linear-gradient(180deg, rgba(28,14,32,0.68) 0%, rgba(28,14,32,0.84) 55%, rgba(28,14,32,0.92) 100%)"
       : "linear-gradient(180deg, rgba(255,246,252,0.7) 0%, rgba(255,246,252,0.86) 55%, rgba(255,246,252,0.93) 100%)";
+  }
+  if (themeId === "floura") {
+    return dark
+      ? "linear-gradient(180deg, rgba(30,40,25,0.4) 0%, rgba(30,40,25,0.75) 100%)"
+      : "linear-gradient(180deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.6) 100%)";
   }
   return dark
     ? "linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.88) 100%)"

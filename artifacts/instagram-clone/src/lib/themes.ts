@@ -20,7 +20,13 @@ export function darkenHex(hex: string, amount = 0.28): string {
   return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, "0")}`;
 }
 
-export function getPartnerBubbleColors(theme: Pick<ChatTheme, "bubbleColor" | "bubbleBorder">) {
+export function getPartnerBubbleColors(theme: Pick<ChatTheme, "bubbleColor" | "bubbleBorder"> & { id?: string }) {
+  if (theme.id === "floura-override") {
+    return {
+      fill: "#5C7C49",
+      border: "#5C7C49",
+    };
+  }
   return {
     fill: darkenHex(theme.bubbleColor, 0.32),
     border: darkenHex(theme.bubbleBorder, 0.15),
