@@ -3136,13 +3136,14 @@ export default function Messages() {
         />
       )}
       <div
-        className={`chat-panel flex-1 min-w-0 h-full min-h-0 relative bg-black ${premiumChatClass}`}
+        className={`chat-panel flex-1 min-w-0 h-full min-h-0 relative ${premiumChatClass}`}
       >
+        {showChatAurora && <ChatAuroraLayer />}
 
 
         <div className="chat-panel-top shrink-0 z-20 flex flex-col relative">
           {/* ── Header ── */}
-          <div className="chat-panel-header flex items-center gap-1.5 sm:gap-2 px-1.5 sm:px-3 py-1 sm:py-1.5 border-b shrink-0 text-white">
+          <div className="chat-panel-header flex items-center gap-1.5 sm:gap-2 px-1.5 sm:px-3 py-1 sm:py-1.5 border-b shrink-0 text-foreground">
             <div className="relative shrink-0">
               <AvatarImage src={pAvatar} userId={partnerId} alt={pName} className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover" />
               {presence.online && (

@@ -276,12 +276,8 @@
   color: #fff;
 }
 
-/* Chat panel — background stays black; scoped tokens so light app mode doesn't hide controls */
+/* Chat panel — adapts to theme */
 .chat-panel {
-  --chat-header-bg: 0 0% 8%;
-  --foreground: 0 0% 96%;
-  --muted-foreground: 0 0% 65%;
-  color: hsl(0 0% 96%);
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   overflow: hidden;
@@ -289,7 +285,8 @@
 
 .chat-panel-top {
   grid-row: 1;
-  background: hsl(var(--chat-header-bg));
+  background: hsl(var(--background) / 0.85);
+  backdrop-filter: blur(8px);
 }
 
 .chat-panel-messages {
@@ -316,17 +313,17 @@
 }
 
 .chat-panel .chat-muted {
-  color: hsl(0 0% 65%);
+  color: hsl(var(--muted-foreground));
 }
 
 .chat-panel-header {
-  background: hsl(var(--chat-header-bg) / 0.98);
-  border-color: hsl(0 0% 20%);
+  border-color: hsl(var(--border) / 0.5);
 }
 
 .chat-panel-input {
-  background: hsl(0 0% 8% / 0.98);
-  border-color: hsl(0 0% 20%);
+  background: hsl(var(--background) / 0.85);
+  backdrop-filter: blur(8px);
+  border-color: hsl(var(--border) / 0.5);
   padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px));
 }
 
