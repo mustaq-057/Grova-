@@ -10,11 +10,12 @@ import {
   type AppThemeId,
 } from "@/lib/app-theme";
 
-type Props = { themeId: AppThemeId };
+type Props = { themeId: AppThemeId; isChat?: boolean };
 
 /** Full-screen themed photo behind app chrome — soft, never hides UI. */
-export const ThemeBackgroundOverlay = memo(function ThemeBackgroundOverlay({ themeId }: Props) {
-  const url = getThemeBackgroundUrl(themeId);
+export const ThemeBackgroundOverlay = memo(function ThemeBackgroundOverlay({ themeId, isChat }: Props) {
+  const defaultUrl = getThemeBackgroundUrl(themeId);
+  const url = (themeId === "mint" && isChat) ? "/mint-chat.jpg" : defaultUrl;
   const [hidden, setHidden] = useState(false);
   const [dark, setDark] = useState(() => getStoredDarkMode());
 
@@ -32,7 +33,7 @@ export const ThemeBackgroundOverlay = memo(function ThemeBackgroundOverlay({ the
 
   if (!url || hidden) return null;
 
-  const opacity = getThemeBackgroundOpacity(themeId);
+  const opacity = (themeId === "mint" && isChat) ? 0.8 : getThemeBackgroundOpacity(themeId);
   const scrim = themeUsesPhotoScrim(themeId);
 
   return createPortal(

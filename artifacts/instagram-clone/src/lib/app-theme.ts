@@ -6,7 +6,8 @@ export type AppThemeId =
   | "sakura-fall"
   | "sara-lavender"
   | "moonlight-saga"
-  | "floura";
+  | "floura"
+  | "mint";
 
 const PREMIUM_ANIMATED_THEMES: AppThemeId[] = ["moonlight-saga"];
 
@@ -23,6 +24,7 @@ const RETIRED_THEME_ALIASES: Record<string, AppThemeId> = {
 const THEME_BACKGROUNDS: Partial<Record<AppThemeId, string>> = {
   "sara-lavender": "/themes/sara-lilies.jpg",
   "floura": "/themes/saralikedtheme.png",
+  "mint": "/mint-home.png",
 };
 
 export const APP_THEME_CHANGED = "grova-app-theme-changed";
@@ -55,6 +57,28 @@ export const APP_THEMES: {
         "--app-card": "0 0% 100%",
         "--app-secondary": "100 28% 95%",
         "--app-border": "100 22% 88%",
+      },
+    },
+    {
+      id: "mint",
+      name: "Mint",
+      description: "A calming creamy mint aesthetic 🌿",
+      swatch: "bg-gradient-to-br from-green-100 via-emerald-200 to-green-300",
+      dark: {
+        "--app-background": "120 15% 12%",
+        "--app-foreground": "120 15% 95%",
+        "--app-primary": "140 40% 30%",
+        "--app-card": "120 15% 16%",
+        "--app-secondary": "120 15% 20%",
+        "--app-border": "120 10% 25%",
+      },
+      light: {
+        "--app-background": "45 25% 94%",
+        "--app-foreground": "120 40% 18%",
+        "--app-primary": "120 45% 22%",
+        "--app-card": "45 25% 90%",
+        "--app-secondary": "45 30% 88%",
+        "--app-border": "45 20% 84%",
       },
     },
     {
@@ -228,6 +252,7 @@ export function getThemeBackgroundOpacity(themeId?: AppThemeId): number {
   const id = themeId ?? getStoredAppTheme();
   if (id === "sara-lavender") return 0.32;
   if (id === "floura") return 1.0;
+  if (id === "mint") return 1.0; // Mint uses a full vivid background
   return 0.28;
 }
 
@@ -246,6 +271,11 @@ export function getPhotoScrimGradient(themeId: AppThemeId, dark: boolean): strin
     return dark
       ? "linear-gradient(180deg, rgba(30,40,25,0.1) 0%, rgba(30,40,25,0.4) 100%)"
       : "linear-gradient(180deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.3) 100%)";
+  }
+  if (themeId === "mint") {
+    return dark
+      ? "linear-gradient(180deg, rgba(20,30,20,0.4) 0%, rgba(20,30,20,0.6) 100%)"
+      : "linear-gradient(180deg, rgba(235,235,225,0.3) 0%, rgba(225,230,215,0.5) 100%)";
   }
   return dark
     ? "linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.88) 100%)"

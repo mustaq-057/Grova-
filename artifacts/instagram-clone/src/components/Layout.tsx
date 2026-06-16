@@ -136,7 +136,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-[100dvh] app-chrome bg-background text-foreground overflow-hidden relative">
-      {showThemeBg && <ThemeBackgroundOverlay themeId={appTheme} />}
+      {showThemeBg && <ThemeBackgroundOverlay themeId={appTheme} isChat={isChat} />}
       {showPremiumScene && <PremiumThemeOverlay themeId={appTheme} />}
       {showAurora && !showPremiumScene && <></>}
       {showSakura && <FallingFlowersOverlay />}

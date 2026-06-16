@@ -12,6 +12,7 @@ import { PARTNER_CHANGED } from "@/lib/couple-sync";
 import { parsePresenceResponse } from "@/lib/presence-api";
 import { USER_TIMEZONES } from "@/lib/timezones";
 import { readSessionSnapshot } from "@/lib/profile-cache";
+import { getStoredAppTheme, APP_THEME_CHANGED, type AppThemeId } from "@/lib/app-theme";
 
 export default memo(function Home() {
   const { user, partner: authPartner } = useAuth();
@@ -22,8 +23,15 @@ export default memo(function Home() {
   const [moroccoTime, setMoroccoTime] = useState("");
   const [indiaTime, setIndiaTime] = useState("");
   const [loadingPartner, setLoadingPartner] = useState(() => !authPartner && !readSessionSnapshot()?.partner);
+  const [appThemeId, setAppThemeId] = useState<AppThemeId>(() => getStoredAppTheme());
 
   const partnerId = user?.id === "me" ? "wife" : "me";
+
+  useEffect(() => {
+    const onTheme = () => setAppThemeId(getStoredAppTheme());
+    window.addEventListener(APP_THEME_CHANGED, onTheme);
+    return () => window.removeEventListener(APP_THEME_CHANGED, onTheme);
+  }, []);
 
   useEffect(() => {
     if (authPartner) {
@@ -109,6 +117,122 @@ export default memo(function Home() {
     { href: "/memories", icon: Heart, label: "Memories", desc: "Your moments" },
     { href: "/create", icon: ImagePlus, label: "Photos", desc: "Upload an image" },
   ];
+
+  const isMint = appThemeId === "mint";
+
+  if (isMint) {
+    return (
+      <div className="max-w-[470px] mx-auto pb-20 md:pb-6 min-h-screen text-[#1E2E1B]">
+        {/* We hide the default top bar for Mint for a cleaner look, or just keep it very transparent */}
+        
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.1, duration: 0.3 }}
+          className="px-4 pt-12 pb-6 text-center"
+        >
+          <p className="text-sm font-medium tracking-wide opacity-80 font-serif">Welcome back</p>
+          <h1 className="text-4xl mt-1 font-serif text-[#1e331b] drop-shadow-sm font-bold tracking-tight">
+            {user?.name ?? "You"}
+          </h1>
+
+          {loadingPartner ? (
+             <div className="flex items-center justify-center gap-3 mt-8">
+               <div className="w-16 h-16 rounded-full bg-black/10 animate-pulse" />
+               <Heart className="w-6 h-6 text-[#1E2E1B] fill-[#1E2E1B]" />
+               <div className="w-16 h-16 rounded-full bg-black/10 animate-pulse" />
+             </div>
+          ) : partner && (
+            <Link href="/chat">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.2, duration: 0.3 }}
+                className="flex flex-col items-center justify-center mt-8 cursor-pointer group"
+              >
+                <div className="flex items-center justify-center gap-4">
+                  <div className="relative">
+                    <AvatarImage
+                      src={user?.avatar}
+                      userId={user?.id ?? "me"}
+                      alt=""
+                      className="w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-[3px] border-white shadow-md bg-background group-hover:scale-105 transition-transform"
+                    />
+                    <div className="absolute bottom-0 right-0 w-5 h-5 sm:w-6 sm:h-6 bg-green-500 rounded-full border-[3px] border-[#d8e3ce] z-20 shadow-sm" />
+                  </div>
+                  
+                  <Heart className="w-6 h-6 sm:w-7 sm:h-7 text-[#233a1e] fill-[#233a1e]" />
+
+                  <div className="relative">
+                    <AvatarImage
+                      src={partner.avatar}
+                      userId={partner.id}
+                      alt=""
+                      className="w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-[3px] border-white shadow-md bg-background group-hover:scale-105 transition-transform"
+                    />
+                    <div className={`absolute bottom-0 right-0 w-5 h-5 sm:w-6 sm:h-6 rounded-full border-[3px] border-[#d8e3ce] z-20 shadow-sm ${partnerOnline ? "bg-green-500" : "bg-gray-400"}`} />
+                  </div>
+                </div>
+
+                <p className="text-lg font-serif italic mt-5 font-semibold text-[#1E2E1B] drop-shadow-sm flex items-center gap-2">
+                  <span className="text-lg opacity-70">🌿</span> 
+                  You & {partner.name} 
+                  <span className="text-lg opacity-70">🌿</span>
+                </p>
+              </motion.div>
+            </Link>
+          )}
+
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3, duration: 0.3 }}
+            className="flex items-center justify-center gap-3 mt-8"
+          >
+            <div className="flex items-center gap-2 px-4 py-2 bg-[#dce5cd]/60 border border-[#b8cc9b]/40 rounded-full shadow-sm">
+              <Clock className="w-4 h-4 text-[#2a4522]" />
+              <span className="text-[13px] font-semibold text-[#2a4522]">Morocco: {moroccoTime}</span>
+              <span className="text-sm ml-1 opacity-80">🌲</span>
+            </div>
+            <div className="flex items-center gap-2 px-4 py-2 bg-[#dce5cd]/60 border border-[#b8cc9b]/40 rounded-full shadow-sm">
+              <Clock className="w-4 h-4 text-[#2a4522]" />
+              <span className="text-[13px] font-semibold text-[#2a4522]">India: {indiaTime}</span>
+              <span className="text-sm ml-1 opacity-80">🌲</span>
+            </div>
+          </motion.div>
+        </motion.div>
+
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4, duration: 0.4 }}
+          className="grid grid-cols-2 gap-4 px-5 mt-2"
+        >
+          {shortcuts.map((s, i) => {
+            const Icon = s.icon;
+            return (
+              <Link key={s.href} href={s.href}>
+                <div className="relative p-5 h-36 bg-[#e4edd6]/80 backdrop-blur-md border border-[#c3d6ac]/50 rounded-2xl shadow-sm hover:shadow-md hover:bg-[#dce6cb] transition-all cursor-pointer group overflow-hidden">
+                  <div className="w-11 h-11 rounded-2xl bg-[#2b4221] flex items-center justify-center mb-3 text-white shadow-inner group-hover:scale-105 transition-transform">
+                    <Icon className="w-5 h-5" strokeWidth={2.5} />
+                  </div>
+                  <p className="font-serif font-bold text-[17px] text-[#1e331b] leading-tight">{s.label}</p>
+                  <p className="text-[11px] font-medium text-[#3b5930]/80 mt-1 uppercase tracking-wider">{s.desc}</p>
+                  
+                  {/* Decorative background element */}
+                  <div className="absolute -bottom-4 -right-4 w-24 h-24 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-[#98b87c]/20 to-transparent blur-xl pointer-events-none" />
+                </div>
+              </Link>
+            );
+          })}
+        </motion.div>
+
+        <div className="mt-8">
+          <PostFeed focusPostId={focusPostId} focusCommentId={focusCommentId} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-[470px] mx-auto pb-20 md:pb-6">
