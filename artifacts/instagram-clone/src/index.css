@@ -298,6 +298,15 @@
   padding-bottom: 1.25rem;
 }
 
+.chat-panel-messages > * {
+  overflow-anchor: none;
+}
+
+.scroll-anchor-bottom {
+  overflow-anchor: auto;
+  height: 1px;
+  width: 100%;
+}
 /* Avoid content-visibility on .chat-message-row — it underestimates height and breaks stick-to-bottom. */
 .chat-panel-bottom {
   grid-row: 3;
