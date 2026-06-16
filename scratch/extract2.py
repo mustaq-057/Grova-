@@ -3,7 +3,7 @@ import numpy as np
 import os
 import shutil
 
-image_path = "themes/stickerz.png"
+image_path = "themes/image.png"
 output_dir = "artifacts/instagram-clone/public/stickerz"
 
 if os.path.exists(output_dir):
@@ -11,7 +11,7 @@ if os.path.exists(output_dir):
 os.makedirs(output_dir)
 
 img = cv2.imread(image_path)
-bg_color = np.array([240, 249, 251], dtype=np.int16)
+bg_color = np.array([241, 250, 253], dtype=np.int16)
 
 # Calculate difference from background
 diff = np.abs(img.astype(np.int16) - bg_color)

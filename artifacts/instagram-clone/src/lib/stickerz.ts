@@ -36,8 +36,6 @@ export const CUSTOM_STICKERZ: CustomSticker[] = [
   // Islamic Couple
   { id: "pookie-17", url: "/stickerz/17.png", caption: "Making dua", category: "Islamic Couple" },
   { id: "pookie-18", url: "/stickerz/18.png", caption: "Iftar together", category: "Islamic Couple" },
-  { id: "pookie-19", url: "/stickerz/19.png", caption: "Eid mubarak", category: "Islamic Couple" },
-  { id: "pookie-20", url: "/stickerz/20.png", caption: "Masjid walk", category: "Islamic Couple" },
   { id: "pookie-21", url: "/stickerz/21.png", caption: "Quran together", category: "Islamic Couple" },
   { id: "pookie-22", url: "/stickerz/22.png", caption: "Ramadan moon", category: "Islamic Couple" },
   { id: "pookie-23", url: "/stickerz/23.png", caption: "Pray for me", category: "Islamic Couple" },

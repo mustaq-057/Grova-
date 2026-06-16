@@ -2,7 +2,7 @@ import cv2
 import os
 import shutil
 
-image_path = "themes/stickerz.png"
+image_path = "themes/image.png"
 output_dir = "artifacts/instagram-clone/public/stickerz"
 
 shutil.rmtree(output_dir, ignore_errors=True)
