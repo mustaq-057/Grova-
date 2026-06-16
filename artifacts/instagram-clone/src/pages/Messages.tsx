@@ -12,6 +12,7 @@ import type { GreetingTemplate } from "@/lib/greeting-messages";
 import { normalizeMessages, previewMessagesForDisplay, prepareOutgoingMessage, buildOptimisticMessage, buildSeenLabel, findLastSeenOutgoingId, messagePreview, replyPreviewLabel, collectImageStack, parseMediaViewMode } from "@/lib/message-utils";
 import { ImageStackBubble } from "@/components/ImageStackBubble";
 import { MediaViewerOverlay } from "@/components/MediaViewerOverlay";
+import type { CustomSticker } from "@/lib/stickerz";
 import { callStartedText, callEndedText, isCallLogMessage } from "@/lib/call-chat-log";
 import { usePresenceLabel } from "@/hooks/usePresenceLabel";
 import { groupByDay, shouldShowTimeGap } from "@/lib/message-helpers";
@@ -2311,6 +2312,14 @@ export default function Messages() {
     },
     [sendMsg],
   );
+
+  const sendCustomSticker = useCallback(
+    (sticker: CustomSticker) => {
+      sendMsg({ imageUrl: sticker.url, type: "image", text: sticker.caption });
+    },
+    [sendMsg],
+  );
+
   const sendGif = useCallback((url: string) => sendMsg({ gifUrl: url, type: "gif" }), [sendMsg]);
 
   const sendImage = useCallback((dataUrl: string) => sendMsg({ imageData: dataUrl, type: "image" }), [sendMsg]);
@@ -3472,6 +3481,7 @@ export default function Messages() {
                 ) : undefined
               }
               onStickerSelect={sendSticker}
+              onCustomStickerSelect={sendCustomSticker}
               onGifSelect={sendGif}
               onGreetingSelect={sendGreeting}
               onImageSelect={(file, itemType) => {

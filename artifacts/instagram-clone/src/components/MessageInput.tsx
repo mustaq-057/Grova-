@@ -5,6 +5,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import EmojiPicker from "@/components/EmojiPicker";
 import StickerPicker from "@/components/StickerPicker";
 import GreetingPicker from "@/components/GreetingPicker";
+import { StickerzPicker } from "@/components/StickerzPicker";
+import type { CustomSticker } from "@/lib/stickerz";
 import { extractClipboardFiles, readClipboardFilesAsync } from "@/lib/media-file";
 import { useChatTheme } from "@/hooks/useChatTheme";
 import { isSupportedFileType, MAX_FILE_SIZE_MB, DOCUMENTS_ONLY_ACCEPT } from "@/lib/supported-file-types";
@@ -24,6 +26,7 @@ interface MessageInputProps {
   onShareLocation?: () => void;
   sharingLocation?: boolean;
   onStickerSelect: (sticker: string) => void;
+  onCustomStickerSelect?: (sticker: CustomSticker) => void;
   onGifSelect: (gif: string) => void;
   onGreetingSelect: (greeting: unknown) => void;
   onImageSelect: (file: File | File[], clipboardItemType?: string) => void;
@@ -41,7 +44,7 @@ interface MessageInputProps {
   replyPreview?: React.ReactNode;
 }
 
-type OpenPicker = "emoji" | "sticker" | "greeting" | null;
+type OpenPicker = "emoji" | "sticker" | "greeting" | "stickerz" | null;
 
 export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputProps>(function MessageInput({
   onSendMessage,
@@ -49,6 +52,7 @@ export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputPro
   onShareLocation,
   sharingLocation = false,
   onStickerSelect,
+  onCustomStickerSelect,
   onGifSelect,
   onGreetingSelect,
   onImageSelect,
@@ -235,6 +239,11 @@ export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputPro
     setShowAttachmentMenu(false);
   }, []);
 
+  const toggleStickerzPicker = useCallback(() => {
+    setShowAttachmentMenu(false);
+    setOpenPicker((p) => (p === "stickerz" ? null : "stickerz"));
+  }, []);
+
   const toggleQuickReplies = useCallback(() => {
     setShowAttachmentMenu(false);
     setOpenPicker((p) => (p === "greeting" ? null : "greeting"));
@@ -263,6 +272,11 @@ export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputPro
     onGreetingSelect(greeting);
     setOpenPicker(null);
   }, [onGreetingSelect]);
+
+  const handleCustomStickerSelect = useCallback((sticker: CustomSticker) => {
+    onCustomStickerSelect?.(sticker);
+    setOpenPicker(null);
+  }, [onCustomStickerSelect]);
 
   const iconBtn =
     "p-2 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 shrink-0";
@@ -379,6 +393,18 @@ export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputPro
                 <CustomFileIcon />
               </div>
               <span>Files</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={toggleStickerzPicker}
+              className="flex items-center gap-[20px] px-[24px] py-[15px] text-[17px] font-normal hover:bg-white/5 transition-colors w-full text-left text-white"
+              disabled={disabled}
+            >
+              <div className="w-[28px] h-[28px] flex items-center justify-center shrink-0">
+                <Sparkles className="w-[26px] h-[26px] text-white" strokeWidth={1.6} />
+              </div>
+              <span>Stickerz</span>
             </button>
 
             <button
@@ -541,6 +567,12 @@ export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputPro
         <StickerPicker
           onSelect={handleStickerSelect}
           onSelectGif={handleGifSelect}
+          onClose={() => setOpenPicker(null)}
+        />
+      )}
+      {openPicker === "stickerz" && (
+        <StickerzPicker
+          onSelect={handleCustomStickerSelect}
           onClose={() => setOpenPicker(null)}
         />
       )}
