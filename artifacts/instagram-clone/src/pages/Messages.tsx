@@ -1402,14 +1402,13 @@ export default function Messages() {
     const shouldStick =
       !isPrependingRef.current &&
       !pendingScrollRestoreRef.current &&
-      !firstPaint &&
       (stickToBottomRef.current ||
-        (isOwnLast && tailChanged && isNearBottomRef.current));
+        (!firstPaint && isOwnLast && tailChanged && isNearBottomRef.current));
 
     if (shouldStick) {
       scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
       setHasNewMessages(false);
-      stickToBottomRef.current = false;
+      
       if (firstPaint) {
         isInitialLoadRef.current = false;
       }
@@ -1523,16 +1522,16 @@ export default function Messages() {
         return;
       }
 
-      // If user manually scrolls up, instantly break the "stick" to prevent snapping back down
+      // If user manually scrolls up, instantly break the "stick"
       const isScrollingUp = scrollTop < lastScrollTopRef.current;
       if (isScrollingUp) {
         stickToBottomRef.current = false;
       }
 
-      // Tightened threshold from 150px to 40px to prevent accidental snaps when slightly scrolled up
+      // If user scrolls near the bottom, re-enable stickiness
       const isNear = scrollHeight - (scrollTop + clientHeight) < 40;
       isNearBottomRef.current = isNear;
-      if (!isNear) stickToBottomRef.current = false;
+      if (isNear) stickToBottomRef.current = true;
 
       if (debounceTimer) clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => {

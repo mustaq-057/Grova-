@@ -484,7 +484,7 @@ export const MessageItem = memo(function MessageItem({
             )}
           </div>
         </div>
-      ) : displayText && !isImageSticker ? (
+      ) : displayText && (msg.type === "text" || msg.type === "heart" || msg.type === "sticker") ? (
         <div className={cn(msg.companionSticker && !msg.companionSticker.startsWith("__vm:") && msg.companionSticker !== "🤲" && "flex items-start gap-1.5")}>
           {msg.companionSticker && !msg.companionSticker.startsWith("__vm:") && msg.companionSticker !== "🤲" && (
             <span className="text-xl leading-snug shrink-0">{msg.companionSticker}</span>
