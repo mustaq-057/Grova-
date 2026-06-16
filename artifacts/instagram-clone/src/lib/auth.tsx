@@ -278,10 +278,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let es: EventSource | null = null;
     let stopLive: (() => void) | null = null;
 
+    let pollCount = 0;
     const onLivePoll = () => {
       void hydrateNotifications();
       if (!window.location.pathname.includes("/chat")) {
         void syncChatBadgeFromServer();
+      }
+      pollCount++;
+      // Sync couple prefs every 5 polls (approx 5 seconds) to catch theme changes
+      // from partner when SSE is disabled on Vercel
+      if (pollCount % 5 === 0) {
+        void refreshCouplePrefs();
       }
     };
 
