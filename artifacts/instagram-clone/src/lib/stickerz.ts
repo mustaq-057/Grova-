@@ -1,3 +1,5 @@
+import { registerLocalBlobUrl } from "./media-url";
+
 export type StickerCategory =
   | "Forest Romance"
   | "Cozy Night"
@@ -70,6 +72,15 @@ export function preloadStickerz() {
       link.as = "image";
       link.href = sticker.url;
       document.head.appendChild(link);
+
+      // Also fetch it to memory as a blob URL for 0ms rendering in MessageItem
+      fetch(sticker.url)
+        .then(res => res.blob())
+        .then(blob => {
+          const objectUrl = URL.createObjectURL(blob);
+          registerLocalBlobUrl(sticker.url, objectUrl);
+        })
+        .catch(() => {}); // silent fail, link preload acts as fallback
     });
   };
 

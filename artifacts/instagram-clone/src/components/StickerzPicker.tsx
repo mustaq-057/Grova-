@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { getLocalBlobUrl } from "@/lib/media-url";
 import { X, Search } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CUSTOM_STICKERZ, type CustomSticker } from "@/lib/stickerz";
@@ -73,11 +74,11 @@ export function StickerzPicker({ onSelect, onClose }: StickerzPickerProps) {
                 >
                   <div className="w-full aspect-square rounded-lg overflow-hidden bg-white/5 flex items-center justify-center">
                     <img 
-                      src={sticker.url} 
+                      src={getLocalBlobUrl(sticker.url) || sticker.url} 
                       alt={sticker.caption} 
                       className="w-full h-full object-cover transition-transform group-hover:scale-110"
                       loading="eager"
-                      decoding="async"
+                      fetchPriority="high"
                     />
                   </div>
                   <span className="text-[9px] text-center text-white/70 line-clamp-1 w-full px-0.5 leading-tight group-hover:text-white">
