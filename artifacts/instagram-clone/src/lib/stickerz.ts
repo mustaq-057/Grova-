@@ -62,16 +62,17 @@ export function preloadStickerz() {
   if (typeof window === "undefined" || preloaded) return;
   preloaded = true;
   
+  // Immediately inject preload links into the head so the browser's native network stack handles it optimally
   const doPreload = () => {
     CUSTOM_STICKERZ.forEach((sticker) => {
-      const img = new Image();
-      img.src = sticker.url;
+      const link = document.createElement("link");
+      link.rel = "preload";
+      link.as = "image";
+      link.href = sticker.url;
+      document.head.appendChild(link);
     });
   };
 
-  if ("requestIdleCallback" in window) {
-    window.requestIdleCallback(() => doPreload(), { timeout: 1000 });
-  } else {
-    setTimeout(doPreload, 100);
-  }
+  // Run instantly on next tick
+  setTimeout(doPreload, 0);
 }

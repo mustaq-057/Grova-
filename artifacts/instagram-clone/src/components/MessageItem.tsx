@@ -347,7 +347,7 @@ export const MessageItem = memo(function MessageItem({
                 isDoodle && "shadow-sm",
               )}
               loading="eager"
-              decoding="async"
+              fetchPriority="high"
               referrerPolicy="no-referrer"
               onLoad={(e) => {
                 onMediaLoad?.(msg.id);
