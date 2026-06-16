@@ -57,7 +57,7 @@ export function StickerzPicker({ onSelect, onClose }: StickerzPickerProps) {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-4 pb-8">
+        <div className="flex-1 overflow-y-auto px-4 pb-24">
           {filteredStickers.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-white/50">
               <p>No stickerz found</p>
