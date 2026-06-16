@@ -3537,7 +3537,7 @@ export default function Messages() {
           current={appThemeId}
           onSelect={(themeId) => {
             setAppThemeId(themeId);
-            api.updateCouplePrefs({ appTheme: themeId }).then(refreshCouplePrefs).catch(console.error);
+            api.updateCouplePrefs({ appTheme: themeId }).catch(console.error);
           }}
         />
 

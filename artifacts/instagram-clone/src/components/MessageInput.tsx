@@ -296,7 +296,7 @@ export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputPro
       <button
         type="button"
         onClick={onSendRecording}
-        className="p-2.5 bg-primary text-primary-foreground rounded-full hover:bg-primary/90 transition-all"
+        className="send-btn p-2.5 bg-primary text-primary-foreground rounded-full hover:bg-primary/90 transition-all"
         aria-label="Send voice message"
       >
         <Send className="w-5 h-5" />
@@ -306,7 +306,7 @@ export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputPro
     <button
       type="button"
       onClick={submitMessage}
-      className={`p-2.5 rounded-full transition-all shrink-0 ${
+      className={`send-btn p-2.5 rounded-full transition-all shrink-0 ${
         disabled ? "opacity-50 cursor-not-allowed bg-primary/60" : "bg-primary text-primary-foreground hover:bg-primary/90"
       }`}
       aria-label="Send message"

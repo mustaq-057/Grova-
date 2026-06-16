@@ -92,8 +92,6 @@ export const MessageItem = memo(function MessageItem({
   const [showReactions, setShowReactions] = useState(false);
   const [reactionAnchor, setReactionAnchor] = useState<DOMRect | null>(null);
   const [hovered, setHovered] = useState(false);
-  const [swipeOffset, setSwipeOffset] = useState(0);
-  const [isSwiping, setIsSwiping] = useState(false);
   const [quickReactions, setQuickReactions] = useState(getQuickReactions);
   const [showReactionEmojiPicker, setShowReactionEmojiPicker] = useState(false);
   const [imageLoadFailed, setImageLoadFailed] = useState(false);
@@ -105,8 +103,6 @@ export const MessageItem = memo(function MessageItem({
   const [displayImageSrc, setDisplayImageSrc] = useState<string | undefined>(remoteImageSrc);
   const reactBtnRef = useRef<HTMLButtonElement>(null);
   const bubbleWrapRef = useRef<HTMLDivElement>(null);
-  const touchStartX = useRef(0);
-  const touchStartY = useRef(0);
 
   useEffect(() => onQuickReactionsChanged(setQuickReactions), []);
 
@@ -270,27 +266,6 @@ export const MessageItem = memo(function MessageItem({
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     onOpenMenu?.(msg, rect);
   }, [onOpenMenu, msg]);
-
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX;
-    touchStartY.current = e.touches[0].clientY;
-    setIsSwiping(false);
-  }, []);
-
-  const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    const deltaX = e.touches[0].clientX - touchStartX.current;
-    const deltaY = e.touches[0].clientY - touchStartY.current;
-    if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 10) {
-      setIsSwiping(true);
-      setSwipeOffset(Math.max(-80, Math.min(0, deltaX)));
-    }
-  }, []);
-
-  const handleTouchEnd = useCallback(() => {
-    if (isSwiping && swipeOffset < -50) onReply?.(msg);
-    setSwipeOffset(0);
-    setIsSwiping(false);
-  }, [isSwiping, swipeOffset, onReply, msg]);
 
   if (msg.deleted) {
     return <DeletedMessageNotice isMe={isMe} partnerName={partnerName} />;
@@ -544,14 +519,7 @@ export const MessageItem = memo(function MessageItem({
       data-testid={`message-${msg.id}`}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
       role="listitem"
-      style={{
-        transform: `translateX(${swipeOffset}px)`,
-        transition: isSwiping ? "none" : "none",
-      }}
     >
       {!isMe && !sameSender ? (
         <AvatarImage

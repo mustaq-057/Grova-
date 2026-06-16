@@ -31,6 +31,10 @@ export const ThemeBackgroundOverlay = memo(function ThemeBackgroundOverlay({ the
     };
   }, []);
 
+  useEffect(() => {
+    setHidden(false);
+  }, [themeId]);
+
   if (!url || hidden) return null;
 
   const opacity = (themeId === "mint" && isChat) ? 0.8 : getThemeBackgroundOpacity(themeId);

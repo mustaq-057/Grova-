@@ -1329,12 +1329,12 @@ html[data-theme-id="mint"] .message-input-pill textarea::placeholder {
   opacity: 0.6;
 }
 
-html[data-theme-id="mint"] .message-input-pill button:not(.camera-btn) {
+html[data-theme-id="mint"] .message-input-pill button:not(.camera-btn):not(.send-btn) {
   color: #354A21 !important;
 }
 
 html[data-theme-id="mint"] .message-input-pill .camera-btn,
-html[data-theme-id="mint"] .message-input-pill .bg-primary {
+html[data-theme-id="mint"] .message-input-pill .send-btn {
   background-color: #354A21 !important;
   color: #EBE2CD !important;
 }
@@ -1376,12 +1376,12 @@ html[data-theme-id="library"] .message-input-pill textarea::placeholder {
   opacity: 0.7;
 }
 
-html[data-theme-id="library"] .message-input-pill button:not(.camera-btn) {
+html[data-theme-id="library"] .message-input-pill button:not(.camera-btn):not(.send-btn) {
   color: #3b2a22 !important;
 }
 
 html[data-theme-id="library"] .message-input-pill .camera-btn,
-html[data-theme-id="library"] .message-input-pill .bg-primary {
+html[data-theme-id="library"] .message-input-pill .send-btn {
   background-color: #3b2a22 !important;
   color: #f8f1e7 !important;
 }

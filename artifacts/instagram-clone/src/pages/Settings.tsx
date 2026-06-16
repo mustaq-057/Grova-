@@ -379,7 +379,7 @@ export default memo(function Settings() {
           onSelect={(themeId) => {
             setAppTheme(themeId);
             applyAppTheme(themeId);
-            syncPref({ appTheme: themeId });
+            api.updateCouplePrefs({ appTheme: themeId }).catch(console.error);
           }}
         />
 
