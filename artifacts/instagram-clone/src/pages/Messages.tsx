@@ -1520,7 +1520,14 @@ export default function Messages() {
         return;
       }
 
-      const isNear = scrollHeight - (scrollTop + clientHeight) < 150;
+      // If user manually scrolls up, instantly break the "stick" to prevent snapping back down
+      const isScrollingUp = scrollTop < lastScrollTopRef.current;
+      if (isScrollingUp) {
+        stickToBottomRef.current = false;
+      }
+
+      // Tightened threshold from 150px to 40px to prevent accidental snaps when slightly scrolled up
+      const isNear = scrollHeight - (scrollTop + clientHeight) < 40;
       isNearBottomRef.current = isNear;
       if (!isNear) stickToBottomRef.current = false;
 

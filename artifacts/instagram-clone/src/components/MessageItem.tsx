@@ -113,9 +113,9 @@ export const MessageItem = memo(function MessageItem({
 
 
   const isEmojiOnly = useMemo(() => (msg.type === "text" || msg.type === "heart") && isEmojiOnlyText(msg.text), [msg.type, msg.text]);
-  const isSticker = useMemo(() => msg.type === "sticker", [msg.type]);
-  const isGif = useMemo(() => msg.type === "gif", [msg.type]);
   const isImage = useMemo(() => msg.type === "image" || msg.type === "doodle", [msg.type]);
+  const isSticker = useMemo(() => msg.type === "sticker" || (isImage && Boolean(msg.imageUrl?.includes("/stickerz/"))), [msg.type, isImage, msg.imageUrl]);
+  const isGif = useMemo(() => msg.type === "gif", [msg.type]);
   const isDoodle = useMemo(() => msg.type === "doodle", [msg.type]);
   const isFile = useMemo(() => msg.type === "file", [msg.type]);
   const isVideo = useMemo(() => msg.type === "video", [msg.type]);
@@ -345,6 +345,7 @@ export const MessageItem = memo(function MessageItem({
               className={cn(
                 "max-w-[min(280px,92vw)] max-h-[340px] min-h-[72px] w-auto h-auto object-contain rounded-2xl block cursor-pointer bg-black/15",
                 isDoodle && "shadow-sm",
+                isSticker && "aspect-square w-[200px] h-[200px]"
               )}
               loading="eager"
               fetchPriority="high"

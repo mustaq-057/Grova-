@@ -1524,6 +1524,102 @@ html[data-theme-id="library"] .library-locket-container .fill-primary {
 html[data-theme-id="library"] .library-locket-container .bg-primary\/25,
 html[data-theme-id="library"] .library-locket-container .bg-primary\/40,
 html[data-theme-id="library"] .library-locket-container .bg-primary\/60 {
-  background-color: rgba(184, 153, 71, 0.2) !important;
+/* Library Deep UI Enhancements */
+html[data-theme-id="library"] .wax-seal {
+  background: radial-gradient(circle at 30% 30%, #900000, #5a0000) !important;
+  border: 1px solid #3a0000 !important;
+  box-shadow: inset 0 2px 4px rgba(255,255,255,0.3), 0 2px 4px rgba(0,0,0,0.5) !important;
+  color: #fff !important;
+  font-family: 'Playfair Display', serif;
+  text-shadow: 0 1px 1px rgba(0,0,0,0.8);
+}
+
+html[data-theme-id="library"] a[href="/memories"] .library-shortcut-card {
+  background: #e6dac3 !important;
+  border: 4px solid #f8f1e7 !important;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.4), inset 0 0 20px rgba(0,0,0,0.1) !important;
+  border-radius: 4px !important;
+  transform: rotate(-2deg);
+}
+
+html[data-theme-id="library"] a[href="/memories"] .library-shortcut-card:hover {
+  transform: rotate(0deg) scale(1.05);
+}
+
+html[data-theme-id="library"] a[href="/memories"] .library-shortcut-card::after {
+  display: none !important;
+}
+
+html[data-theme-id="library"] a[href="/memories"] .library-shortcut-title {
+  color: #3b2a22 !important;
+  font-family: 'Caveat', 'Playfair Display', cursive !important;
+  font-size: 1.2rem;
+  text-shadow: none !important;
+}
+
+html[data-theme-id="library"] a[href="/memories"] .library-shortcut-desc {
+  display: none !important;
+}
+
+html[data-theme-id="library"] a[href="/memories"] .library-shortcut-icon-wrapper {
+  border: none !important;
+  background: transparent !important;
   box-shadow: none !important;
+}
+
+html[data-theme-id="library"] a[href="/memories"] .library-shortcut-icon {
+  color: #3b2a22 !important;
+  opacity: 0.8;
+}
+
+/* Mint Frosted Glass Enhancements */
+html[data-theme-id="mint"] .app-chrome,
+html[data-theme-id="mint"] .chat-input-container {
+  background: rgba(255, 255, 255, 0.15) !important;
+  backdrop-filter: blur(24px) saturate(150%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(150%) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.4) !important;
+  box-shadow: 0 -4px 20px rgba(167, 243, 208, 0.1);
+}
+
+html[data-theme-id="mint"] .message-bubble-me {
+  background: linear-gradient(135deg, rgba(167, 243, 208, 0.4), rgba(52, 211, 153, 0.2)) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.5) !important;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.05) !important;
+  color: #064e3b !important;
+}
+
+html[data-theme-id="mint"] .message-bubble-partner {
+  background: rgba(255, 255, 255, 0.3) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.6) !important;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.05) !important;
+  color: #1e293b !important;
+}
+
+html[data-theme-id="mint"] .home-avatar-mint-glow {
+  position: relative;
+}
+
+html[data-theme-id="mint"] .home-avatar-mint-glow::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 140%;
+  height: 140%;
+  background: radial-gradient(circle, rgba(167, 243, 208, 0.35) 0%, transparent 60%);
+  border-radius: 50%;
+  z-index: 0;
+  pointer-events: none;
+  animation: mint-breathe 6s ease-in-out infinite alternate;
+}
+
+@keyframes mint-breathe {
+  0% { opacity: 0.5; transform: translate(-50%, -50%) scale(0.95); }
+  100% { opacity: 1; transform: translate(-50%, -50%) scale(1.05); }
 }

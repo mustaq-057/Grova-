@@ -186,7 +186,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     <div className="relative shrink-0">
                       <Icon className={`w-6 h-6 ${isActive ? "text-primary" : ""}`} strokeWidth={isActive ? 2.5 : 1.5} />
                       {badge > 0 && (
-                        <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 bg-red-600 text-[10px] text-white rounded-full flex items-center justify-center font-bold shadow-md ring-2 ring-background z-30">
+                        <span className={`absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 bg-red-600 text-[10px] text-white rounded-full flex items-center justify-center font-bold shadow-md ring-2 ring-background z-30 ${appTheme === 'library' ? 'wax-seal' : ''}`}>
                           {badge > 9 ? "9+" : badge}
                         </span>
                       )}
@@ -236,7 +236,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 <div className={`relative p-2 sm:p-1.5 rounded-xl ${isActive ? "bg-primary/10" : "group-hover:bg-secondary/50"}`}>
                   <Icon className={`w-5 h-5 sm:w-5 sm:h-5`} strokeWidth={isActive ? 2.5 : 1.5} />
                   {badge > 0 && (
-                    <span className="absolute -top-1.5 -right-1.5 z-30 min-w-[20px] h-5 px-1 bg-red-600 text-[11px] text-white rounded-full flex items-center justify-center font-bold shadow-lg ring-2 ring-background">
+                    <span className={`absolute -top-1.5 -right-1.5 z-30 min-w-[20px] h-5 px-1 bg-red-600 text-[11px] text-white rounded-full flex items-center justify-center font-bold shadow-lg ring-2 ring-background ${appTheme === 'library' ? 'wax-seal' : ''}`}>
                       {badge > 9 ? "9+" : badge}
                     </span>
                   )}
