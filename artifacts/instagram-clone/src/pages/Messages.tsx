@@ -3210,14 +3210,16 @@ export default function Messages() {
               </div>
 
 
-              <button
-                onClick={() => setShowBubbleColors(true)}
-                className="p-1.5 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 active:scale-95 text-muted-foreground hover:text-foreground hover:bg-secondary"
-                aria-label="Chat Colors"
-                title="Chat Colors"
-              >
-                <Palette className="w-4 h-4" strokeWidth={1.5} />
-              </button>
+              {appThemeId !== "mint" && (
+                <button
+                  onClick={() => setShowBubbleColors(true)}
+                  className="p-1.5 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 active:scale-95 text-muted-foreground hover:text-foreground hover:bg-secondary"
+                  aria-label="Chat Colors"
+                  title="Chat Colors"
+                >
+                  <Palette className="w-4 h-4" strokeWidth={1.5} />
+                </button>
+              )}
               <button
                 onClick={() => startCall("audio")}
                 className="hidden sm:inline-flex p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 active:scale-95"
