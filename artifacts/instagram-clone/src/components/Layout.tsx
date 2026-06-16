@@ -31,7 +31,7 @@ import { MobileMenuGrid } from "./MobileMenuGrid";
 import { api } from "@/lib/api";
 import { writeChatCache } from "@/lib/chat-cache";
 import { normalizeMessages } from "@/lib/message-utils";
-import { preloadStickerz } from "@/lib/stickerz";
+import { preloadStickerz, CUSTOM_STICKERZ } from "@/lib/stickerz";
 
 type NavItem = {
   icon: typeof Home;
@@ -265,6 +265,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
         chatBadge={chatBadge}
         notifCount={notifCount}
       />
+
+      {/* Aggressive DOM Preloading for zero-latency sticker rendering */}
+      <div className="hidden" aria-hidden="true" style={{ display: 'none' }}>
+        {CUSTOM_STICKERZ.map(s => (
+          <img key={s.id} src={s.url} loading="eager" fetchPriority="high" alt="" />
+        ))}
+      </div>
     </div>
   );
 }

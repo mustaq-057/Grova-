@@ -1405,3 +1405,125 @@ html[data-theme-id="library"] .seen-glow {
   font-weight: 600;
   letter-spacing: -0.5px;
 }
+
+/* Library Theme Home Screen Overrides */
+html[data-theme-id="library"] .library-home-title {
+  color: #f8f1e7 !important;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+  font-family: 'Playfair Display', Georgia, serif;
+  letter-spacing: 1px;
+}
+
+html[data-theme-id="library"] .library-home-subtitle {
+  color: #d1bfae !important;
+  font-family: 'Playfair Display', Georgia, serif;
+  font-style: italic;
+}
+
+html[data-theme-id="library"] .library-home-name {
+  color: #f8f1e7 !important;
+  font-family: 'Playfair Display', Georgia, serif;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.6);
+  letter-spacing: 0.5px;
+}
+
+html[data-theme-id="library"] .library-locket-container {
+  position: relative;
+}
+
+html[data-theme-id="library"] .library-locket-container::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 140%;
+  height: 140%;
+  background: radial-gradient(circle, rgba(200, 120, 60, 0.15) 0%, transparent 60%);
+  border-radius: 50%;
+  z-index: 0;
+  pointer-events: none;
+  animation: library-candle-flicker 4s ease-in-out infinite alternate;
+}
+
+@keyframes library-candle-flicker {
+  0% { opacity: 0.8; transform: translate(-50%, -50%) scale(0.95); }
+  100% { opacity: 1; transform: translate(-50%, -50%) scale(1.05); }
+}
+
+html[data-theme-id="library"] .library-locket {
+  border: 3px solid #b89947 !important; /* Antique Gold */
+  box-shadow: 0 10px 25px rgba(0,0,0,0.6), inset 0 0 10px rgba(0,0,0,0.8) !important;
+  background: #3b2a22 !important;
+  position: relative;
+  z-index: 10;
+}
+
+html[data-theme-id="library"] .library-home-text {
+  color: #f8f1e7 !important;
+  font-family: 'Playfair Display', Georgia, serif;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+}
+
+html[data-theme-id="library"] .library-shortcut-card {
+  background: linear-gradient(135deg, #3b2a22 0%, #2c1e16 100%) !important;
+  border: 1px solid #4a382c !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05) !important;
+  border-radius: 12px !important;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Leather texture overlay */
+html[data-theme-id="library"] .library-shortcut-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.2;
+  background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23noise)' opacity='0.5'/%3E%3C/svg%3E");
+  pointer-events: none;
+}
+
+html[data-theme-id="library"] .library-shortcut-icon-wrapper {
+  background: transparent !important;
+  border: 1px solid rgba(184, 153, 71, 0.3) !important;
+  border-radius: 50% !important;
+  box-shadow: inset 0 0 10px rgba(184, 153, 71, 0.1);
+  position: relative;
+  z-index: 2;
+}
+
+html[data-theme-id="library"] .library-shortcut-icon {
+  color: #b89947 !important; /* Gold */
+}
+
+html[data-theme-id="library"] .library-shortcut-title {
+  color: #f8f1e7 !important;
+  font-family: 'Playfair Display', Georgia, serif;
+  letter-spacing: 0.5px;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+  position: relative;
+  z-index: 2;
+}
+
+html[data-theme-id="library"] .library-shortcut-desc {
+  color: #b09e8d !important;
+  font-style: italic;
+  font-family: 'Playfair Display', Georgia, serif;
+  position: relative;
+  z-index: 2;
+}
+
+/* Home Heart Icon Gold Styling */
+html[data-theme-id="library"] .library-locket-container .fill-primary {
+  fill: #b89947 !important;
+  color: #b89947 !important;
+  filter: drop-shadow(0 0 8px rgba(184, 153, 71, 0.6)) !important;
+}
+
+html[data-theme-id="library"] .library-locket-container .bg-primary\/25,
+html[data-theme-id="library"] .library-locket-container .bg-primary\/40,
+html[data-theme-id="library"] .library-locket-container .bg-primary\/60 {
+  background-color: rgba(184, 153, 71, 0.2) !important;
+  box-shadow: none !important;
+}
