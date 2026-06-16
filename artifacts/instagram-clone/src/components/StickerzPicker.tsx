@@ -76,7 +76,8 @@ export function StickerzPicker({ onSelect, onClose }: StickerzPickerProps) {
                       src={sticker.url} 
                       alt={sticker.caption} 
                       className="w-full h-full object-cover transition-transform group-hover:scale-110"
-                      loading="lazy"
+                      loading="eager"
+                      decoding="async"
                     />
                   </div>
                   <span className="text-[9px] text-center text-white/70 line-clamp-1 w-full px-0.5 leading-tight group-hover:text-white">
