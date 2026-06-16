@@ -362,11 +362,11 @@ export default function Messages() {
       window.setTimeout(() => el.classList.remove("message-highlight-flash"), 2600);
     };
 
-    const tryScroll = async (): Promise<boolean> => {
+    const tryScroll = async (wait: boolean): Promise<boolean> => {
       let el = document.querySelector(`[data-testid="message-${messageId}"]`) as HTMLElement | null;
       
-      // Wait up to ~400ms for React to render the element if it's not immediately there
-      if (!el) {
+      // Wait up to ~400ms for React to render the element if we expect it to appear
+      if (!el && wait) {
         for (let i = 0; i < 25; i++) {
           await new Promise((r) => requestAnimationFrame(r));
           el = document.querySelector(`[data-testid="message-${messageId}"]`) as HTMLElement | null;
@@ -393,7 +393,7 @@ export default function Messages() {
       return true;
     };
 
-    if (await tryScroll()) return true;
+    if (await tryScroll(false)) return true;
 
     try {
       const data = await api.getMessageContext(messageId, 35);
@@ -406,7 +406,7 @@ export default function Messages() {
       setMessages((prev) => mergeMessagesById(prev, batch));
       setHasMore(data.pagination?.hasMoreBefore ?? hasMore);
 
-      return tryScroll();
+      return tryScroll(true);
     } catch {
       return false;
     }
