@@ -18,6 +18,9 @@ export function CameraOverlay({ onClose, onCapture }: CameraOverlayProps) {
   const [aspectRatio, setAspectRatio] = useState<"Full" | "16:9" | "4:3" | "1:1">("Full");
   const [error, setError] = useState<string | null>(null);
   const [vintageMode, setVintageMode] = useState(false);
+  
+  const [zoom, setZoom] = useState(1);
+  const pinchStartRef = useRef<{ dist: number, zoom: number } | null>(null);
   const startCamera = useCallback(async (mode: "user" | "environment") => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(t => t.stop());
@@ -79,14 +82,17 @@ export function CameraOverlay({ onClose, onCapture }: CameraOverlayProps) {
       ch = vw / targetRatio;
     }
 
+    const cropW = cw / zoom;
+    const cropH = ch / zoom;
+
     const canvas = document.createElement("canvas");
     canvas.width = cw;
     canvas.height = ch;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     
-    const sx = (vw - cw) / 2;
-    const sy = (vh - ch) / 2;
+    const sx = (vw - cropW) / 2;
+    const sy = (vh - cropH) / 2;
 
     if (facingMode === "user") {
       ctx.translate(cw, 0);
@@ -97,7 +103,7 @@ export function CameraOverlay({ onClose, onCapture }: CameraOverlayProps) {
       ctx.filter = "sepia(0.4) contrast(1.1) saturate(1.2) brightness(1.05) hue-rotate(-5deg)";
     }
     
-    ctx.drawImage(video, sx, sy, cw, ch, 0, 0, cw, ch);
+    ctx.drawImage(video, sx, sy, cropW, cropH, 0, 0, cw, ch);
     
     if (vintageMode) {
       ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -145,6 +151,39 @@ export function CameraOverlay({ onClose, onCapture }: CameraOverlayProps) {
     onCapture(file);
   };
 
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      const t1 = e.touches[0];
+      const t2 = e.touches[1];
+      const dist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+      pinchStartRef.current = { dist, zoom };
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 2 && pinchStartRef.current) {
+      const t1 = e.touches[0];
+      const t2 = e.touches[1];
+      const dist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+      const { dist: startDist, zoom: startZoom } = pinchStartRef.current;
+      
+      const delta = dist / startDist;
+      let newZoom = startZoom * delta;
+      newZoom = Math.max(1, Math.min(newZoom, 5));
+      setZoom(newZoom);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    pinchStartRef.current = null;
+  };
+
+  const handleWheel = (e: React.WheelEvent) => {
+    let newZoom = zoom - e.deltaY * 0.005;
+    newZoom = Math.max(1, Math.min(newZoom, 5));
+    setZoom(newZoom);
+  };
+
   return createPortal(
     <AnimatePresence>
       <motion.div
@@ -176,14 +215,22 @@ export function CameraOverlay({ onClose, onCapture }: CameraOverlayProps) {
                style={{ 
                  aspectRatio: aspectRatio === "Full" ? "auto" : aspectRatio === "16:9" ? "9/16" : aspectRatio === "4:3" ? "3/4" : "1/1",
                }}
+               onTouchStart={handleTouchStart}
+               onTouchMove={handleTouchMove}
+               onTouchEnd={handleTouchEnd}
+               onWheel={handleWheel}
             >
               <video
                 ref={videoRef}
                 autoPlay
                 playsInline
                 muted
-                className={`absolute inset-0 w-full h-full object-cover transition-all duration-300 ${facingMode === "user" ? "scale-x-[-1]" : ""}`}
-                style={vintageMode ? { filter: "sepia(0.4) contrast(1.1) saturate(1.2) brightness(1.05) hue-rotate(-5deg)" } : undefined}
+                className={`absolute inset-0 w-full h-full object-cover origin-center ${facingMode === "user" ? "scale-x-[-1]" : ""}`}
+                style={{
+                  transform: `scale(${zoom}) ${facingMode === "user" ? "scaleX(-1)" : ""}`,
+                  filter: vintageMode ? "sepia(0.4) contrast(1.1) saturate(1.2) brightness(1.05) hue-rotate(-5deg)" : "none",
+                  transition: pinchStartRef.current ? "none" : "transform 0.1s ease-out"
+                }}
               />
               {vintageMode && (
                 <>
