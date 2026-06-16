@@ -1,4 +1,4 @@
-export type StickerCategory = 
+export type StickerCategory =
   | "Forest Romance"
   | "Cozy Night"
   | "Islamic Couple"
