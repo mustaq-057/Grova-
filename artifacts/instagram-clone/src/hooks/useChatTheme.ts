@@ -31,5 +31,16 @@ export function useChatTheme() {
     };
   }
 
+  if (appTheme === "mint") {
+    theme = {
+      ...theme,
+      id: "mint",
+      bubbleColor: "#354A21",
+      bubbleBorder: "#354A21",
+      textColor: "#EBE2CD",
+      partnerTextColor: "#354A21"
+    };
+  }
+
   return { themeId, theme };
 }
