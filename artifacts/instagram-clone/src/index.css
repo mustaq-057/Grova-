@@ -1328,3 +1328,16 @@ html[data-theme-id="mint"] .message-input-pill .bg-primary {
   background-color: #354A21 !important;
   color: #EBE2CD !important;
 }
+
+/* Mint Chat Bubbles */
+html[data-theme-id="mint"] .chat-bubble-text.rounded-bl-md {
+  background-color: #EBE2CD !important;
+  border-color: #EBE2CD !important;
+  color: #354A21 !important;
+}
+
+html[data-theme-id="mint"] .chat-bubble-text.rounded-br-md {
+  background-color: #354A21 !important;
+  border-color: #354A21 !important;
+  color: #EBE2CD !important;
+}
