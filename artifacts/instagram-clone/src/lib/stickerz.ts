@@ -55,3 +55,26 @@ export const CUSTOM_STICKERZ: CustomSticker[] = [
   { id: "pookie-31", url: "/stickerz/imagecopy31.png", caption: "cloud and moon", category: "Matching Profile" },
   { id: "pookie-32", url: "/stickerz/imagecopy32.png", caption: "fox and buuny", category: "Matching Profile" },
 ];
+
+let preloaded = false;
+
+export function preloadStickerz() {
+  if (typeof window === "undefined" || preloaded) return;
+  preloaded = true;
+  
+  // Delay slightly to prioritize critical UI rendering first
+  setTimeout(() => {
+    const doPreload = () => {
+      CUSTOM_STICKERZ.forEach((sticker) => {
+        const img = new Image();
+        img.src = sticker.url;
+      });
+    };
+
+    if ("requestIdleCallback" in window) {
+      window.requestIdleCallback(() => doPreload());
+    } else {
+      doPreload();
+    }
+  }, 2000);
+}

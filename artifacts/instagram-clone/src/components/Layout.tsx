@@ -31,6 +31,7 @@ import { MobileMenuGrid } from "./MobileMenuGrid";
 import { api } from "@/lib/api";
 import { writeChatCache } from "@/lib/chat-cache";
 import { normalizeMessages } from "@/lib/message-utils";
+import { preloadStickerz } from "@/lib/stickerz";
 
 type NavItem = {
   icon: typeof Home;
@@ -116,6 +117,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
       cancelled = true;
     };
   }, [user?.id]);
+
+  // Preload sticker assets silently in the background
+  useEffect(() => {
+    preloadStickerz();
+  }, []);
 
   const navItems: NavItem[] = [
     { icon: Home, label: "Home", href: "/" },
