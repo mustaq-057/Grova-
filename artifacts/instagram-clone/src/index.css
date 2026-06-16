@@ -1320,13 +1320,20 @@ html[data-theme-id="mint"] .message-input-pill textarea::placeholder {
   opacity: 0.6;
 }
 
-html[data-theme-id="mint"] .message-input-pill button {
+html[data-theme-id="mint"] .message-input-pill button:not(.camera-btn) {
   color: #354A21 !important;
 }
 
+html[data-theme-id="mint"] .message-input-pill .camera-btn,
 html[data-theme-id="mint"] .message-input-pill .bg-primary {
   background-color: #354A21 !important;
   color: #EBE2CD !important;
+}
+
+html[data-theme-id="mint"] .seen-glow,
+html[data-theme-id="floura"] .seen-glow {
+  text-shadow: 0 0 8px currentColor, 0 0 12px currentColor;
+  filter: brightness(1.2);
 }
 
 /* Mint Chat Bubbles */

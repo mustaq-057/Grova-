@@ -489,7 +489,7 @@ export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputPro
         <button
           type="button"
           onClick={onOpenCamera}
-          className="w-[38px] h-[38px] sm:w-[44px] sm:h-[44px] rounded-full active:scale-95 flex shrink-0 items-center justify-center text-white border-none transition-all hover:brightness-90"
+          className="camera-btn w-[38px] h-[38px] sm:w-[44px] sm:h-[44px] rounded-full active:scale-95 flex shrink-0 items-center justify-center text-white border-none transition-all hover:brightness-90"
           style={{ backgroundColor: theme.bubbleColor }}
           disabled={disabled}
           aria-label="Take photo with camera"

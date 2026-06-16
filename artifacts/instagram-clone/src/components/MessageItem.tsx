@@ -667,7 +667,7 @@ export const MessageItem = memo(function MessageItem({
           <p
             className={`text-[11px] mt-0.5 pr-1 font-medium transition-all duration-300 ${
               seenLabel === "Just seen"
-                ? "text-primary animate-pulse"
+                ? "text-primary animate-pulse seen-glow"
                 : "text-muted-foreground/80"
             }`}
           >
