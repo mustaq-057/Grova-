@@ -9,9 +9,120 @@ import { AvatarImage } from "@/components/AvatarImage";
 import { PostFeed } from "@/components/PostFeed";
 import { useAppSearchParams } from "@/lib/app-search";
 import { PARTNER_CHANGED } from "@/lib/couple-sync";
-import { parsePresenceResponse } from "@/lib/presence-api";
-import { USER_TIMEZONES } from "@/lib/timezones";
-import { readSessionSnapshot } from "@/lib/profile-cache";
+import { getStoredAppTheme, APP_THEME_CHANGED } from "@/lib/app-theme";
+import { Trees, Moon, Sun, Camera, Leaf, Sparkles } from "lucide-react";
+
+function MintHomeLayout({ partnerName }: { partnerName?: string }) {
+  return (
+    <div className="max-w-[470px] mx-auto min-h-[100dvh] flex flex-col pt-12 pb-24 px-6 relative">
+      <div className="absolute inset-0 pointer-events-none z-[-1]" />
+      
+      {/* Header */}
+      <motion.div 
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, ease: "easeOut" }}
+        className="flex items-center justify-center gap-4 mt-8 mb-10"
+      >
+        <Leaf className="w-5 h-5 text-[#354A21] opacity-70 transform -scale-x-100" />
+        <h1 className="font-serif italic text-3xl font-bold text-[#354A21] tracking-wide">
+          You & {partnerName || "Sara"}
+        </h1>
+        <Leaf className="w-5 h-5 text-[#354A21] opacity-70" />
+      </motion.div>
+
+      {/* Pill Controls */}
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.5, delay: 0.1 }}
+        className="flex justify-center gap-4 mb-12"
+      >
+        <button className="flex items-center gap-2 px-5 py-2.5 bg-[#F6F0E0] rounded-full border border-[#354A21]/10 shadow-[0_2px_10px_rgba(53,74,33,0.05)] hover:shadow-[0_4px_12px_rgba(53,74,33,0.08)] transition-all active:scale-95">
+          <Moon className="w-4 h-4 text-[#354A21]" />
+          <div className="w-px h-4 bg-[#354A21]/20 mx-1" />
+          <Trees className="w-4 h-4 text-[#354A21]" fill="#354A21" />
+        </button>
+        <button className="flex items-center gap-2 px-5 py-2.5 bg-[#F6F0E0] rounded-full border border-[#354A21]/10 shadow-[0_2px_10px_rgba(53,74,33,0.05)] hover:shadow-[0_4px_12px_rgba(53,74,33,0.08)] transition-all active:scale-95">
+          <Sun className="w-4 h-4 text-[#354A21]" />
+          <div className="w-px h-4 bg-[#354A21]/20 mx-1" />
+          <Trees className="w-4 h-4 text-[#354A21]" />
+        </button>
+      </motion.div>
+
+      {/* 2x2 Grid */}
+      <div className="grid grid-cols-2 gap-5 flex-1 content-start">
+        <Link href="/chat">
+          <motion.a 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="block aspect-square bg-[#F6F0E0] rounded-3xl p-5 relative overflow-hidden shadow-[0_4px_20px_rgba(53,74,33,0.06)] hover:shadow-[0_8px_25px_rgba(53,74,33,0.12)] hover:-translate-y-1 transition-all cursor-pointer group"
+          >
+            <div className="w-10 h-10 rounded-xl bg-[#354A21] flex items-center justify-center mb-2 shadow-md">
+              <MessageCircle className="w-5 h-5 text-white" />
+            </div>
+            <div className="absolute -bottom-4 -right-4 w-28 h-28 opacity-30 group-hover:opacity-50 transition-opacity">
+              <Trees className="w-full h-full text-[#354A21]" />
+            </div>
+            <span className="font-medium text-[#354A21] absolute bottom-5 left-5">Chat</span>
+          </motion.a>
+        </Link>
+
+        <Link href="/dua">
+          <motion.a 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.3 }}
+            className="block aspect-square bg-[#F6F0E0] rounded-3xl p-5 relative overflow-hidden shadow-[0_4px_20px_rgba(53,74,33,0.06)] hover:shadow-[0_8px_25px_rgba(53,74,33,0.12)] hover:-translate-y-1 transition-all cursor-pointer group"
+          >
+            <div className="w-10 h-10 rounded-xl bg-[#354A21] flex items-center justify-center mb-2 shadow-md">
+              <BookOpen className="w-5 h-5 text-white" />
+            </div>
+            <div className="absolute -bottom-6 -right-4 w-32 h-32 opacity-20 group-hover:opacity-40 transition-opacity transform rotate-12">
+              <Leaf className="w-full h-full text-[#354A21]" />
+            </div>
+            <span className="font-medium text-[#354A21] absolute bottom-5 left-5">Duas</span>
+          </motion.a>
+        </Link>
+
+        <Link href="/memories">
+          <motion.a 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.4 }}
+            className="block aspect-square bg-[#F6F0E0] rounded-3xl p-5 relative overflow-hidden shadow-[0_4px_20px_rgba(53,74,33,0.06)] hover:shadow-[0_8px_25px_rgba(53,74,33,0.12)] hover:-translate-y-1 transition-all cursor-pointer group"
+          >
+            <div className="w-10 h-10 rounded-xl bg-[#354A21] flex items-center justify-center mb-2 shadow-md">
+              <Heart className="w-5 h-5 text-white fill-white" />
+            </div>
+            <div className="absolute -bottom-2 -right-2 w-24 h-24 opacity-25 group-hover:opacity-45 transition-opacity transform -rotate-12">
+              <Camera className="w-full h-full text-[#354A21]" />
+            </div>
+            <span className="font-medium text-[#354A21] absolute bottom-5 left-5">Memories</span>
+          </motion.a>
+        </Link>
+
+        <Link href="/create">
+          <motion.a 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.5 }}
+            className="block aspect-square bg-[#F6F0E0] rounded-3xl p-5 relative overflow-hidden shadow-[0_4px_20px_rgba(53,74,33,0.06)] hover:shadow-[0_8px_25px_rgba(53,74,33,0.12)] hover:-translate-y-1 transition-all cursor-pointer group"
+          >
+            <div className="w-10 h-10 rounded-xl bg-[#354A21] flex items-center justify-center mb-2 shadow-md">
+              <ImagePlus className="w-5 h-5 text-white" />
+            </div>
+            <div className="absolute -bottom-3 -right-3 w-24 h-24 opacity-20 group-hover:opacity-40 transition-opacity">
+              <Sparkles className="w-full h-full text-[#354A21]" />
+            </div>
+            <span className="font-medium text-[#354A21] absolute bottom-5 left-5">Photos</span>
+          </motion.a>
+        </Link>
+      </div>
+    </div>
+  );
+}
 
 export default memo(function Home() {
   const { user, partner: authPartner } = useAuth();
@@ -21,6 +132,7 @@ export default memo(function Home() {
   const [partner, setPartner] = useState<ApiUser | null>(() => authPartner ?? readSessionSnapshot()?.partner ?? null);
   const [moroccoTime, setMoroccoTime] = useState("");
   const [indiaTime, setIndiaTime] = useState("");
+  const [appTheme, setAppTheme] = useState(getStoredAppTheme);
   const [loadingPartner, setLoadingPartner] = useState(() => !authPartner && !readSessionSnapshot()?.partner);
 
   const partnerId = user?.id === "me" ? "wife" : "me";
@@ -38,7 +150,14 @@ export default memo(function Home() {
       setLoadingPartner(false);
     };
     window.addEventListener(PARTNER_CHANGED, onPartner);
-    return () => window.removeEventListener(PARTNER_CHANGED, onPartner);
+    
+    const onTheme = () => setAppTheme(getStoredAppTheme());
+    window.addEventListener(APP_THEME_CHANGED as any, onTheme);
+    
+    return () => {
+      window.removeEventListener(PARTNER_CHANGED, onPartner);
+      window.removeEventListener(APP_THEME_CHANGED as any, onTheme);
+    };
   }, []);
 
   useEffect(() => {
@@ -109,6 +228,10 @@ export default memo(function Home() {
     { href: "/memories", icon: Heart, label: "Memories", desc: "Your moments" },
     { href: "/create", icon: ImagePlus, label: "Photos", desc: "Upload an image" },
   ];
+
+  if (appTheme === "mint") {
+    return <MintHomeLayout partnerName={partner?.name} />;
+  }
 
   return (
     <div className="max-w-[470px] mx-auto pb-20 md:pb-6">
