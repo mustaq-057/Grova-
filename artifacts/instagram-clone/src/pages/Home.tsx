@@ -11,6 +11,9 @@ import { useAppSearchParams } from "@/lib/app-search";
 import { PARTNER_CHANGED } from "@/lib/couple-sync";
 import { getStoredAppTheme, APP_THEME_CHANGED } from "@/lib/app-theme";
 import { Trees, Moon, Sun, Camera, Leaf, Sparkles } from "lucide-react";
+import { readSessionSnapshot } from "@/lib/profile-cache";
+import { parsePresenceResponse } from "@/lib/presence-api";
+import { USER_TIMEZONES } from "@/lib/timezones";
 
 function MintHomeLayout({ partnerName }: { partnerName?: string }) {
   return (
