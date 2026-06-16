@@ -282,6 +282,7 @@ export default function Messages() {
   const sseRetryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingRequestsRef = useRef<Map<string, Promise<any>>>(new Map());
   const previousMessagesLengthRef = useRef(0);
+  const [readyToShow, setReadyToShow] = useState(false);
   const isInitialLoadRef = useRef(true);
   const initialServerFetchDoneRef = useRef(false);
   const initialLoadTimeRef = useRef(Date.now());
@@ -1363,6 +1364,7 @@ export default function Messages() {
             scrollChatToBottom(container, bottomRef.current);
             if (initialServerFetchDoneRef.current) {
               isInitialLoadRef.current = false;
+              setReadyToShow(true);
             }
           });
         }
@@ -1371,6 +1373,7 @@ export default function Messages() {
       if (initialServerFetchDoneRef.current) {
         firstPaintScrollDoneRef.current = true;
         isInitialLoadRef.current = false;
+        setReadyToShow(true);
       }
     }
 
@@ -1384,6 +1387,7 @@ export default function Messages() {
         isNearBottomRef.current = false;
         stickToBottomRef.current = false;
         isInitialLoadRef.current = false;
+        setReadyToShow(true);
         return;
       }
     }
@@ -1409,7 +1413,10 @@ export default function Messages() {
       scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
       setHasNewMessages(false);
       stickToBottomRef.current = false;
-      if (firstPaint) isInitialLoadRef.current = false;
+      if (firstPaint) {
+        isInitialLoadRef.current = false;
+        setReadyToShow(true);
+      }
     } else if (
       !firstPaint &&
       tailChanged &&
@@ -3257,7 +3264,10 @@ export default function Messages() {
 
         {/* ── Messages ── */}
         <div
-          className="chat-panel-messages relative z-[1] overflow-y-auto px-2 sm:px-3 py-2 md:py-3 md:px-4 flex flex-col gap-1 scrollbar-hide"
+          className={cn(
+            "chat-panel-messages relative z-[1] overflow-y-auto px-2 sm:px-3 py-2 md:py-3 md:px-4 flex flex-col gap-1 scrollbar-hide transition-opacity duration-150",
+            !readyToShow && "opacity-0 pointer-events-none"
+          )}
           data-testid="messages-list"
           ref={messagesContainerRef}
           style={{ scrollBehavior: 'auto' }}
