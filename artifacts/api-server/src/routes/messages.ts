@@ -168,7 +168,7 @@ router.get("/messages", optionalAuth, async (req, res) => {
              (SELECT COUNT(*) FROM message_media_opens WHERE message_id = m.id AND user_id = ?) as viewer_media_open_count,
              (SELECT MAX(opened_at) FROM message_media_opens WHERE message_id = m.id AND user_id = ?) as partner_media_opened_at
       FROM messages m
-      WHERE m.deleted = 0 AND (m.sender_id = ? OR m.sender_id = ?)
+      WHERE (m.sender_id = ? OR m.sender_id = ?)
     `;
     const params: unknown[] = [
       authenticatedUserId,
@@ -199,7 +199,7 @@ router.get("/messages", optionalAuth, async (req, res) => {
     const messages = result.rows.map((row) => rowToMessage(row, authenticatedUserId)).reverse();
 
     let countSql =
-      "SELECT COUNT(*) as total FROM messages WHERE deleted = 0 AND (sender_id = ? OR sender_id = ?)";
+      "SELECT COUNT(*) as total FROM messages WHERE (sender_id = ? OR sender_id = ?)";
     const countParams: unknown[] = [authenticatedUserId, partnerId];
     if (chatClearedAt) {
       countSql += " AND timestamp > ?";
@@ -238,7 +238,7 @@ router.get("/messages/context/:messageId", optionalAuth, async (req, res) => {
 
     const targetResult = await db.query(
       `SELECT timestamp FROM messages
-       WHERE id = ? AND deleted = 0 AND (sender_id = ? OR sender_id = ?)
+       WHERE id = ? AND (sender_id = ? OR sender_id = ?)
        ${chatClearedAt ? "AND timestamp > ?" : ""}
        LIMIT 1`,
       chatClearedAt
@@ -259,7 +259,7 @@ router.get("/messages/context/:messageId", optionalAuth, async (req, res) => {
              (SELECT COUNT(*) FROM message_media_opens WHERE message_id = m.id AND user_id = ?) as viewer_media_open_count,
              (SELECT MAX(opened_at) FROM message_media_opens WHERE message_id = m.id AND user_id = ?) as partner_media_opened_at
       FROM messages m
-      WHERE m.deleted = 0 AND (m.sender_id = ? OR m.sender_id = ?)
+      WHERE (m.sender_id = ? OR m.sender_id = ?)
     `;
     const baseParams: unknown[] = [
       authenticatedUserId,
@@ -304,7 +304,7 @@ router.get("/messages/context/:messageId", optionalAuth, async (req, res) => {
     );
 
     let countSql =
-      "SELECT COUNT(*) as total FROM messages WHERE deleted = 0 AND (sender_id = ? OR sender_id = ?)";
+      "SELECT COUNT(*) as total FROM messages WHERE (sender_id = ? OR sender_id = ?)";
     const countParams: unknown[] = [authenticatedUserId, partnerId];
     if (chatClearedAt) {
       countSql += " AND timestamp > ?";

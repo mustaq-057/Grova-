@@ -696,6 +696,7 @@ export default function Messages() {
     let livePollStop: (() => void) | null = null;
     let presencePollId: number | null = null;
     let localPartnerLastSeen = 0;
+    let localPartnerLastSeenReceivedAt = 0;
     let presenceTickCount = 0;
     let pollTickCount = 0;
 
@@ -703,7 +704,7 @@ export default function Messages() {
       if (!mounted) return;
       if (document.visibilityState !== "visible" || !navigator.onLine) return;
 
-      const partnerActive = (Date.now() - localPartnerLastSeen) < 60_000;
+      const partnerActive = (Date.now() - localPartnerLastSeenReceivedAt) < 60_000;
       if (!partnerActive) {
         presenceTickCount++;
         if (presenceTickCount % 5 !== 0) return;
@@ -714,6 +715,9 @@ export default function Messages() {
       void api.getPresence().then((raw) => {
         const { lastSeen, typing } = parsePresenceResponse(raw);
         if (lastSeen[partnerId] != null) {
+          if (localPartnerLastSeen !== lastSeen[partnerId]) {
+            localPartnerLastSeenReceivedAt = Date.now();
+          }
           setPartnerLastSeen(lastSeen[partnerId]);
           localPartnerLastSeen = lastSeen[partnerId];
         }
@@ -764,7 +768,7 @@ export default function Messages() {
       if (!mounted) return;
       if (document.visibilityState !== "visible" || !navigator.onLine) return;
 
-      const partnerActive = (Date.now() - localPartnerLastSeen) < 60_000;
+      const partnerActive = (Date.now() - localPartnerLastSeenReceivedAt) < 60_000;
       if (!partnerActive) {
         pollTickCount++;
         if (pollTickCount % 5 !== 0) return;
