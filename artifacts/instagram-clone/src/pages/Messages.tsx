@@ -20,6 +20,7 @@ import { isEncryptionReady } from "@/lib/crypto";
 import { isOnline } from "@/lib/offline";
 import { requestNotificationPermission, subscribeToPush, sendSubscriptionToServer } from "@/lib/notifications";
 import { isSupportedFileType, MAX_FILE_SIZE_MB } from "@/lib/supported-file-types";
+import { cn } from "@/lib/utils";
 
 
 
