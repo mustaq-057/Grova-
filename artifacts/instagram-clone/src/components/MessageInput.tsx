@@ -402,7 +402,7 @@ export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputPro
               disabled={disabled}
             >
               <div className="w-[28px] h-[28px] flex items-center justify-center shrink-0">
-                <Sparkles className="w-[26px] h-[26px] text-white" strokeWidth={1.6} />
+                <Sticker className="w-[26px] h-[26px] text-white" strokeWidth={1.6} />
               </div>
               <span>Stickerz</span>
             </button>
