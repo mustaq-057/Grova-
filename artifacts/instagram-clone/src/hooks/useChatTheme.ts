@@ -42,5 +42,16 @@ export function useChatTheme() {
     };
   }
 
+  if (appTheme === "library") {
+    theme = {
+      ...theme,
+      id: "library",
+      bubbleColor: "#3b2a22", // Espresso Brown
+      bubbleBorder: "#3b2a22",
+      textColor: "#f8f1e7", // Cream
+      partnerTextColor: "#2c1e16" // Dark Mahogany text on partner's cream bubble
+    };
+  }
+
   return { themeId, theme };
 }

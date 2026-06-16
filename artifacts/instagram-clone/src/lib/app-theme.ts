@@ -7,7 +7,8 @@ export type AppThemeId =
   | "sara-lavender"
   | "moonlight-saga"
   | "floura"
-  | "mint";
+  | "mint"
+  | "library";
 
 const PREMIUM_ANIMATED_THEMES: AppThemeId[] = ["moonlight-saga"];
 
@@ -25,6 +26,7 @@ const THEME_BACKGROUNDS: Partial<Record<AppThemeId, string>> = {
   "sara-lavender": "/themes/sara-lilies.jpg",
   "floura": "/themes/saralikedtheme.png",
   "mint": "/mint-home.png",
+  "library": "/themes/library-bg.png",
 };
 
 export const APP_THEME_CHANGED = "grova-app-theme-changed";
@@ -79,6 +81,28 @@ export const APP_THEMES: {
         "--app-card": "45 25% 90%",
         "--app-secondary": "45 30% 88%",
         "--app-border": "45 20% 84%",
+      },
+    },
+    {
+      id: "library",
+      name: "Library",
+      description: "A cozy, vintage reading sanctuary 🕰️",
+      swatch: "bg-gradient-to-br from-[#4d3a2e] via-[#3b2b23] to-[#2c1e16]",
+      dark: {
+        "--app-background": "25 25% 10%",
+        "--app-foreground": "35 30% 90%",
+        "--app-primary": "25 40% 30%",
+        "--app-card": "25 20% 14%",
+        "--app-secondary": "25 20% 18%",
+        "--app-border": "25 15% 25%",
+      },
+      light: {
+        "--app-background": "40 30% 95%",
+        "--app-foreground": "25 40% 15%",
+        "--app-primary": "25 50% 25%",
+        "--app-card": "40 25% 98%",
+        "--app-secondary": "40 20% 90%",
+        "--app-border": "40 15% 85%",
       },
     },
     {
@@ -253,6 +277,7 @@ export function getThemeBackgroundOpacity(themeId?: AppThemeId): number {
   if (id === "sara-lavender") return 0.32;
   if (id === "floura") return 1.0;
   if (id === "mint") return 1.0; // Mint uses a full vivid background
+  if (id === "library") return 1.0; // Library uses a full immersive photo
   return 0.28;
 }
 
@@ -276,6 +301,11 @@ export function getPhotoScrimGradient(themeId: AppThemeId, dark: boolean): strin
     return dark
       ? "linear-gradient(180deg, rgba(20,30,20,0.4) 0%, rgba(20,30,20,0.6) 100%)"
       : "linear-gradient(180deg, rgba(235,235,225,0.3) 0%, rgba(225,230,215,0.5) 100%)";
+  }
+  if (themeId === "library") {
+    return dark
+      ? "linear-gradient(180deg, rgba(30,20,15,0.5) 0%, rgba(20,10,5,0.85) 100%)"
+      : "linear-gradient(180deg, rgba(250,240,230,0.4) 0%, rgba(240,230,215,0.7) 100%)";
   }
   return dark
     ? "linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.88) 100%)"
