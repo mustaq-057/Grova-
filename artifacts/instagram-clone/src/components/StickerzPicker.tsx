@@ -75,8 +75,8 @@ export function StickerzPicker({ onSelect, onClose }: StickerzPickerProps) {
                   <div className="w-full aspect-square rounded-lg overflow-hidden bg-white/5 flex items-center justify-center">
                     <img 
                       src={getLocalBlobUrl(sticker.url) || sticker.url} 
-                      alt={sticker.caption} 
-                      className="w-full h-full object-cover transition-transform group-hover:scale-110"
+                      alt="" 
+                      className="w-full h-full object-cover transition-transform group-hover:scale-110 text-transparent"
                       loading="eager"
                       fetchPriority="high"
                     />

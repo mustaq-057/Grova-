@@ -1524,6 +1524,10 @@ html[data-theme-id="library"] .library-locket-container .fill-primary {
 html[data-theme-id="library"] .library-locket-container .bg-primary\/25,
 html[data-theme-id="library"] .library-locket-container .bg-primary\/40,
 html[data-theme-id="library"] .library-locket-container .bg-primary\/60 {
+  background-color: rgba(184, 153, 71, 0.2) !important;
+  box-shadow: none !important;
+}
+
 /* Library Deep UI Enhancements */
 html[data-theme-id="library"] .wax-seal {
   background: radial-gradient(circle at 30% 30%, #900000, #5a0000) !important;
