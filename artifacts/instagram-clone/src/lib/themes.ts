@@ -6,6 +6,10 @@ export type ChatTheme = {
   /** Outgoing chat bubble border */
   bubbleBorder: string;
   swatch: string;
+  /** Optional text color override for outgoing */
+  textColor?: string;
+  /** Optional text color override for incoming */
+  partnerTextColor?: string;
 };
 
 /** Darken a hex color — used for partner bubbles so both accounts see the same palette. */
@@ -27,6 +31,12 @@ export function getPartnerBubbleColors(theme: Pick<ChatTheme, "bubbleColor" | "b
       border: "#5C7C49",
     };
   }
+  if (theme.id === "mint") {
+    return {
+      fill: "#EBE2CD",
+      border: "#EBE2CD",
+    };
+  }
   return {
     fill: darkenHex(theme.bubbleColor, 0.32),
     border: darkenHex(theme.bubbleBorder, 0.15),
@@ -44,7 +54,7 @@ export const THEMES: ChatTheme[] = [
   { id: "aurora", name: "Aurora", bubbleColor: "#0891b2", bubbleBorder: "#22d3ee", swatch: "bg-cyan-600" },
   { id: "sunset", name: "Sunset", bubbleColor: "#ea580c", bubbleBorder: "#fb923c", swatch: "bg-orange-600" },
   { id: "lavender", name: "Lavender", bubbleColor: "#7c3aed", bubbleBorder: "#a78bfa", swatch: "bg-violet-600" },
-  { id: "mint", name: "Mint", bubbleColor: "#16a34a", bubbleBorder: "#4ade80", swatch: "bg-green-600" },
+  { id: "mint", name: "Mint", bubbleColor: "#354A21", bubbleBorder: "#354A21", swatch: "bg-[#354A21]", textColor: "#EBE2CD", partnerTextColor: "#354A21" },
   { id: "cosmic", name: "Cosmic", bubbleColor: "#1d4ed8", bubbleBorder: "#60a5fa", swatch: "bg-blue-700" },
   { id: "candy", name: "Candy", bubbleColor: "#db2777", bubbleBorder: "#f472b6", swatch: "bg-pink-500" },
   { id: "nebula", name: "Nebula", bubbleColor: "#4f46e5", bubbleBorder: "#818cf8", swatch: "bg-indigo-600" },

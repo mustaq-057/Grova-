@@ -224,6 +224,12 @@ export const MessageItem = memo(function MessageItem({
   const { theme } = useChatTheme();
 
   const defaultBubbleStyle = { backgroundColor: theme.bubbleColor, borderColor: theme.bubbleBorder };
+  const partnerBubbleStyle = useMemo(() => {
+    const c = getPartnerBubbleColors(theme);
+    return { backgroundColor: c.fill, borderColor: c.border };
+  }, [theme]);
+  
+  const currentBubbleStyle = isMe ? defaultBubbleStyle : partnerBubbleStyle;
 
   const openReactionPicker = useCallback(() => {
     const anchor = bubbleWrapRef.current;
@@ -499,14 +505,17 @@ export const MessageItem = memo(function MessageItem({
         className={cn(
           "chat-bubble-text px-3 py-2 sm:px-3.5 sm:py-2 text-[16px] sm:text-[17px] leading-relaxed border-2 relative break-words whitespace-pre-wrap [overflow-wrap:anywhere]",
           customBubbleStyle ? `bubble-${customBubbleStyle}` : "bubble-default",
-          !customBubbleStyle && (isMe ? "rounded-br-md text-white" : "rounded-bl-md text-white")
+          !customBubbleStyle && (isMe ? "rounded-br-md" : "rounded-bl-md"),
+          !customBubbleStyle && (isMe ? (theme.textColor ? "" : "text-white") : (theme.partnerTextColor ? "" : "text-white"))
         )}
         style={
           customBubbleStyle 
             ? getFontStyleStyles(msg.fontStyle)
             : { 
-                ...defaultBubbleStyle, 
-                ...getFontStyleStyles(msg.fontStyle)
+                ...currentBubbleStyle, 
+                ...getFontStyleStyles(msg.fontStyle),
+                ...(isMe && theme.textColor ? { color: theme.textColor } : {}),
+                ...(!isMe && theme.partnerTextColor ? { color: theme.partnerTextColor } : {})
               }
         }
       >

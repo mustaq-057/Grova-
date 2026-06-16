@@ -297,6 +297,7 @@ export function applyAppTheme(themeId: AppThemeId) {
   } else {
     delete root.dataset.photoTheme;
   }
+  root.dataset.themeId = currentAppTheme;
   syncAppChromeFromTheme();
   window.dispatchEvent(new Event(APP_THEME_CHANGED));
 }

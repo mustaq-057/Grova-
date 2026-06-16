@@ -1304,3 +1304,27 @@ body {
   font-style: normal;
   line-height: 1;
 }
+
+/* Mint Theme Overrides */
+html[data-theme-id="mint"] .message-input-pill {
+  background-color: #EBE2CD !important;
+  border-color: transparent !important;
+}
+
+html[data-theme-id="mint"] .message-input-pill textarea {
+  color: #354A21 !important;
+}
+
+html[data-theme-id="mint"] .message-input-pill textarea::placeholder {
+  color: #354A21 !important;
+  opacity: 0.6;
+}
+
+html[data-theme-id="mint"] .message-input-pill button {
+  color: #354A21 !important;
+}
+
+html[data-theme-id="mint"] .message-input-pill .bg-primary {
+  background-color: #354A21 !important;
+  color: #EBE2CD !important;
+}
