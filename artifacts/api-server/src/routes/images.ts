@@ -132,6 +132,31 @@ router.post("/images/upload", rateLimiters.upload, authenticate, async (req, res
   await handleMediaUpload(req, res);
 });
 
+router.get("/media/sign", authenticate, async (req, res) => {
+  try {
+    const timestamp = Math.round(new Date().getTime() / 1000);
+    // Dynamic import for cloudinary to avoid initializing if not configured
+    const { v2: cloudinary } = await import("cloudinary");
+    if (!process.env.CLOUDINARY_API_SECRET) {
+      res.status(501).json({ error: "Cloudinary is not configured" });
+      return;
+    }
+    const signature = cloudinary.utils.api_sign_request(
+      { timestamp },
+      process.env.CLOUDINARY_API_SECRET
+    );
+    res.json({
+      timestamp,
+      signature,
+      apiKey: process.env.CLOUDINARY_API_KEY,
+      cloudName: process.env.CLOUDINARY_CLOUD_NAME,
+    });
+  } catch (err) {
+    console.error("Error generating signature:", err);
+    res.status(500).json({ error: "Failed to generate upload signature" });
+  }
+});
+
 router.post("/media/upload", rateLimiters.upload, authenticate, async (req, res) => {
   await handleMediaUpload(req, res);
 });

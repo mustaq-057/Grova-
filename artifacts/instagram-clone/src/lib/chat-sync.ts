@@ -22,35 +22,15 @@ function isRemoteMediaUrl(url?: string): boolean {
   return Boolean(url?.startsWith("http") || url?.startsWith("/api/"));
 }
 
-/** Keep blob/data previews visible until the remote asset is ready (avoids flash). */
-function pickMediaUrl(incoming?: string, prev?: string): string | undefined {
-  if (!incoming && !prev) return undefined;
-  if (!incoming) return prev;
-  if (!prev) return incoming;
-  if (isLocalMediaUrl(prev) && isRemoteMediaUrl(incoming)) return prev;
-  if (isRemoteMediaUrl(prev) && isLocalMediaUrl(incoming)) return prev;
-  return incoming;
-}
-
 export function mergeOptimisticWithServer(optimistic: ApiMessage, server: ApiMessage): ApiMessage {
-  const remoteVideoReady =
-    server.type === "video" &&
-    isRemoteMediaUrl(server.fileData) &&
-    isLocalMediaUrl(optimistic.fileData);
-  const imageUrl = pickMediaUrl(server.imageUrl, optimistic.imageUrl);
-  const hasRemoteImage = isRemoteMediaUrl(imageUrl) || isRemoteMediaUrl(server.imageUrl);
   return {
     ...server,
     clientUniqueId: optimistic.clientUniqueId || optimistic.id,
     text: server.text ?? optimistic.text,
     gifUrl: server.gifUrl || optimistic.gifUrl,
-    imageUrl,
-    imageData: hasRemoteImage
-      ? undefined
-      : pickMediaUrl(server.imageData, optimistic.imageData),
-    fileData: remoteVideoReady
-      ? server.fileData
-      : pickMediaUrl(server.fileData, optimistic.fileData),
+    imageUrl: server.imageUrl || optimistic.imageUrl,
+    imageData: server.imageData || optimistic.imageData,
+    fileData: server.fileData || optimistic.fileData,
     audioData: server.audioData ?? optimistic.audioData,
     fileType: server.fileType ?? optimistic.fileType,
     fileSize: server.fileSize ?? optimistic.fileSize,
@@ -105,18 +85,14 @@ export function mergeMessagesById(existing: ApiMessage[], incoming: ApiMessage[]
     const prevText = prev.text ?? "";
     const text =
       incomingText === "…" && prevText && prevText !== "…" ? prevText : m.text ?? prev.text;
-    const imageUrl = pickMediaUrl(m.imageUrl, prev.imageUrl);
-    const hasRemoteImage = isRemoteMediaUrl(imageUrl) || isRemoteMediaUrl(m.imageUrl);
     map.set(m.id, {
       ...m,
       clientUniqueId: prev.clientUniqueId || m.clientUniqueId,
       text,
-      imageUrl,
-      imageData: hasRemoteImage
-        ? undefined
-        : pickMediaUrl(m.imageData, prev.imageData),
+      imageUrl: m.imageUrl || prev.imageUrl,
+      imageData: m.imageData || prev.imageData,
       audioData: m.audioData ?? prev.audioData,
-      fileData: pickMediaUrl(m.fileData, prev.fileData),
+      fileData: m.fileData || prev.fileData,
       fileType: m.fileType ?? prev.fileType,
       fileSize: m.fileSize ?? prev.fileSize,
       read: prev.read || m.read,

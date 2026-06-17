@@ -28,7 +28,6 @@ async function refreshSessionIfUnauthorized(status: number, attempt: number): Pr
   return false;
 }
 
-/** Raw body upload — much faster than base64 for photos and videos. */
 export async function uploadMediaBinary(
   file: File | Blob,
   contentType: string,
@@ -41,18 +40,40 @@ export async function uploadMediaBinary(
 
   let res: Response;
   try {
-    res = await fetch("/api/media/upload-binary", {
-      method: "POST",
+    const signRes = await fetch("/api/media/sign", {
+      headers: getAuthHeaders(),
       credentials: "include",
-      headers: binaryUploadHeaders(mime),
-      body: file,
       signal: controller.signal,
     });
+    
+    if (signRes.ok) {
+      const { signature, timestamp, apiKey, cloudName } = await signRes.json();
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("api_key", apiKey);
+      formData.append("timestamp", String(timestamp));
+      formData.append("signature", signature);
+
+      res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`, {
+        method: "POST",
+        body: formData,
+        signal: controller.signal,
+      });
+    } else {
+      // Fallback to Express backend if signature endpoint isn't supported/configured
+      res = await fetch("/api/media/upload-binary", {
+        method: "POST",
+        credentials: "include",
+        headers: binaryUploadHeaders(mime),
+        body: file,
+        signal: controller.signal,
+      });
+    }
   } catch (err) {
     clearTimeout(timer);
     if (err instanceof DOMException && err.name === "AbortError") {
       const timeoutSec = Math.round(timeoutMs / 1000);
-      throw new Error(`Video upload timed out after ${timeoutSec}s. Try a smaller video or better connection.`);
+      throw new Error(`Media upload timed out after ${timeoutSec}s. Try a smaller file or better connection.`);
     }
     if (attempt < 2) {
       await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
@@ -63,7 +84,8 @@ export async function uploadMediaBinary(
     clearTimeout(timer);
   }
 
-  if (await refreshSessionIfUnauthorized(res.status, attempt)) {
+  // Only refresh session if the request hit our backend (401/403)
+  if (!res.url.includes("api.cloudinary.com") && await refreshSessionIfUnauthorized(res.status, attempt)) {
     return uploadMediaBinary(file, contentType, attempt + 1);
   }
   if (RETRYABLE_STATUS.has(res.status) && attempt < 2) {
@@ -71,11 +93,12 @@ export async function uploadMediaBinary(
     return uploadMediaBinary(file, contentType, attempt + 1);
   }
   if (!res.ok) {
-    const err = (await res.json().catch(() => ({ error: "Upload failed" }))) as { error?: string };
-    throw new Error(err.error ?? "Failed to upload to cloud storage");
+    const err = (await res.json().catch(() => ({ error: "Upload failed" }))) as { error?: string; message?: string };
+    throw new Error(err.error ?? err.message ?? "Failed to upload to cloud storage");
   }
-  const body = (await res.json()) as { url: string };
-  return body.url;
+  
+  const body = (await res.json()) as { url?: string; secure_url?: string };
+  return body.secure_url || body.url || "";
 }
 
 /** Upload base64 data URL to Cloudinary via API. Returns public URL. */

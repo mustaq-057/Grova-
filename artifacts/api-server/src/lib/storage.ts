@@ -59,7 +59,10 @@ function cloudinaryResourceType(contentType: string): "image" | "video" | "raw" 
 async function uploadToCloudinary(key: string, buffer: Buffer, contentType: string): Promise<string> {
   ensureCloudinary();
   const resourceType = cloudinaryResourceType(contentType);
-  const publicId = `grova/${key.replace(/\.[^.]+$/, "")}`;
+  // Cloudinary requires extensions for raw files, and prefers them for videos.
+  const publicId = (resourceType === "raw" || resourceType === "video") 
+    ? `grova/${key}` 
+    : `grova/${key.replace(/\.[^.]+$/, "")}`;
   const opts = {
     public_id: publicId,
     resource_type: resourceType,
