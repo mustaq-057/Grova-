@@ -10,10 +10,14 @@ function normalizeUploadMime(mime: string): string {
   return mime.split(";")[0]?.trim().toLowerCase() || "application/octet-stream";
 }
 
-function binaryUploadHeaders(contentType: string): Record<string, string> {
+function binaryUploadHeaders(contentType: string, fileName?: string): Record<string, string> {
   const auth = getAuthHeaders();
   // auth includes Content-Type: application/json — must override with real file mime
-  return { ...auth, "Content-Type": contentType };
+  const headers: Record<string, string> = { ...auth, "Content-Type": contentType };
+  if (fileName) {
+    headers["X-File-Name"] = encodeURIComponent(fileName);
+  }
+  return headers;
 }
 
 function guessContentType(dataUrl: string): string {
@@ -32,6 +36,7 @@ export async function uploadMediaBinary(
   file: File | Blob,
   contentType: string,
   attempt = 0,
+  fileName?: string,
 ): Promise<string> {
   const mime = normalizeUploadMime(contentType);
   const controller = new AbortController();
@@ -64,7 +69,7 @@ export async function uploadMediaBinary(
       res = await fetch("/api/media/upload-binary", {
         method: "POST",
         credentials: "include",
-        headers: binaryUploadHeaders(mime),
+        headers: binaryUploadHeaders(mime, fileName),
         body: file,
         signal: controller.signal,
       });
@@ -102,7 +107,7 @@ export async function uploadMediaBinary(
 }
 
 /** Upload base64 data URL to Cloudinary via API. Returns public URL. */
-export async function uploadMedia(dataUrl: string, contentType?: string, attempt = 0): Promise<string> {
+export async function uploadMedia(dataUrl: string, contentType?: string, attempt = 0, fileName?: string): Promise<string> {
   const mime = contentType ?? guessContentType(dataUrl);
   const base64Data = dataUrl.replace(/^data:[^;]+;base64,/, "");
   const approxBytes = Math.floor((base64Data.length * 3) / 4);
@@ -123,6 +128,7 @@ export async function uploadMedia(dataUrl: string, contentType?: string, attempt
     body: JSON.stringify({
       data: dataUrl,
       contentType: mime,
+      fileName,
     }),
   });
   if (await refreshSessionIfUnauthorized(res.status, attempt)) {
@@ -146,11 +152,13 @@ export async function uploadMediaFile(file: File | Blob, contentType?: string): 
     normalizeUploadMime(contentType || (file instanceof File ? file.type : "") || "application/octet-stream");
 
   const useBinary = file.size >= BINARY_UPLOAD_MIN_BYTES;
+  const fileName = file instanceof File ? file.name : undefined;
+
   if (useBinary) {
-    return uploadMediaBinary(file, mime);
+    return uploadMediaBinary(file, mime, 0, fileName);
   }
   const dataUrl = await readFileAsDataUrl(file);
-  return uploadMedia(dataUrl, mime || guessContentType(dataUrl));
+  return uploadMedia(dataUrl, mime || guessContentType(dataUrl), 0, fileName);
 }
 
 /** @deprecated Use uploadMedia — kept for older imports */

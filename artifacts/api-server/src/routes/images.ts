@@ -95,7 +95,7 @@ router.get("/media/inline", rateLimiters.read, authenticateBearerOrQuery, async 
 });
 
 async function handleMediaUpload(
-  req: { body: { data?: string; image?: string; contentType?: string } },
+  req: { body: { data?: string; image?: string; contentType?: string; fileName?: string } },
   res: import("express").Response,
 ) {
   try {
@@ -104,7 +104,7 @@ async function handleMediaUpload(
       return;
     }
 
-    const { data, contentType } = req.body as { data: string; contentType?: string };
+    const { data, contentType, fileName } = req.body as { data: string; contentType?: string; fileName?: string };
     const mime = contentType || "image/jpeg";
     const base64Data = data.replace(/^data:[^;]+;base64,/, "");
     const buffer = Buffer.from(base64Data, "base64");
@@ -114,7 +114,16 @@ async function handleMediaUpload(
       return;
     }
 
-    const key = `${randomUUID()}.${extForContentType(mime)}`;
+    // Try to get extension from sniffed mime first, fallback to filename extension
+    let ext = extForContentType(mime);
+    if (ext === "bin" && fileName) {
+      const nameExt = fileName.substring(fileName.lastIndexOf(".") + 1).toLowerCase();
+      if (nameExt && nameExt !== fileName.toLowerCase()) {
+        ext = nameExt;
+      }
+    }
+
+    const key = `${randomUUID()}.${ext}`;
     const url = await uploadMedia(key, buffer, mime);
 
     res.json({ url, key });
@@ -182,7 +191,18 @@ export async function handleBinaryMediaUpload(req: Request, res: Response): Prom
 
     const headerMime = String(req.headers["content-type"] || "application/octet-stream").split(";")[0].trim();
     const mime = sniffBufferMime(buffer, headerMime);
-    const key = `${randomUUID()}.${extForContentType(mime)}`;
+    
+    let ext = extForContentType(mime);
+    const fileNameHeader = req.headers["x-file-name"];
+    if (ext === "bin" && fileNameHeader) {
+      const fileName = decodeURIComponent(String(fileNameHeader));
+      const nameExt = fileName.substring(fileName.lastIndexOf(".") + 1).toLowerCase();
+      if (nameExt && nameExt !== fileName.toLowerCase()) {
+        ext = nameExt;
+      }
+    }
+
+    const key = `${randomUUID()}.${ext}`;
     const url = await uploadMedia(key, buffer, mime);
 
     res.json({ url, key });
