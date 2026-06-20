@@ -4,6 +4,7 @@ import { useLocation } from "wouter";
 import { apiFetch, api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { InAppBrowser } from "@/components/InAppBrowser";
+import ePub from "epubjs";
 
 type ApiBook = {
   id: string;
@@ -133,6 +134,7 @@ export default function Library() {
   const [showSettings, setShowSettings] = useState(false);
   const [libLang, setLibLang] = useState<"en" | "ar">(() => (localStorage.getItem("grova-library-language") as "en" | "ar") || "en");
   const [libTheme, setLibTheme] = useState<"dark" | "light" | "sepia">(() => (localStorage.getItem("grova-library-theme") as "dark" | "light" | "sepia") || "dark");
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -236,6 +238,56 @@ export default function Library() {
       console.error("Search failed:", err);
     } finally {
       setIsSearching(false);
+    }
+  };
+
+  const handleEpubUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsSearching(true); // use as loading state
+    try {
+      const buffer = await file.arrayBuffer();
+      const book = ePub(buffer);
+      await book.ready;
+      const metadata = await book.loaded.metadata;
+      
+      let coverUrl = null;
+      try {
+        const coverUrlRaw = await book.coverUrl();
+        if (coverUrlRaw) {
+          // It's a blob url, we won't upload the cover right now since we need to extract it as a file.
+          // Using generative gradient instead for simplicity.
+        }
+      } catch (err) {}
+
+      // Upload binary to cloudinary
+      const res = await apiFetch<{ url: string }>("/media/upload", {
+        method: "POST",
+        headers: { "Content-Type": file.type || "application/epub+zip" },
+        body: buffer,
+      });
+
+      // Add to Library
+      await apiFetch("/library", {
+        method: "POST",
+        body: JSON.stringify({
+          title: metadata?.title || file.name.replace(".epub", ""),
+          author: metadata?.creator || "Unknown Author",
+          coverUrl: null,
+          description: metadata?.description || "Uploaded manually.",
+          epubUrl: res.url,
+          totalPages: 100,
+          source: "Uploaded",
+        }),
+      });
+
+      await loadBooks();
+    } catch (err) {
+      console.error("Failed to upload EPUB:", err);
+      alert("Failed to upload EPUB.");
+    } finally {
+      setIsSearching(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
@@ -377,6 +429,20 @@ export default function Library() {
               <ChevronLeft className="w-8 h-8" />
             </button>
             <h1 className="text-3xl font-bold font-serif italic text-primary leading-none flex-1">{t.library}</h1>
+            <input 
+              type="file" 
+              accept=".epub" 
+              ref={fileInputRef} 
+              onChange={handleEpubUpload} 
+              className="hidden" 
+            />
+            <button 
+              onClick={() => fileInputRef.current?.click()}
+              className="p-2 rounded-full active:scale-90 transition-all bg-primary/10 text-primary hover:bg-primary/20 flex items-center gap-1 text-xs font-bold"
+            >
+              <Plus className="w-4 h-4" />
+              Upload
+            </button>
             <button 
               onClick={() => setShowSettings(true)}
               className="p-2 rounded-full active:scale-90 transition-all hover:bg-[var(--lib-btn-hover)] text-[var(--lib-text)]"
@@ -385,7 +451,7 @@ export default function Library() {
             </button>
           </div>
         <form onSubmit={handleSearch} className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--lib-muted)]" />
           <input
             type="text"
             placeholder={t.searchPlaceholder}

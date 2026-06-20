@@ -3,6 +3,7 @@ import { randomUUID } from "crypto";
 import db from "../lib/db";
 import { authenticate } from "../lib/auth-middleware";
 import type { AuthenticatedRequest } from "../types";
+import * as cheerio from "cheerio";
 
 const libraryRouter = Router();
 
@@ -119,8 +120,13 @@ libraryRouter.get("/library/search", authenticate, async (req, res) => {
   // 6. HathiTrust — always a deep-link card (403 from server)
   const hathiFetch: Promise<Response | null> = Promise.resolve(null);
 
+  // 1.5. Standard Ebooks
+  const standardUrl = `https://standardebooks.org/ebooks?query=${enc}`;
+  const standardFetch = skipGutendex ? Promise.resolve(null) : fetch(standardUrl, { signal: AbortSignal.timeout(6000) }).catch(() => null);
+
   const [
     openLibRes,
+    standardRes,
     gutendexRes,
     archiveRes,
     shamelaRawRes,
@@ -129,6 +135,7 @@ libraryRouter.get("/library/search", authenticate, async (req, res) => {
     hathiRawRes,
   ] = await Promise.allSettled([
     openLibFetch,
+    standardFetch,
     gutendexFetch,
     archiveFetch,
     shamelaFetch,
@@ -173,6 +180,41 @@ libraryRouter.get("/library/search", authenticate, async (req, res) => {
     } catch { sourceMeta["Open Library"] = "timeout"; }
   } else {
     sourceMeta["Open Library"] = openLibRes.status === "rejected" ? "timeout" : "empty";
+  }
+
+  // ── 1.5 Standard Ebooks (English, High Quality EPUBs) ─────────────────────────
+  if (!skipGutendex) {
+    if (standardRes.status === "fulfilled" && (standardRes.value as Response | null)?.ok) {
+      try {
+        const html = await (standardRes.value as Response).text();
+        const $ = cheerio.load(html);
+        let added = 0;
+        $('ol.list > li').each((_, el) => {
+          if (added >= 3) return;
+          const title = $(el).find('p[property="schema:name"]').text().trim() || $(el).find('p.title a').text().trim();
+          const author = $(el).find('p.author').text().trim() || "Unknown Author";
+          const link = $(el).find('a').first().attr('href');
+          const cover = $(el).find('img').attr('src');
+          if (title && link && dedup(title)) {
+            const epubLinkId = link.replace('/ebooks/', '').replace(/\//g, '_');
+            results.push({
+              id: `se_${epubLinkId}`,
+              title,
+              author,
+              coverUrl: cover ? `https://standardebooks.org${cover.replace('/downloads/cover-thumbnail.jpg', '/downloads/cover.jpg')}` : null,
+              description: "High-quality public domain ebook.",
+              epubUrl: `https://standardebooks.org${link}/downloads/${epubLinkId}.epub`,
+              totalPages: 250,
+              source: "Standard Ebooks",
+            });
+            added++;
+          }
+        });
+        sourceMeta["Standard Ebooks"] = added > 0 ? "ok" : "empty";
+      } catch { sourceMeta["Standard Ebooks"] = "timeout"; }
+    } else {
+      sourceMeta["Standard Ebooks"] = standardRes.status === "rejected" ? "timeout" : "empty";
+    }
   }
 
   // ── 2. Gutendex / Project Gutenberg (English queries only) ───────────────
