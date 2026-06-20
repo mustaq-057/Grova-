@@ -155,7 +155,7 @@ libraryRouter.get("/library/search", authenticate, async (req, res) => {
     });
     
     if (ghSearchRes.ok) {
-      const ghSearchData = await ghSearchRes.json();
+      const ghSearchData = await ghSearchRes.json() as any;
       let added = 0;
       for (const repo of (ghSearchData.items || [])) {
         try {
@@ -165,7 +165,7 @@ libraryRouter.get("/library/search", authenticate, async (req, res) => {
             signal: AbortSignal.timeout(3000)
           });
           if (treeRes.ok) {
-            const treeData = await treeRes.json();
+            const treeData = await treeRes.json() as any;
             const epubs = (treeData.tree || []).filter((f: any) => f.path.toLowerCase().endsWith(".epub"));
             if (epubs.length > 0) {
               const file = epubs[0];
