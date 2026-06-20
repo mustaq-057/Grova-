@@ -177,7 +177,7 @@ libraryRouter.get("/library/search", authenticate, async (req, res) => {
                   author: repo.owner?.login || "GitHub Open Source",
                   coverUrl: null,
                   description: repo.description || "Found via Global GitHub Search.",
-                  epubUrl: `https://raw.githubusercontent.com/${repo.full_name}/${repo.default_branch}/${file.path.split("/").map(encodeURIComponent).join("/")}`,
+                  epubUrl: `https://cdn.jsdelivr.net/gh/${repo.full_name}@${repo.default_branch}/${file.path.split("/").map(encodeURIComponent).join("/")}`,
                   totalPages: 250,
                   source: `GitHub (${repo.owner?.login})`,
                 });
@@ -354,7 +354,27 @@ libraryRouter.get("/library/search", authenticate, async (req, res) => {
   ]);
 
 
+  // ── Sort to boost exact matches ──────────────────────────────────────────────
+  const exactLower = query.toLowerCase().trim();
+  results.sort((a, b) => {
+    const aExact = a.title.toLowerCase() === exactLower;
+    const bExact = b.title.toLowerCase() === exactLower;
+    if (aExact && !bExact) return -1;
+    if (!aExact && bExact) return 1;
 
+    const aContains = a.title.toLowerCase().includes(exactLower);
+    const bContains = b.title.toLowerCase().includes(exactLower);
+    if (aContains && !bContains) return -1;
+    if (!aContains && bContains) return 1;
+
+    // Favor Standard Ebooks and Gutendex over Github Global if both match
+    const aIsGithub = a.source.includes("GitHub Global");
+    const bIsGithub = b.source.includes("GitHub Global");
+    if (!aIsGithub && bIsGithub) return -1;
+    if (aIsGithub && !bIsGithub) return 1;
+
+    return 0;
+  });
   // ── Cache and respond ──────────────────────────────────────────────────────
   const meta = { cached: false, sources: sourceMeta, total: results.length };
   setCache(cacheKey, results, { cached: false, sources: sourceMeta, total: results.length });

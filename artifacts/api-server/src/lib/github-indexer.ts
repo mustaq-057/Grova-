@@ -52,7 +52,7 @@ export async function initGithubIndexer() {
               id: `gh_${randomUUID().substring(0,8)}`,
               title: title.trim(),
               author: "GitHub Open Source",
-              epubUrl: `https://raw.githubusercontent.com/${target.repo}/${target.branch}/${f.path.split("/").map(encodeURIComponent).join("/")}`,
+              epubUrl: `https://cdn.jsdelivr.net/gh/${target.repo}@${target.branch}/${f.path.split("/").map(encodeURIComponent).join("/")}`,
               coverUrl: null,
               description: `A file from the ${target.label} GitHub repository (${target.repo}).`,
               source: `GitHub (${target.repo.split("/")[0]})`,
