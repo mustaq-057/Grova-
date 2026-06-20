@@ -509,6 +509,15 @@ export const MessageItem = memo(function MessageItem({
     const isMissed = msg.text.toLowerCase().includes("missed");
     const isOutgoing = isMe;
     
+    // Parse duration if present (e.g. "📞 Audio call ended · 10:45 AM · 5:23")
+    const parts = msg.text.split(" · ");
+    const durationStr = parts.length >= 3 ? parts[2] : null;
+    
+    let title = isVideoLog ? "Video call" : "Audio call";
+    if (isMissed) title = `Missed ${isVideoLog ? "video" : "audio"} call`;
+    else if (isEnded) title = `${isVideoLog ? "Video" : "Audio"} call ended`;
+    else title = `${isVideoLog ? "Video" : "Audio"} call started`;
+
     // Format timestamp nicely for the call log (e.g. 9:41 PM)
     const timeString = new Date(msg.timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 
@@ -539,10 +548,10 @@ export const MessageItem = memo(function MessageItem({
           {/* Text Content */}
           <div className="flex flex-col flex-1 min-w-0">
             <p className="text-white font-semibold text-[15px] truncate">
-              {msg.text}
+              {title}
             </p>
             <p className="text-white/60 text-[13px] mt-0.5">
-              {timeString}
+              {timeString} {durationStr ? ` · ${durationStr}` : ''}
             </p>
           </div>
         </button>

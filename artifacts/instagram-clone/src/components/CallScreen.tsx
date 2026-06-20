@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Phone, PhoneOff, Video, VideoOff, Mic, MicOff, Volume2, VolumeX, SwitchCamera } from "lucide-react";
+import { Phone, PhoneOff, Video, VideoOff, Mic, MicOff, Volume2, VolumeX, SwitchCamera, ChevronDown, AlertCircle, MonitorUp } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@/lib/api";
 
@@ -97,8 +97,13 @@ export default function CallScreen({
   const [elapsed, setElapsed] = useState(0);
   const [connected, setConnected] = useState(false);
   const [isPipDragged, setIsPipDragged] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(false);
+  const [poorConnection, setPoorConnection] = useState(false);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
   
   const audioCtxRef = useRef<AudioContext | null>(null);
+  const ringtoneAudioRef = useRef<HTMLAudioElement | null>(null);
+  const ringbackAudioRef = useRef<HTMLAudioElement | null>(null);
   const ringingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
@@ -132,22 +137,54 @@ export default function CallScreen({
   useEffect(() => {
     const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
     audioCtxRef.current = ctx;
-    return () => { void ctx.close(); };
+    
+    // Attempt to load real MP3 ringtones
+    const ringtone = new Audio("/sounds/ringtone.mp3");
+    const ringback = new Audio("/sounds/ringback.mp3");
+    ringtone.loop = true;
+    ringback.loop = true;
+    ringtoneAudioRef.current = ringtone;
+    ringbackAudioRef.current = ringback;
+    
+    return () => { 
+      void ctx.close(); 
+      ringtone.pause();
+      ringtone.src = "";
+      ringback.pause();
+      ringback.src = "";
+    };
   }, []);
 
   // Ringing logic
   useEffect(() => {
     if (connected || !audioCtxRef.current) {
       if (ringingIntervalRef.current) clearInterval(ringingIntervalRef.current);
+      ringtoneAudioRef.current?.pause();
+      ringbackAudioRef.current?.pause();
       return;
     }
     
-    const play = () => playRingtone(audioCtxRef.current!, call.status === "outgoing");
-    play(); // Play immediately
-    ringingIntervalRef.current = setInterval(play, call.status === "outgoing" ? 4000 : 2000);
+    const isOutgoing = call.status === "outgoing";
+    let mp3Playing = false;
     
+    // Try to play MP3
+    const audioEl = isOutgoing ? ringbackAudioRef.current : ringtoneAudioRef.current;
+    if (audioEl) {
+      audioEl.currentTime = 0;
+      audioEl.play().then(() => {
+        mp3Playing = true;
+      }).catch((err) => {
+        console.log("MP3 ringtone missing or failed to play, falling back to synthesizer.", err);
+        // Fallback to synthesizer
+        const play = () => playRingtone(audioCtxRef.current!, isOutgoing);
+        play(); // Play immediately
+        ringingIntervalRef.current = setInterval(play, isOutgoing ? 4000 : 2000);
+      });
+    }
+
     return () => {
       if (ringingIntervalRef.current) clearInterval(ringingIntervalRef.current);
+      audioEl?.pause();
     };
   }, [call.status, connected]);
 
@@ -170,12 +207,42 @@ export default function CallScreen({
     }
   }, [connected, onConnected]);
 
-  // Timer
+  // Timer and Network Stats
   useEffect(() => {
     if (!connected) return;
     startTimeRef.current = Date.now();
+    
+    // Timer
     const iv = setInterval(() => setElapsed(Math.floor((Date.now() - startTimeRef.current) / 1000)), 1000);
-    return () => clearInterval(iv);
+    
+    // Network Stats Polling
+    const statsIv = setInterval(() => {
+      if (!pcRef.current) return;
+      pcRef.current.getStats().then((stats) => {
+        let hasPoorConnection = false;
+        stats.forEach((report) => {
+          if (report.type === "candidate-pair" && report.state === "succeeded") {
+            // Check RTT (Round Trip Time)
+            if (report.currentRoundTripTime > 0.5) { // 500ms
+              hasPoorConnection = true;
+            }
+          }
+          if (report.type === "inbound-rtp" && report.kind === "video") {
+            // Spikes in packet loss
+            if (report.packetsLost > 50) { // arbitrary threshold for recent spikes
+              hasPoorConnection = true;
+            }
+          }
+        });
+        setPoorConnection(hasPoorConnection);
+      }).catch(() => {});
+    }, 3000);
+
+    return () => {
+      clearInterval(iv);
+      clearInterval(statsIv);
+      setPoorConnection(false);
+    };
   }, [connected]);
 
   // Speaker sync
@@ -316,6 +383,58 @@ export default function CallScreen({
     }
   };
 
+  const toggleScreenShare = async () => {
+    if (call.type !== "video" || !localStreamRef.current) return;
+    try {
+      if (isScreenSharing) {
+        // Stop screen share, go back to camera
+        const newStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: cameraFacing },
+          audio: false
+        });
+        const videoTrack = newStream.getVideoTracks()[0];
+        const oldTrack = localStreamRef.current.getVideoTracks()[0];
+        
+        if (pcRef.current && videoTrack && oldTrack) {
+          const sender = pcRef.current.getSenders().find(s => s.track?.kind === "video");
+          if (sender) await sender.replaceTrack(videoTrack);
+          
+          localStreamRef.current.removeTrack(oldTrack);
+          localStreamRef.current.addTrack(videoTrack);
+          oldTrack.stop();
+          
+          setIsScreenSharing(false);
+        }
+      } else {
+        // Start screen share
+        const newStream = await navigator.mediaDevices.getDisplayMedia({
+          video: true,
+          audio: false
+        });
+        const videoTrack = newStream.getVideoTracks()[0];
+        const oldTrack = localStreamRef.current.getVideoTracks()[0];
+        
+        videoTrack.onended = () => {
+          // If user stops sharing via browser UI, revert
+          void toggleScreenShare();
+        };
+
+        if (pcRef.current && videoTrack && oldTrack) {
+          const sender = pcRef.current.getSenders().find(s => s.track?.kind === "video");
+          if (sender) await sender.replaceTrack(videoTrack);
+          
+          localStreamRef.current.removeTrack(oldTrack);
+          localStreamRef.current.addTrack(videoTrack);
+          oldTrack.stop();
+          
+          setIsScreenSharing(true);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to toggle screen share", err);
+    }
+  };
+
   // Signal Handling
   useEffect(() => {
     const pc = pcRef.current;
@@ -345,6 +464,37 @@ export default function CallScreen({
 
   const isVideo = call.type === "video";
 
+  if (isMinimized) {
+    return (
+      <motion.div
+        drag
+        dragConstraints={{ top: 20, left: 20, right: window.innerWidth - 140, bottom: window.innerHeight - 180 }}
+        className="fixed top-20 right-4 z-[200] w-[120px] h-[160px] rounded-[24px] overflow-hidden shadow-2xl bg-zinc-900 border-2 border-white/20 cursor-pointer"
+        onClick={() => setIsMinimized(false)}
+      >
+        <audio ref={remoteAudioRef} autoPlay playsInline className="sr-only" aria-hidden />
+        {isVideo ? (
+          <video 
+            ref={remoteVideoRef} 
+            autoPlay 
+            playsInline 
+            className="w-full h-full object-cover" 
+          />
+        ) : (
+          <div className="w-full h-full flex flex-col items-center justify-center bg-black/50 backdrop-blur-md">
+            <img src={partnerAvatar} alt="" className="w-12 h-12 rounded-full object-cover mb-2 ring-2 ring-white/20" />
+            <p className="text-white text-[10px] font-medium">{formatTime(elapsed)}</p>
+          </div>
+        )}
+        {poorConnection && (
+          <div className="absolute top-2 right-2 bg-red-500/90 p-1 rounded-full shadow-sm">
+            <AlertCircle className="w-3 h-3 text-white" />
+          </div>
+        )}
+      </motion.div>
+    );
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -355,14 +505,32 @@ export default function CallScreen({
     >
       <audio ref={remoteAudioRef} autoPlay playsInline className="sr-only" aria-hidden />
 
+      {poorConnection && (
+        <div className="absolute top-[80px] inset-x-0 z-[200] flex justify-center pointer-events-none">
+          <div className="bg-red-500/90 text-white text-xs font-medium px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-lg backdrop-blur-sm animate-pulse">
+            <AlertCircle className="w-4 h-4" />
+            Poor connection...
+          </div>
+        </div>
+      )}
+
       {isVideo ? (
         // --- VIDEO CALL UI (Instagram Style) ---
         <div className="relative w-full h-full flex flex-col">
           {/* Remote Video (Full Screen) */}
           <div className="absolute inset-0 bg-zinc-900">
             {!connected && (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-24 h-24 rounded-full overflow-hidden animate-pulse ring-4 ring-white/10">
+              <div className="relative w-full h-full flex flex-col items-center justify-center z-10 pt-10">
+                <div className="absolute top-safe left-4 mt-4 z-20">
+                  <button 
+                    className="p-2 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md transition-colors"
+                    onClick={() => setIsMinimized(true)}
+                    title="Minimize Call"
+                  >
+                    <ChevronDown className="w-6 h-6 text-white" />
+                  </button>
+                </div>
+                <div className="w-32 h-32 md:w-40 md:h-40 rounded-full overflow-hidden mb-6 ring-4 ring-white/10 shadow-2xl z-10 relative">
                   <img src={partnerAvatar} alt="" className="w-full h-full object-cover" />
                 </div>
               </div>
@@ -380,9 +548,10 @@ export default function CallScreen({
             <div className="mt-4 flex items-center gap-3 drop-shadow-md">
               <button 
                 className="pointer-events-auto p-2 rounded-full bg-white/20 hover:bg-white/30 backdrop-blur"
-                onClick={handleEnd}
+                onClick={() => setIsMinimized(true)}
+                title="Minimize Call"
               >
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>
+                <ChevronDown className="w-6 h-6 text-white" />
               </button>
               <div>
                 <h2 className="text-white font-semibold text-lg leading-tight">{partnerName}</h2>
@@ -417,6 +586,7 @@ export default function CallScreen({
             <ControlButton icon={videoOff ? <VideoOff /> : <Video />} onClick={toggleVideo} active={videoOff} label="Video" />
             <ControlButton icon={muted ? <MicOff /> : <Mic />} onClick={toggleMute} active={muted} label="Mute" />
             <ControlButton icon={<SwitchCamera />} onClick={flipCamera} label="Flip" />
+            <ControlButton icon={<MonitorUp />} onClick={toggleScreenShare} active={isScreenSharing} label="Share" />
             <button
               onClick={handleEnd}
               className="w-16 h-16 bg-red-500 rounded-full flex items-center justify-center text-white transition-transform active:scale-90 hover:bg-red-600 shadow-lg"

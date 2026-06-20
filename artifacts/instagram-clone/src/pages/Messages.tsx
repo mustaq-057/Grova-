@@ -212,6 +212,7 @@ export default function Messages() {
     isPinned: false,
   });
   const [isTyping, setIsTyping] = useState(false);
+  const [isPartnerDoodling, setIsPartnerDoodling] = useState(false);
   const [appThemeId, setAppThemeId] = useState<AppThemeId>(() => getStoredAppTheme());
   const searchParams = useAppSearchParams();
   const highlightParam = searchParams.get("highlight");
@@ -306,7 +307,7 @@ export default function Messages() {
 
   const presence = usePresenceLabel(partnerLastSeen);
   const partnerActive = isPartnerActiveInChat(partnerLastSeen);
-  const showPartnerTyping = isTyping;
+  const showPartnerTyping = isTyping || isPartnerDoodling;
 
   const requestStickToBottom = useCallback(() => {
     if (isPrependingRef.current || pendingScrollRestoreRef.current) return;
@@ -711,9 +712,14 @@ export default function Messages() {
         }
         const partnerTyping = Boolean(typing[partnerId]);
         setIsTyping(partnerTyping);
+        // Note: polling doesn't send doodling status, so we reset it to avoid stale state
+        setIsPartnerDoodling(false); 
         if (partnerTyping) {
           if (typingTimeout) clearTimeout(typingTimeout);
-          typingTimeout = setTimeout(() => setIsTyping(false), 4000);
+          typingTimeout = setTimeout(() => {
+            setIsTyping(false);
+            setIsPartnerDoodling(false);
+          }, 4000);
         }
       }).catch(() => { });
     };
@@ -1036,9 +1042,13 @@ export default function Messages() {
           const d = JSON.parse(e.data);
           if (d.userId === partnerId) {
             setIsTyping(d.typing);
-            if (d.typing) {
+            setIsPartnerDoodling(Boolean(d.doodling));
+            if (d.typing || d.doodling) {
               if (typingTimeout) clearTimeout(typingTimeout);
-              typingTimeout = setTimeout(() => setIsTyping(false), 5000);
+              typingTimeout = setTimeout(() => {
+                setIsTyping(false);
+                setIsPartnerDoodling(false);
+              }, 5000);
             }
           }
         } catch (err) {
@@ -1984,7 +1994,7 @@ export default function Messages() {
       }
 
       setOpeningMediaId(null);
-      const raw = msg.type === "image" ? msg.imageUrl || msg.imageData : msg.fileData;
+      const raw = (msg.type === "image" || msg.type === "doodle") ? msg.imageUrl || msg.imageData : msg.fileData;
       if (!raw) return;
       const display =
         msg.type === "video"
@@ -3365,7 +3375,9 @@ export default function Messages() {
             <div className="flex items-end gap-2 px-3 py-1.5 shrink-0 border-t border-white/5 bg-background/80 backdrop-blur-sm">
               <AvatarImage src={pAvatar} userId={partnerId} alt="" className="w-6 h-6 rounded-full object-cover shrink-0" />
               <div className="bg-secondary/80 rounded-2xl rounded-bl-md px-3 py-2 flex items-center gap-1.5">
-                <span className="text-xs text-muted-foreground">{partnerTypingLine(partnerId)}</span>
+                <span className="text-xs text-muted-foreground">
+                  {isPartnerDoodling ? `${partnerName} is drawing a doodle…` : partnerTypingLine(partnerId)}
+                </span>
                 <TypingDots />
               </div>
             </div>
@@ -3386,6 +3398,11 @@ export default function Messages() {
               onClose={closeDoodlePanel}
               onSend={handleDoodleSend}
               onError={(msg) => toast.error(msg, { duration: 4000 })}
+              onDrawStart={() => {
+                if (user && partnerId) {
+                  void api.sendTyping(user.id, partnerId, false, true);
+                }
+              }}
             />
           )}
 

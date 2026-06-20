@@ -569,12 +569,40 @@ export async function initDb() {
     `);
 
     await db.execute(`
-      CREATE TABLE IF NOT EXISTS daily_checkins (
+      CREATE TABLE IF NOT EXISTS library_books (
         id TEXT PRIMARY KEY,
-        question TEXT NOT NULL,
-        answer TEXT NOT NULL,
-        mood TEXT NOT NULL,
-        author TEXT NOT NULL,
+        title TEXT NOT NULL,
+        author TEXT,
+        cover_url TEXT,
+        description TEXT,
+        epub_url TEXT,
+        source TEXT DEFAULT 'Unknown',
+        added_by TEXT NOT NULL,
+        added_at TEXT NOT NULL,
+        status TEXT DEFAULT 'reading',
+        current_page INTEGER DEFAULT 0,
+        total_pages INTEGER DEFAULT 100
+      )
+    `);
+
+    // Migrate existing library_books tables
+    for (const sql of [
+      "ALTER TABLE library_books ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'Unknown'",
+    ]) {
+      try {
+        await db.execute(sql);
+      } catch {
+        /* column may already exist */
+      }
+    }
+
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS library_notes (
+        id TEXT PRIMARY KEY,
+        book_id TEXT NOT NULL,
+        chapter_or_page TEXT,
+        text TEXT NOT NULL,
+        author_id TEXT NOT NULL,
         timestamp TEXT NOT NULL
       )
     `);
@@ -623,9 +651,19 @@ export async function initDb() {
         receiver_id TEXT NOT NULL,
         event TEXT NOT NULL,
         data TEXT NOT NULL,
-        created_at BIGINT NOT NULL
+        created_at BIGINT NOT NULL,
+        expires_at BIGINT NOT NULL
       )
     `);
+    
+    // Add expires_at to existing call_signals table
+    for (const sql of ["ALTER TABLE call_signals ADD COLUMN IF NOT EXISTS expires_at BIGINT NOT NULL DEFAULT 0"]) {
+      try {
+        await db.execute(sql);
+      } catch {
+        // Ignore if column exists
+      }
+    }
     await db.execute(`CREATE INDEX IF NOT EXISTS idx_call_signals_receiver ON call_signals(receiver_id)`);
 
     dbReady = true;

@@ -163,8 +163,7 @@ export const FILE_INPUT_ACCEPT = SUPPORTED_MIME_TYPES.join(",");
 export const DOCUMENTS_ONLY_ACCEPT = SUPPORTED_MIME_TYPES.filter(
   (mime) =>
     !mime.startsWith("image/") &&
-    !mime.startsWith("video/") &&
-    !mime.startsWith("audio/"),
+    !mime.startsWith("video/"),
 ).join(",");
 
 // Helper function to check if a file is supported

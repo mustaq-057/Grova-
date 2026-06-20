@@ -75,18 +75,20 @@ export function AudioMessage({
       audio.pause();
       setPlaying(false);
     } else {
-      if (waveform.length === 0) void generateWaveform(audio);
+      if (waveform.length === 0) void generateWaveform();
       audio.play().catch((err) => console.error("Audio playback failed:", err));
       setPlaying(true);
     }
   };
 
-  const generateWaveform = async (audio: HTMLAudioElement) => {
+  const generateWaveform = useCallback(async () => {
+    if (waveform.length > 0) return;
     try {
       if (!audioContextRef.current) {
         audioContextRef.current = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
       }
-      await audioContextRef.current.resume().catch(() => {});
+      // Note: Do not resume audio context here as it requires user gesture, 
+      // decoding audio data works without resuming.
       const response = await fetch(audioData);
       const arrayBuffer = await response.arrayBuffer();
       const audioBuffer = await audioContextRef.current.decodeAudioData(arrayBuffer);
@@ -106,7 +108,7 @@ export function AudioMessage({
     } catch {
       setWaveform(STATIC_BARS.map(() => 0.35 + Math.random() * 0.35));
     }
-  };
+  }, [audioData, duration, waveform.length]);
 
   const transcribeAudio = async () => {
     if (!isTranscriptionSupported()) {
@@ -168,12 +170,34 @@ export function AudioMessage({
     };
   }, [audioData]);
 
+  const containerRef = useRef<HTMLDivElement>(null);
+  
+  useEffect(() => {
+    if (waveform.length > 0) return;
+    const current = containerRef.current;
+    if (!current) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries;
+        if (entry?.isIntersecting) {
+          void generateWaveform();
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "100px 0px" } // trigger slightly before it comes into view
+    );
+
+    observer.observe(current);
+    return () => observer.disconnect();
+  }, [generateWaveform, waveform.length]);
+
   const bars = waveform.length > 0 ? waveform : STATIC_BARS;
   const barHeights = bars.map((a) => Math.max(3, Math.min(16, (typeof a === "number" ? a : 0.5) * 16)));
   const timeLabel = `${formatAudioTime(currentTime)} / ${formatAudioTime(duration)}`;
 
   return (
-    <div className="flex flex-col gap-1.5 max-w-[min(280px,88vw)]">
+    <div ref={containerRef} className="flex flex-col gap-1.5 max-w-[min(280px,88vw)]">
       <div
         className={`flex items-center gap-2.5 px-3 py-2 rounded-2xl overflow-hidden ${
           isMe ? "bg-white/15" : "bg-primary/10"
@@ -205,7 +229,7 @@ export function AudioMessage({
             return (
               <div
                 key={i}
-                className={`w-[3px] rounded-full shrink-0 transition-colors ${
+                className={`w-[3px] rounded-full shrink-0 transition-all duration-300 ease-in-out ${
                   isMe
                     ? isActive
                       ? "bg-white"
@@ -216,7 +240,7 @@ export function AudioMessage({
                 }`}
                 style={{
                   height: `${h}px`,
-                  transform: playing && isActive ? `scaleY(${1 + Math.sin(i * 0.5) * 0.15})` : undefined,
+                  transform: playing && isActive ? `scaleY(${1 + Math.sin(currentTime * 10 + i * 0.5) * 0.25})` : "scaleY(1)",
                   transformOrigin: "center",
                 }}
               />

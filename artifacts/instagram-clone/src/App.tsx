@@ -18,7 +18,8 @@ import Notifications from "@/pages/Notifications";
 import Dua from "@/pages/Dua";
 import Memories from "@/pages/Memories";
 import Calendar from "@/pages/Calendar";
-import DailyCheckin from "@/pages/DailyCheckin";
+import Library from "@/pages/Library";
+import EReader from "@/pages/EReader";
 import Tasks from "@/pages/Tasks";
 import Milestones from "@/pages/Milestones";
 import SecretNotes from "@/pages/SecretNotes";
@@ -109,8 +110,11 @@ function ProtectedRouter() {
         <Route path="/calendar">
           <PageWrapper><Calendar /></PageWrapper>
         </Route>
-        <Route path="/checkin">
-          <PageWrapper><DailyCheckin /></PageWrapper>
+        <Route path="/library">
+          <PageWrapper><Library /></PageWrapper>
+        </Route>
+        <Route path="/read/:id">
+          <PageWrapper><EReader /></PageWrapper>
         </Route>
         <Route path="/tasks">
           <PageWrapper><Tasks /></PageWrapper>

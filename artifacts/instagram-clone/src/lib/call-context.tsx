@@ -196,7 +196,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
           }}
           onEnd={endCall}
           onConnected={onCallConnected}
-          incomingSignal={callSignal}
+          incomingSignal={callSignal || undefined}
         />
       )}
     </CallContext.Provider>

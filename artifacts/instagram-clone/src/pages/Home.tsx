@@ -13,6 +13,7 @@ import { getStoredAppTheme, APP_THEME_CHANGED } from "@/lib/app-theme";
 import { readSessionSnapshot } from "@/lib/profile-cache";
 import { parsePresenceResponse } from "@/lib/presence-api";
 import { USER_TIMEZONES } from "@/lib/timezones";
+import { LibraryWidget } from "@/components/LibraryWidget";
 
 export default memo(function Home() {
   const { user, partner: authPartner } = useAuth();
@@ -116,7 +117,7 @@ export default memo(function Home() {
     { href: "/chat", icon: MessageCircle, label: "Chat", desc: "Messages & calls" },
     { href: "/dua", icon: BookOpen, label: "Duas", desc: "Shared prayers" },
     { href: "/memories", icon: Heart, label: "Memories", desc: "Your moments" },
-    { href: "/create", icon: ImagePlus, label: "Photos", desc: "Upload an image" },
+    { href: "/library", icon: BookOpen, label: "Library", desc: "Shared books" },
   ];
 
   return (
@@ -234,6 +235,8 @@ export default memo(function Home() {
           </div>
         </motion.div>
       </motion.div>
+
+      <LibraryWidget />
 
       <motion.div 
         initial={{ opacity: 0, y: 10 }}

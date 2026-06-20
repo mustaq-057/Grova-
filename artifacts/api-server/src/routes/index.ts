@@ -28,6 +28,7 @@ import mediaRouter from "./media";
 import hiddenMessagesRouter from "./hidden-messages";
 import exportRouter from "./export";
 import coupleSyncRouter from "./couple-sync";
+import libraryRouter from "./library";
 
 const router: IRouter = Router();
 
@@ -65,5 +66,6 @@ router.use(mediaRouter);
 router.use(hiddenMessagesRouter);
 router.use(exportRouter);
 router.use(coupleSyncRouter);
+router.use(libraryRouter);
 
 export default router;

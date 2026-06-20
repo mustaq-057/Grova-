@@ -131,7 +131,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     { icon: BookOpen, label: "Dua", href: "/dua" },
     { icon: Heart, label: "Memories", href: "/memories" },
     { icon: CalendarIcon, label: "Calendar", href: "/calendar" },
-    { icon: Sparkles, label: "Check-in", href: "/checkin" },
+    { icon: Sparkles, label: "Library", href: "/library" },
     { icon: ListTodo, label: "Tasks", href: "/tasks" },
     { icon: Star, label: "Milestones", href: "/milestones" },
     { icon: Shield, label: "Secret Notes", href: "/secret-notes" },
@@ -219,7 +219,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <nav
         className={`md:hidden fixed bottom-0 left-0 right-0 h-16 sm:h-14 app-chrome border-t border-border/50 flex items-center justify-around px-1 z-50 safe-area-bottom ${showThemeBg ? "bg-background/95 backdrop-blur-lg" : "bg-background/95 backdrop-blur-md"}`}
       >
-        {navItems.filter((i) => !["Dua", "Memories", "Calendar", "Check-in", "Tasks", "Milestones", "Secret Notes"].includes(i.label)).map((item) => {
+        {navItems.filter((i) => !["Dua", "Memories", "Calendar", "Library", "Tasks", "Milestones", "Secret Notes"].includes(i.label)).map((item) => {
           const Icon = item.icon;
           const isActive =
             location === item.href ||

@@ -49,11 +49,18 @@ self.addEventListener("fetch", (event) => {
 self.addEventListener("push", (event) => {
   let targetPath = "/chat";
   let body = "New message";
+  let title = "Grova";
+  let requireInteraction = false;
+  
   if (event.data) {
     try {
       const payload = event.data.json();
       if (typeof payload?.targetPath === "string") targetPath = payload.targetPath;
       if (typeof payload?.body === "string") body = payload.body;
+      if (typeof payload?.title === "string") title = payload.title;
+      if (payload?.type === "call") {
+        requireInteraction = true;
+      }
     } catch {
       body = event.data.text();
     }
@@ -63,8 +70,9 @@ self.addEventListener("push", (event) => {
     icon: "/favicon.svg",
     badge: "/favicon.svg",
     data: { targetPath },
+    requireInteraction,
   };
-  event.waitUntil(self.registration.showNotification("Grova", options));
+  event.waitUntil(self.registration.showNotification(title, options));
 });
 
 self.addEventListener("notificationclick", (event) => {

@@ -65,7 +65,7 @@ export async function tryRefreshSession(): Promise<boolean> {
   return refreshInFlight;
 }
 
-async function apiFetch<T = unknown>(path: string, options?: RequestInit, attempt = 0): Promise<T> {
+export async function apiFetch<T = unknown>(path: string, options?: RequestInit, attempt = 0): Promise<T> {
   const method = options?.method ?? "GET";
   const isRead = method === "GET" || method === "HEAD";
   const maxAttempts = isRead ? 2 : 2;
@@ -637,10 +637,10 @@ export const api = {
   getHiddenMessageIds: (userId: string) =>
     apiFetch<{ messageIds: string[]; clearedAt?: string | null }>(`/hidden-messages/${userId}`),
 
-  sendTyping: (userId: string, partnerId: string, typing: boolean) =>
+  sendTyping: (userId: string, partnerId: string, typing: boolean, doodling: boolean = false) =>
     apiFetch<{ success: boolean }>("/typing", {
       method: "POST",
-      body: JSON.stringify({ userId, partnerId, typing }),
+      body: JSON.stringify({ userId, partnerId, typing, doodling }),
     }),
 
   getCallSignals: () => apiFetch<{ event: string; data: any }[]>("/call/signals"),

@@ -57,6 +57,21 @@ export function CameraOverlay({ onClose, onCapture }: CameraOverlayProps) {
     setFlashOn(!flashOn);
   };
 
+  useEffect(() => {
+    if (!streamRef.current) return;
+    const track = streamRef.current.getVideoTracks()[0];
+    if (track) {
+      try {
+        // @ts-ignore - torch constraint is not in standard TS types yet
+        track.applyConstraints({ advanced: [{ torch: flashOn }] }).catch(() => {
+          console.warn("Flashlight not supported by this device/camera.");
+        });
+      } catch (err) {
+        console.error("Failed to apply flashlight constraint", err);
+      }
+    }
+  }, [flashOn]);
+
   const toggleRatio = () => {
     setAspectRatio(prev => prev === "Full" ? "16:9" : prev === "16:9" ? "4:3" : prev === "4:3" ? "1:1" : "Full");
   };

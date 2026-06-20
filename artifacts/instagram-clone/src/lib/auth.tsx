@@ -448,6 +448,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     source.addEventListener("activity-read-all", () => {
       markAllReadLocal();
     });
+
+    source.addEventListener("page-sync", (e) => {
+      try {
+        const data = JSON.parse((e as MessageEvent).data);
+        window.dispatchEvent(new CustomEvent("grova-page-sync", { detail: data }));
+      } catch {
+        /* ignore */
+      }
+    });
     };
 
     const connectLive = () => {

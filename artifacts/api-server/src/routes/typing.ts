@@ -9,7 +9,7 @@ const router = Router();
 // Send typing indicator (SSE + DB for Vercel polling)
 router.post("/typing", rateLimiters.messages, authenticate, async (req, res) => {
   try {
-    const { userId, partnerId, typing } = req.body;
+    const { userId, partnerId, typing, doodling } = req.body;
     const authenticatedUserId = (req as { user?: { id: string } }).user?.id;
 
     if (!userId || !partnerId || typeof typing !== "boolean") {
@@ -28,7 +28,7 @@ router.post("/typing", rateLimiters.messages, authenticate, async (req, res) => 
       /* ignore if column missing on old DB */
     }
 
-    broadcast("typing-indicator", { userId, typing }, partnerId);
+    broadcast("typing-indicator", { userId, typing, doodling: Boolean(doodling) }, partnerId);
 
     res.json({ success: true });
   } catch (err) {

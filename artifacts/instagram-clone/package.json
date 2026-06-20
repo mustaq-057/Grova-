@@ -69,5 +69,9 @@
     "vite": "catalog:",
     "wouter": "^3.3.5",
     "zod": "catalog:"
+  },
+  "dependencies": {
+    "epubjs": "^0.3.93",
+    "react-reader": "^2.0.15"
   }
 }

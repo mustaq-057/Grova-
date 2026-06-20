@@ -43,6 +43,9 @@ export async function alertIncomingChatMessage(raw: ApiMessage, ctx: ChatNotifyC
     /* use raw for preview */
   }
 
+  const isDnd = window.localStorage.getItem("DND_LIBRARY_MODE") === "true";
+  if (isDnd) return;
+
   const preview = messagePreview(msg) || "New message";
   showChatToast(ctx.partnerName, preview);
 
@@ -61,6 +64,9 @@ export async function alertIncomingChatMessage(raw: ApiMessage, ctx: ChatNotifyC
 }
 
 export function alertIncomingChatLike(ctx: Pick<ChatNotifyContext, "partnerName" | "partnerAvatar">): void {
+  const isDnd = window.localStorage.getItem("DND_LIBRARY_MODE") === "true";
+  if (isDnd) return;
+
   const body = "liked your message";
   showChatToast(ctx.partnerName, body);
   if (areNotificationsEnabled() && Notification.permission === "granted" && shouldBumpChatBadge()) {
@@ -72,6 +78,9 @@ export function alertIncomingChatReaction(
   emoji: string,
   ctx: Pick<ChatNotifyContext, "partnerName" | "partnerAvatar">,
 ): void {
+  const isDnd = window.localStorage.getItem("DND_LIBRARY_MODE") === "true";
+  if (isDnd) return;
+
   const body = `reacted ${emoji} to your message`;
   showChatToast(ctx.partnerName, body);
   if (areNotificationsEnabled() && Notification.permission === "granted" && shouldBumpChatBadge()) {

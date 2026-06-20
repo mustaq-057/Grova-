@@ -13,6 +13,7 @@ interface DoodleCanvasProps {
   onClose: () => void;
   onSend: (data: DoodleData) => void;
   onError?: (message: string) => void;
+  onDrawStart?: () => void;
 }
 
 const BACKGROUND_WHITE = "#FFFFFF";
@@ -96,7 +97,7 @@ function isBackgroundPixel(r: number, g: number, b: number, a: number, bg: strin
   return Math.abs(r - br) < 8 && Math.abs(g - bg2) < 8 && Math.abs(b - bb) < 8;
 }
 
-export default function DoodleCanvas({ onClose, onSend, onError }: DoodleCanvasProps) {
+export default function DoodleCanvas({ onClose, onSend, onError, onDrawStart }: DoodleCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const colorScrollRef = useRef<HTMLDivElement>(null);
@@ -235,6 +236,7 @@ export default function DoodleCanvas({ onClose, onSend, onError }: DoodleCanvasP
     canvasRef.current?.setPointerCapture(e.pointerId);
     isDrawingRef.current = true;
     lastPtRef.current = pt;
+    onDrawStart?.();
 
     const ctx = canvasRef.current?.getContext("2d");
     if (!ctx) return;
