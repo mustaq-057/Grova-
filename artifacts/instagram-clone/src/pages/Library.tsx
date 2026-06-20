@@ -68,10 +68,10 @@ const SOURCE_COLORS: Record<string, string> = {
 };
 
 const RANDOM_CATALOG = [
-  { id: "c1", title: "Alice's Adventures in Wonderland", author: "Lewis Carroll", source: "Gutendex", totalPages: 150, epubUrl: "https://s3.amazonaws.com/moby-dick/moby-dick.epub", description: "A classic tale.", coverUrl: "https://covers.openlibrary.org/b/id/12818862-L.jpg" },
-  { id: "c2", title: "The Count of Monte Cristo", author: "Alexandre Dumas", source: "Gutendex", totalPages: 1200, epubUrl: "https://s3.amazonaws.com/moby-dick/moby-dick.epub", description: "A story of revenge.", coverUrl: "https://covers.openlibrary.org/b/id/10521270-L.jpg" },
-  { id: "c3", title: "Pride and Prejudice", author: "Jane Austen", source: "Gutendex", totalPages: 350, epubUrl: "https://s3.amazonaws.com/moby-dick/moby-dick.epub", description: "A romantic novel.", coverUrl: "https://covers.openlibrary.org/b/id/10521278-L.jpg" },
-  { id: "c4", title: "Moby Dick", author: "Herman Melville", source: "Gutendex", totalPages: 800, epubUrl: "https://s3.amazonaws.com/moby-dick/moby-dick.epub", description: "The whale.", coverUrl: "https://covers.openlibrary.org/b/id/12648505-L.jpg" }
+  { id: "c1", title: "كليلة ودمنة", author: "ابن المقفع", source: "Shamela", totalPages: 300, epubUrl: "https://shamela.ws/book/23846", description: "أشهر حكايات الحيوان الرمزية في التراث العربي.", coverUrl: "https://covers.openlibrary.org/b/id/10574706-L.jpg", isLink: true },
+  { id: "c2", title: "Pride and Prejudice", author: "Jane Austen", source: "Gutendex", totalPages: 350, epubUrl: "https://www.gutenberg.org/ebooks/1342.epub3.images", description: "A classic romance novel.", coverUrl: "https://www.gutenberg.org/cache/epub/1342/pg1342.cover.medium.jpg" },
+  { id: "c3", title: "Les Misérables", author: "Victor Hugo", source: "Gutendex", totalPages: 1400, epubUrl: "https://www.gutenberg.org/ebooks/135.epub3.images", description: "A French historical novel.", coverUrl: "https://www.gutenberg.org/cache/epub/135/pg135.cover.medium.jpg" },
+  { id: "c4", title: "Don Quijote", author: "Miguel de Cervantes", source: "Gutendex", totalPages: 1000, epubUrl: "https://www.gutenberg.org/ebooks/2000.epub3.images", description: "The classic Spanish novel.", coverUrl: "https://www.gutenberg.org/cache/epub/2000/pg2000.cover.medium.jpg" }
 ];
 
 function BookCover({
@@ -279,17 +279,14 @@ export default function Library() {
   };
 
   const openBook = (book: ApiBook) => {
-    if (book.isLink && book.epubUrl) {
-      setInAppBrowserUrl(book.epubUrl);
-      return;
+    // Shamela and HathiTrust are web pages, not direct epub files
+    if (book.isLink || book.source === "Shamela" || book.source === "HathiTrust") {
+      if (book.epubUrl) {
+        setInAppBrowserUrl(book.epubUrl);
+        return;
+      }
     }
-    if (book.epubUrl && !book.isLink) {
-       // if it's not a link but has an epubUrl, just use the in-app browser or the local reader? 
-       // We'll trust the existing logic mostly but use the overlay for external links
-       setInAppBrowserUrl(book.epubUrl);
-       return;
-    }
-    // Fallback: use EReader
+    // For standard EPUBs (or books without URLs that will use the fallback/error state), use our native EReader
     setLocation(`/read/${book.id}`);
   };
 

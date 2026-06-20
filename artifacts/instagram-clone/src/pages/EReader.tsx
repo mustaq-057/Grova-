@@ -69,7 +69,12 @@ export default function EReader() {
     if (!id) return;
     setLoading(true);
     apiFetch(`/library/${id}`).then((book: any) => {
-      setEpubUrl(book.epubUrl || FALLBACK_EPUB);
+      let finalUrl = book.epubUrl;
+      if (finalUrl && finalUrl.startsWith("http") && finalUrl.includes("gutenberg.org")) {
+        // Wrap Gutenberg epubs in a CORS proxy to prevent browser blocks
+        finalUrl = `https://corsproxy.io/?${encodeURIComponent(finalUrl)}`;
+      }
+      setEpubUrl(finalUrl || FALLBACK_EPUB);
       setLoading(false);
     }).catch((e) => {
       console.error(e);
