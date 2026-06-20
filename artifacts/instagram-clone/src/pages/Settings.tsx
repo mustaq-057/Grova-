@@ -1,5 +1,5 @@
 import { useState, memo, useEffect } from "react";
-import { ChevronRight, User, Lock, Bell, Moon, Sun, LogOut, Heart, Shield, Smartphone, Eye, EyeOff, Check, Edit3, X } from "lucide-react";
+import { ChevronRight, User, Lock, Bell, Moon, Sun, LogOut, Heart, Shield, Smartphone, Eye, EyeOff, Check, Edit3, X, Maximize } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
@@ -56,6 +56,22 @@ export default memo(function Settings() {
   const [codeError, setCodeError] = useState("");
   const [codeSuccess, setCodeSuccess] = useState(false);
   const [savingCode, setSavingCode] = useState(false);
+
+  const [isFullscreen, setIsFullscreen] = useState(!!document.fullscreenElement);
+  
+  useEffect(() => {
+    const handleFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, []);
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(err => console.error("Error attempting to enable fullscreen:", err));
+    } else if (document.exitFullscreen) {
+      document.exitFullscreen().catch(err => console.error("Error attempting to exit fullscreen:", err));
+    }
+  };
 
   const toggleDark = () => {
     setDarkMode((d: boolean) => {
@@ -357,6 +373,13 @@ export default memo(function Settings() {
             </div>
             <div className="flex-1"><p className="text-sm font-medium">Dark mode</p><p className="text-xs text-muted-foreground">{darkMode ? "Currently dark" : "Currently light"}</p></div>
             <Toggle on={darkMode} toggle={toggleDark} />
+          </div>
+          <div className="flex items-center gap-4 px-4 py-3.5 border-t border-border/50">
+            <div className="w-10 h-10 bg-secondary/50 rounded-xl flex items-center justify-center">
+              <Maximize className="w-5 h-5 text-muted-foreground" strokeWidth={1.5} />
+            </div>
+            <div className="flex-1"><p className="text-sm font-medium">Full screen mode</p><p className="text-xs text-muted-foreground">Hide browser interface</p></div>
+            <Toggle on={isFullscreen} toggle={toggleFullscreen} />
           </div>
           <button
             type="button"

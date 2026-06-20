@@ -141,9 +141,56 @@ libraryRouter.get("/library/search", authenticate, async (req, res) => {
       results.push(ghBook);
       added++;
     }
-    sourceMeta["GitHub"] = added > 0 ? "ok" : "empty";
+    sourceMeta["GitHub Omni"] = added > 0 ? "ok" : "empty";
   } catch (err) {
-    sourceMeta["GitHub"] = "timeout";
+    sourceMeta["GitHub Omni"] = "timeout";
+  }
+
+  // ── 1.1 Global GitHub Search (Dynamic) ────────────────────────────────────
+  try {
+    // Search repositories that match the query and contain epub
+    const ghSearchRes = await fetch(`https://api.github.com/search/repositories?q=${enc}+epub&per_page=2`, {
+      headers: { "User-Agent": "Grova-App" },
+      signal: AbortSignal.timeout(4000)
+    });
+    
+    if (ghSearchRes.ok) {
+      const ghSearchData = await ghSearchRes.json();
+      let added = 0;
+      for (const repo of (ghSearchData.items || [])) {
+        try {
+          // Fetch the file tree of the found repo
+          const treeRes = await fetch(`https://api.github.com/repos/${repo.full_name}/git/trees/${repo.default_branch}?recursive=1`, {
+            headers: { "User-Agent": "Grova-App" },
+            signal: AbortSignal.timeout(3000)
+          });
+          if (treeRes.ok) {
+            const treeData = await treeRes.json();
+            const epubs = (treeData.tree || []).filter((f: any) => f.path.toLowerCase().endsWith(".epub"));
+            if (epubs.length > 0) {
+              const file = epubs[0];
+              const title = file.path.split("/").pop()?.replace(/\.epub$/i, "").replace(/[-_]/g, " ") || repo.name;
+              if (dedup(title)) {
+                results.push({
+                  id: `gh_global_${repo.id}`,
+                  title,
+                  author: repo.owner?.login || "GitHub Open Source",
+                  coverUrl: null,
+                  description: repo.description || "Found via Global GitHub Search.",
+                  epubUrl: `https://raw.githubusercontent.com/${repo.full_name}/${repo.default_branch}/${encodeURIComponent(file.path)}`,
+                  totalPages: 250,
+                  source: `GitHub (${repo.owner?.login})`,
+                });
+                added++;
+              }
+            }
+          }
+        } catch (e) { /* ignore tree fetch errors */ }
+      }
+      sourceMeta["GitHub Global"] = added > 0 ? "ok" : "empty";
+    }
+  } catch (err) {
+    sourceMeta["GitHub Global"] = "timeout";
   }
 
   // ── 1.5 Standard Ebooks (English, High Quality EPUBs) ─────────────────────────

@@ -309,8 +309,7 @@ export default function Library() {
       });
       setAddedIds((prev) => new Set([...prev, book.id]));
       await loadBooks();
-      // Immediately open book
-      openBook(book as unknown as ApiBook);
+      // DO NOT immediately open book. User wants to see the "Read Now" and "Download Cover" buttons instead.
     } catch (err) {
       console.error("Failed to add book:", err);
     } finally {
@@ -539,14 +538,31 @@ export default function Library() {
                           >
                             <ExternalLink className="w-3 h-3" /> Open HathiTrust
                           </a>
+                        ) : alreadyAdded ? (
+                          <div className="flex flex-col gap-2 w-full px-2">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); openBook(result as unknown as ApiBook); }}
+                              className="bg-white text-black font-bold text-xs py-2 w-full rounded-full flex items-center justify-center gap-1.5 active:scale-95 transition-all"
+                            >
+                              <BookOpen className="w-3 h-3" /> Read Now
+                            </button>
+                            {result.coverUrl && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); window.open(result.coverUrl, "_blank"); }}
+                                className="bg-white/20 text-white font-bold text-xs py-2 w-full rounded-full flex items-center justify-center gap-1.5 active:scale-95 transition-all border border-white/30 hover:bg-white/30"
+                              >
+                                <Download className="w-3 h-3" /> Cover
+                              </button>
+                            )}
+                          </div>
                         ) : (
                           <button
                             onClick={(e) => { e.stopPropagation(); addToLibrary(result); }}
-                            disabled={alreadyAdded || isAdding}
-                            className="bg-primary text-primary-foreground font-bold text-xs py-2 px-4 rounded-full flex items-center gap-1.5 disabled:opacity-70 transition-all active:scale-95 shadow-lg shadow-primary/20"
+                            disabled={isAdding}
+                            className="bg-primary text-primary-foreground font-bold text-xs py-2 px-4 rounded-full flex items-center gap-1.5 disabled:opacity-70 transition-all active:scale-95 shadow-lg shadow-primary/20 hover:bg-primary/90"
                           >
-                            {isAdding ? <Loader2 className="w-3 h-3 animate-spin" /> : alreadyAdded ? <CheckCircle2 className="w-3 h-3" /> : <BookOpen className="w-3 h-3" />}
-                            {alreadyAdded ? t.finished : "Read Now"}
+                            {isAdding ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
+                            Add to Shelf
                           </button>
                         )}
                         <p className="text-xs text-white text-center line-clamp-2 leading-tight">{result.description}</p>
