@@ -4,6 +4,7 @@ import db from "../lib/db";
 import { authenticate } from "../lib/auth-middleware";
 import type { AuthenticatedRequest } from "../types";
 import * as cheerio from "cheerio";
+import { searchGithubIndex } from "../lib/github-indexer";
 
 const libraryRouter = Router();
 
@@ -131,32 +132,18 @@ libraryRouter.get("/library/search", authenticate, async (req, res) => {
     return true;
   }
 
-  // ── 1. Open Library ────────────────────────────────────────────────────────
-  if (openLibRes.status === "fulfilled" && openLibRes.value?.ok) {
-    try {
-      const data = await (openLibRes.value as Response).json() as any;
-      const docs = (data.docs || []);
-      let added = 0;
-      for (const doc of docs) {
-        if (!doc.title || !dedup(doc.title)) continue;
-        results.push({
-          id: `ol_${(doc.key || "").replace("/works/", "") || randomUUID()}`,
-          title: doc.title,
-          author: doc.author_name?.[0] || "Unknown Author",
-          coverUrl: doc.cover_i
-            ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg`
-            : null,
-          description: "Available on Open Library.",
-          totalPages: doc.number_of_pages_median || 100,
-          source: "Open Library",
-        });
-        added++;
-        if (added >= 4) break;
-      }
-      sourceMeta["Open Library"] = added > 0 ? "ok" : "empty";
-    } catch { sourceMeta["Open Library"] = "timeout"; }
-  } else {
-    sourceMeta["Open Library"] = openLibRes.status === "rejected" ? "timeout" : "empty";
+  // ── 1. GitHub Curation Indexer (Blazing Fast In-Memory) ─────────────────
+  try {
+    const githubResults = await searchGithubIndex(query);
+    let added = 0;
+    for (const ghBook of githubResults) {
+      if (!dedup(ghBook.title)) continue;
+      results.push(ghBook);
+      added++;
+    }
+    sourceMeta["GitHub"] = added > 0 ? "ok" : "empty";
+  } catch (err) {
+    sourceMeta["GitHub"] = "timeout";
   }
 
   // ── 1.5 Standard Ebooks (English, High Quality EPUBs) ─────────────────────────

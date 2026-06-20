@@ -1,0 +1,119 @@
+import { randomUUID } from "crypto";
+
+export interface GithubBook {
+  id: string;
+  title: string;
+  author: string;
+  epubUrl: string;
+  coverUrl: string | null;
+  description: string;
+  source: string;
+  totalPages: number;
+}
+
+let githubCache: GithubBook[] = [];
+let isInitialized = false;
+
+const REPOS_TREES = [
+  { repo: "canaveensetia/Books", branch: "master", label: "Tech & Productivity" },
+  { repo: "rishabhmodi03/BOOKS", branch: "master", label: "General Collection" },
+  { repo: "ikrukov/epub", branch: "master", label: "Public Domain Tech" },
+  { repo: "Abdalrahman-Alhamod/Books", branch: "main", label: "Arabic & Engineering" },
+];
+
+const REPOS_RELEASES = [
+  { repo: "rockneverdies55/quran-epub", label: "Quranic & Islamic EPUBs" }
+];
+
+export async function initGithubIndexer() {
+  if (isInitialized) return;
+  
+  try {
+    const promises = [];
+    
+    // Fetch Trees
+    for (const target of REPOS_TREES) {
+      promises.push(
+        fetch(`https://api.github.com/repos/${target.repo}/git/trees/${target.branch}?recursive=1`, {
+          headers: { "User-Agent": "Grova-Library-Indexer" }
+        })
+        .then(r => r.json())
+        .then(data => {
+          if (!data.tree) return;
+          const files = data.tree.filter((f: any) => f.path.toLowerCase().endsWith(".epub") || f.path.toLowerCase().endsWith(".pdf"));
+          
+          files.forEach((f: any) => {
+            // Extract filename without extension for title
+            const filename = f.path.split("/").pop();
+            if (!filename) return;
+            const title = filename.replace(/\.(epub|pdf)$/i, "").replace(/[-_]/g, " ");
+            
+            githubCache.push({
+              id: `gh_${randomUUID().substring(0,8)}`,
+              title: title.trim(),
+              author: "GitHub Open Source",
+              epubUrl: `https://raw.githubusercontent.com/${target.repo}/${target.branch}/${encodeURIComponent(f.path)}`,
+              coverUrl: null,
+              description: `A file from the ${target.label} GitHub repository (${target.repo}).`,
+              source: `GitHub (${target.repo.split("/")[0]})`,
+              totalPages: 250,
+            });
+          });
+        })
+        .catch(err => console.error(`Failed to index ${target.repo}:`, err.message))
+      );
+    }
+    
+    // Fetch Releases
+    for (const target of REPOS_RELEASES) {
+      promises.push(
+        fetch(`https://api.github.com/repos/${target.repo}/releases`, {
+          headers: { "User-Agent": "Grova-Library-Indexer" }
+        })
+        .then(r => r.json())
+        .then(releases => {
+          if (!Array.isArray(releases)) return;
+          releases.forEach((release: any) => {
+            (release.assets || []).forEach((asset: any) => {
+              if (asset.name.toLowerCase().endsWith(".epub")) {
+                githubCache.push({
+                  id: `gh_rel_${randomUUID().substring(0,8)}`,
+                  title: asset.name.replace(/\.epub$/i, "").replace(/[-_]/g, " "),
+                  author: "Open Source Contributor",
+                  epubUrl: asset.browser_download_url,
+                  coverUrl: null,
+                  description: `High-quality Arabic release from ${target.label} (${target.repo}).`,
+                  source: `GitHub (${target.repo.split("/")[0]})`,
+                  totalPages: 300,
+                });
+              }
+            });
+          });
+        })
+        .catch(err => console.error(`Failed to index release ${target.repo}:`, err.message))
+      );
+    }
+
+    await Promise.allSettled(promises);
+    isInitialized = true;
+    console.log(`[GitHub Indexer] Successfully indexed ${githubCache.length} direct EPUB/PDF files into memory.`);
+  } catch (error) {
+    console.error("[GitHub Indexer] Initialization failed:", error);
+  }
+}
+
+export async function searchGithubIndex(query: string): Promise<GithubBook[]> {
+  if (!isInitialized) {
+    // Lazy initialize if not done
+    await initGithubIndexer();
+  }
+  
+  if (!query) return [];
+  const lowerQuery = query.toLowerCase();
+  
+  // Simple substring match
+  const matches = githubCache.filter(book => book.title.toLowerCase().includes(lowerQuery));
+  
+  // Return top 4 results
+  return matches.slice(0, 4);
+}
