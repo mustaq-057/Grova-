@@ -513,12 +513,49 @@ export default function Library() {
 
       {/* ── Search Results ── */}
       {searchQuery && (
-        <div className="px-4 py-4">
-          {isSearching ? (
-            <div className="flex flex-col items-center py-12 gap-3 text-[var(--lib-muted)]">
-              <Loader2 className="w-7 h-7 animate-spin text-primary" />
-              <p className="text-sm font-semibold">{t.loading}</p>
-            </div>
+        <div className="px-4 py-4 space-y-8">
+          {/* Local Matches */}
+          {(() => {
+            const localMatches = books.filter(b => 
+              b.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+              b.author.toLowerCase().includes(searchQuery.toLowerCase())
+            );
+            if (localMatches.length === 0) return null;
+            return (
+              <div>
+                <h3 className="text-lg font-bold mb-3 flex items-center text-primary">
+                  <BookMarked className="w-5 h-5 mr-2" /> In Your Library
+                </h3>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                  {localMatches.map((result) => (
+                    <div key={result.id} className="bg-[var(--lib-card)] rounded-2xl overflow-hidden border border-[var(--lib-border)] flex flex-col group cursor-pointer transition-colors duration-300" onClick={() => openBook(result)}>
+                      <div className="aspect-[2/3] w-full bg-gray-900 relative overflow-hidden">
+                        <BookCover coverUrl={result.coverUrl} title={result.title} />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <BookOpen className="w-8 h-8 text-white drop-shadow-md" />
+                        </div>
+                      </div>
+                      <div className="p-2.5 flex flex-col gap-0.5">
+                        <p className="font-bold text-xs line-clamp-1 leading-tight">{result.title}</p>
+                        <p className="text-[11px] text-[var(--lib-muted)] line-clamp-1">{result.author}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Global Matches */}
+          <div>
+            <h3 className="text-lg font-bold mb-3 flex items-center">
+              <Search className="w-5 h-5 mr-2 text-muted-foreground" /> Global Catalog
+            </h3>
+            {isSearching ? (
+              <div className="flex flex-col items-center py-12 gap-3 text-[var(--lib-muted)]">
+                <Loader2 className="w-7 h-7 animate-spin text-primary" />
+                <p className="text-sm font-semibold">{t.loading}</p>
+              </div>
           ) : displayedResults.length > 0 ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
               {displayedResults.map((result) => {
@@ -589,6 +626,7 @@ export default function Library() {
               <p className="text-xs mt-1 opacity-70">Try a different term or check your spelling.</p>
             </div>
           )}
+          </div>
         </div>
       )}
 

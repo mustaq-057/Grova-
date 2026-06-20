@@ -38,7 +38,7 @@ export async function initGithubIndexer() {
           headers: { "User-Agent": "Grova-Library-Indexer" }
         })
         .then(r => r.json())
-        .then(data => {
+        .then((data: any) => {
           if (!data.tree) return;
           const files = data.tree.filter((f: any) => f.path.toLowerCase().endsWith(".epub") || f.path.toLowerCase().endsWith(".pdf"));
           
@@ -71,7 +71,7 @@ export async function initGithubIndexer() {
           headers: { "User-Agent": "Grova-Library-Indexer" }
         })
         .then(r => r.json())
-        .then(releases => {
+        .then((releases: any) => {
           if (!Array.isArray(releases)) return;
           releases.forEach((release: any) => {
             (release.assets || []).forEach((asset: any) => {
@@ -111,8 +111,10 @@ export async function searchGithubIndex(query: string): Promise<GithubBook[]> {
   if (!query) return [];
   const lowerQuery = query.toLowerCase();
   
-  // Simple substring match
-  const matches = githubCache.filter(book => book.title.toLowerCase().includes(lowerQuery));
+  const matches = githubCache.filter(book => 
+    book.title.toLowerCase().includes(lowerQuery) || 
+    book.author.toLowerCase().includes(lowerQuery)
+  );
   
   // Return top 4 results
   return matches.slice(0, 4);
