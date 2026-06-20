@@ -218,13 +218,21 @@ export default function EReader() {
               <Info className="w-10 h-10 text-white/30" />
             </div>
             <h2 className="text-2xl font-serif font-bold text-white mb-2">No Digital Version Available</h2>
-            <p className="text-white/50 max-w-sm mb-8">This book was added to your library from a source that only provides metadata, not the actual digital EPUB file.</p>
+            <p className="text-white/50 max-w-sm mb-8">This book was added to your library from a source that only provides metadata, not the actual digital file.</p>
             <button 
               onClick={() => setLocation("/library")}
               className="px-6 py-3 bg-primary text-primary-foreground font-bold rounded-full hover:scale-105 active:scale-95 transition-transform"
             >
               Return to Library
             </button>
+          </div>
+        ) : epubUrl.toLowerCase().includes(".pdf") ? (
+          <div className="w-full h-full bg-white relative">
+             <iframe 
+               src={`https://docs.google.com/viewer?url=${encodeURIComponent(epubUrl)}&embedded=true`}
+               className="w-full h-full border-none absolute inset-0"
+               title="PDF Viewer"
+             />
           </div>
         ) : (
           <ReactReader
