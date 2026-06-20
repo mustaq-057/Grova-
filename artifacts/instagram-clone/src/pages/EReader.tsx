@@ -90,19 +90,29 @@ export default function EReader() {
     return () => window.removeEventListener("grova-page-sync", handleRemoteSync);
   }, [duetMode, id]);
 
+  const syncDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const locationChanged = (epubcifi: string) => {
-    setBookLocation(epubcifi);
-    
-    // Only broadcast if it's a local user action
-    if (!isRemoteSync.current && duetMode) {
-      apiFetch(`/library/${id}/sync`, { 
-        method: "POST", 
-        body: JSON.stringify({ epubcifi }) 
-      }).catch(e => console.error("Sync failed:", e));
+    // Clear any previous debounce
+    if (syncDebounceRef.current) {
+      clearTimeout(syncDebounceRef.current);
     }
-    
-    // Reset the flag
-    isRemoteSync.current = false;
+
+    // Debounce the state update and network sync to prevent UI thread locking
+    syncDebounceRef.current = setTimeout(() => {
+      setBookLocation(epubcifi);
+      
+      // Only broadcast if it's a local user action
+      if (!isRemoteSync.current && duetMode) {
+        apiFetch(`/library/${id}/sync`, { 
+          method: "POST", 
+          body: JSON.stringify({ epubcifi }) 
+        }).catch(e => console.error("Sync failed:", e));
+      }
+      
+      // Reset the flag
+      isRemoteSync.current = false;
+    }, 300); // Wait 300ms after last page turn before syncing
   };
 
   const handleToggleMenu = () => {

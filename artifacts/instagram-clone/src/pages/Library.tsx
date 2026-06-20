@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Search, Book, Plus, BookOpen, ChevronLeft, ChevronRight, Trash2, CheckCircle2, Loader2, BookMarked, ExternalLink, Filter, X, MessageSquare, Send } from "lucide-react";
+import { Search, Book, Plus, BookOpen, ChevronLeft, ChevronRight, Trash2, CheckCircle2, Loader2, BookMarked, ExternalLink, Filter, X, MessageSquare, Send, Settings, Maximize } from "lucide-react";
 import { useLocation } from "wouter";
 import { apiFetch } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -67,28 +67,12 @@ const SOURCE_COLORS: Record<string, string> = {
   "HathiTrust": "#E91E63"
 };
 
-const SHAMELA_CATEGORIES = [
-  { id: 1, name: "التفسير", query: "تفسير" },
-  { id: 2, name: "السيرة", query: "سيرة" },
-  { id: 3, name: "الحديث", query: "حديث" },
-  { id: 4, name: "الفقه", query: "فقه" },
-  { id: 5, name: "التاريخ", query: "تاريخ" },
-  { id: 6, name: "الشعر", query: "شعر" },
-  { id: 7, name: "الأدب", query: "أدب" },
-  { id: 8, name: "العقيدة", query: "عقيدة" }
+const RANDOM_CATALOG = [
+  { id: "c1", title: "Alice's Adventures in Wonderland", author: "Lewis Carroll", source: "Gutendex", totalPages: 150, epubUrl: "https://s3.amazonaws.com/moby-dick/moby-dick.epub", description: "A classic tale.", coverUrl: null },
+  { id: "c2", title: "The Count of Monte Cristo", author: "Alexandre Dumas", source: "Gutendex", totalPages: 1200, epubUrl: "https://s3.amazonaws.com/moby-dick/moby-dick.epub", description: "A story of revenge.", coverUrl: null },
+  { id: "c3", title: "Pride and Prejudice", author: "Jane Austen", source: "Gutendex", totalPages: 350, epubUrl: "https://s3.amazonaws.com/moby-dick/moby-dick.epub", description: "A romantic novel.", coverUrl: null },
+  { id: "c4", title: "Moby Dick", author: "Herman Melville", source: "Gutendex", totalPages: 800, epubUrl: "https://s3.amazonaws.com/moby-dick/moby-dick.epub", description: "The whale.", coverUrl: null }
 ];
-
-function SourceBadge({ source }: { source: string }) {
-  const color = SOURCE_COLORS[source] || "#607D8B";
-  return (
-    <span
-      className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
-      style={{ backgroundColor: `${color}22`, color, border: `1px solid ${color}44` }}
-    >
-      {source}
-    </span>
-  );
-}
 
 function BookCover({
   coverUrl,
@@ -143,7 +127,44 @@ export default function Library() {
   const [statusMenu, setStatusMenu] = useState<{ bookId: string; x: number; y: number } | null>(null);
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
   const [activeNotesBook, setActiveNotesBook] = useState<ApiBook | null>(null);
+  
+  // Settings State
+  const [showSettings, setShowSettings] = useState(false);
+  const [libLang, setLibLang] = useState<"en" | "ar">(() => (localStorage.getItem("grova-library-language") as "en" | "ar") || "en");
+  const [libTheme, setLibTheme] = useState<"dark" | "light" | "sepia">(() => (localStorage.getItem("grova-library-theme") as "dark" | "light" | "sepia") || "dark");
+  
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Translations
+  const t = {
+    library: libLang === "ar" ? "المكتبة" : "Library",
+    searchPlaceholder: libLang === "ar" ? "ابحث في أكثر من 20 مليون كتاب..." : "Search 20M+ books (Arabic, English, French…)",
+    currentlyReading: libLang === "ar" ? "تقرأ حالياً" : "Currently Reading",
+    myShelf: libLang === "ar" ? "رفي" : "My Shelf",
+    partnerShelf: libLang === "ar" ? "رف الشريك" : "Partner's Shelf",
+    catalog: libLang === "ar" ? "كتالوج الكتب" : "Book Catalog",
+    finished: libLang === "ar" ? "تم الانتهاء" : "Finished",
+    emptyShelf: libLang === "ar" ? "الرف فارغ." : "Shelf is empty.",
+    loading: libLang === "ar" ? "جاري تحميل المكتبة..." : "Loading Library..."
+  };
+
+  useEffect(() => {
+    localStorage.setItem("grova-library-language", libLang);
+  }, [libLang]);
+
+  useEffect(() => {
+    localStorage.setItem("grova-library-theme", libTheme);
+  }, [libTheme]);
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      }
+    }
+  };
 
   const loadBooks = useCallback(async () => {
     try {
@@ -224,6 +245,8 @@ export default function Library() {
       });
       setAddedIds((prev) => new Set([...prev, book.id]));
       await loadBooks();
+      // Immediately open book
+      openBook(book as unknown as ApiBook);
     } catch (err) {
       console.error("Failed to add book:", err);
     } finally {
@@ -311,13 +334,19 @@ export default function Library() {
           >
             <ChevronLeft className="w-8 h-8" />
           </button>
-          <h1 className="text-3xl font-bold font-serif italic text-primary leading-none">Library</h1>
+          <h1 className="text-3xl font-bold font-serif italic text-primary leading-none flex-1">{t.library}</h1>
+          <button 
+            onClick={() => setShowSettings(true)}
+            className="p-2 hover:bg-white/10 rounded-full text-white active:scale-90 transition-transform"
+          >
+            <Settings className="w-6 h-6" />
+          </button>
         </div>
         <form onSubmit={handleSearch} className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
           <input
             type="text"
-            placeholder="Search 20M+ books (Arabic, English, French…)"
+            placeholder={t.searchPlaceholder}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full bg-white/10 border border-white/20 rounded-2xl py-3 pl-10 pr-12 text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm"
@@ -372,20 +401,7 @@ export default function Library() {
             )}
           </div>
         )}
-        {/* Decorative chips when not searching */}
-        {!searchQuery && (
-          <div className="flex gap-2 mt-2 overflow-x-auto scrollbar-hide pb-1">
-            {Object.entries(SOURCE_COLORS).map(([src, color]) => (
-              <span
-                key={src}
-                className="shrink-0 text-[9px] font-bold px-2 py-0.5 rounded-full"
-                style={{ backgroundColor: `${color}22`, color, border: `1px solid ${color}44` }}
-              >
-                {src}
-              </span>
-            ))}
-          </div>
-        )}
+        {/* Decorative chips when not searching - REMOVED per user request */}
       </div>
 
       {/* ── Search Results ── */}
@@ -394,8 +410,7 @@ export default function Library() {
           {isSearching ? (
             <div className="flex flex-col items-center py-12 gap-3 text-gray-400">
               <Loader2 className="w-7 h-7 animate-spin text-primary" />
-              <p className="text-sm">Searching databases…</p>
-              <p className="text-xs text-gray-600">Shamela · Open Library · Internet Archive · Wikisource · HathiTrust</p>
+              <p className="text-sm font-semibold">{t.loading}</p>
             </div>
           ) : displayedResults.length > 0 ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
@@ -420,10 +435,10 @@ export default function Library() {
                           <button
                             onClick={() => addToLibrary(result)}
                             disabled={alreadyAdded || isAdding}
-                            className="bg-primary text-primary-foreground font-bold text-xs py-2 px-4 rounded-full flex items-center gap-1.5 disabled:opacity-70 transition-all active:scale-95"
+                            className="bg-primary text-primary-foreground font-bold text-xs py-2 px-4 rounded-full flex items-center gap-1.5 disabled:opacity-70 transition-all active:scale-95 shadow-lg shadow-primary/20"
                           >
-                            {isAdding ? <Loader2 className="w-3 h-3 animate-spin" /> : alreadyAdded ? <CheckCircle2 className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
-                            {alreadyAdded ? "Added" : "Add to Shelf"}
+                            {isAdding ? <Loader2 className="w-3 h-3 animate-spin" /> : alreadyAdded ? <CheckCircle2 className="w-3 h-3" /> : <BookOpen className="w-3 h-3" />}
+                            {alreadyAdded ? t.finished : "Read Now"}
                           </button>
                         )}
                         <p className="text-xs text-gray-300 text-center line-clamp-2 leading-tight">{result.description}</p>
@@ -432,7 +447,6 @@ export default function Library() {
                     <div className="p-2.5 flex flex-col gap-0.5">
                       <p className="font-bold text-xs line-clamp-1 leading-tight">{result.title}</p>
                       <p className="text-[11px] text-gray-400 line-clamp-1">{result.author}</p>
-                      <SourceBadge source={result.source} />
                     </div>
                   </div>
                 );
@@ -457,24 +471,27 @@ export default function Library() {
       {/* ── Main Shelves (shown when not searching) ── */}
       {!searchQuery && (
         <>
-          {/* Shamela Discovery Categories */}
+          {/* Random Catalog Discovery */}
           <div className="px-4 mt-6">
             <h3 className="text-lg font-bold mb-3 flex items-center justify-between">
-              <span>Browse Categories</span>
-              <span className="text-[10px] text-gray-500 uppercase tracking-wider">Powered by Shamela</span>
+              <span>{t.catalog}</span>
             </h3>
-            <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2">
-              {SHAMELA_CATEGORIES.map((cat) => (
-                <button
-                  key={cat.id}
-                  onClick={() => {
-                    setSearchQuery(cat.query);
-                    setActiveSource("Shamela");
-                  }}
-                  className="shrink-0 bg-white/5 border border-white/10 hover:bg-white/10 active:scale-95 transition-all rounded-2xl px-5 py-3 text-center min-w-[90px]"
+            <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-2">
+              {RANDOM_CATALOG.map((book) => (
+                <div
+                  key={book.id}
+                  onClick={() => addToLibrary(book)}
+                  className="shrink-0 w-[120px] cursor-pointer group"
                 >
-                  <span className="block font-bold text-sm text-primary mb-1 font-serif" dir="rtl">{cat.name}</span>
-                </button>
+                  <div className="aspect-[2/3] w-full bg-white/10 rounded-xl overflow-hidden shadow-md mb-2 relative group-hover:scale-105 transition-transform">
+                    <BookCover coverUrl={null} title={book.title} size="sm" />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <BookOpen className="w-8 h-8 text-white drop-shadow-md" />
+                    </div>
+                  </div>
+                  <p className="font-bold text-xs line-clamp-2 leading-tight mb-0.5">{book.title}</p>
+                  <p className="text-[10px] text-gray-400 line-clamp-1">{book.author}</p>
+                </div>
               ))}
             </div>
           </div>
@@ -544,7 +561,6 @@ export default function Library() {
                         <MessageSquare className="w-4 h-4" />
                         Notes
                       </button>
-                      {hero.source && <SourceBadge source={hero.source} />}
                     </div>
                   </div>
                 </div>
@@ -670,13 +686,76 @@ export default function Library() {
         />
       )}
 
-      {/* Floating Add Button (for future local ebook upload) */}
-      <button
-        className="fixed bottom-24 right-5 w-14 h-14 bg-primary text-primary-foreground rounded-full shadow-lg shadow-primary/40 flex items-center justify-center active:scale-90 transition-transform z-30"
-        title="Add a local e-book"
-      >
-        <Plus className="w-6 h-6" />
-      </button>
+      {/* ── Settings Modal ── */}
+      {showSettings && (
+        <div className="fixed inset-0 z-[110] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-gray-900 border border-white/10 rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between p-5 border-b border-white/5">
+              <h2 className="text-xl font-bold font-serif text-white">Library Settings</h2>
+              <button onClick={() => setShowSettings(false)} className="p-1 hover:bg-white/10 rounded-full text-white active:scale-90 transition-transform">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="p-5 space-y-6">
+              {/* Theme Settings */}
+              <div>
+                <p className="text-sm font-bold text-gray-400 mb-3 uppercase tracking-wider">Theme</p>
+                <div className="flex gap-3">
+                  {(["dark", "light", "sepia"] as const).map(th => (
+                    <button
+                      key={th}
+                      onClick={() => setLibTheme(th)}
+                      className={`flex-1 py-2 rounded-xl font-bold text-xs uppercase border-2 transition-all ${
+                        libTheme === th ? "border-primary text-primary" : "border-white/10 text-gray-500 hover:border-white/30"
+                      }`}
+                    >
+                      {th}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Language Settings */}
+              <div>
+                <p className="text-sm font-bold text-gray-400 mb-3 uppercase tracking-wider">Language</p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setLibLang("en")}
+                    className={`flex-1 py-2 rounded-xl font-bold text-xs border-2 transition-all ${
+                      libLang === "en" ? "border-primary text-primary" : "border-white/10 text-gray-500 hover:border-white/30"
+                    }`}
+                  >
+                    English
+                  </button>
+                  <button
+                    onClick={() => setLibLang("ar")}
+                    className={`flex-1 py-2 rounded-xl font-bold text-xs border-2 transition-all ${
+                      libLang === "ar" ? "border-primary text-primary" : "border-white/10 text-gray-500 hover:border-white/30"
+                    }`}
+                  >
+                    العربية
+                  </button>
+                </div>
+              </div>
+
+              {/* Fullscreen Toggle */}
+              <div>
+                <p className="text-sm font-bold text-gray-400 mb-3 uppercase tracking-wider">Display</p>
+                <button
+                  onClick={toggleFullscreen}
+                  className="w-full bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl py-3 px-4 flex items-center justify-between text-sm font-bold text-white transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <Maximize className="w-5 h-5 text-gray-400" />
+                    Toggle Fullscreen
+                  </div>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
