@@ -1,5 +1,5 @@
 import { useState, memo, useEffect } from "react";
-import { ChevronRight, User, Lock, Bell, Moon, Sun, LogOut, Heart, Shield, Smartphone, Eye, EyeOff, Check, Edit3, X, Maximize } from "lucide-react";
+import { ChevronRight, User, Lock, Bell, Moon, Sun, LogOut, Heart, Shield, Smartphone, Eye, EyeOff, Check, Edit3, X, Maximize, BookOpen } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
@@ -58,6 +58,7 @@ export default memo(function Settings() {
   const [savingCode, setSavingCode] = useState(false);
 
   const [isFullscreen, setIsFullscreen] = useState(!!document.fullscreenElement);
+  const [libraryMode, setLibraryMode] = useState(() => localStorage.getItem("libraryMode") === "true");
   
   useEffect(() => {
     const handleFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
@@ -71,6 +72,13 @@ export default memo(function Settings() {
     } else if (document.exitFullscreen) {
       document.exitFullscreen().catch(err => console.error("Error attempting to exit fullscreen:", err));
     }
+  };
+
+  const toggleLibraryMode = () => {
+    const next = !libraryMode;
+    setLibraryMode(next);
+    localStorage.setItem("libraryMode", String(next));
+    window.dispatchEvent(new Event("LIBRARY_MODE_CHANGED"));
   };
 
   const toggleDark = () => {
@@ -380,6 +388,13 @@ export default memo(function Settings() {
             </div>
             <div className="flex-1"><p className="text-sm font-medium">Full screen mode</p><p className="text-xs text-muted-foreground">Hide browser interface</p></div>
             <Toggle on={isFullscreen} toggle={toggleFullscreen} />
+          </div>
+          <div className="flex items-center gap-4 px-4 py-3.5 border-t border-border/50">
+            <div className="w-10 h-10 bg-secondary/50 rounded-xl flex items-center justify-center">
+              <BookOpen className="w-5 h-5 text-muted-foreground" strokeWidth={1.5} />
+            </div>
+            <div className="flex-1"><p className="text-sm font-medium">Library Focus Mode</p><p className="text-xs text-muted-foreground">Blocks all other app tabs</p></div>
+            <Toggle on={libraryMode} toggle={toggleLibraryMode} />
           </div>
           <button
             type="button"

@@ -55,6 +55,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const showPremiumScene = isPremiumAnimatedTheme(appTheme) && !isChat;
   const showThemeBg = themeUsesPhotoBackground(appTheme);
   const isLibrary = location.startsWith("/library") || location.startsWith("/read");
+  const [libraryMode, setLibraryMode] = useState(() => localStorage.getItem("libraryMode") === "true");
+
+  useEffect(() => {
+    const onLibraryMode = () => setLibraryMode(localStorage.getItem("libraryMode") === "true");
+    window.addEventListener("LIBRARY_MODE_CHANGED", onLibraryMode);
+    return () => window.removeEventListener("LIBRARY_MODE_CHANGED", onLibraryMode);
+  }, []);
 
   useEffect(() => {
     const onTheme = () => setAppTheme(getStoredAppTheme());
@@ -149,10 +156,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
       {showSakura && <FallingFlowersOverlay />}
       {showSaraLavender && <FallingNamesOverlay />}
       {/* Desktop Sidebar */}
-      <nav
-        className={`hidden md:flex flex-col w-[72px] lg:w-[244px] border-r border-border h-full px-3 py-6 justify-between shrink-0 app-chrome relative z-10 ${photoChrome}`}
-      >
-        <div className="flex flex-col gap-6 h-full min-h-0">
+      {!libraryMode && (
+        <nav
+          className={`hidden md:flex flex-col w-[72px] lg:w-[244px] border-r border-border h-full px-3 py-6 justify-between shrink-0 app-chrome relative z-10 ${photoChrome}`}
+        >
+          <div className="flex flex-col gap-6 h-full min-h-0">
           <Link href="/" className="px-3 pt-2 pb-2 group">
             <span className="font-serif text-2xl tracking-tighter hidden lg:block italic font-bold text-primary inline-block">Grova</span>
             <span className="font-serif text-2xl tracking-tighter block lg:hidden italic font-bold text-primary">G</span>
@@ -199,7 +207,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
             })}
           </div>
         </div>
-      </nav>
+        </nav>
+      )}
 
       {/* Main content area */}
       {isChat ? (
@@ -217,7 +226,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       )}
 
       {/* Mobile Bottom Bar - Responsive with Menu Toggle */}
-      {!isLibrary && (
+      {!isLibrary && !libraryMode && (
         <nav
           className={`md:hidden fixed bottom-0 left-0 right-0 h-16 sm:h-14 app-chrome border-t border-border/50 flex items-center justify-around px-1 z-50 safe-area-bottom ${showThemeBg ? "bg-background/95 backdrop-blur-lg" : "bg-background/95 backdrop-blur-md"}`}
         >

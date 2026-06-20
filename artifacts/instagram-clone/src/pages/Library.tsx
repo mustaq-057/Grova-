@@ -534,6 +534,17 @@ export default function Library() {
                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                           <BookOpen className="w-8 h-8 text-white drop-shadow-md" />
                         </div>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); deleteBook(result.id); }}
+                          className="absolute top-2 right-2 w-7 h-7 bg-black/70 rounded-full items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity flex z-20 hover:bg-red-500/80"
+                          title="Remove from Shelf"
+                        >
+                          {deletingId === result.id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
+                          ) : (
+                            <Trash2 className="w-3.5 h-3.5 text-white" />
+                          )}
+                        </button>
                       </div>
                       <div className="p-2.5 flex flex-col gap-0.5">
                         <p className="font-bold text-xs line-clamp-1 leading-tight">{result.title}</p>
@@ -679,6 +690,19 @@ export default function Library() {
                   )}
                   <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-black/20" />
                 </div>
+                
+                {/* Top Right Delete Button */}
+                <button
+                  onClick={(e) => { e.stopPropagation(); deleteBook(hero.id); }}
+                  className="absolute top-4 right-4 w-9 h-9 bg-black/40 backdrop-blur-md rounded-full items-center justify-center flex z-20 hover:bg-red-500/50 transition-colors border border-white/10 shadow-lg"
+                  title="Remove from Shelf"
+                >
+                  {deletingId === hero.id ? (
+                    <Loader2 className="w-4 h-4 animate-spin text-white" />
+                  ) : (
+                    <Trash2 className="w-4 h-4 text-white" />
+                  )}
+                </button>
 
                 {/* Content */}
                 <div className="relative z-10 flex gap-5 items-end p-5 pt-10">
@@ -722,12 +746,6 @@ export default function Library() {
                       >
                         <MessageSquare className="w-4 h-4" />
                         Notes
-                      </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); deleteBook(hero.id); }}
-                        className="bg-red-500/10 text-red-400 font-bold p-2 px-3 rounded-full text-sm flex items-center justify-center active:scale-95 transition-transform hover:bg-red-500/20"
-                      >
-                        {deletingId === hero.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                       </button>
                     </div>
                   </div>

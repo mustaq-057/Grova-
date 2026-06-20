@@ -177,7 +177,7 @@ libraryRouter.get("/library/search", authenticate, async (req, res) => {
                   author: repo.owner?.login || "GitHub Open Source",
                   coverUrl: null,
                   description: repo.description || "Found via Global GitHub Search.",
-                  epubUrl: `https://raw.githubusercontent.com/${repo.full_name}/${repo.default_branch}/${encodeURIComponent(file.path)}`,
+                  epubUrl: `https://raw.githubusercontent.com/${repo.full_name}/${repo.default_branch}/${file.path.split("/").map(encodeURIComponent).join("/")}`,
                   totalPages: 250,
                   source: `GitHub (${repo.owner?.login})`,
                 });
