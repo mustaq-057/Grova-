@@ -1,9 +1,10 @@
 import { Router } from "express";
+import { authenticate } from "../lib/auth-middleware";
 import { addClient, removeClient } from "../lib/sse";
 
 const router = Router();
 
-router.get("/sse", (req, res) => {
+router.get("/sse", authenticate, (req, res) => {
   // Serverless: long-lived SSE is not supported — client falls back to polling.
   if (process.env.VERCEL) {
     res.status(200).json({ mode: "poll", pollIntervalMs: 1_000 });

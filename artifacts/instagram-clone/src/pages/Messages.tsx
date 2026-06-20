@@ -831,19 +831,6 @@ export default function Messages() {
       }
       if (!channel) return;
 
-      if (channel.mode === "poll") {
-        livePollStop = channel.stop;
-        presencePollId = window.setInterval(syncPresenceFromServer, 1_000);
-        void syncPresenceFromServer();
-        return;
-      }
-
-      es = channel.eventSource;
-
-      es.addEventListener("connected", () => {
-        sseRetryCountRef.current = 0;
-      });
-
       const handleNewMessage = async (e: MessageEvent) => {
         if (!mounted) return;
         try {
@@ -1165,6 +1152,45 @@ export default function Messages() {
       const handleDuaAdded = () => { hydrateNotifications(); };
       const handleDuaDeleted = () => { api.getDuas().catch(() => { }); };
       const handlePrefsUpdated = () => { refreshCouplePrefs(); };
+
+      if (channel.mode === "poll") {
+        livePollStop = channel.stop;
+        presencePollId = window.setInterval(syncPresenceFromServer, 1_000);
+        void syncPresenceFromServer();
+        
+        const pollCallSignals = async () => {
+          if (!mounted || !user) return;
+          try {
+            const signals = await api.getCallSignals();
+            for (const sig of signals) {
+              const e = { data: JSON.stringify(sig.data) } as MessageEvent;
+              switch (sig.event) {
+                case "call-offer": handleCallOffer(e); break;
+                case "call-ring": handleCallRing(e); break;
+                case "call-answer": handleCallAnswer(e); break;
+                case "call-ice": handleCallIce(e); break;
+                case "call-end": handleCallEnd(); break;
+                case "call-reject": handleCallReject(); break;
+              }
+            }
+          } catch (err) {
+            console.error("Failed to poll call signals:", err);
+          }
+        };
+        const callPollId = window.setInterval(pollCallSignals, 1000);
+        const originalStop = livePollStop;
+        livePollStop = () => {
+          originalStop();
+          window.clearInterval(callPollId);
+        };
+        return;
+      }
+
+      es = channel.eventSource;
+
+      es.addEventListener("connected", () => {
+        sseRetryCountRef.current = 0;
+      });
 
       es.addEventListener("new-message", handleNewMessage);
       es.addEventListener("message-liked", handleMessageLiked);

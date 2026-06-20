@@ -642,4 +642,6 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ userId, partnerId, typing }),
     }),
+
+  getCallSignals: () => apiFetch<{ event: string; data: any }[]>("/call/signals"),
 };

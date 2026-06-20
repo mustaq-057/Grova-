@@ -617,6 +617,17 @@ export async function initDb() {
       )
     `);
 
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS call_signals (
+        id SERIAL PRIMARY KEY,
+        receiver_id TEXT NOT NULL,
+        event TEXT NOT NULL,
+        data TEXT NOT NULL,
+        created_at BIGINT NOT NULL
+      )
+    `);
+    await db.execute(`CREATE INDEX IF NOT EXISTS idx_call_signals_receiver ON call_signals(receiver_id)`);
+
     dbReady = true;
   } catch (err) {
     console.error("Database initialization error:", err);
