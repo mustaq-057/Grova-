@@ -13,7 +13,7 @@ import { getStoredAppTheme, APP_THEME_CHANGED } from "@/lib/app-theme";
 import { readSessionSnapshot } from "@/lib/profile-cache";
 import { parsePresenceResponse } from "@/lib/presence-api";
 import { USER_TIMEZONES } from "@/lib/timezones";
-import { LibraryWidget } from "@/components/LibraryWidget";
+
 
 export default memo(function Home() {
   const { user, partner: authPartner } = useAuth();
@@ -236,7 +236,6 @@ export default memo(function Home() {
         </motion.div>
       </motion.div>
 
-      <LibraryWidget />
 
       <motion.div 
         initial={{ opacity: 0, y: 10 }}

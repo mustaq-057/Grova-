@@ -154,7 +154,7 @@ libraryRouter.get("/library/search", authenticate, async (req, res) => {
       const docs = (data.docs || []);
       let added = 0;
       for (const doc of docs) {
-        if (!doc.title || !doc.cover_i || !dedup(doc.title)) continue;
+        if (!doc.title || !dedup(doc.title)) continue;
         results.push({
           id: `ol_${(doc.key || "").replace("/works/", "") || randomUUID()}`,
           title: doc.title,

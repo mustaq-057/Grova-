@@ -61,7 +61,22 @@ export default function EReader() {
 
   // Fallback to a free sample alice in wonderland epub if the db book has no epubUrl
   // since most Google books don't have direct epub downloads in the search list.
-  const epubUrl = "https://s3.amazonaws.com/moby-dick/moby-dick.epub";
+  const FALLBACK_EPUB = "https://s3.amazonaws.com/moby-dick/moby-dick.epub";
+  const [epubUrl, setEpubUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!id) return;
+    setLoading(true);
+    apiFetch(`/library/${id}`).then((book: any) => {
+      setEpubUrl(book.epubUrl || FALLBACK_EPUB);
+      setLoading(false);
+    }).catch((e) => {
+      console.error(e);
+      setEpubUrl(FALLBACK_EPUB);
+      setLoading(false);
+    });
+  }, [id]);
 
   useEffect(() => {
     // DND MODE: Block notifications and chat while reading
@@ -191,8 +206,14 @@ export default function EReader() {
 
       {/* Reader */}
       <div className="flex-1 relative z-0 pb-10" style={{ height: "100vh" }}>
-        <ReactReader
-          url={epubUrl}
+        {loading || !epubUrl ? (
+          <div className="w-full h-full flex flex-col items-center justify-center text-white/50 space-y-4">
+            <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+            <p className="text-sm font-medium tracking-widest uppercase">Opening Book...</p>
+          </div>
+        ) : (
+          <ReactReader
+            url={epubUrl}
           location={bookLocation}
           locationChanged={locationChanged}
           getRendition={(rendition) => {
@@ -218,6 +239,7 @@ export default function EReader() {
             arrow:      { ...ReactReaderStyle.arrow,      background: 'transparent', padding: '0 20px', color: THEMES[theme].text, opacity: '0.3' },
           }}
         />
+        )}
       </div>
 
       {/* Bottom Bar Scrubber */}
