@@ -125,8 +125,15 @@ export function CallProvider({ children }: { children: ReactNode }) {
     
     // Safety check for old signals: if we already have an active call and we get an offer, ignore it.
     if (callState?.status === "active" && type === "call-offer") return;
+    
+    // Block incoming calls in Library Focus Mode
+    const isLibraryMode = window.localStorage.getItem("libraryMode") === "true";
 
     if (type === "call-offer") {
+      if (isLibraryMode) {
+         api.sendCallSignal({ type: "reject", senderId: user.id }).catch(() => {});
+         return;
+      }
       const d = data as { from: string; callType: CallType; sdp?: RTCSessionDescriptionInit };
       if (d.from !== partnerId || !d.sdp) return;
       setIncomingCall({ type: d.callType, offer: d.sdp });

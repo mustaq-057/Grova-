@@ -374,14 +374,19 @@ export default function Library() {
   const resultSources = [...new Set(searchResults.map((r) => r.source))];
 
   // Netflix-style shelves
-  const myId = user?.id as string | undefined;
-  const partnerId = myId === "me" ? "wife" : "me";
-  const partnerDisplayName = partnerId === "wife" ? "Sara" : "Mustaq";
+  const { partner: authPartner } = useAuth();
+  const myId = user?.id || "me";
+  const partnerId = authPartner?.id || (myId === "me" ? "wife" : "me");
+  const partnerDisplayName = authPartner?.name || (partnerId === "wife" ? "Sara" : "Mustaq");
   const currentlyReading = books.filter((b) => b.status === "reading");
   const myShelf = books.filter((b) => b.addedBy === myId);
   const partnerShelf = books.filter((b) => b.addedBy === partnerId);
   const finishedBooks = books.filter((b) => b.status === "finished");
   const hero = currentlyReading[0] || myShelf[0];
+
+  // Stats
+  const totalPagesRead = books.filter((b) => b.addedBy === myId).reduce((acc, b) => acc + (b.currentPage || 0), 0);
+  const estimatedHours = Math.round((totalPagesRead * 1.5) / 60); // approx 1.5 min per page
 
   return (
     <>
@@ -666,6 +671,26 @@ export default function Library() {
                   <p className="text-[10px] text-gray-400 line-clamp-1">{book.author}</p>
                 </div>
               ))}
+            </div>
+          </div>
+
+          {/* Library Stats */}
+          <div className="px-4 mt-6">
+            <div className="bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20 rounded-2xl p-4 flex items-center justify-around shadow-sm">
+              <div className="text-center">
+                <p className="text-[10px] text-[var(--lib-muted)] uppercase tracking-wider font-bold mb-1">Pages Read</p>
+                <p className="text-2xl font-serif font-bold text-primary">{totalPagesRead.toLocaleString()}</p>
+              </div>
+              <div className="w-px h-10 bg-primary/20" />
+              <div className="text-center">
+                <p className="text-[10px] text-[var(--lib-muted)] uppercase tracking-wider font-bold mb-1">Hours Spent</p>
+                <p className="text-2xl font-serif font-bold text-primary">{estimatedHours} <span className="text-sm font-normal">hrs</span></p>
+              </div>
+              <div className="w-px h-10 bg-primary/20" />
+              <div className="text-center">
+                <p className="text-[10px] text-[var(--lib-muted)] uppercase tracking-wider font-bold mb-1">Finished</p>
+                <p className="text-2xl font-serif font-bold text-primary">{finishedBooks.filter(b => b.addedBy === myId).length}</p>
+              </div>
             </div>
           </div>
 
