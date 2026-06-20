@@ -71,8 +71,7 @@ export default function EReader() {
     apiFetch(`/library/${id}`).then((book: any) => {
       let finalUrl = book.epubUrl;
       if (finalUrl && finalUrl.startsWith("http") && finalUrl.includes("gutenberg.org")) {
-        // Wrap Gutenberg epubs in a CORS proxy to prevent browser blocks
-        finalUrl = `https://corsproxy.io/?${encodeURIComponent(finalUrl)}`;
+        finalUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(finalUrl)}`;
       }
       setEpubUrl(finalUrl || FALLBACK_EPUB);
       setLoading(false);

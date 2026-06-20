@@ -526,7 +526,7 @@ export default function Library() {
                   className="shrink-0 w-[120px] cursor-pointer group"
                 >
                   <div className="aspect-[2/3] w-full bg-white/10 rounded-xl overflow-hidden shadow-md mb-2 relative group-hover:scale-105 transition-transform">
-                    <BookCover coverUrl={null} title={book.title} size="sm" />
+                    <BookCover coverUrl={book.coverUrl} title={book.title} size="sm" />
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                       <BookOpen className="w-8 h-8 text-white drop-shadow-md" />
                     </div>
@@ -631,8 +631,22 @@ export default function Library() {
               }}
               updatingStatus={updatingStatus}
             />
-
-
+            {/* Partner Shelf */}
+            {partnerShelf.length > 0 && (
+              <ShelfRow
+                title={t.partnerShelf}
+                books={partnerShelf}
+                emptyMsg=""
+                onOpen={openBook}
+                onDelete={deleteBook}
+                deletingId={deletingId}
+                onStatusChangeMenu={(e, bookId) => {
+                  e.preventDefault();
+                  setStatusMenu({ bookId, x: e.clientX, y: e.clientY });
+                }}
+                updatingStatus={updatingStatus}
+              />
+            )}
 
             {/* Finished */}
             {finishedBooks.length > 0 && (
