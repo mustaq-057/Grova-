@@ -54,6 +54,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const showSaraLavender = isSaraLavenderTheme(appTheme);
   const showPremiumScene = isPremiumAnimatedTheme(appTheme) && !isChat;
   const showThemeBg = themeUsesPhotoBackground(appTheme);
+  const isLibrary = location.startsWith("/library");
 
   useEffect(() => {
     const onTheme = () => setAppTheme(getStoredAppTheme());
@@ -216,9 +217,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
       )}
 
       {/* Mobile Bottom Bar - Responsive with Menu Toggle */}
-      <nav
-        className={`md:hidden fixed bottom-0 left-0 right-0 h-16 sm:h-14 app-chrome border-t border-border/50 flex items-center justify-around px-1 z-50 safe-area-bottom ${showThemeBg ? "bg-background/95 backdrop-blur-lg" : "bg-background/95 backdrop-blur-md"}`}
-      >
+      {!isLibrary && (
+        <nav
+          className={`md:hidden fixed bottom-0 left-0 right-0 h-16 sm:h-14 app-chrome border-t border-border/50 flex items-center justify-around px-1 z-50 safe-area-bottom ${showThemeBg ? "bg-background/95 backdrop-blur-lg" : "bg-background/95 backdrop-blur-md"}`}
+        >
         {navItems.filter((i) => !["Dua", "Memories", "Calendar", "Library", "Tasks", "Milestones", "Secret Notes"].includes(i.label)).map((item) => {
           const Icon = item.icon;
           const isActive =
@@ -257,6 +259,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </button>
       </nav>
+      )}
 
       <MobileMenuGrid
         isOpen={showMobileMenu}

@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Search, Book, Plus, BookOpen, ChevronRight, Trash2, CheckCircle2, Loader2, BookMarked, ExternalLink, Filter, X, MessageSquare, Send } from "lucide-react";
+import { Search, Book, Plus, BookOpen, ChevronLeft, ChevronRight, Trash2, CheckCircle2, Loader2, BookMarked, ExternalLink, Filter, X, MessageSquare, Send } from "lucide-react";
+import { useLocation } from "wouter";
 import { apiFetch } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { InAppBrowser } from "@/components/InAppBrowser";
 
 type ApiBook = {
   id: string;
@@ -16,6 +18,7 @@ type ApiBook = {
   totalPages: number;
   epubUrl?: string | null;
   source?: string;
+  isLink?: boolean;
 };
 
 type SearchResult = {
@@ -125,11 +128,13 @@ function BookCover({
 
 export default function Library() {
   const { user } = useAuth();
+  const [, setLocation] = useLocation();
   const [books, setBooks] = useState<ApiBook[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searchMeta, setSearchMeta] = useState<SearchMeta | null>(null);
   const [isSearching, setIsSearching] = useState(false);
+  const [inAppBrowserUrl, setInAppBrowserUrl] = useState<string | null>(null);
   const [addingId, setAddingId] = useState<string | null>(null);
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -239,11 +244,18 @@ export default function Library() {
   };
 
   const openBook = (book: ApiBook) => {
-    if (book.epubUrl) {
-      window.open(book.epubUrl, "_blank");
-    } else {
-      window.location.href = `/read/${book.id}`;
+    if (book.isLink && book.epubUrl) {
+      setInAppBrowserUrl(book.epubUrl);
+      return;
     }
+    if (book.epubUrl && !book.isLink) {
+       // if it's not a link but has an epubUrl, just use the in-app browser or the local reader? 
+       // We'll trust the existing logic mostly but use the overlay for external links
+       setInAppBrowserUrl(book.epubUrl);
+       return;
+    }
+    // Fallback: use EReader
+    setLocation(`/read/${book.id}`);
   };
 
   const changeStatus = async (bookId: string, status: ApiBook["status"]) => {
@@ -292,7 +304,15 @@ export default function Library() {
     <div className="min-h-full bg-black text-white pb-24">
       {/* ── Sticky Search Header ── */}
       <div className="sticky top-0 z-20 bg-black/90 backdrop-blur-md pt-[max(1rem,env(safe-area-inset-top))] px-4 pb-4 border-b border-white/5">
-        <h1 className="text-3xl font-bold font-serif italic mb-3 text-primary">Library</h1>
+        <div className="flex items-center gap-2 mb-3">
+          <button 
+            onClick={() => setLocation("/")}
+            className="p-1 -ml-1 hover:bg-white/10 rounded-full text-white active:scale-90 transition-transform"
+          >
+            <ChevronLeft className="w-8 h-8" />
+          </button>
+          <h1 className="text-3xl font-bold font-serif italic text-primary leading-none">Library</h1>
+        </div>
         <form onSubmit={handleSearch} className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
           <input
@@ -639,6 +659,14 @@ export default function Library() {
           onClose={() => setActiveNotesBook(null)}
           myId={myId}
           partnerName={partnerDisplayName}
+        />
+      )}
+
+      {/* ── In-App Browser Modal ── */}
+      {inAppBrowserUrl && (
+        <InAppBrowser 
+          url={inAppBrowserUrl} 
+          onClose={() => setInAppBrowserUrl(null)} 
         />
       )}
 
