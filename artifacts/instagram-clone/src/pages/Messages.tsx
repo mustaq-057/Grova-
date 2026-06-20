@@ -201,6 +201,7 @@ export default function Messages() {
     return partner?.avatar ?? snap?.avatar ?? "";
   });
   const [partnerLastSeen, setPartnerLastSeen] = useState<number | undefined>();
+  const [partnerInLibrary, setPartnerInLibrary] = useState(false);
   const [online, setOnline] = useState(isOnline());
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -305,7 +306,7 @@ export default function Messages() {
 
   const partnerId = useMemo(() => user?.id === "me" ? "wife" : "me", [user?.id]);
 
-  const presence = usePresenceLabel(partnerLastSeen);
+  const presence = usePresenceLabel(partnerLastSeen, partnerInLibrary);
   const partnerActive = isPartnerActiveInChat(partnerLastSeen);
   const showPartnerTyping = isTyping || isPartnerDoodling;
 
@@ -702,13 +703,16 @@ export default function Messages() {
       }
 
       void api.getPresence().then((raw) => {
-        const { lastSeen, typing } = parsePresenceResponse(raw);
+        const { lastSeen, typing, inLibrary } = parsePresenceResponse(raw);
         if (lastSeen[partnerId] != null) {
           if (localPartnerLastSeen !== lastSeen[partnerId]) {
             localPartnerLastSeenReceivedAt = Date.now();
           }
           setPartnerLastSeen(lastSeen[partnerId]);
           localPartnerLastSeen = lastSeen[partnerId];
+        }
+        if (inLibrary?.[partnerId] != null) {
+          setPartnerInLibrary(inLibrary[partnerId]);
         }
         const partnerTyping = Boolean(typing[partnerId]);
         setIsTyping(partnerTyping);
@@ -990,10 +994,11 @@ export default function Messages() {
       const handlePresence = (e: MessageEvent) => {
         if (!mounted) return;
         try {
-          const d = JSON.parse(e.data) as { userId: string; lastSeen: number };
+          const d = JSON.parse(e.data) as { userId: string; lastSeen: number; inLibrary?: boolean };
           if (d.userId === partnerId) {
             setPartnerLastSeen(d.lastSeen);
             localPartnerLastSeen = d.lastSeen;
+            if (d.inLibrary != null) setPartnerInLibrary(d.inLibrary);
           }
         } catch (err) {
           console.error("Failed to handle presence:", err);

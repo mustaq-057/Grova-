@@ -4,6 +4,7 @@ import type { PresenceResponse } from "./api";
 export function parsePresenceResponse(raw: PresenceResponse | Record<string, number>): {
   lastSeen: Record<string, number>;
   typing: Record<string, boolean>;
+  inLibrary: Record<string, boolean>;
 } {
   if (raw && typeof raw === "object" && "lastSeen" in raw && typeof raw.lastSeen === "object") {
     const typed = raw as PresenceResponse;
@@ -14,16 +15,17 @@ export function parsePresenceResponse(raw: PresenceResponse | Record<string, num
     return {
       lastSeen: fixedLastSeen,
       typing: typed.typing ?? {},
+      inLibrary: typed.inLibrary ?? {},
     };
   }
   const flat = raw as Record<string, string | number>;
   const lastSeen: Record<string, number> = {};
   for (const [k, v] of Object.entries(flat)) {
-    if (k === "typing" || k === "lastSeen") continue;
+    if (k === "typing" || k === "lastSeen" || k === "inLibrary") continue;
     if (typeof v === "number") lastSeen[k] = v;
     else if (typeof v === "string") lastSeen[k] = new Date(v).getTime();
   }
-  return { lastSeen, typing: {} };
+  return { lastSeen, typing: {}, inLibrary: {} };
 }
 
 /** Partner considered online in chat (heartbeat + poll friendly). */

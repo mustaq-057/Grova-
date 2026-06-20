@@ -78,7 +78,7 @@ libraryRouter.get("/library/search", authenticate, async (req, res) => {
 
   // 1. Open Library (always)
   const openLibFetch = fetch(
-    `https://openlibrary.org/search.json?q=${enc}&limit=4&fields=key,title,author_name,cover_i,number_of_pages_median`
+    `https://openlibrary.org/search.json?q=${enc}&limit=10&fields=key,title,author_name,cover_i,number_of_pages_median`
   );
 
   // 2. Gutendex (English only)
@@ -151,10 +151,10 @@ libraryRouter.get("/library/search", authenticate, async (req, res) => {
   if (openLibRes.status === "fulfilled" && openLibRes.value?.ok) {
     try {
       const data = await (openLibRes.value as Response).json() as any;
-      const docs = (data.docs || []).slice(0, 4);
+      const docs = (data.docs || []);
       let added = 0;
       for (const doc of docs) {
-        if (!doc.title || !dedup(doc.title)) continue;
+        if (!doc.title || !doc.cover_i || !dedup(doc.title)) continue;
         results.push({
           id: `ol_${(doc.key || "").replace("/works/", "") || randomUUID()}`,
           title: doc.title,
@@ -167,6 +167,7 @@ libraryRouter.get("/library/search", authenticate, async (req, res) => {
           source: "Open Library",
         });
         added++;
+        if (added >= 4) break;
       }
       sourceMeta["Open Library"] = added > 0 ? "ok" : "empty";
     } catch { sourceMeta["Open Library"] = "timeout"; }

@@ -3,7 +3,7 @@ import { formatPresence } from "@/lib/message-utils";
 import { isShowPresenceEnabled, PREFS_CHANGED } from "@/lib/couple-sync";
 
 /** Re-computes “Active X min ago” as time passes without a new heartbeat. */
-export function usePresenceLabel(lastSeen: number | undefined) {
+export function usePresenceLabel(lastSeen: number | undefined, inLibrary?: boolean) {
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
@@ -15,8 +15,12 @@ export function usePresenceLabel(lastSeen: number | undefined) {
 
   return useMemo(() => {
     if (!showPresence) return { label: "", online: false };
-    return formatPresence(lastSeen);
-  }, [lastSeen, tick, showPresence]);
+    const presence = formatPresence(lastSeen);
+    if (presence.online && inLibrary) {
+      return { label: "In Library 📚", online: true };
+    }
+    return presence;
+  }, [lastSeen, tick, showPresence, inLibrary]);
 }
 
 export function useShowPresence() {

@@ -276,6 +276,7 @@ export type ScheduledMessage = {
 export type PresenceResponse = {
   lastSeen: Record<string, number>;
   typing: Record<string, boolean>;
+  inLibrary?: Record<string, boolean>;
 };
 
 /** @deprecated Use PresenceResponse — kept for callers that expect a flat map */
@@ -470,8 +471,8 @@ export const api = {
   getCallRtcConfig: () =>
     apiFetch<{ iceServers: RTCIceServer[] }>("/call/rtc-config"),
 
-  heartbeat: (userId: string) =>
-    apiFetch<{ success: boolean }>("/presence/heartbeat", { method: "POST", body: JSON.stringify({ userId }) }),
+  heartbeat: (userId: string, opts?: { inLibrary?: boolean }) =>
+    apiFetch<{ success: boolean }>("/presence/heartbeat", { method: "POST", body: JSON.stringify({ userId, inLibrary: opts?.inLibrary }) }),
 
   getPresence: () => apiFetch<PresenceResponse>("/presence"),
 

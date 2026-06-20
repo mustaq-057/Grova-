@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Search, Book, Plus, BookOpen, ChevronLeft, ChevronRight, Trash2, CheckCircle2, Loader2, BookMarked, ExternalLink, Filter, X, MessageSquare, Send, Settings, Maximize } from "lucide-react";
 import { useLocation } from "wouter";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { InAppBrowser } from "@/components/InAppBrowser";
 
@@ -68,10 +68,10 @@ const SOURCE_COLORS: Record<string, string> = {
 };
 
 const RANDOM_CATALOG = [
-  { id: "c1", title: "Alice's Adventures in Wonderland", author: "Lewis Carroll", source: "Gutendex", totalPages: 150, epubUrl: "https://s3.amazonaws.com/moby-dick/moby-dick.epub", description: "A classic tale.", coverUrl: null },
-  { id: "c2", title: "The Count of Monte Cristo", author: "Alexandre Dumas", source: "Gutendex", totalPages: 1200, epubUrl: "https://s3.amazonaws.com/moby-dick/moby-dick.epub", description: "A story of revenge.", coverUrl: null },
-  { id: "c3", title: "Pride and Prejudice", author: "Jane Austen", source: "Gutendex", totalPages: 350, epubUrl: "https://s3.amazonaws.com/moby-dick/moby-dick.epub", description: "A romantic novel.", coverUrl: null },
-  { id: "c4", title: "Moby Dick", author: "Herman Melville", source: "Gutendex", totalPages: 800, epubUrl: "https://s3.amazonaws.com/moby-dick/moby-dick.epub", description: "The whale.", coverUrl: null }
+  { id: "c1", title: "Alice's Adventures in Wonderland", author: "Lewis Carroll", source: "Gutendex", totalPages: 150, epubUrl: "https://s3.amazonaws.com/moby-dick/moby-dick.epub", description: "A classic tale.", coverUrl: "https://covers.openlibrary.org/b/id/12818862-L.jpg" },
+  { id: "c2", title: "The Count of Monte Cristo", author: "Alexandre Dumas", source: "Gutendex", totalPages: 1200, epubUrl: "https://s3.amazonaws.com/moby-dick/moby-dick.epub", description: "A story of revenge.", coverUrl: "https://covers.openlibrary.org/b/id/10521270-L.jpg" },
+  { id: "c3", title: "Pride and Prejudice", author: "Jane Austen", source: "Gutendex", totalPages: 350, epubUrl: "https://s3.amazonaws.com/moby-dick/moby-dick.epub", description: "A romantic novel.", coverUrl: "https://covers.openlibrary.org/b/id/10521278-L.jpg" },
+  { id: "c4", title: "Moby Dick", author: "Herman Melville", source: "Gutendex", totalPages: 800, epubUrl: "https://s3.amazonaws.com/moby-dick/moby-dick.epub", description: "The whale.", coverUrl: "https://covers.openlibrary.org/b/id/12648505-L.jpg" }
 ];
 
 function BookCover({
@@ -127,6 +127,7 @@ export default function Library() {
   const [statusMenu, setStatusMenu] = useState<{ bookId: string; x: number; y: number } | null>(null);
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
   const [activeNotesBook, setActiveNotesBook] = useState<ApiBook | null>(null);
+  const [selectedPreviewBook, setSelectedPreviewBook] = useState<SearchResult | null>(null);
   
   // Settings State
   const [showSettings, setShowSettings] = useState(false);
@@ -180,6 +181,17 @@ export default function Library() {
   useEffect(() => {
     loadBooks();
   }, [loadBooks]);
+
+  useEffect(() => {
+    if (!user) return;
+    const sendHeartbeat = () => api.heartbeat(user.id, { inLibrary: true }).catch(() => {});
+    sendHeartbeat();
+    const interval = setInterval(sendHeartbeat, 10000);
+    return () => {
+      clearInterval(interval);
+      api.heartbeat(user.id, { inLibrary: false }).catch(() => {}); // clear when leaving
+    };
+  }, [user]);
 
   // Debounced auto-search — fires 600ms after the user stops typing
   useEffect(() => {
@@ -324,24 +336,57 @@ export default function Library() {
   const hero = currentlyReading[0] || myShelf[0];
 
   return (
-    <div className="min-h-full bg-black text-white pb-24">
-      {/* ── Sticky Search Header ── */}
-      <div className="sticky top-0 z-20 bg-black/90 backdrop-blur-md pt-[max(1rem,env(safe-area-inset-top))] px-4 pb-4 border-b border-white/5">
-        <div className="flex items-center gap-2 mb-3">
-          <button 
-            onClick={() => setLocation("/")}
-            className="p-1 -ml-1 hover:bg-white/10 rounded-full text-white active:scale-90 transition-transform"
-          >
-            <ChevronLeft className="w-8 h-8" />
-          </button>
-          <h1 className="text-3xl font-bold font-serif italic text-primary leading-none flex-1">{t.library}</h1>
-          <button 
-            onClick={() => setShowSettings(true)}
-            className="p-2 hover:bg-white/10 rounded-full text-white active:scale-90 transition-transform"
-          >
-            <Settings className="w-6 h-6" />
-          </button>
-        </div>
+    <>
+      <style>{`
+        .lib-theme-dark {
+          --lib-bg: #000000;
+          --lib-text: #ffffff;
+          --lib-header: rgba(0,0,0,0.9);
+          --lib-card: rgba(255,255,255,0.05);
+          --lib-border: rgba(255,255,255,0.1);
+          --lib-input: rgba(255,255,255,0.1);
+          --lib-muted: #9ca3af;
+          --lib-btn-hover: rgba(255,255,255,0.1);
+        }
+        .lib-theme-light {
+          --lib-bg: #f9fafb;
+          --lib-text: #111827;
+          --lib-header: rgba(249,250,251,0.9);
+          --lib-card: #ffffff;
+          --lib-border: rgba(0,0,0,0.1);
+          --lib-input: #ffffff;
+          --lib-muted: #6b7280;
+          --lib-btn-hover: rgba(0,0,0,0.05);
+        }
+        .lib-theme-sepia {
+          --lib-bg: #f4ecd8;
+          --lib-text: #5b4636;
+          --lib-header: rgba(244,236,216,0.9);
+          --lib-card: #eaddc5;
+          --lib-border: rgba(91,70,54,0.15);
+          --lib-input: #eaddc5;
+          --lib-muted: #8b7355;
+          --lib-btn-hover: rgba(91,70,54,0.1);
+        }
+      `}</style>
+      <div className={`min-h-full pb-24 lib-theme-${libTheme} bg-[var(--lib-bg)] text-[var(--lib-text)] transition-colors duration-300`}>
+        {/* ── Sticky Search Header ── */}
+        <div className="sticky top-0 z-20 backdrop-blur-md pt-[max(1rem,env(safe-area-inset-top))] px-4 pb-4 border-b border-[var(--lib-border)] bg-[var(--lib-header)] transition-colors duration-300">
+          <div className="flex items-center gap-2 mb-3">
+            <button 
+              onClick={() => setLocation("/")}
+              className="p-1 -ml-1 rounded-full active:scale-90 transition-all hover:bg-[var(--lib-btn-hover)] text-[var(--lib-text)]"
+            >
+              <ChevronLeft className="w-8 h-8" />
+            </button>
+            <h1 className="text-3xl font-bold font-serif italic text-primary leading-none flex-1">{t.library}</h1>
+            <button 
+              onClick={() => setShowSettings(true)}
+              className="p-2 rounded-full active:scale-90 transition-all hover:bg-[var(--lib-btn-hover)] text-[var(--lib-text)]"
+            >
+              <Settings className="w-6 h-6" />
+            </button>
+          </div>
         <form onSubmit={handleSearch} className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
           <input
@@ -349,14 +394,14 @@ export default function Library() {
             placeholder={t.searchPlaceholder}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-white/10 border border-white/20 rounded-2xl py-3 pl-10 pr-12 text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm"
+            className="w-full bg-[var(--lib-input)] border border-[var(--lib-border)] rounded-2xl py-3 pl-10 pr-12 text-[var(--lib-text)] placeholder-[var(--lib-muted)] focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm transition-colors duration-300"
             dir="auto"
           />
           {searchQuery && (
             <button
               type="button"
               onClick={() => { setSearchQuery(""); setSearchResults([]); }}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white text-lg leading-none"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--lib-muted)] hover:text-[var(--lib-text)] text-lg leading-none"
             >
               ×
             </button>
@@ -408,7 +453,7 @@ export default function Library() {
       {searchQuery && (
         <div className="px-4 py-4">
           {isSearching ? (
-            <div className="flex flex-col items-center py-12 gap-3 text-gray-400">
+            <div className="flex flex-col items-center py-12 gap-3 text-[var(--lib-muted)]">
               <Loader2 className="w-7 h-7 animate-spin text-primary" />
               <p className="text-sm font-semibold">{t.loading}</p>
             </div>
@@ -418,7 +463,7 @@ export default function Library() {
                 const alreadyAdded = addedIds.has(result.id);
                 const isAdding = addingId === result.id;
                 return (
-                  <div key={result.id} className="bg-white/5 rounded-2xl overflow-hidden border border-white/10 flex flex-col group">
+                  <div key={result.id} className="bg-[var(--lib-card)] rounded-2xl overflow-hidden border border-[var(--lib-border)] flex flex-col group cursor-pointer transition-colors duration-300" onClick={() => setSelectedPreviewBook(result)}>
                     <div className="aspect-[2/3] w-full bg-gray-900 relative overflow-hidden">
                       <BookCover coverUrl={result.coverUrl} title={result.title} />
                       <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 p-3 backdrop-blur-sm">
@@ -433,7 +478,7 @@ export default function Library() {
                           </a>
                         ) : (
                           <button
-                            onClick={() => addToLibrary(result)}
+                            onClick={(e) => { e.stopPropagation(); addToLibrary(result); }}
                             disabled={alreadyAdded || isAdding}
                             className="bg-primary text-primary-foreground font-bold text-xs py-2 px-4 rounded-full flex items-center gap-1.5 disabled:opacity-70 transition-all active:scale-95 shadow-lg shadow-primary/20"
                           >
@@ -441,28 +486,28 @@ export default function Library() {
                             {alreadyAdded ? t.finished : "Read Now"}
                           </button>
                         )}
-                        <p className="text-xs text-gray-300 text-center line-clamp-2 leading-tight">{result.description}</p>
+                        <p className="text-xs text-white text-center line-clamp-2 leading-tight">{result.description}</p>
                       </div>
                     </div>
                     <div className="p-2.5 flex flex-col gap-0.5">
                       <p className="font-bold text-xs line-clamp-1 leading-tight">{result.title}</p>
-                      <p className="text-[11px] text-gray-400 line-clamp-1">{result.author}</p>
+                      <p className="text-[11px] text-[var(--lib-muted)] line-clamp-1">{result.author}</p>
                     </div>
                   </div>
                 );
               })}
             </div>
           ) : searchResults.length > 0 ? (
-            <div className="text-center py-10 text-gray-500">
+            <div className="text-center py-10 text-[var(--lib-muted)]">
               <Filter className="w-8 h-8 mx-auto mb-2 opacity-30" />
               <p className="text-sm">No {activeSource} results.</p>
               <button onClick={() => setActiveSource(null)} className="text-xs text-primary mt-2">Show all results</button>
             </div>
           ) : (
-            <div className="text-center py-12 text-gray-500">
+            <div className="text-center py-12 text-[var(--lib-muted)]">
               <Book className="w-10 h-10 mx-auto mb-3 opacity-30" />
               <p className="text-sm">No results found across all sources.</p>
-              <p className="text-xs mt-1 text-gray-600">Try a different term or check your spelling.</p>
+              <p className="text-xs mt-1 opacity-70">Try a different term or check your spelling.</p>
             </div>
           )}
         </div>
@@ -480,7 +525,7 @@ export default function Library() {
               {RANDOM_CATALOG.map((book) => (
                 <div
                   key={book.id}
-                  onClick={() => addToLibrary(book)}
+                  onClick={() => setSelectedPreviewBook(book as SearchResult)}
                   className="shrink-0 w-[120px] cursor-pointer group"
                 >
                   <div className="aspect-[2/3] w-full bg-white/10 rounded-xl overflow-hidden shadow-md mb-2 relative group-hover:scale-105 transition-transform">
@@ -561,6 +606,12 @@ export default function Library() {
                         <MessageSquare className="w-4 h-4" />
                         Notes
                       </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); deleteBook(hero.id); }}
+                        className="bg-red-500/10 text-red-400 font-bold p-2 px-3 rounded-full text-sm flex items-center justify-center active:scale-95 transition-transform hover:bg-red-500/20"
+                      >
+                        {deletingId === hero.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -584,16 +635,7 @@ export default function Library() {
               updatingStatus={updatingStatus}
             />
 
-            {/* Partner's Shelf */}
-            <ShelfRow
-              title={`${partnerDisplayName}'s Shelf`}
-              books={partnerShelf}
-              emptyMsg="Partner hasn't added any books yet."
-              onOpen={openBook}
-              onDelete={null}
-              deletingId={null}
-              dimmed
-            />
+
 
             {/* Finished */}
             {finishedBooks.length > 0 && (
@@ -707,7 +749,7 @@ export default function Library() {
                       key={th}
                       onClick={() => setLibTheme(th)}
                       className={`flex-1 py-2 rounded-xl font-bold text-xs uppercase border-2 transition-all ${
-                        libTheme === th ? "border-primary text-primary" : "border-white/10 text-gray-500 hover:border-white/30"
+                        libTheme === th ? "border-primary text-primary bg-primary/10" : "border-white/10 text-gray-500 hover:border-white/30"
                       }`}
                     >
                       {th}
@@ -723,7 +765,7 @@ export default function Library() {
                   <button
                     onClick={() => setLibLang("en")}
                     className={`flex-1 py-2 rounded-xl font-bold text-xs border-2 transition-all ${
-                      libLang === "en" ? "border-primary text-primary" : "border-white/10 text-gray-500 hover:border-white/30"
+                      libLang === "en" ? "border-primary text-primary bg-primary/10" : "border-white/10 text-gray-500 hover:border-white/30"
                     }`}
                   >
                     English
@@ -731,7 +773,7 @@ export default function Library() {
                   <button
                     onClick={() => setLibLang("ar")}
                     className={`flex-1 py-2 rounded-xl font-bold text-xs border-2 transition-all ${
-                      libLang === "ar" ? "border-primary text-primary" : "border-white/10 text-gray-500 hover:border-white/30"
+                      libLang === "ar" ? "border-primary text-primary bg-primary/10" : "border-white/10 text-gray-500 hover:border-white/30"
                     }`}
                   >
                     العربية
@@ -756,7 +798,57 @@ export default function Library() {
           </div>
         </div>
       )}
+
+      {/* ── Book Preview Modal ── */}
+      {selectedPreviewBook && (
+        <div className="fixed inset-0 z-[120] bg-black/80 backdrop-blur-sm flex flex-col items-center justify-end sm:justify-center p-0 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-gray-900 border border-white/10 rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in slide-in-from-bottom-8 sm:zoom-in-95 duration-300">
+            <div className="relative aspect-[4/3] w-full bg-black overflow-hidden flex items-end justify-center pb-8">
+              {/* Blurred background */}
+              <div className="absolute inset-0 opacity-40">
+                {selectedPreviewBook.coverUrl ? (
+                   <img src={selectedPreviewBook.coverUrl} className="w-full h-full object-cover blur-2xl scale-110" alt="" />
+                ) : (
+                   <div className="w-full h-full bg-gradient-to-br from-primary/30 to-black" />
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/60 to-transparent" />
+              </div>
+              
+              <button 
+                onClick={() => setSelectedPreviewBook(null)}
+                className="absolute top-4 right-4 p-2 bg-black/40 hover:bg-black/60 rounded-full text-white backdrop-blur-md z-10 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              {/* Book Cover */}
+              <div className="relative z-10 w-32 aspect-[2/3] rounded-xl shadow-2xl shadow-black/50 overflow-hidden ring-1 ring-white/20">
+                <BookCover coverUrl={selectedPreviewBook.coverUrl} title={selectedPreviewBook.title} />
+              </div>
+            </div>
+            
+            <div className="p-6 text-center space-y-2">
+              <h2 className="text-2xl font-bold font-serif text-white line-clamp-2 leading-tight">{selectedPreviewBook.title}</h2>
+              <p className="text-gray-400 text-sm font-medium">{selectedPreviewBook.author}</p>
+              {selectedPreviewBook.description && (
+                <p className="text-xs text-gray-500 line-clamp-3 mt-4 px-2">{selectedPreviewBook.description}</p>
+              )}
+            </div>
+
+            <div className="p-6 pt-0 flex gap-3">
+              <button
+                onClick={() => { addToLibrary(selectedPreviewBook); setSelectedPreviewBook(null); }}
+                className="flex-1 bg-primary text-primary-foreground font-bold py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 active:scale-95 transition-transform"
+              >
+                <BookOpen className="w-5 h-5" />
+                Read Now
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
+    </>
   );
 }
 
