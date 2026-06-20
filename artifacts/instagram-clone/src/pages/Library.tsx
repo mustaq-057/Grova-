@@ -68,7 +68,7 @@ const SOURCE_COLORS: Record<string, string> = {
 };
 
 const RANDOM_CATALOG = [
-  { id: "c1", title: "كليلة ودمنة", author: "ابن المقفع", source: "Shamela", totalPages: 300, epubUrl: "https://shamela.ws/book/23846", description: "أشهر حكايات الحيوان الرمزية في التراث العربي.", coverUrl: "https://covers.openlibrary.org/b/id/10574706-L.jpg", isLink: true },
+  { id: "c1", title: "كليلة ودمنة", author: "ابن المقفع", source: "Shamela", totalPages: 300, epubUrl: "https://shamela.ws/book/23846", description: "أشهر حكايات الحيوان الرمزية في التراث العربي.", coverUrl: null, isLink: true },
   { id: "c2", title: "Pride and Prejudice", author: "Jane Austen", source: "Gutendex", totalPages: 350, epubUrl: "https://www.gutenberg.org/ebooks/1342.epub3.images", description: "A classic romance novel.", coverUrl: "https://www.gutenberg.org/cache/epub/1342/pg1342.cover.medium.jpg" },
   { id: "c3", title: "Les Misérables", author: "Victor Hugo", source: "Gutendex", totalPages: 1400, epubUrl: "https://www.gutenberg.org/ebooks/135.epub3.images", description: "A French historical novel.", coverUrl: "https://www.gutenberg.org/cache/epub/135/pg135.cover.medium.jpg" },
   { id: "c4", title: "Don Quijote", author: "Miguel de Cervantes", source: "Gutendex", totalPages: 1000, epubUrl: "https://www.gutenberg.org/ebooks/2000.epub3.images", description: "The classic Spanish novel.", coverUrl: "https://www.gutenberg.org/cache/epub/2000/pg2000.cover.medium.jpg" }
