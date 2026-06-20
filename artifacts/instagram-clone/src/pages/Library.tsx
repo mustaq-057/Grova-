@@ -195,11 +195,21 @@ export default function Library() {
 
   useEffect(() => {
     if (!user) return;
-    const sendHeartbeat = () => api.heartbeat(user.id, { inLibrary: true }).catch(() => {});
+    const sendHeartbeat = () => {
+      if (document.visibilityState !== "visible" || !navigator.onLine) return;
+      api.heartbeat(user.id, { inLibrary: true }).catch(() => {});
+    };
     sendHeartbeat();
     const interval = setInterval(sendHeartbeat, 10000);
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") sendHeartbeat();
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
     return () => {
       clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       api.heartbeat(user.id, { inLibrary: false }).catch(() => {}); // clear when leaving
     };
   }, [user]);
