@@ -54,7 +54,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const showSaraLavender = isSaraLavenderTheme(appTheme);
   const showPremiumScene = isPremiumAnimatedTheme(appTheme) && !isChat;
   const showThemeBg = themeUsesPhotoBackground(appTheme);
-  const isLibrary = location.startsWith("/library");
+  const isLibrary = location.startsWith("/library") || location.startsWith("/read");
 
   useEffect(() => {
     const onTheme = () => setAppTheme(getStoredAppTheme());

@@ -205,7 +205,8 @@ export default function EReader() {
           swipeable
           epubOptions={{
             flow: "paginated",
-            manager: "continuous"
+            manager: "continuous",
+            spread: "none"
           }}
           readerStyles={{
             // Spread all required default styles first, then override what we need
