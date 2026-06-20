@@ -134,6 +134,15 @@ export default function Library() {
   const [showSettings, setShowSettings] = useState(false);
   const [libLang, setLibLang] = useState<"en" | "ar">(() => (localStorage.getItem("grova-library-language") as "en" | "ar") || "en");
   const [libTheme, setLibTheme] = useState<"dark" | "light" | "sepia">(() => (localStorage.getItem("grova-library-theme") as "dark" | "light" | "sepia") || "dark");
+  const [libraryMode, setLibraryMode] = useState(() => localStorage.getItem("libraryMode") === "true");
+
+  const toggleLibraryMode = () => {
+    const next = !libraryMode;
+    setLibraryMode(next);
+    localStorage.setItem("libraryMode", String(next));
+    window.dispatchEvent(new Event("LIBRARY_MODE_CHANGED"));
+  };
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -951,6 +960,25 @@ export default function Library() {
                     }`}
                   >
                     العربية
+                  </button>
+                </div>
+              </div>
+
+              {/* Library Focus Mode */}
+              <div className="pt-4 border-t border-white/5">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-bold text-white mb-0.5 flex items-center">
+                      <BookOpen className="w-4 h-4 mr-1.5 text-primary" />
+                      Focus Mode
+                    </p>
+                    <p className="text-[11px] text-gray-400">Blocks all incoming calls, notifications, and menus.</p>
+                  </div>
+                  <button 
+                    onClick={toggleLibraryMode}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${libraryMode ? "bg-primary" : "bg-white/20"}`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${libraryMode ? "translate-x-6" : "translate-x-1"}`} />
                   </button>
                 </div>
               </div>
