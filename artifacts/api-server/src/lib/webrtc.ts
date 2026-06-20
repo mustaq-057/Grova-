@@ -54,18 +54,21 @@ export function getStunServers(): RTCIceServer[] {
 export function getTurnServers(): RTCIceServer[] {
   const turnUrls = process.env.TURN_SERVERS?.split(',').filter(Boolean) || [];
   const turnUsername = process.env.TURN_USERNAME;
-  const turnCredential = process.env.TURN_CREDENTIAL;
+  const turnSecret = process.env.TURN_CREDENTIAL; // Using the credential env var as the secret
 
-  if (turnUrls.length === 0 || !turnUsername || !turnCredential) {
+  if (turnUrls.length === 0 || !turnUsername || !turnSecret) {
     console.warn('TURN server not configured. WebRTC may not work in restrictive network environments.');
     console.warn('Set TURN_SERVERS, TURN_USERNAME, and TURN_CREDENTIAL environment variables.');
     return [];
   }
 
+  // Generate dynamic time-limited credentials
+  const { username, credential } = generateTurnCredentials(turnUsername, turnSecret);
+
   return turnUrls.map(url => ({
     urls: url.trim(),
-    username: turnUsername,
-    credential: turnCredential,
+    username: username,
+    credential: credential,
     credentialType: 'password' as const,
   }));
 }

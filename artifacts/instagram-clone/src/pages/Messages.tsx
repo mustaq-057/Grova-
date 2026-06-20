@@ -3,7 +3,7 @@ import { Info, Heart, Mic, X, Trash2, Ban, Phone, Video, WifiOff, Wifi, Search, 
 import { motion } from "framer-motion";
 import { api, type ApiMessage } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import CallScreen, { IncomingCallOverlay } from "@/components/CallScreen";
+import { useCall } from "@/lib/call-context";
 import { MessageItem } from "@/components/MessageItem";
 import { MessageInput } from "@/components/MessageInput";
 import { InfoPanel } from "@/components/InfoPanel";
@@ -13,7 +13,6 @@ import { normalizeMessages, previewMessagesForDisplay, prepareOutgoingMessage, b
 import { ImageStackBubble } from "@/components/ImageStackBubble";
 import { MediaViewerOverlay } from "@/components/MediaViewerOverlay";
 import type { CustomSticker } from "@/lib/stickerz";
-import { callStartedText, callEndedText, isCallLogMessage } from "@/lib/call-chat-log";
 import { usePresenceLabel } from "@/hooks/usePresenceLabel";
 import { groupByDay, shouldShowTimeGap } from "@/lib/message-helpers";
 import { isEncryptionReady } from "@/lib/crypto";
@@ -171,6 +170,7 @@ function initialChatMessages(): ApiMessage[] {
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function Messages() {
   const { user, partner, refreshCouplePrefs, updateChatTheme } = useAuth();
+  const { startCall, handleCallSignal } = useCall();
   const [messages, setMessages] = useState<ApiMessage[]>(initialChatMessages);
   const messagesSigRef = useRef(
     messages.length ? messagesListSignature(messages) : "0",
@@ -185,7 +185,6 @@ export default function Messages() {
   const [hasMore, setHasMore] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesStartRef = useRef<HTMLDivElement>(null);
-  const [callState, setCallState] = useState<CallState>(null);
   const [showCamera, setShowCamera] = useState(false);
   const [pendingMediaPreview, setPendingMediaPreview] = useState<{
     file: File;
@@ -193,17 +192,6 @@ export default function Messages() {
     kind: "image" | "video" | "other";
     normalized: File;
   } | null>(null);
-  const [incomingCall, setIncomingCall] = useState<{
-    type: "audio" | "video";
-    offer?: RTCSessionDescriptionInit;
-  } | null>(null);
-  const [callSignal, setCallSignal] = useState<{ type: "answer" | "ice"; data: unknown; seq: number } | null>(null);
-  const callSignalSeq = useRef(0);
-  const callConnectedAtRef = useRef(0);
-  const callLoggedStartRef = useRef(false);
-  const activeCallTypeRef = useRef<"audio" | "video">("audio");
-  const callRoleRef = useRef<"outgoing" | "incoming">("outgoing");
-  const endCallRef = useRef<(opts?: { fromRemote?: boolean }) => void>(() => { });
   const [partnerName, setPartnerName] = useState(() => {
     const snap = readSessionSnapshot()?.partner;
     return partner?.name ?? snap?.name ?? "";
@@ -1011,71 +999,26 @@ export default function Messages() {
         setMessages((prev) => prev.filter((m) => pendingOutgoingRef.current.has(m.id)));
       };
 
-      const pushCallSignal = (type: "answer" | "ice", data: unknown) => {
-        callSignalSeq.current += 1;
-        setCallSignal({ type, data, seq: callSignalSeq.current });
-      };
+
 
       const handleCallOffer = (e: MessageEvent) => {
-        if (!mounted || !user) return;
-        try {
-          const d = JSON.parse(e.data) as {
-            from: string;
-            callType: "audio" | "video";
-            sdp?: RTCSessionDescriptionInit;
-          };
-          if (d.from !== partnerId || !d.sdp) return;
-          setIncomingCall({ type: d.callType, offer: d.sdp });
-          if (Notification.permission === "granted") {
-            new Notification(`${partnerName} is calling`, {
-              body: d.callType === "video" ? "Video call" : "Audio call",
-              icon: pAvatar,
-            });
-          }
-        } catch (err) {
-          console.error("Failed to handle call offer:", err);
-        }
+        try { handleCallSignal("call-offer", JSON.parse(e.data)); } catch { }
       };
 
       const handleCallRing = (e: MessageEvent) => {
-        if (!mounted || !user) return;
-        try {
-          const d = JSON.parse(e.data) as { from: string; callType: "audio" | "video" };
-          if (d.from !== partnerId) return;
-          setIncomingCall((prev) => prev ?? { type: d.callType });
-        } catch (err) {
-          console.error("Failed to handle call ring:", err);
-        }
+        try { handleCallSignal("call-ring", JSON.parse(e.data)); } catch { }
       };
 
       const handleCallAnswer = (e: MessageEvent) => {
-        if (!mounted || !user) return;
-        try {
-          const d = JSON.parse(e.data) as { from: string; sdp: RTCSessionDescriptionInit };
-          if (d.from !== partnerId || !d.sdp) return;
-          pushCallSignal("answer", d.sdp);
-        } catch (err) {
-          console.error("Failed to handle call answer:", err);
-        }
+        try { handleCallSignal("call-answer", JSON.parse(e.data)); } catch { }
       };
 
       const handleCallIce = (e: MessageEvent) => {
-        if (!mounted || !user) return;
-        try {
-          const d = JSON.parse(e.data) as { from: string; candidate: RTCIceCandidateInit };
-          if (d.from !== partnerId || !d.candidate) return;
-          pushCallSignal("ice", d.candidate);
-        } catch (err) {
-          console.error("Failed to handle call ICE:", err);
-        }
+        try { handleCallSignal("call-ice", JSON.parse(e.data)); } catch { }
       };
 
-      const handleCallEnd = () => {
-        if (mounted) endCallRef.current({ fromRemote: true });
-      };
-      const handleCallReject = () => {
-        if (mounted) endCallRef.current({ fromRemote: true });
-      };
+      const handleCallEnd = () => handleCallSignal("call-end", {});
+      const handleCallReject = () => handleCallSignal("call-reject", {});
 
       const handleProfileUpdated = (e: MessageEvent) => {
         if (!mounted) return;
@@ -2923,63 +2866,7 @@ export default function Messages() {
     chunksRef.current = [];
   }, []);
 
-  // Call actions
-  const startCall = useCallback((type: "audio" | "video") => {
-    if (!user) return;
-    activeCallTypeRef.current = type;
-    callRoleRef.current = "outgoing";
-    callLoggedStartRef.current = false;
-    callConnectedAtRef.current = 0;
-    setCallSignal(null);
-    setCallState({ status: "outgoing", type });
-    setIncomingCall(null);
-  }, [user]);
-
-  const acceptCall = useCallback(() => {
-    if (!incomingCall?.offer) return;
-    activeCallTypeRef.current = incomingCall.type;
-    callRoleRef.current = "incoming";
-    callLoggedStartRef.current = false;
-    callConnectedAtRef.current = 0;
-    setCallSignal(null);
-    setCallState({ status: "incoming", type: incomingCall.type, incomingOffer: incomingCall.offer });
-    setIncomingCall(null);
-  }, [incomingCall]);
-
-  const rejectCall = useCallback(() => {
-    if (user) {
-      api.sendCallSignal({ type: "reject", senderId: user.id }).catch(() => { });
-    }
-    setIncomingCall(null);
-  }, [user]);
-
-  const onCallConnected = useCallback(() => {
-    if (callLoggedStartRef.current) return;
-    callLoggedStartRef.current = true;
-    callConnectedAtRef.current = Date.now();
-    if (callRoleRef.current === "outgoing") {
-      void sendMsg({ type: "text", text: callStartedText(activeCallTypeRef.current) });
-    }
-  }, [sendMsg]);
-
-  const endCall = useCallback((opts?: { fromRemote?: boolean }) => {
-    const type = activeCallTypeRef.current;
-    const startedAt = callConnectedAtRef.current;
-    const hadSession = callLoggedStartRef.current;
-    callLoggedStartRef.current = false;
-    callConnectedAtRef.current = 0;
-    setCallState(null);
-    setCallSignal(null);
-    setIncomingCall(null);
-    if (hadSession && !opts?.fromRemote) {
-      const durationSec = startedAt ? Math.max(0, Math.floor((Date.now() - startedAt) / 1000)) : 0;
-      void sendMsg({ type: "text", text: callEndedText(type, durationSec) });
-    }
-  }, [sendMsg]);
-
-  useEffect(() => {
-    endCallRef.current = endCall;
-  }, [endCall]);
+  // Call actions removed (moved to CallContext)
 
   const handleDeleteChat = useCallback(async () => {
     if (!user) return;
@@ -3615,32 +3502,7 @@ export default function Messages() {
           </div>
         )}
 
-        {/* ── Incoming call banner ── */}
-        {incomingCall && (
-          <IncomingCallOverlay
-            callerName={pName}
-            callerAvatar={pAvatar}
-            callType={incomingCall.type}
-            canAccept={Boolean(incomingCall.offer)}
-            onAccept={acceptCall}
-            onReject={rejectCall}
-          />
-        )}
 
-        {/* ── Active / Outgoing call screen ── */}
-        {callState && (
-          <CallScreen
-            call={callState}
-            partnerId={partnerId}
-            partnerName={pName}
-            partnerAvatar={pAvatar}
-            myId={user!.id}
-            onSendSignal={(data) => api.sendCallSignal(data)}
-            onConnected={onCallConnected}
-            onEnd={endCall}
-            incomingSignal={callSignal ?? undefined}
-          />
-        )}
 
         {mediaViewer && (
           <MediaViewerOverlay

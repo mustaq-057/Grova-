@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Layout } from "@/components/Layout";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthProvider, useAuth, PROFILE_INACTIVITY_MS } from "@/lib/auth";
+import { CallProvider } from "@/lib/call-context";
 import Login from "@/pages/Login";
 import Home from "@/pages/Home";
 import { useEffect, useRef, type ReactNode } from "react";
@@ -137,9 +138,11 @@ function App() {
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
           <AuthProvider>
-            <WouterRouter base={(import.meta.env.BASE_URL ?? "/").replace(/\/$/, "") || ""}>
-              <ProtectedRouter />
-            </WouterRouter>
+            <CallProvider>
+              <WouterRouter base={(import.meta.env.BASE_URL ?? "/").replace(/\/$/, "") || ""}>
+                <ProtectedRouter />
+              </WouterRouter>
+            </CallProvider>
             <Toaster />
             <SonnerToaster />
           </AuthProvider>

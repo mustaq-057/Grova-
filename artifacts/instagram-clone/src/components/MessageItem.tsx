@@ -22,6 +22,8 @@ import { MessageText } from "@/lib/linkify";
 import { resolveChatImageUrl, resolveChatVideoUrl, resolveChatAudioUrl, resolveMediaDownloadUrl } from "@/lib/media-url";
 import { useEffect } from "react";
 import { useChatTheme } from "@/hooks/useChatTheme";
+import { useCall } from "@/lib/call-context";
+import { Phone, PhoneOff, PhoneForwarded, PhoneMissed, Video } from "lucide-react";
 
 function isEmojiOnlyText(text?: string): boolean {
   if (!text) return false;
@@ -219,6 +221,7 @@ export const MessageItem = memo(function MessageItem({
   }, [hasReply, msg.replyToSenderId, myId, partnerName]);
 
   const { theme } = useChatTheme();
+  const { startCall } = useCall();
 
   const defaultBubbleStyle = { backgroundColor: theme.bubbleColor, borderColor: theme.bubbleBorder };
   const partnerBubbleStyle = useMemo(() => {
@@ -501,11 +504,48 @@ export const MessageItem = memo(function MessageItem({
     );
 
   if (isCallLog && msg.text) {
+    const isVideoLog = msg.text.toLowerCase().includes("video");
+    const isEnded = msg.text.toLowerCase().includes("ended");
+    const isMissed = msg.text.toLowerCase().includes("missed");
+    const isOutgoing = isMe;
+    
+    // Format timestamp nicely for the call log (e.g. 9:41 PM)
+    const timeString = new Date(msg.timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+
     return (
-      <div className="flex justify-center my-3 px-4" data-testid={`message-${msg.id}`}>
-        <p className="text-xs text-muted-foreground/90 text-center font-medium bg-secondary/40 px-4 py-2 rounded-full">
-          {msg.text}
-        </p>
+      <div 
+        className={`flex ${isMe ? "justify-end" : "justify-start"} my-1 px-4 max-w-full`}
+        data-testid={`message-${msg.id}`}
+      >
+        <button
+          onClick={() => startCall(isVideoLog ? "video" : "audio")}
+          className="flex items-center gap-3 bg-[#262626] hover:bg-[#2e2e2e] active:bg-[#333] transition-colors rounded-3xl px-4 py-3 max-w-[85%] sm:max-w-[70%] border border-white/5 text-left"
+        >
+          {/* Circular Icon Container */}
+          <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+            {isVideoLog ? (
+              <Video className="w-6 h-6 text-white" fill="currentColor" />
+            ) : isMissed ? (
+              <PhoneMissed className="w-6 h-6 text-red-500" />
+            ) : isEnded ? (
+              <PhoneOff className="w-6 h-6 text-white" />
+            ) : isOutgoing ? (
+              <PhoneForwarded className="w-6 h-6 text-white" />
+            ) : (
+              <Phone className="w-6 h-6 text-white" fill="currentColor" />
+            )}
+          </div>
+          
+          {/* Text Content */}
+          <div className="flex flex-col flex-1 min-w-0">
+            <p className="text-white font-semibold text-[15px] truncate">
+              {msg.text}
+            </p>
+            <p className="text-white/60 text-[13px] mt-0.5">
+              {timeString}
+            </p>
+          </div>
+        </button>
       </div>
     );
   }
