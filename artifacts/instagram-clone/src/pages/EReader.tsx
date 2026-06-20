@@ -59,9 +59,6 @@ export default function EReader() {
   const renditionRef = useRef<any>(null);
   const isRemoteSync = useRef(false);
 
-  // Fallback to a free sample alice in wonderland epub if the db book has no epubUrl
-  // since most Google books don't have direct epub downloads in the search list.
-  const FALLBACK_EPUB = "https://s3.amazonaws.com/moby-dick/moby-dick.epub";
   const [epubUrl, setEpubUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -73,11 +70,11 @@ export default function EReader() {
       if (finalUrl && finalUrl.startsWith("http") && finalUrl.includes("gutenberg.org")) {
         finalUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(finalUrl)}`;
       }
-      setEpubUrl(finalUrl || FALLBACK_EPUB);
+      setEpubUrl(finalUrl || null);
       setLoading(false);
     }).catch((e) => {
       console.error(e);
-      setEpubUrl(FALLBACK_EPUB);
+      setEpubUrl(null);
       setLoading(false);
     });
   }, [id]);
@@ -210,10 +207,24 @@ export default function EReader() {
 
       {/* Reader */}
       <div className="flex-1 relative z-0 pb-10" style={{ height: "100vh" }}>
-        {loading || !epubUrl ? (
+        {loading ? (
           <div className="w-full h-full flex flex-col items-center justify-center text-white/50 space-y-4">
             <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
             <p className="text-sm font-medium tracking-widest uppercase">Opening Book...</p>
+          </div>
+        ) : !epubUrl ? (
+          <div className="w-full h-full flex flex-col items-center justify-center text-center px-6">
+            <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mb-6">
+              <Info className="w-10 h-10 text-white/30" />
+            </div>
+            <h2 className="text-2xl font-serif font-bold text-white mb-2">No Digital Version Available</h2>
+            <p className="text-white/50 max-w-sm mb-8">This book was added to your library from a source that only provides metadata, not the actual digital EPUB file.</p>
+            <button 
+              onClick={() => setLocation("/library")}
+              className="px-6 py-3 bg-primary text-primary-foreground font-bold rounded-full hover:scale-105 active:scale-95 transition-transform"
+            >
+              Return to Library
+            </button>
           </div>
         ) : (
           <ReactReader
