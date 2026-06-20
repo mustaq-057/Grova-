@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Search, Book, Plus, BookOpen, ChevronLeft, ChevronRight, Trash2, CheckCircle2, Loader2, BookMarked, ExternalLink, Filter, X, MessageSquare, Send, Settings, Maximize } from "lucide-react";
+import { Search, Book, Plus, BookOpen, ChevronLeft, ChevronRight, Trash2, CheckCircle2, Loader2, BookMarked, ExternalLink, Filter, X, MessageSquare, Send, Settings, Maximize, Download } from "lucide-react";
 import { useLocation } from "wouter";
 import { apiFetch, api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -548,7 +548,7 @@ export default function Library() {
                             </button>
                             {result.coverUrl && (
                               <button
-                                onClick={(e) => { e.stopPropagation(); window.open(result.coverUrl, "_blank"); }}
+                                onClick={(e) => { e.stopPropagation(); window.open(result.coverUrl as string, "_blank"); }}
                                 className="bg-white/20 text-white font-bold text-xs py-2 w-full rounded-full flex items-center justify-center gap-1.5 active:scale-95 transition-all border border-white/30 hover:bg-white/30"
                               >
                                 <Download className="w-3 h-3" /> Cover
