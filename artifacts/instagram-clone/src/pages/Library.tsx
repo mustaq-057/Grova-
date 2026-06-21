@@ -407,6 +407,12 @@ export default function Library() {
   };
 
   const openBook = (book: ApiBook) => {
+    if (!book.epubUrl?.trim()) {
+      alert(libLang === "ar"
+        ? "لا يوجد ملف رقمي لهذا الكتاب. احذفه وأضف نسخة من نتائج البحث التي تحتوي EPUB أو PDF."
+        : "No digital file for this book. Remove it and re-add from search results with EPUB or PDF.");
+      return;
+    }
     // Shamela and HathiTrust are web pages, not direct epub files
     if (book.isLink || book.source === "Shamela" || book.source === "HathiTrust") {
       if (book.epubUrl) {

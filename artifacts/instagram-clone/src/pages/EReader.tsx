@@ -3,6 +3,12 @@ import { useLocation, useParams } from "wouter";
 import { ReactReader, ReactReaderStyle } from "react-reader";
 import { ChevronLeft, Settings, Info, Type, Link as LinkIcon, MessageSquare, Send, X } from "lucide-react";
 import { apiFetch } from "@/lib/api";
+import { getAuthHeaders } from "@/lib/session";
+
+type LibraryBook = {
+  epubUrl?: string | null;
+  title?: string;
+};
 
 type Theme = "obsidian" | "parchment" | "sepia" | "midnight";
 
@@ -62,7 +68,10 @@ export default function EReader() {
   const lastPageRef = useRef<number | null>(null);
 
   const [epubData, setEpubData] = useState<ArrayBuffer | string | null>(null);
+  const [isPdf, setIsPdf] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const pdfBlobRef = useRef<string | null>(null);
   const [showNoteModal, setShowNoteModal] = useState(false);
   const [noteText, setNoteText] = useState("");
   const [isSavingNote, setIsSavingNote] = useState(false);
@@ -98,43 +107,69 @@ export default function EReader() {
 
   useEffect(() => {
     if (!id) return;
-    setLoading(true);
-    apiFetch(`/library/${id}`).then((res: any) => res.json()).then(async (book: any) => {
-      let finalUrl = book.epubUrl;
-      if (!finalUrl) {
-        setEpubData(null);
-        setLoading(false);
-        return;
-      }
+    let cancelled = false;
 
-      // Proxy Gutenberg or other restrictive URLs using corsproxy.io
-      if (finalUrl.includes("gutenberg.org")) {
-        finalUrl = `https://corsproxy.io/?${encodeURIComponent(finalUrl)}`;
-      }
-
-      if (finalUrl.toLowerCase().includes(".pdf")) {
-        setEpubData(finalUrl);
-        setLoading(false);
-        return;
+    (async () => {
+      setLoading(true);
+      setLoadError(null);
+      setIsPdf(false);
+      if (pdfBlobRef.current) {
+        URL.revokeObjectURL(pdfBlobRef.current);
+        pdfBlobRef.current = null;
       }
 
       try {
-        // Fetch as ArrayBuffer to bypass epub.js URL extension parsing issues
-        const response = await fetch(finalUrl);
-        if (!response.ok) throw new Error("Network response was not ok");
-        const buffer = await response.arrayBuffer();
-        setEpubData(buffer);
-      } catch (err) {
-        console.error("Failed to fetch epub as buffer, falling back to URL", err);
-        setEpubData(finalUrl);
+        const book = await apiFetch<LibraryBook>(`/library/${id}`);
+        if (!book.epubUrl?.trim()) {
+          if (!cancelled) {
+            setEpubData(null);
+            setLoading(false);
+          }
+          return;
+        }
+
+        const response = await fetch(`/api/library/${id}/file`, {
+          credentials: "include",
+          headers: getAuthHeaders(),
+        });
+        if (!response.ok) throw new Error(`Could not load book file (HTTP ${response.status})`);
+
+        const contentType = response.headers.get("content-type") || "";
+        const urlIsPdf = book.epubUrl.toLowerCase().includes(".pdf");
+        const pdf = urlIsPdf || contentType.includes("application/pdf");
+
+        if (pdf) {
+          const blob = await response.blob();
+          const blobUrl = URL.createObjectURL(blob);
+          pdfBlobRef.current = blobUrl;
+          if (!cancelled) {
+            setIsPdf(true);
+            setEpubData(blobUrl);
+          } else {
+            URL.revokeObjectURL(blobUrl);
+          }
+        } else {
+          const buffer = await response.arrayBuffer();
+          if (!cancelled) setEpubData(buffer);
+        }
+      } catch (e) {
+        console.error(e);
+        if (!cancelled) {
+          setEpubData(null);
+          setLoadError(e instanceof Error ? e.message : "Failed to load book");
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
-    }).catch((e) => {
-      console.error(e);
-      setEpubData(null);
-      setLoading(false);
-    });
+    })();
+
+    return () => {
+      cancelled = true;
+      if (pdfBlobRef.current) {
+        URL.revokeObjectURL(pdfBlobRef.current);
+        pdfBlobRef.current = null;
+      }
+    };
   }, [id]);
 
   useEffect(() => {
@@ -326,8 +361,12 @@ export default function EReader() {
             <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mb-6">
               <Info className="w-10 h-10 text-white/30" />
             </div>
-            <h2 className="text-2xl font-serif font-bold text-white mb-2">No Digital Version Available</h2>
-            <p className="text-white/50 max-w-sm mb-8">This book was added to your library from a source that only provides metadata, not the actual digital file.</p>
+            <h2 className="text-2xl font-serif font-bold text-white mb-2">
+              {loadError ? "Error Loading Book" : "No Digital Version Available"}
+            </h2>
+            <p className="text-white/50 max-w-sm mb-8">
+              {loadError || "This book has no downloadable file. Remove it and add again from search results that include EPUB or PDF."}
+            </p>
             <button 
               onClick={() => setLocation("/library")}
               className="px-6 py-3 bg-primary text-primary-foreground font-bold rounded-full hover:scale-105 active:scale-95 transition-transform"
@@ -335,10 +374,10 @@ export default function EReader() {
               Return to Library
             </button>
           </div>
-        ) : typeof epubData === 'string' && epubData.toLowerCase().includes(".pdf") ? (
+        ) : isPdf && typeof epubData === "string" ? (
           <div className="w-full h-full bg-white relative">
-             <iframe 
-               src={`https://docs.google.com/viewer?url=${encodeURIComponent(epubData)}&embedded=true`}
+             <iframe
+               src={epubData}
                className="w-full h-full border-none absolute inset-0"
                title="PDF Viewer"
              />

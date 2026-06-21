@@ -2,6 +2,7 @@ import "./lib/load-env";
 import app from "./app";
 import { logger } from "./lib/logger";
 import { initDb } from "./lib/db";
+import { initGithubIndexer } from "./lib/github-indexer";
 import { startScheduleWorker } from "./lib/schedule-worker";
 import { authenticateEncryption } from "./lib/encryption";
 
@@ -35,6 +36,7 @@ async function start() {
     try {
       await initDb();
       logger.info("Database initialized");
+      initGithubIndexer().catch((err) => logger.warn({ err }, "GitHub library indexer failed"));
       startScheduleWorker();
       return;
     } catch (err) {

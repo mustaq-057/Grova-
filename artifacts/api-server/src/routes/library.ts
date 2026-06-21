@@ -46,6 +46,37 @@ function setCache(key: string, results: any[], meta: any): void {
   searchCache.set(key, { results, meta, ts: Date.now() });
 }
 
+const ALLOWED_BOOK_HOSTS = [
+  "gutenberg.org",
+  "standardebooks.org",
+  "cdn.jsdelivr.net",
+  "raw.githubusercontent.com",
+  "github.com",
+  "objects.githubusercontent.com",
+  "res.cloudinary.com",
+  "library.oapen.org",
+  "ws-export.wmcloud.org",
+  "feedbooks.com",
+  "catalog.feedbooks.com",
+  "shamela.ws",
+];
+
+function isAllowedBookUrl(url: string): boolean {
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, "");
+    return ALLOWED_BOOK_HOSTS.some((h) => host === h || host.endsWith(`.${h}`));
+  } catch {
+    return false;
+  }
+}
+
+function guessBookContentType(url: string): string {
+  const lower = url.toLowerCase();
+  if (lower.includes(".pdf")) return "application/pdf";
+  if (lower.includes(".epub")) return "application/epub+zip";
+  return "application/octet-stream";
+}
+
 // ─── OMNI-SEARCH ENGINE (Federated 6-Source Aggregator) ─────────────────────
 libraryRouter.get("/library/search", authenticate, async (req, res) => {
   const query = (req.query.q as string || "").trim();
@@ -237,13 +268,18 @@ libraryRouter.get("/library/search", authenticate, async (req, res) => {
         let added = 0;
         for (const item of (data.results || []).slice(0, 3)) {
           if (!item.title || !dedup(item.title)) continue;
+          const fileUrl =
+            item.formats?.["application/pdf"] ||
+            item.formats?.["application/epub+zip"] ||
+            null;
+          if (!fileUrl) continue;
           results.push({
             id: `guten_${item.id}`,
             title: item.title,
             author: item.authors?.[0]?.name || "Unknown Author",
             coverUrl: item.formats?.["image/jpeg"] || null,
             description: "Public domain ebook from Project Gutenberg.",
-            epubUrl: item.formats?.["application/epub+zip"] || null,
+            epubUrl: fileUrl,
             totalPages: 200,
             source: "Gutendex",
           });
@@ -526,6 +562,46 @@ libraryRouter.get("/library/notes", authenticate, async (req: AuthenticatedReque
   } catch (err) {
     console.error("Library all notes GET error:", err);
     return res.status(500).json({ error: "Failed to fetch all notes" });
+  }
+});
+
+// ─── STREAM BOOK FILE (proxy — fixes CORS + PDF loading) ───────────────────
+libraryRouter.get("/library/:id/file", authenticate, async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT epub_url AS "epubUrl" FROM library_books WHERE id = $1`,
+      [req.params.id]
+    );
+    const epubUrl = result.rows[0]?.epubUrl as string | undefined;
+    if (!epubUrl?.trim()) {
+      return res.status(404).json({ error: "No file URL for this book" });
+    }
+    if (!isAllowedBookUrl(epubUrl)) {
+      return res.status(400).json({ error: "Book source not allowed" });
+    }
+
+    const upstream = await fetch(epubUrl, {
+      headers: { "User-Agent": "Grova-Library/1.0" },
+      signal: AbortSignal.timeout(60_000),
+      redirect: "follow",
+    });
+    if (!upstream.ok) {
+      return res.status(502).json({ error: `Upstream returned HTTP ${upstream.status}` });
+    }
+
+    const contentType =
+      upstream.headers.get("content-type")?.split(";")[0]?.trim() ||
+      guessBookContentType(epubUrl);
+
+    res.setHeader("Content-Type", contentType);
+    res.setHeader("Cache-Control", "private, max-age=3600");
+    res.setHeader("Content-Disposition", "inline");
+
+    const buffer = Buffer.from(await upstream.arrayBuffer());
+    return res.send(buffer);
+  } catch (err) {
+    console.error("Library file proxy error:", err);
+    return res.status(500).json({ error: "Failed to fetch book file" });
   }
 });
 
