@@ -137,11 +137,13 @@ export async function uploadMediaBinary(
   let res: Response;
   try {
     if (isPdfMime(mime)) {
+      const errors: string[] = [];
+
       // Direct Cloudinary upload first (bypasses Vercel body limits); fall back to server paths.
       try {
         return await uploadPdfToCloudinaryRaw(file, controller, attempt);
-      } catch {
-        /* try server upload below */
+      } catch (err) {
+        errors.push(`Direct upload: ${err instanceof Error ? err.message : String(err)}`);
       }
 
       if (file.size <= 200 * 1024 * 1024) {
@@ -151,9 +153,13 @@ export async function uploadMediaBinary(
             const body = (await res.json()) as { url?: string; secure_url?: string };
             const url = body.secure_url || body.url || "";
             if (url) return url;
+          } else {
+            const errBody = await res.json().catch(() => ({}));
+            const msg = errBody.error || errBody.message || `HTTP ${res.status}`;
+            errors.push(`Backend upload: ${msg}`);
           }
-        } catch {
-          /* try JSON upload below */
+        } catch (err) {
+          errors.push(`Backend upload: ${err instanceof Error ? err.message : String(err)}`);
         }
       }
 
@@ -163,14 +169,12 @@ export async function uploadMediaBinary(
           return await uploadMedia(dataUrl, mime, 0, fileName);
         } catch (jsonErr) {
           const msg = jsonErr instanceof Error ? jsonErr.message : "Upload failed";
-          if (/fetch|network|failed/i.test(msg)) {
-            throw new Error("Upload failed — check your connection, log in again, or verify CLOUDINARY_URL on Vercel.");
-          }
-          throw jsonErr instanceof Error ? jsonErr : new Error(msg);
+          errors.push(`JSON upload: ${msg}`);
         }
       }
 
-      throw new Error("PDF upload failed. Try a file under 200 MB or check Cloudinary settings on Vercel.");
+      const combinedError = errors.join(" | ");
+      throw new Error(`PDF upload failed. Details: ${combinedError || "Check Cloudinary settings on Vercel"}`);
     } else {
       const signRes = await fetch("/api/media/sign", {
         headers: getAuthHeaders(),

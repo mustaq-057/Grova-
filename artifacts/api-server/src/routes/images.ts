@@ -149,7 +149,6 @@ router.get("/media/sign", authenticate, async (req, res) => {
     const resourceType =
       typeof req.query.resourceType === "string" && req.query.resourceType === "raw" ? "raw" : "auto";
     const paramsToSign: Record<string, string | number> = { timestamp };
-    if (resourceType === "raw") paramsToSign.resource_type = "raw";
 
     const { v2: cloudinary } = await import("cloudinary");
     cloudinary.config({
