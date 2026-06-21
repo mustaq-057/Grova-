@@ -58,6 +58,8 @@ export default function EReader() {
   const [duetMode, setDuetMode] = useState(false);
   const renditionRef = useRef<any>(null);
   const isRemoteSync = useRef(false);
+  const sessionPagesReadRef = useRef(0);
+  const lastPageRef = useRef<number | null>(null);
 
   const [epubData, setEpubData] = useState<ArrayBuffer | string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -72,9 +74,12 @@ export default function EReader() {
     // Set an interval to log a minute of reading
     const intervalId = setInterval(() => {
       if (document.visibilityState === "visible") {
+        const pagesRead = sessionPagesReadRef.current;
+        sessionPagesReadRef.current = 0; // Reset after sending
+
         apiFetch(`/library/${id}/session`, {
           method: "POST",
-          body: JSON.stringify({ durationMinutes: 1 })
+          body: JSON.stringify({ durationMinutes: 1, pagesRead })
         }).catch(err => console.error("Failed to log session:", err));
       }
     }, 60000);
@@ -178,6 +183,11 @@ export default function EReader() {
            if (loc && loc.start && loc.start.displayed) {
               const page = loc.start.displayed.page;
               if (page && page > 0) {
+                 if (lastPageRef.current !== null && page !== lastPageRef.current) {
+                    sessionPagesReadRef.current += 1;
+                 }
+                 lastPageRef.current = page;
+
                  apiFetch(`/library/${id}/progress`, {
                    method: "PUT",
                    body: JSON.stringify({ page, status: "reading" })

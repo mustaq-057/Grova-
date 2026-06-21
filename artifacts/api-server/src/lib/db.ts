@@ -603,9 +603,18 @@ export async function initDb() {
         user_id TEXT NOT NULL,
         book_id TEXT NOT NULL,
         date TEXT NOT NULL,
-        duration_minutes INTEGER DEFAULT 0
+        duration_minutes INTEGER DEFAULT 0,
+        pages_read INTEGER DEFAULT 0
       )
     `);
+
+    for (const sql of ["ALTER TABLE library_reading_sessions ADD COLUMN IF NOT EXISTS pages_read INTEGER DEFAULT 0"]) {
+      try {
+        await db.execute(sql);
+      } catch {
+        // Ignore if column exists
+      }
+    }
 
     await db.execute(`
       CREATE TABLE IF NOT EXISTS library_notes (

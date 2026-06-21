@@ -355,9 +355,12 @@ libraryRouter.get("/library/search", authenticate, async (req, res) => {
   ]);
 
 
+  // ── Filter to ONLY include books with an EPUB link ──────────────────────────
+  let finalResults = results.filter(r => r.epubUrl && r.epubUrl.trim() !== "");
+
   // ── Sort to boost exact matches ──────────────────────────────────────────────
   const exactLower = query.toLowerCase().trim();
-  results.sort((a, b) => {
+  finalResults.sort((a, b) => {
     const aExact = a.title.toLowerCase() === exactLower;
     const bExact = b.title.toLowerCase() === exactLower;
     if (aExact && !bExact) return -1;
@@ -377,9 +380,9 @@ libraryRouter.get("/library/search", authenticate, async (req, res) => {
     return 0;
   });
   // ── Cache and respond ──────────────────────────────────────────────────────
-  const meta = { cached: false, sources: sourceMeta, total: results.length };
-  setCache(cacheKey, results, { cached: false, sources: sourceMeta, total: results.length });
-  return res.json({ results, meta });
+  const meta = { cached: false, sources: sourceMeta, total: finalResults.length };
+  setCache(cacheKey, finalResults, { cached: false, sources: sourceMeta, total: finalResults.length });
+  return res.json({ results: finalResults, meta });
 });
 
 // ─── GET ALL BOOKS (with camelCase mapping) ──────────────────────────────────
@@ -448,6 +451,14 @@ libraryRouter.get("/library/stats", authenticate, async (req: AuthenticatedReque
       [userId, `${currentYear}-%`]
     );
 
+    const totalMetricsResult = await db.query(
+      `SELECT SUM(duration_minutes) as total_duration, SUM(pages_read) as total_pages FROM library_reading_sessions WHERE user_id = $1`,
+      [userId]
+    );
+    const totalDuration = Number(totalMetricsResult.rows[0]?.total_duration) || 0;
+    const totalPagesRead = Number(totalMetricsResult.rows[0]?.total_pages) || 0;
+    const avgTimePerPage = totalPagesRead > 0 ? (totalDuration / totalPagesRead).toFixed(1) : 0;
+
     // Compute weekly data (last 7 days)
     const weeklyData = [];
     for (let i = 6; i >= 0; i--) {
@@ -483,6 +494,8 @@ libraryRouter.get("/library/stats", authenticate, async (req: AuthenticatedReque
       streakDays,
       dailyMinutes: dailyResult.rows[0]?.total || 0,
       annualMinutes: annualResult.rows[0]?.total || 0,
+      totalPagesRead,
+      avgTimePerPage: Number(avgTimePerPage),
       weeklyData,
       monthlyData
     });
@@ -612,7 +625,7 @@ libraryRouter.post("/library/:id/sync", authenticate, async (req: AuthenticatedR
 // ─── ADD READING SESSION ───────────────────────────────────────────────────────
 libraryRouter.post("/library/:id/session", authenticate, async (req: AuthenticatedRequest, res) => {
   try {
-    const { durationMinutes } = req.body;
+    const { durationMinutes, pagesRead } = req.body;
     const userId = req.user?.id;
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
@@ -620,9 +633,9 @@ libraryRouter.post("/library/:id/session", authenticate, async (req: Authenticat
     const id = randomUUID();
 
     await db.execute(
-      `INSERT INTO library_reading_sessions (id, user_id, book_id, date, duration_minutes)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [id, userId, req.params.id, date, durationMinutes || 1]
+      `INSERT INTO library_reading_sessions (id, user_id, book_id, date, duration_minutes, pages_read)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [id, userId, req.params.id, date, durationMinutes || 1, pagesRead || 0]
     );
     return res.json({ success: true });
   } catch (err) {

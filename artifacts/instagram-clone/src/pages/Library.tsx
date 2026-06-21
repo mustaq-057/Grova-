@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Search, Book, Plus, BookOpen, ChevronLeft, ChevronRight, Trash2, CheckCircle2, Loader2, BookMarked, ExternalLink, Filter, X, MessageSquare, Send, Settings, Maximize, Download, Sparkles, Calendar, Flame, TrendingUp, Lightbulb, User, Medal, ArrowUpRight, BarChart3, Bookmark } from "lucide-react";
+import { Search, Book, Plus, BookOpen, ChevronLeft, ChevronRight, Trash2, CheckCircle2, Loader2, BookMarked, ExternalLink, Filter, X, MessageSquare, Send, Settings, Maximize, Download, Sparkles, Calendar, Flame, TrendingUp, Lightbulb, User, Medal, ArrowUpRight, BarChart3, Bookmark, Clock } from "lucide-react";
 import { useLocation } from "wouter";
 import { apiFetch, api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -143,12 +143,16 @@ export default function Library() {
     streakDays: number;
     dailyMinutes: number;
     annualMinutes: number;
+    totalPagesRead: number;
+    avgTimePerPage: number;
     weeklyData: { date: string; minutes: number }[];
     monthlyData: { month: string; minutes: number }[];
   }>({
     streakDays: 0,
     dailyMinutes: 0,
     annualMinutes: 0,
+    totalPagesRead: 0,
+    avgTimePerPage: 0,
     weeklyData: [],
     monthlyData: []
   });
@@ -227,6 +231,8 @@ export default function Library() {
         streakDays: data.streakDays || 0,
         dailyMinutes: data.dailyMinutes || 0,
         annualMinutes: data.annualMinutes || 0,
+        totalPagesRead: data.totalPagesRead || 0,
+        avgTimePerPage: data.avgTimePerPage || 0,
         weeklyData: data.weeklyData || [],
         monthlyData: data.monthlyData || []
       });
@@ -464,10 +470,6 @@ export default function Library() {
   const finishedBooks = books.filter((b) => b.status === "finished");
   const hero = currentlyReading[0] || myShelf[0];
 
-  // Stats
-  const totalPagesRead = books.filter((b) => b.addedBy === myId).reduce((acc, b) => acc + (b.currentPage || 0), 0);
-  const estimatedHours = Math.round((totalPagesRead * 1.5) / 60); // approx 1.5 min per page
-
   return (
     <>
       <style>{`
@@ -580,7 +582,6 @@ export default function Library() {
             )}
           </div>
         )}
-        {/* Decorative chips when not searching - REMOVED per user request */}
       </div>
 
       {/* ── Search Results ── */}
@@ -775,13 +776,23 @@ export default function Library() {
             <div className="grid grid-cols-2 gap-3 mb-3">
               <div className="bg-[var(--lib-card)] border border-[var(--lib-border)] rounded-2xl p-4 flex flex-col justify-center items-center shadow-sm">
                 <Flame className="w-6 h-6 text-orange-500 mb-2" />
-                <p className="text-[10px] text-[var(--lib-muted)] uppercase tracking-wider font-bold mb-1">Reading Streak</p>
+                <p className="text-[10px] text-[var(--lib-muted)] text-center uppercase tracking-wider font-bold mb-1">Reading Streak</p>
                 <p className="text-xl font-serif font-bold text-[var(--lib-text)]">{stats.streakDays} <span className="text-xs font-normal">days</span></p>
               </div>
               <div className="bg-[var(--lib-card)] border border-[var(--lib-border)] rounded-2xl p-4 flex flex-col justify-center items-center shadow-sm">
                 <Calendar className="w-6 h-6 text-primary mb-2" />
-                <p className="text-[10px] text-[var(--lib-muted)] uppercase tracking-wider font-bold mb-1">Today's Read</p>
+                <p className="text-[10px] text-[var(--lib-muted)] text-center uppercase tracking-wider font-bold mb-1">Today's Read</p>
                 <p className="text-xl font-serif font-bold text-[var(--lib-text)]">{stats.dailyMinutes} <span className="text-xs font-normal">min</span></p>
+              </div>
+              <div className="bg-[var(--lib-card)] border border-[var(--lib-border)] rounded-2xl p-4 flex flex-col justify-center items-center shadow-sm">
+                <BookOpen className="w-6 h-6 text-blue-500 mb-2" />
+                <p className="text-[10px] text-[var(--lib-muted)] text-center uppercase tracking-wider font-bold mb-1">Pages Read</p>
+                <p className="text-xl font-serif font-bold text-[var(--lib-text)]">{stats.totalPagesRead} <span className="text-xs font-normal">pgs</span></p>
+              </div>
+              <div className="bg-[var(--lib-card)] border border-[var(--lib-border)] rounded-2xl p-4 flex flex-col justify-center items-center shadow-sm">
+                <Clock className="w-6 h-6 text-purple-500 mb-2" />
+                <p className="text-[10px] text-[var(--lib-muted)] text-center uppercase tracking-wider font-bold mb-1">Avg Speed</p>
+                <p className="text-xl font-serif font-bold text-[var(--lib-text)]">{stats.avgTimePerPage} <span className="text-xs font-normal">m/pg</span></p>
               </div>
             </div>
             
