@@ -753,6 +753,35 @@ export default function Library() {
               ))}
             </div>
           </div>
+          {/* Add a Book Banner */}
+          <div className="px-4 mt-6">
+            <div 
+              onClick={() => fileInputRef.current?.click()}
+              className="relative overflow-hidden rounded-3xl p-6 cursor-pointer group active:scale-[0.98] transition-transform shadow-sm border border-[var(--lib-border)]"
+              style={{ backgroundColor: "#F7F6F0" }} // Off-white cream color from the image
+            >
+              {/* Background Shapes */}
+              <div className="absolute top-0 right-0 w-full h-full pointer-events-none overflow-hidden rounded-3xl">
+                {/* Dark Blue corner blob */}
+                <div className="absolute -top-12 -right-12 w-32 h-32 bg-[#2D7398] rounded-full blur-[2px]" />
+                <div className="absolute -bottom-16 -right-16 w-48 h-48 bg-[#2D7398] rounded-full blur-[2px]" />
+                
+                {/* Plus marks */}
+                <Plus className="absolute top-8 right-12 w-6 h-6 text-[#2D7398] opacity-10 rotate-12" strokeWidth={4} />
+                <Plus className="absolute bottom-12 left-1/2 w-10 h-10 text-[#2D7398] opacity-10 rotate-45" strokeWidth={4} />
+                <Plus className="absolute top-1/2 right-1/4 w-8 h-8 text-[#2D7398] opacity-10 -rotate-12" strokeWidth={4} />
+                
+                {/* Big Plus Mark */}
+                <Plus className="absolute -bottom-8 -right-8 w-40 h-40 text-[#82ADC1] opacity-90 group-hover:scale-110 transition-transform duration-500" strokeWidth={3} />
+              </div>
+
+              {/* Content */}
+              <div className="relative z-10 w-2/3">
+                <h3 className="text-2xl font-bold text-gray-700 mb-1">Add a book</h3>
+                <p className="text-sm font-medium text-gray-400">Is there a book you are reading?</p>
+              </div>
+            </div>
+          </div>
 
           {/* Library Stats / Widgets Grid */}
           <div className="px-4 mt-6">
