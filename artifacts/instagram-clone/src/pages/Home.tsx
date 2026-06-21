@@ -129,7 +129,6 @@ export default memo(function Home() {
     { href: "/library", icon: BookOpen, label: "Library", desc: "Shared books" },
     { href: "/dua", icon: BookOpen, label: "Duas", desc: "Shared prayers" },
     { href: "/memories", icon: Heart, label: "Memories", desc: "Your moments" },
-    { href: "/library", icon: BookOpen, label: "Library", desc: "Shared books" },
   ];
 
   return (
