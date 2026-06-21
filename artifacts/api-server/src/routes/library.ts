@@ -448,10 +448,43 @@ libraryRouter.get("/library/stats", authenticate, async (req: AuthenticatedReque
       [userId, `${currentYear}-%`]
     );
 
+    // Compute weekly data (last 7 days)
+    const weeklyData = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setUTCHours(0, 0, 0, 0);
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().split("T")[0];
+      const sumRes = await db.query(
+        `SELECT SUM(duration_minutes) as total FROM library_reading_sessions WHERE user_id = $1 AND date = $2`,
+        [userId, dateStr]
+      );
+      weeklyData.push({
+        date: dateStr,
+        minutes: Number(sumRes.rows[0]?.total || 0)
+      });
+    }
+
+    // Compute monthly data (12 months of current year)
+    const monthlyData = [];
+    for (let i = 1; i <= 12; i++) {
+      const monthStr = i.toString().padStart(2, "0");
+      const sumRes = await db.query(
+        `SELECT SUM(duration_minutes) as total FROM library_reading_sessions WHERE user_id = $1 AND date LIKE $2`,
+        [userId, `${currentYear}-${monthStr}-%`]
+      );
+      monthlyData.push({
+        month: monthStr,
+        minutes: Number(sumRes.rows[0]?.total || 0)
+      });
+    }
+
     return res.json({
       streakDays,
       dailyMinutes: dailyResult.rows[0]?.total || 0,
-      annualMinutes: annualResult.rows[0]?.total || 0
+      annualMinutes: annualResult.rows[0]?.total || 0,
+      weeklyData,
+      monthlyData
     });
   } catch (err) {
     console.error("Library stats GET error:", err);

@@ -199,6 +199,7 @@ export default function EReader() {
           chapterOrPage: String(bookLocation) // Saving current location
         })
       });
+      window.dispatchEvent(new Event("LIBRARY_NOTES_UPDATED"));
       setShowNoteModal(false);
       setNoteText("");
     } catch (err) {

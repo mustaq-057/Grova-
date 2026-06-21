@@ -139,7 +139,19 @@ export default function Library() {
   const [activeTab, setActiveTab] = useState<"myShelf" | "partnerShelf" | "finished" | "favorites" | "paused" | "gaveUp">("myShelf");
   const [libraryTab, setLibraryTab] = useState<"dashboard" | "memorize" | "achievements">("dashboard");
   const [allNotes, setAllNotes] = useState<LibraryNote[]>([]);
-  const [stats, setStats] = useState({ streakDays: 0, dailyMinutes: 0, annualMinutes: 0 });
+  const [stats, setStats] = useState<{
+    streakDays: number;
+    dailyMinutes: number;
+    annualMinutes: number;
+    weeklyData: { date: string; minutes: number }[];
+    monthlyData: { month: string; minutes: number }[];
+  }>({
+    streakDays: 0,
+    dailyMinutes: 0,
+    annualMinutes: 0,
+    weeklyData: [],
+    monthlyData: []
+  });
   // Settings State
   const [showSettings, setShowSettings] = useState(false);
   const [libLang, setLibLang] = useState<"en" | "ar">(() => (localStorage.getItem("grova-library-language") as "en" | "ar") || "en");
@@ -214,7 +226,9 @@ export default function Library() {
       setStats({
         streakDays: data.streakDays || 0,
         dailyMinutes: data.dailyMinutes || 0,
-        annualMinutes: data.annualMinutes || 0
+        annualMinutes: data.annualMinutes || 0,
+        weeklyData: data.weeklyData || [],
+        monthlyData: data.monthlyData || []
       });
     } catch (err) {
       console.error("Failed to load stats:", err);
@@ -225,6 +239,10 @@ export default function Library() {
     loadBooks();
     loadNotes();
     loadStats();
+    
+    const handleNotesUpdate = () => loadNotes();
+    window.addEventListener("LIBRARY_NOTES_UPDATED", handleNotesUpdate);
+    return () => window.removeEventListener("LIBRARY_NOTES_UPDATED", handleNotesUpdate);
   }, [loadBooks, loadNotes, loadStats]);
 
   useEffect(() => {
@@ -750,22 +768,8 @@ export default function Library() {
                 <p className="text-xl font-serif font-bold text-[var(--lib-text)]">{stats.dailyMinutes} <span className="text-xs font-normal">min</span></p>
               </div>
             </div>
-            <div className="bg-[var(--lib-card)] border border-[var(--lib-border)] rounded-2xl p-4 flex items-center justify-around shadow-sm">
-              <div className="text-center">
-                <p className="text-[10px] text-[var(--lib-muted)] uppercase tracking-wider font-bold mb-1">Annual Stats</p>
-                <p className="text-xl font-serif font-bold text-primary">{(stats.annualMinutes / 60).toFixed(1)} <span className="text-xs font-normal">hrs</span></p>
-              </div>
-              <div className="w-px h-10 bg-[var(--lib-border)]" />
-              <div className="text-center">
-                <p className="text-[10px] text-[var(--lib-muted)] uppercase tracking-wider font-bold mb-1">Active Reads</p>
-                <p className="text-xl font-serif font-bold text-primary">{currentlyReading.length}</p>
-              </div>
-              <div className="w-px h-10 bg-[var(--lib-border)]" />
-              <div className="text-center">
-                <p className="text-[10px] text-[var(--lib-muted)] uppercase tracking-wider font-bold mb-1">Finished</p>
-                <p className="text-xl font-serif font-bold text-primary">{finishedBooks.filter(b => b.addedBy === myId).length}</p>
-              </div>
-            </div>
+            
+            <LibraryStatsGraph weeklyData={stats.weeklyData} monthlyData={stats.monthlyData} />
           </div>
 
           {/* Hero – Currently Reading */}
@@ -1118,30 +1122,13 @@ export default function Library() {
           </div>
           <div className="px-4 -mt-16 pb-12">
             <div className="bg-[var(--lib-card)] border border-[var(--lib-border)] rounded-3xl p-6 shadow-xl min-h-[400px] relative overflow-hidden">
-              <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
-                 <Medal className="w-64 h-64" />
-              </div>
               <h3 className="text-lg font-bold text-[var(--lib-text)] mb-6 flex items-center gap-2 relative z-10">
-                <Medal className="w-5 h-5 text-yellow-500" /> Trophies ({finishedBooks.length})
+                <Sparkles className="w-5 h-5 text-yellow-500" /> Your Badges
               </h3>
               
-              {finishedBooks.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-48 text-center relative z-10">
-                  <p className="text-[var(--lib-muted)] font-medium">You haven't finished any books yet.</p>
-                  <button onClick={() => setLibraryTab("dashboard")} className="mt-4 px-6 py-2 bg-primary/10 text-primary font-bold rounded-full hover:bg-primary/20 transition-colors">Start Reading</button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-3 gap-4 relative z-10">
-                  {finishedBooks.map(b => (
-                    <div key={b.id} onClick={() => openBook(b)} className="flex flex-col items-center gap-2 cursor-pointer group">
-                      <div className="w-full aspect-[2/3] rounded-lg overflow-hidden border-2 border-yellow-500/50 group-hover:border-yellow-500 transition-colors shadow-lg">
-                        <BookCover coverUrl={b.coverUrl} title={b.title} size="sm" />
-                      </div>
-                      <p className="text-[10px] font-bold text-center line-clamp-1">{b.title}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <div className="relative z-10">
+                <LibraryAchievements stats={stats} books={books} />
+              </div>
             </div>
           </div>
         </div>
@@ -1730,5 +1717,150 @@ function NotesModal({
         </motion.div>
       </motion.div>
     </AnimatePresence>
+  );
+}
+
+// ── Statistics Graph Component ──────────────────────────────────────────────────
+
+function LibraryStatsGraph({ weeklyData, monthlyData }: { weeklyData: { date: string; minutes: number }[], monthlyData: { month: string; minutes: number }[] }) {
+  const [view, setView] = useState<"week" | "year">("week");
+  
+  const data = view === "week" ? weeklyData : monthlyData;
+  const maxMinutes = Math.max(...data.map(d => d.minutes), 1); // Avoid division by zero
+
+  const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+  const getLabel = (d: any) => {
+    if (view === "week") {
+      const date = new Date(d.date);
+      return daysOfWeek[date.getDay()];
+    }
+    return months[parseInt(d.month) - 1];
+  }
+
+  return (
+    <div className="bg-[var(--lib-card)] border border-[var(--lib-border)] rounded-3xl p-5 shadow-sm mt-4">
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="font-bold text-[var(--lib-text)] flex items-center gap-2">
+          <BarChart3 className="w-5 h-5 text-primary" /> Activity
+        </h3>
+        <div className="flex bg-[var(--lib-input)] rounded-lg p-1 border border-[var(--lib-border)]">
+          <button 
+            onClick={() => setView("week")}
+            className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${view === "week" ? "bg-[var(--lib-card)] text-[var(--lib-text)] shadow-sm" : "text-[var(--lib-muted)]"}`}
+          >
+            Week
+          </button>
+          <button 
+            onClick={() => setView("year")}
+            className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${view === "year" ? "bg-[var(--lib-card)] text-[var(--lib-text)] shadow-sm" : "text-[var(--lib-muted)]"}`}
+          >
+            Year
+          </button>
+        </div>
+      </div>
+
+      <div className="h-40 flex items-end justify-between gap-1 sm:gap-2">
+        {data.map((d, i) => {
+          const heightPct = (d.minutes / maxMinutes) * 100;
+          return (
+            <div key={i} className="flex-1 flex flex-col items-center gap-2 group">
+              <div className="w-full relative h-full flex flex-col justify-end">
+                {/* Tooltip */}
+                <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-black text-white text-[10px] font-bold py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
+                  {Math.round(d.minutes)} min
+                </div>
+                <motion.div 
+                  initial={{ height: 0 }}
+                  animate={{ height: `${Math.max(heightPct, 2)}%` }}
+                  transition={{ type: "spring", stiffness: 100, damping: 15, delay: i * 0.05 }}
+                  className="w-full bg-primary rounded-t-sm opacity-80 group-hover:opacity-100 transition-opacity"
+                />
+              </div>
+              <span className="text-[8px] sm:text-[9px] font-bold text-[var(--lib-muted)] uppercase">{getLabel(d)}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── Achievements Component ────────────────────────────────────────────────────
+
+function LibraryAchievements({ stats, books }: { stats: any, books: ApiBook[] }) {
+  const finishedCount = books.filter(b => b.status === "finished").length;
+  
+  const badges = [
+    {
+      id: "first_page",
+      title: "First Page",
+      desc: "Finish your first book",
+      icon: <BookOpen className="w-8 h-8 text-blue-400" />,
+      earned: finishedCount >= 1,
+      progress: Math.min(finishedCount, 1) / 1,
+      bg: "from-blue-500/20 to-blue-900/20",
+      border: "border-blue-500/30"
+    },
+    {
+      id: "bookworm",
+      title: "Bookworm",
+      desc: "Finish 10 books",
+      icon: <BookMarked className="w-8 h-8 text-purple-400" />,
+      earned: finishedCount >= 10,
+      progress: Math.min(finishedCount, 10) / 10,
+      bg: "from-purple-500/20 to-purple-900/20",
+      border: "border-purple-500/30"
+    },
+    {
+      id: "streak_master",
+      title: "Streak Master",
+      desc: "7-day reading streak",
+      icon: <Flame className="w-8 h-8 text-orange-400" />,
+      earned: stats.streakDays >= 7,
+      progress: Math.min(stats.streakDays, 7) / 7,
+      bg: "from-orange-500/20 to-orange-900/20",
+      border: "border-orange-500/30"
+    },
+    {
+      id: "marathon",
+      title: "Marathon",
+      desc: "100 hours total read time",
+      icon: <TrendingUp className="w-8 h-8 text-green-400" />,
+      earned: stats.annualMinutes >= 6000, // 100 hrs
+      progress: Math.min(stats.annualMinutes, 6000) / 6000,
+      bg: "from-green-500/20 to-green-900/20",
+      border: "border-green-500/30"
+    }
+  ];
+
+  return (
+    <div className="grid grid-cols-2 gap-4">
+      {badges.map((b, i) => (
+        <motion.div 
+          key={b.id}
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: i * 0.1 }}
+          className={`relative overflow-hidden rounded-3xl p-5 border bg-gradient-to-br ${b.earned ? `${b.bg} ${b.border}` : "from-[var(--lib-card)] to-[var(--lib-card)] border-[var(--lib-border)] grayscale opacity-60"} flex flex-col items-center text-center shadow-sm`}
+        >
+          {b.earned && (
+            <div className="absolute top-2 right-2">
+              <CheckCircle2 className="w-5 h-5 text-green-500" />
+            </div>
+          )}
+          <div className="w-16 h-16 rounded-full bg-black/20 flex items-center justify-center mb-3 shadow-inner">
+            {b.icon}
+          </div>
+          <h4 className="font-bold text-[var(--lib-text)] mb-1 leading-tight">{b.title}</h4>
+          <p className="text-[10px] text-[var(--lib-muted)] mb-4 leading-tight">{b.desc}</p>
+          
+          <div className="w-full bg-black/20 rounded-full h-1.5 overflow-hidden">
+            <div className="bg-white/80 h-full rounded-full" style={{ width: `${b.progress * 100}%` }} />
+          </div>
+        </motion.div>
+      ))}
+    </div>
   );
 }
