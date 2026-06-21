@@ -449,6 +449,7 @@ export default function EReader() {
             <div className="absolute inset-y-0 right-0 w-3 bg-gradient-to-l from-black/10 to-transparent pointer-events-none z-10" />
             <ReactReader
               url={epubData}
+              showToc={false}
               epubInitOptions={{ openAs: "epub" }}
               location={bookLocation}
               locationChanged={locationChanged}

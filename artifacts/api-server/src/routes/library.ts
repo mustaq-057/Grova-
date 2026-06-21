@@ -131,7 +131,8 @@ libraryRouter.get("/library/search", authenticate, async (req, res) => {
   const enc = encodeURIComponent(query);
   const arabic = isArabicQuery(query);
   const exactLower = query.toLowerCase().trim();
-  const qTerms = exactLower.split(/\s+/).filter(w => w.length > 2);
+  const stopWords = new Set(["the", "and", "for", "with", "that", "this", "from"]);
+  const qTerms = exactLower.split(/\s+/).filter(w => w.length > 2 && !stopWords.has(w));
 
   // ── Cache check ─────────────────────────────────────────────────────────
   const cacheKey = query.toLowerCase();
@@ -290,7 +291,7 @@ libraryRouter.get("/library/search", authenticate, async (req, res) => {
               if (!pathLower.endsWith(".epub")) return false;
               if (pathLower.includes(exactLower)) return true;
               if (qTerms.length === 0) return pathLower.includes(exactLower);
-              return qTerms.some(w => pathLower.includes(w));
+              return qTerms.every(w => pathLower.includes(w));
             });
             if (epubs.length > 0) {
               const file = epubs[0];
@@ -493,7 +494,9 @@ libraryRouter.get("/library/search", authenticate, async (req, res) => {
     const a = (r.author || "").toLowerCase();
     if (t.includes(exactLower) || a.includes(exactLower)) return true;
     if (qTerms.length === 0) return t.includes(exactLower) || a.includes(exactLower);
-    return qTerms.some(w => t.includes(w) || a.includes(w));
+    
+    // Match only if ALL significant words are present
+    return qTerms.every(w => t.includes(w) || a.includes(w));
   });
 
   // ── Sort to boost exact matches ──────────────────────────────────────────────
@@ -595,7 +598,7 @@ libraryRouter.get("/library/stats", authenticate, async (req: AuthenticatedReque
     );
     
     const annualResult = await db.query(
-      `SELECT SUM(duration_minutes) as total FROM library_reading_sessions WHERE user_id = $1 AND date LIKE $2`,
+      `SELECT SUM(duration_minutes) as total FROM library_reading_sessions WHERE user_id = $1 AND CAST(date AS TEXT) LIKE $2`,
       [userId, `${currentYear}-%`]
     );
 
@@ -629,7 +632,7 @@ libraryRouter.get("/library/stats", authenticate, async (req: AuthenticatedReque
     for (let i = 1; i <= 12; i++) {
       const monthStr = i.toString().padStart(2, "0");
       const sumRes = await db.query(
-        `SELECT SUM(duration_minutes) as total FROM library_reading_sessions WHERE user_id = $1 AND date LIKE $2`,
+        `SELECT SUM(duration_minutes) as total FROM library_reading_sessions WHERE user_id = $1 AND CAST(date AS TEXT) LIKE $2`,
         [userId, `${currentYear}-${monthStr}-%`]
       );
       monthlyData.push({
@@ -638,14 +641,21 @@ libraryRouter.get("/library/stats", authenticate, async (req: AuthenticatedReque
       });
     }
 
+    const finishedResult = await db.query(
+      `SELECT COUNT(*) as total FROM library_books WHERE added_by = $1 AND status = 'finished'`,
+      [userId]
+    );
+    const booksRead = Number(finishedResult.rows[0]?.total || 0);
+
     return res.json({
       streakDays,
-      dailyMinutes: dailyResult.rows[0]?.total || 0,
-      annualMinutes: annualResult.rows[0]?.total || 0,
+      dailyMinutes: Number(dailyResult.rows[0]?.total || 0),
+      annualMinutes: Number(annualResult.rows[0]?.total || 0),
       totalPagesRead,
       avgTimePerPage: Number(avgTimePerPage),
       weeklyData,
-      monthlyData
+      monthlyData,
+      booksRead
     });
   } catch (err) {
     console.error("Library stats GET error:", err);

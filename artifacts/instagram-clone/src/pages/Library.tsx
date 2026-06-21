@@ -129,6 +129,8 @@ export default function Library() {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searchMeta, setSearchMeta] = useState<SearchMeta | null>(null);
   const [isSearching, setIsSearching] = useState(false);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [inAppBrowserUrl, setInAppBrowserUrl] = useState<string | null>(null);
   const [addingId, setAddingId] = useState<string | null>(null);
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
@@ -150,6 +152,7 @@ export default function Library() {
     annualMinutes: number;
     totalPagesRead: number;
     avgTimePerPage: number;
+    booksRead: number;
     weeklyData: { date: string; minutes: number }[];
     monthlyData: { month: string; minutes: number }[];
   }>({
@@ -158,6 +161,7 @@ export default function Library() {
     annualMinutes: 0,
     totalPagesRead: 0,
     avgTimePerPage: 0,
+    booksRead: 0,
     weeklyData: [],
     monthlyData: []
   });
@@ -199,6 +203,23 @@ export default function Library() {
     localStorage.setItem("grova-library-theme", libTheme);
   }, [libTheme]);
 
+  useEffect(() => {
+    if (!user?.id) return;
+    try {
+      const stored = localStorage.getItem(`grova-library-recent-searches-${user.id}`);
+      if (stored) setRecentSearches(JSON.parse(stored));
+    } catch { }
+  }, [user?.id]);
+
+  const addRecentSearch = (q: string) => {
+    if (!q || !user?.id) return;
+    setRecentSearches(prev => {
+      const next = [q, ...prev.filter(item => item !== q)].slice(0, 10);
+      localStorage.setItem(`grova-library-recent-searches-${user.id}`, JSON.stringify(next));
+      return next;
+    });
+  };
+
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen().catch(() => {});
@@ -238,6 +259,7 @@ export default function Library() {
         annualMinutes: data.annualMinutes || 0,
         totalPagesRead: data.totalPagesRead || 0,
         avgTimePerPage: data.avgTimePerPage || 0,
+        booksRead: data.booksRead || 0,
         weeklyData: data.weeklyData || [],
         monthlyData: data.monthlyData || []
       });
@@ -283,6 +305,7 @@ export default function Library() {
     const q = searchQuery.trim();
     if (!q) { setSearchResults([]); setSearchMeta(null); setActiveSource(null); return; }
     debounceRef.current = setTimeout(async () => {
+      addRecentSearch(q);
       setIsSearching(true);
       setSearchResults([]);
       setActiveSource(null);
@@ -302,11 +325,13 @@ export default function Library() {
   }, [searchQuery]);
 
   // Keep form submit working too (instant search on Enter)
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSearch = async (e: React.FormEvent | string) => {
+    if (typeof e !== "string") e.preventDefault();
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    const q = searchQuery.trim();
+    const q = typeof e === "string" ? e.trim() : searchQuery.trim();
     if (!q) return;
+    if (typeof e === "string") setSearchQuery(q);
+    addRecentSearch(q);
     setIsSearching(true);
     setSearchResults([]);
     setActiveSource(null);
@@ -571,13 +596,15 @@ export default function Library() {
               <Settings className="w-6 h-6" />
             </button>
           </div>
-        <form onSubmit={handleSearch} className="relative">
+        <form onSubmit={handleSearch} className="relative z-50">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--lib-muted)]" />
           <input
             type="text"
             placeholder="Search book"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            onFocus={() => setIsSearchFocused(true)}
+            onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)}
             className="w-full bg-[var(--lib-input)] border border-[var(--lib-border)] rounded-2xl py-3 pl-10 pr-12 text-[var(--lib-text)] placeholder-[var(--lib-muted)] focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm transition-colors duration-300"
             dir="auto"
           />
@@ -590,6 +617,90 @@ export default function Library() {
               ×
             </button>
           )}
+
+          {/* Autocomplete Dropdown */}
+          <AnimatePresence>
+            {isSearchFocused && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="absolute top-full left-0 right-0 mt-2 bg-[var(--lib-card)] border border-[var(--lib-border)] rounded-2xl shadow-2xl overflow-hidden z-50"
+              >
+                {!searchQuery ? (
+                  recentSearches.length > 0 && (
+                    <>
+                      <div className="p-3 border-b border-[var(--lib-border)] flex items-center justify-between">
+                        <h4 className="text-[10px] font-bold text-[var(--lib-muted)] uppercase tracking-wider">Recent Searches</h4>
+                        <button type="button" onMouseDown={(e) => { e.preventDefault(); setRecentSearches([]); localStorage.removeItem(`grova-library-recent-searches-${user?.id}`); }} className="text-[10px] font-bold text-[var(--lib-muted)] hover:text-red-400">Clear</button>
+                      </div>
+                      <div className="max-h-[250px] overflow-y-auto">
+                        {recentSearches.map((rs, idx) => (
+                          <div 
+                            key={idx} 
+                            className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--lib-input)] cursor-pointer transition-colors border-b border-[var(--lib-border)] last:border-0"
+                            onMouseDown={(e) => { e.preventDefault(); handleSearch(rs); }}
+                          >
+                            <Clock className="w-4 h-4 text-[var(--lib-muted)] shrink-0" />
+                            <span className="text-sm text-[var(--lib-text)] font-medium flex-1 truncate">{rs}</span>
+                            <ArrowUpRight className="w-3 h-3 text-[var(--lib-muted)] opacity-50 shrink-0" />
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )
+                ) : (
+                  (() => {
+                    const matches = books.filter(b => 
+                      b.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                      b.author.toLowerCase().includes(searchQuery.toLowerCase())
+                    ).slice(0, 5);
+                    
+                    if (matches.length === 0) return (
+                      <div 
+                        className="p-4 text-center text-primary font-bold text-sm cursor-pointer hover:bg-[var(--lib-input)]"
+                        onMouseDown={(e) => { e.preventDefault(); handleSearch(searchQuery); }}
+                      >
+                        Press Enter to search global catalog
+                      </div>
+                    );
+
+                    return (
+                      <>
+                        <div className="p-3 border-b border-[var(--lib-border)]">
+                          <h4 className="text-[10px] font-bold text-primary uppercase tracking-wider">In Your Library</h4>
+                        </div>
+                        <div className="max-h-[300px] overflow-y-auto">
+                          {matches.map((b) => (
+                            <div 
+                              key={b.id} 
+                              className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--lib-input)] cursor-pointer transition-colors border-b border-[var(--lib-border)] last:border-0 group"
+                              onMouseDown={(e) => { e.preventDefault(); openBook(b); setIsSearchFocused(false); }}
+                            >
+                              <div className="w-8 h-12 bg-[var(--lib-bg)] rounded overflow-hidden shrink-0 border border-[var(--lib-border)]">
+                                <BookCover coverUrl={b.coverUrl} title={b.title} />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm text-[var(--lib-text)] font-bold truncate">{b.title}</p>
+                                <p className="text-[10px] text-[var(--lib-muted)] truncate">{b.author}</p>
+                              </div>
+                              <BookOpen className="w-4 h-4 text-[var(--lib-muted)] group-hover:text-primary transition-colors opacity-0 group-hover:opacity-100" />
+                            </div>
+                          ))}
+                        </div>
+                        <div 
+                          className="p-3 bg-[var(--lib-input)] text-center text-xs font-bold text-primary cursor-pointer hover:bg-primary/10 transition-colors"
+                          onMouseDown={(e) => { e.preventDefault(); handleSearch(searchQuery); setIsSearchFocused(false); }}
+                        >
+                          Search global catalog for "{searchQuery}"
+                        </div>
+                      </>
+                    );
+                  })()
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </form>
         {/* Source Chips — active filters on search results */}
         {searchQuery && resultSources.length > 0 && (
@@ -903,13 +1014,13 @@ export default function Library() {
                 {/* Top Right Delete Button */}
                 <button
                   onClick={(e) => { e.stopPropagation(); deleteBook(hero.id); }}
-                  className="absolute top-4 right-4 w-9 h-9 bg-black/40 backdrop-blur-md rounded-full items-center justify-center flex z-20 hover:bg-red-500/80 transition-colors border border-[var(--lib-border)] shadow-lg"
+                  className="absolute top-4 right-4 w-9 h-9 bg-black/40 backdrop-blur-md rounded-full items-center justify-center flex z-20 hover:bg-red-500/80 transition-colors border border-white/20 shadow-lg"
                   title="Remove from Shelf"
                 >
                   {deletingId === hero.id ? (
-                    <Loader2 className="w-4 h-4 animate-spin text-[var(--lib-text)]" />
+                    <Loader2 className="w-4 h-4 animate-spin text-white" />
                   ) : (
-                    <Trash2 className="w-4 h-4 text-[var(--lib-text)]" />
+                    <Trash2 className="w-4 h-4 text-white" />
                   )}
                 </button>
 
@@ -927,12 +1038,12 @@ export default function Library() {
                       <Sparkles className="w-3 h-3" />
                       {hero.status === "reading" ? "Continue Reading" : "Up Next"}
                     </p>
-                    <h2 className="text-xl sm:text-2xl font-bold font-serif leading-tight mb-1 line-clamp-2 text-[var(--lib-text)] drop-shadow-lg">{hero.title}</h2>
-                    <p className="text-[var(--lib-text)] text-sm line-clamp-1 mb-4 drop-shadow-md">{hero.author}</p>
+                    <h2 className="text-xl sm:text-2xl font-bold font-serif leading-tight mb-1 line-clamp-2 text-white drop-shadow-lg">{hero.title}</h2>
+                    <p className="text-white/80 text-sm line-clamp-1 mb-4 drop-shadow-md">{hero.author}</p>
 
                     {hero.totalPages > 0 && (
                       <div className="mb-4">
-                        <div className="w-full bg-[var(--lib-input)] rounded-full h-1.5 mb-2 overflow-hidden shadow-inner">
+                        <div className="w-full bg-white/20 rounded-full h-1.5 mb-2 overflow-hidden shadow-inner">
                           <motion.div
                             initial={{ width: 0 }}
                             animate={{ width: `${Math.min(100, (hero.currentPage / hero.totalPages) * 100)}%` }}
@@ -942,7 +1053,7 @@ export default function Library() {
                             <div className="absolute inset-0 bg-white/30 animate-pulse" />
                           </motion.div>
                         </div>
-                        <p className="text-[10px] font-medium text-[var(--lib-muted)] uppercase tracking-wide">
+                        <p className="text-[10px] font-medium text-white/60 uppercase tracking-wide">
                           {hero.currentPage > 0
                             ? `${Math.round((hero.currentPage / hero.totalPages) * 100)}% Completed`
                             : `${hero.totalPages} Pages Total`}
@@ -950,7 +1061,7 @@ export default function Library() {
                       </div>
                     )}
 
-                    <div className="flex gap-2 items-center">
+                    <div className="flex flex-wrap gap-2 items-center mt-1">
                       <button
                         onClick={(e) => { e.stopPropagation(); openBook(hero); }}
                         className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-2 px-5 rounded-full text-sm flex items-center gap-1.5 active:scale-95 transition-all shadow-lg shadow-primary/20"
@@ -960,7 +1071,7 @@ export default function Library() {
                       </button>
                       <button
                         onClick={(e) => { e.stopPropagation(); setActiveNotesBook(hero); }}
-                        className="bg-[var(--lib-input)] backdrop-blur-md text-[var(--lib-text)] border border-[var(--lib-border)] font-bold py-2 px-4 rounded-full text-sm flex items-center gap-1.5 active:scale-95 transition-all hover:bg-white/20"
+                        className="bg-white/10 backdrop-blur-md text-white border border-white/20 font-bold py-2 px-4 rounded-full text-sm flex items-center gap-1.5 active:scale-95 transition-all hover:bg-white/20"
                       >
                         <MessageSquare className="w-4 h-4" />
                         Notes
