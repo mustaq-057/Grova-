@@ -379,7 +379,7 @@ export default function Library() {
 
       // Calculate real total pages based on epub structure
       await book.locations.generate(1024);
-      const totalPages = book.locations.total || 200;
+      const totalPages = (book.locations as any).total || 200;
 
       // Add to Library
       await apiFetch("/library", {
