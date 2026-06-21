@@ -831,14 +831,23 @@ libraryRouter.post("/library", authenticate, async (req: AuthenticatedRequest, r
 // ─── UPDATE READING PROGRESS ─────────────────────────────────────────────────
 libraryRouter.put("/library/:id/progress", authenticate, async (req: AuthenticatedRequest, res) => {
   try {
-    const { page, status } = req.body;
+    const { page, status, totalPages } = req.body;
     if (page === undefined) return res.status(400).json({ error: "page is required" });
 
     const newStatus = status || (page > 0 ? "reading" : "reading");
-    await db.execute(
-      `UPDATE library_books SET current_page = $1, status = $2 WHERE id = $3`,
-      [page, newStatus, req.params.id]
-    );
+    
+    if (totalPages !== undefined && totalPages > 0) {
+      await db.execute(
+        `UPDATE library_books SET current_page = $1, status = $2, total_pages = $3 WHERE id = $4`,
+        [page, newStatus, totalPages, req.params.id]
+      );
+    } else {
+      await db.execute(
+        `UPDATE library_books SET current_page = $1, status = $2 WHERE id = $3`,
+        [page, newStatus, req.params.id]
+      );
+    }
+    
     return res.json({ success: true });
   } catch (err) {
     console.error("Library PUT progress error:", err);

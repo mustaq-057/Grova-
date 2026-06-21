@@ -303,7 +303,7 @@ export default function EReader() {
               lastPageRef.current = page;
               apiFetch(`/library/${id}/progress`, {
                 method: "PUT",
-                body: JSON.stringify({ page, status: "reading" }),
+                body: JSON.stringify({ page, status: "reading", totalPages: total }),
               }).catch(() => {});
             }
           }
