@@ -130,6 +130,8 @@ libraryRouter.get("/library/search", authenticate, async (req, res) => {
 
   const enc = encodeURIComponent(query);
   const arabic = isArabicQuery(query);
+  const exactLower = query.toLowerCase().trim();
+  const qTerms = exactLower.split(/\s+/).filter(w => w.length > 2);
 
   // ── Cache check ─────────────────────────────────────────────────────────
   const cacheKey = query.toLowerCase();
@@ -283,7 +285,13 @@ libraryRouter.get("/library/search", authenticate, async (req, res) => {
           });
           if (treeRes.ok) {
             const treeData = await treeRes.json() as any;
-            const epubs = (treeData.tree || []).filter((f: any) => f.path.toLowerCase().endsWith(".epub"));
+            const epubs = (treeData.tree || []).filter((f: any) => {
+              const pathLower = f.path.toLowerCase();
+              if (!pathLower.endsWith(".epub")) return false;
+              if (pathLower.includes(exactLower)) return true;
+              if (qTerms.length === 0) return pathLower.includes(exactLower);
+              return qTerms.some(w => pathLower.includes(w));
+            });
             if (epubs.length > 0) {
               const file = epubs[0];
               const title = file.path.split("/").pop()?.replace(/\.epub$/i, "").replace(/[-_]/g, " ") || repo.name;
@@ -479,8 +487,16 @@ libraryRouter.get("/library/search", authenticate, async (req, res) => {
   // ── Filter to ONLY include books with an EPUB link ──────────────────────────
   let finalResults = results.filter(r => r.epubUrl && r.epubUrl.trim() !== "");
 
+  // ── Filter out completely irrelevant results ──────────────────────────────────
+  finalResults = finalResults.filter(r => {
+    const t = r.title.toLowerCase();
+    const a = (r.author || "").toLowerCase();
+    if (t.includes(exactLower) || a.includes(exactLower)) return true;
+    if (qTerms.length === 0) return t.includes(exactLower) || a.includes(exactLower);
+    return qTerms.some(w => t.includes(w) || a.includes(w));
+  });
+
   // ── Sort to boost exact matches ──────────────────────────────────────────────
-  const exactLower = query.toLowerCase().trim();
   finalResults.sort((a, b) => {
     const aExact = a.title.toLowerCase() === exactLower;
     const bExact = b.title.toLowerCase() === exactLower;
