@@ -5,6 +5,7 @@ import { authenticate } from "../lib/auth-middleware";
 import type { AuthenticatedRequest } from "../types";
 import * as cheerio from "cheerio";
 import { searchGithubIndex } from "../lib/github-indexer";
+import { appConfig } from "../lib/config";
 
 const libraryRouter = Router();
 
@@ -402,6 +403,30 @@ libraryRouter.get("/library", authenticate, async (req, res) => {
   } catch (err) {
     console.error("Library GET error:", err);
     return res.status(500).json({ error: "Failed to fetch library" });
+  }
+});
+
+// ─── GET ALL LIBRARY NOTES ───────────────────────────────────────────────────
+libraryRouter.get("/library/notes", authenticate, async (req: AuthenticatedRequest, res) => {
+  try {
+    const userId = req.user?.id;
+    const partnerId = userId ? appConfig.partnerMapping[userId] : undefined;
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+    const result = await db.query(
+      `SELECT n.id, n.book_id AS "bookId", n.chapter_or_page AS "chapterOrPage",
+              n.text, n.author_id AS "authorId", n.timestamp,
+              b.title AS "bookTitle"
+       FROM library_notes n
+       JOIN library_books b ON n.book_id = b.id
+       WHERE b.added_by = $1 OR b.added_by = $2
+       ORDER BY n.timestamp DESC`,
+      [userId, partnerId || userId]
+    );
+    return res.json(result.rows);
+  } catch (err) {
+    console.error("Library all notes GET error:", err);
+    return res.status(500).json({ error: "Failed to fetch all notes" });
   }
 });
 

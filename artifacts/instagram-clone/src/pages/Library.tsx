@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Search, Book, Plus, BookOpen, ChevronLeft, ChevronRight, Trash2, CheckCircle2, Loader2, BookMarked, ExternalLink, Filter, X, MessageSquare, Send, Settings, Maximize, Download, Sparkles } from "lucide-react";
+import { Search, Book, Plus, BookOpen, ChevronLeft, ChevronRight, Trash2, CheckCircle2, Loader2, BookMarked, ExternalLink, Filter, X, MessageSquare, Send, Settings, Maximize, Download, Sparkles, Calendar, Flame, TrendingUp, Lightbulb, User, Medal, ArrowUpRight, BarChart3, Bookmark } from "lucide-react";
 import { useLocation } from "wouter";
 import { apiFetch, api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -38,6 +38,7 @@ type SearchResult = {
 type LibraryNote = {
   id: string;
   bookId: string;
+  bookTitle?: string;
   chapterOrPage: string | null;
   text: string;
   authorId: string;
@@ -135,6 +136,8 @@ export default function Library() {
   const [activeNotesBook, setActiveNotesBook] = useState<ApiBook | null>(null);
   const [selectedPreviewBook, setSelectedPreviewBook] = useState<SearchResult | null>(null);
   const [activeTab, setActiveTab] = useState<"myShelf" | "partnerShelf" | "finished">("myShelf");
+  const [libraryTab, setLibraryTab] = useState<"dashboard" | "memorize" | "achievements">("dashboard");
+  const [allNotes, setAllNotes] = useState<LibraryNote[]>([]);
   // Settings State
   const [showSettings, setShowSettings] = useState(false);
   const [libLang, setLibLang] = useState<"en" | "ar">(() => (localStorage.getItem("grova-library-language") as "en" | "ar") || "en");
@@ -194,9 +197,19 @@ export default function Library() {
     }
   }, []);
 
+  const loadNotes = useCallback(async () => {
+    try {
+      const data = await apiFetch<LibraryNote[]>("/library/notes");
+      setAllNotes(data);
+    } catch (err) {
+      console.error("Failed to load notes:", err);
+    }
+  }, []);
+
   useEffect(() => {
     loadBooks();
-  }, [loadBooks]);
+    loadNotes();
+  }, [loadBooks, loadNotes]);
 
   useEffect(() => {
     if (!user) return;
@@ -670,8 +683,8 @@ export default function Library() {
         </div>
       )}
 
-      {/* ── Main Shelves (shown when not searching) ── */}
-      {!searchQuery && (
+      {/* ── Main Dashboard ── */}
+      {!searchQuery && libraryTab === "dashboard" && (
         <>
           {/* Random Catalog Discovery */}
           <div className="px-4 mt-6">
@@ -698,22 +711,34 @@ export default function Library() {
             </div>
           </div>
 
-          {/* Library Stats */}
+          {/* Library Stats / Widgets Grid */}
           <div className="px-4 mt-6">
-            <div className="bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20 rounded-2xl p-4 flex items-center justify-around shadow-sm">
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div className="bg-[var(--lib-card)] border border-[var(--lib-border)] rounded-2xl p-4 flex flex-col justify-center items-center shadow-sm">
+                <Calendar className="w-6 h-6 text-primary mb-2" />
+                <p className="text-[10px] text-[var(--lib-muted)] uppercase tracking-wider font-bold mb-1">Total Books</p>
+                <p className="text-xl font-serif font-bold text-[var(--lib-text)]">{myShelf.length + partnerShelf.length}</p>
+              </div>
+              <div className="bg-[var(--lib-card)] border border-[var(--lib-border)] rounded-2xl p-4 flex flex-col justify-center items-center shadow-sm">
+                <Flame className="w-6 h-6 text-orange-500 mb-2" />
+                <p className="text-[10px] text-[var(--lib-muted)] uppercase tracking-wider font-bold mb-1">Active Reads</p>
+                <p className="text-xl font-serif font-bold text-[var(--lib-text)]">{currentlyReading.length}</p>
+              </div>
+            </div>
+            <div className="bg-[var(--lib-card)] border border-[var(--lib-border)] rounded-2xl p-4 flex items-center justify-around shadow-sm">
               <div className="text-center">
                 <p className="text-[10px] text-[var(--lib-muted)] uppercase tracking-wider font-bold mb-1">Pages Read</p>
-                <p className="text-2xl font-serif font-bold text-primary">{totalPagesRead.toLocaleString()}</p>
+                <p className="text-xl font-serif font-bold text-primary">{totalPagesRead.toLocaleString()}</p>
               </div>
-              <div className="w-px h-10 bg-primary/20" />
+              <div className="w-px h-10 bg-[var(--lib-border)]" />
               <div className="text-center">
                 <p className="text-[10px] text-[var(--lib-muted)] uppercase tracking-wider font-bold mb-1">Hours Spent</p>
-                <p className="text-2xl font-serif font-bold text-primary">{estimatedHours} <span className="text-sm font-normal">hrs</span></p>
+                <p className="text-xl font-serif font-bold text-primary">{estimatedHours} <span className="text-xs font-normal">hrs</span></p>
               </div>
-              <div className="w-px h-10 bg-primary/20" />
+              <div className="w-px h-10 bg-[var(--lib-border)]" />
               <div className="text-center">
                 <p className="text-[10px] text-[var(--lib-muted)] uppercase tracking-wider font-bold mb-1">Finished</p>
-                <p className="text-2xl font-serif font-bold text-primary">{finishedBooks.filter(b => b.addedBy === myId).length}</p>
+                <p className="text-xl font-serif font-bold text-primary">{finishedBooks.filter(b => b.addedBy === myId).length}</p>
               </div>
             </div>
           </div>
@@ -820,102 +845,256 @@ export default function Library() {
           )}
           </AnimatePresence>
 
-          <div className="px-4 py-6">
-            {/* Tabs */}
-            <div className="flex gap-2 mb-6 bg-[var(--lib-input)] p-1 rounded-2xl border border-[var(--lib-border)]">
-              <button
-                onClick={() => setActiveTab("myShelf")}
-                className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${activeTab === "myShelf" ? "bg-[var(--lib-card)] text-[var(--lib-text)] shadow-sm" : "text-[var(--lib-muted)] hover:text-[var(--lib-text)]"}`}
-              >
-                My Shelf
-              </button>
-              {partnerShelf.length > 0 && (
-                <button
-                  onClick={() => setActiveTab("partnerShelf")}
-                  className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${activeTab === "partnerShelf" ? "bg-[var(--lib-card)] text-[var(--lib-text)] shadow-sm" : "text-[var(--lib-muted)] hover:text-[var(--lib-text)]"}`}
-                >
-                  {t.partnerShelf}
-                </button>
-              )}
-              {finishedBooks.length > 0 && (
-                <button
-                  onClick={() => setActiveTab("finished")}
-                  className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${activeTab === "finished" ? "bg-[var(--lib-card)] text-[var(--lib-text)] shadow-sm" : "text-[var(--lib-muted)] hover:text-[var(--lib-text)]"}`}
-                >
-                  Finished
-                </button>
+          <div className="px-4 py-6 space-y-4">
+            {/* Wishlist / Read Later Widget */}
+            <div className="bg-[var(--lib-card)] border border-[var(--lib-border)] rounded-2xl p-4 flex flex-col shadow-sm">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-bold text-[var(--lib-text)] flex items-center gap-2">
+                  <Bookmark className="w-4 h-4 text-primary" /> Books to read later
+                </h3>
+              </div>
+              {books.filter(b => b.status === "wishlist").length > 0 ? (
+                <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2">
+                  {books.filter(b => b.status === "wishlist").map(b => (
+                    <div key={b.id} onClick={() => openBook(b)} className="w-16 shrink-0 aspect-[2/3] rounded-lg overflow-hidden border border-[var(--lib-border)] cursor-pointer hover:scale-105 transition-transform">
+                      <BookCover coverUrl={b.coverUrl} title={b.title} size="sm" />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  {[1,2,3,4].map(i => (
+                    <div key={i} onClick={() => { /* maybe open search */ }} className="w-12 h-12 shrink-0 rounded-full bg-[var(--lib-input)] border border-[var(--lib-border)] flex items-center justify-center text-[var(--lib-muted)] cursor-pointer hover:bg-[var(--lib-btn-hover)] transition-colors">
+                      <Plus className="w-5 h-5" />
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
 
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={activeTab}
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.2 }}
-                className="space-y-8"
-              >
-                {activeTab === "myShelf" && (
-                  <ShelfRow
-                    title="My Collection"
-                    books={myShelf}
-                    emptyMsg="Your shelf is empty. Discover new worlds above!"
-                    onOpen={openBook}
-                    onDelete={deleteBook}
-                    deletingId={deletingId}
-                    onStatusChangeMenu={(e, bookId) => {
-                      e.preventDefault();
-                      setStatusMenu({ bookId, x: e.clientX, y: e.clientY });
-                    }}
-                    updatingStatus={updatingStatus}
-                  />
-                )}
-                {activeTab === "partnerShelf" && (
-                  <ShelfRow
-                    title={`${partnerDisplayName}'s Collection`}
-                    books={partnerShelf}
-                    emptyMsg=""
-                    onOpen={openBook}
-                    onDelete={deleteBook}
-                    deletingId={deletingId}
-                    onStatusChangeMenu={(e, bookId) => {
-                      e.preventDefault();
-                      setStatusMenu({ bookId, x: e.clientX, y: e.clientY });
-                    }}
-                    updatingStatus={updatingStatus}
-                  />
-                )}
-                {activeTab === "finished" && (
-                  <ShelfRow
-                    title="Completed Journeys ✓"
-                    books={finishedBooks}
-                    emptyMsg=""
-                    onOpen={openBook}
-                    onDelete={deleteBook}
-                    deletingId={deletingId}
-                    grayscale
-                    onStatusChangeMenu={(e, bookId) => {
-                      e.preventDefault();
-                      setStatusMenu({ bookId, x: e.clientX, y: e.clientY });
-                    }}
-                    updatingStatus={updatingStatus}
-                  />
-                )}
-              </motion.div>
-            </AnimatePresence>
+            {/* Collection Tabs */}
+            <div className="bg-[var(--lib-card)] border border-[var(--lib-border)] rounded-2xl p-4 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-bold text-[var(--lib-text)] flex items-center gap-2">
+                  <BookMarked className="w-4 h-4 text-primary" /> Collections
+                </h3>
+              </div>
+              <div className="flex gap-2 mb-4 bg-[var(--lib-input)] p-1 rounded-2xl border border-[var(--lib-border)] overflow-x-auto scrollbar-hide">
+                <button
+                  onClick={() => setActiveTab("myShelf")}
+                  className={`flex-1 min-w-[80px] py-2 text-xs font-bold rounded-xl transition-all ${activeTab === "myShelf" ? "bg-[var(--lib-card)] text-[var(--lib-text)] shadow-sm" : "text-[var(--lib-muted)] hover:text-[var(--lib-text)]"}`}
+                >
+                  My Shelf
+                </button>
+                <button
+                  onClick={() => setActiveTab("partnerShelf")}
+                  className={`flex-1 min-w-[80px] py-2 text-xs font-bold rounded-xl transition-all ${activeTab === "partnerShelf" ? "bg-[var(--lib-card)] text-[var(--lib-text)] shadow-sm" : "text-[var(--lib-muted)] hover:text-[var(--lib-text)]"}`}
+                >
+                  {partnerDisplayName}
+                </button>
+                <button
+                  onClick={() => setActiveTab("finished")}
+                  className={`flex-1 min-w-[80px] py-2 text-xs font-bold rounded-xl transition-all ${activeTab === "finished" ? "bg-[var(--lib-card)] text-[var(--lib-text)] shadow-sm" : "text-[var(--lib-muted)] hover:text-[var(--lib-text)]"}`}
+                >
+                  Finished
+                </button>
+              </div>
 
-            {/* Empty state */}
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={activeTab}
+                  initial={{ opacity: 0, x: 10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -10 }}
+                  transition={{ duration: 0.15 }}
+                >
+                  {activeTab === "myShelf" && (
+                    <ShelfRow
+                      title=""
+                      books={myShelf}
+                      emptyMsg="Your shelf is empty."
+                      onOpen={openBook}
+                      onDelete={deleteBook}
+                      deletingId={deletingId}
+                      onStatusChangeMenu={(e, bookId) => {
+                        e.preventDefault();
+                        setStatusMenu({ bookId, x: e.clientX, y: e.clientY });
+                      }}
+                      updatingStatus={updatingStatus}
+                    />
+                  )}
+                  {activeTab === "partnerShelf" && (
+                    <ShelfRow
+                      title=""
+                      books={partnerShelf}
+                      emptyMsg={`${partnerDisplayName}'s shelf is empty.`}
+                      onOpen={openBook}
+                      onDelete={deleteBook}
+                      deletingId={deletingId}
+                      onStatusChangeMenu={(e, bookId) => {
+                        e.preventDefault();
+                        setStatusMenu({ bookId, x: e.clientX, y: e.clientY });
+                      }}
+                      updatingStatus={updatingStatus}
+                    />
+                  )}
+                  {activeTab === "finished" && (
+                    <ShelfRow
+                      title=""
+                      books={finishedBooks}
+                      emptyMsg="No finished books yet."
+                      onOpen={openBook}
+                      onDelete={deleteBook}
+                      deletingId={deletingId}
+                      grayscale
+                      onStatusChangeMenu={(e, bookId) => {
+                        e.preventDefault();
+                        setStatusMenu({ bookId, x: e.clientX, y: e.clientY });
+                      }}
+                      updatingStatus={updatingStatus}
+                    />
+                  )}
+                </motion.div>
+              </AnimatePresence>
+            </div>
+
+            {/* Empty state fallback */}
             {books.length === 0 && !loading && (
-              <div className="flex flex-col items-center py-16 text-center text-gray-600">
-                <BookMarked className="w-16 h-16 mb-4 opacity-20" />
-                <p className="text-lg font-bold text-gray-500">Your library is empty</p>
-                <p className="text-sm mt-1">Search millions of books above and add them to your shelf.</p>
+              <div className="flex flex-col items-center py-8 text-center text-[var(--lib-muted)]">
+                <BookMarked className="w-12 h-12 mb-4 opacity-30" />
+                <p className="text-sm font-bold text-[var(--lib-text)]">Your library is empty</p>
+                <p className="text-xs mt-1">Search millions of books above and add them to your shelf.</p>
               </div>
             )}
           </div>
         </>
       )}
+
+      {/* ── Memorize View ── */}
+      {!searchQuery && libraryTab === "memorize" && (
+        <div className="min-h-[80vh] flex flex-col bg-blue-600/10">
+          <div className="bg-primary px-6 py-12 pb-24 text-primary-foreground rounded-b-[3rem] shadow-xl">
+            <h2 className="text-4xl font-black mb-3">Memorize</h2>
+            <p className="text-sm font-medium opacity-90 max-w-[80%] leading-relaxed">
+              After reading books, write down some notes you want to remember. 
+              <br/> If you don't have a book yet, how about adding it first?
+            </p>
+          </div>
+          <div className="px-4 -mt-16 pb-12 space-y-4">
+            {allNotes.length === 0 ? (
+              <div className="bg-[var(--lib-card)] border border-[var(--lib-border)] rounded-3xl p-8 flex flex-col items-center justify-center text-center shadow-xl">
+                <div className="w-32 h-32 bg-primary/10 rounded-full flex items-center justify-center mb-6">
+                  <Lightbulb className="w-16 h-16 text-primary opacity-50" />
+                </div>
+                <p className="text-[var(--lib-muted)] font-medium">There are no reading notes yet.</p>
+              </div>
+            ) : (
+              allNotes.map((note) => (
+                <div key={note.id} className="bg-[var(--lib-card)] border border-[var(--lib-border)] rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow">
+                  <div className="flex items-start gap-3">
+                    <div className="bg-primary/10 p-2 rounded-xl shrink-0">
+                      <MessageSquare className="w-5 h-5 text-primary" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-[10px] text-[var(--lib-muted)] font-bold uppercase tracking-wider mb-1 flex items-center justify-between">
+                        <span className="line-clamp-1 flex-1 mr-2">{note.bookTitle || "Unknown Book"}</span>
+                        <span className="shrink-0">{new Date(note.timestamp).toLocaleDateString()}</span>
+                      </p>
+                      <p className="text-sm text-[var(--lib-text)] leading-relaxed">{note.text}</p>
+                      {note.chapterOrPage && (
+                        <p className="text-xs text-[var(--lib-muted)] mt-2 font-mono bg-[var(--lib-input)] inline-block px-2 py-0.5 rounded-md border border-[var(--lib-border)]">
+                          {note.chapterOrPage}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Achievements View ── */}
+      {!searchQuery && libraryTab === "achievements" && (
+        <div className="min-h-[80vh] flex flex-col">
+          <div className="bg-[#1976D2] px-6 py-12 pb-24 text-white rounded-b-[3rem] shadow-xl">
+            <div className="flex items-center justify-between mb-3">
+               <h2 className="text-4xl font-black">Achievement</h2>
+               <button className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition-colors"><Settings className="w-5 h-5" /></button>
+            </div>
+            <p className="text-sm font-medium opacity-90 max-w-[80%] leading-relaxed">
+              Books which you read are registered in achievement.
+            </p>
+          </div>
+          <div className="px-4 -mt-16 pb-12">
+            <div className="bg-[var(--lib-card)] border border-[var(--lib-border)] rounded-3xl p-6 shadow-xl min-h-[400px] relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+                 <Medal className="w-64 h-64" />
+              </div>
+              <h3 className="text-lg font-bold text-[var(--lib-text)] mb-6 flex items-center gap-2 relative z-10">
+                <Medal className="w-5 h-5 text-yellow-500" /> Trophies ({finishedBooks.length})
+              </h3>
+              
+              {finishedBooks.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-48 text-center relative z-10">
+                  <p className="text-[var(--lib-muted)] font-medium">You haven't finished any books yet.</p>
+                  <button onClick={() => setLibraryTab("dashboard")} className="mt-4 px-6 py-2 bg-primary/10 text-primary font-bold rounded-full hover:bg-primary/20 transition-colors">Start Reading</button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 gap-4 relative z-10">
+                  {finishedBooks.map(b => (
+                    <div key={b.id} onClick={() => openBook(b)} className="flex flex-col items-center gap-2 cursor-pointer group">
+                      <div className="w-full aspect-[2/3] rounded-lg overflow-hidden border-2 border-yellow-500/50 group-hover:border-yellow-500 transition-colors shadow-lg">
+                        <BookCover coverUrl={b.coverUrl} title={b.title} size="sm" />
+                      </div>
+                      <p className="text-[10px] font-bold text-center line-clamp-1">{b.title}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Library Bottom Navigation ── */}
+      <div className="fixed bottom-0 left-0 right-0 bg-[var(--lib-header)] border-t border-[var(--lib-border)] backdrop-blur-xl z-40 pb-[env(safe-area-inset-bottom)] px-6">
+        <div className="flex justify-between items-center py-3 max-w-sm mx-auto">
+          <button 
+            onClick={() => setLibraryTab("dashboard")} 
+            className={`flex flex-col items-center gap-1 transition-all ${libraryTab === "dashboard" ? "text-primary scale-110" : "text-[var(--lib-muted)] hover:text-[var(--lib-text)]"}`}
+          >
+            <div className={`p-2 rounded-full ${libraryTab === "dashboard" ? "bg-primary text-white" : ""}`}>
+              <BookOpen className="w-6 h-6" />
+            </div>
+          </button>
+          <button 
+            onClick={() => setLibraryTab("memorize")} 
+            className={`flex flex-col items-center gap-1 transition-all ${libraryTab === "memorize" ? "text-primary scale-110" : "text-[var(--lib-muted)] hover:text-[var(--lib-text)]"}`}
+          >
+            <div className={`p-2 rounded-full ${libraryTab === "memorize" ? "bg-primary text-white" : ""}`}>
+              <Lightbulb className="w-6 h-6" />
+            </div>
+          </button>
+          <button 
+            onClick={() => setLibraryTab("achievements")} 
+            className={`flex flex-col items-center gap-1 transition-all ${libraryTab === "achievements" ? "text-primary scale-110" : "text-[var(--lib-muted)] hover:text-[var(--lib-text)]"}`}
+          >
+            <div className={`p-2 rounded-full ${libraryTab === "achievements" ? "bg-primary text-white" : ""}`}>
+              <Medal className="w-6 h-6" />
+            </div>
+          </button>
+          <button 
+            onClick={() => setLocation("/")} 
+            className="flex flex-col items-center gap-1 text-[var(--lib-muted)] hover:text-[var(--lib-text)] transition-all"
+          >
+            <div className="p-2 rounded-full">
+              <User className="w-6 h-6" />
+            </div>
+          </button>
+        </div>
+      </div>
 
       {/* ── Status Menu Modal ── */}
       <AnimatePresence>

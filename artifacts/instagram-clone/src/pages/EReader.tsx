@@ -59,22 +59,46 @@ export default function EReader() {
   const renditionRef = useRef<any>(null);
   const isRemoteSync = useRef(false);
 
-  const [epubUrl, setEpubUrl] = useState<string | null>(null);
+  const [epubData, setEpubData] = useState<ArrayBuffer | string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!id) return;
     setLoading(true);
-    apiFetch(`/library/${id}`).then((book: any) => {
+    apiFetch(`/library/${id}`).then(async (book: any) => {
       let finalUrl = book.epubUrl;
-      if (finalUrl && finalUrl.startsWith("http") && finalUrl.includes("gutenberg.org")) {
-        finalUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(finalUrl)}`;
+      if (!finalUrl) {
+        setEpubData(null);
+        setLoading(false);
+        return;
       }
-      setEpubUrl(finalUrl || null);
-      setLoading(false);
+
+      // Proxy Gutenberg or other restrictive URLs using corsproxy.io
+      if (finalUrl.includes("gutenberg.org")) {
+        finalUrl = `https://corsproxy.io/?${encodeURIComponent(finalUrl)}`;
+      }
+
+      if (finalUrl.toLowerCase().includes(".pdf")) {
+        setEpubData(finalUrl);
+        setLoading(false);
+        return;
+      }
+
+      try {
+        // Fetch as ArrayBuffer to bypass epub.js URL extension parsing issues
+        const response = await fetch(finalUrl);
+        if (!response.ok) throw new Error("Network response was not ok");
+        const buffer = await response.arrayBuffer();
+        setEpubData(buffer);
+      } catch (err) {
+        console.error("Failed to fetch epub as buffer, falling back to URL", err);
+        setEpubData(finalUrl);
+      } finally {
+        setLoading(false);
+      }
     }).catch((e) => {
       console.error(e);
-      setEpubUrl(null);
+      setEpubData(null);
       setLoading(false);
     });
   }, [id]);
@@ -212,7 +236,7 @@ export default function EReader() {
             <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
             <p className="text-sm font-medium tracking-widest uppercase">Opening Book...</p>
           </div>
-        ) : !epubUrl ? (
+        ) : !epubData ? (
           <div className="w-full h-full flex flex-col items-center justify-center text-center px-6">
             <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mb-6">
               <Info className="w-10 h-10 text-white/30" />
@@ -226,17 +250,17 @@ export default function EReader() {
               Return to Library
             </button>
           </div>
-        ) : epubUrl.toLowerCase().includes(".pdf") ? (
+        ) : typeof epubData === 'string' && epubData.toLowerCase().includes(".pdf") ? (
           <div className="w-full h-full bg-white relative">
              <iframe 
-               src={`https://docs.google.com/viewer?url=${encodeURIComponent(epubUrl)}&embedded=true`}
+               src={`https://docs.google.com/viewer?url=${encodeURIComponent(epubData)}&embedded=true`}
                className="w-full h-full border-none absolute inset-0"
                title="PDF Viewer"
              />
           </div>
         ) : (
           <ReactReader
-            url={epubUrl}
+            url={epubData}
           epubInitOptions={{ openAs: 'epub' }}
           location={bookLocation}
           locationChanged={locationChanged}
