@@ -460,9 +460,9 @@ export default function EReader() {
               tocChanged={() => {}}
               swipeable
               epubOptions={{
-                flow: "paginated",
-                manager: "default",
-                spread: "auto",
+                flow: "scrolled",
+                manager: "continuous",
+                spread: "none",
               }}
               readerStyles={{
                 ...ReactReaderStyle,
@@ -472,12 +472,7 @@ export default function EReader() {
                 tocArea: { ...ReactReaderStyle.tocArea, display: "none" },
                 arrow: {
                   ...ReactReaderStyle.arrow,
-                  background: "rgba(0,0,0,0.15)",
-                  borderRadius: "50%",
-                  width: 44,
-                  height: 44,
-                  color: t.text,
-                  opacity: 0.7,
+                  display: "none", // Hide the ugly pagination arrows for scrolled view
                 },
               }}
             />

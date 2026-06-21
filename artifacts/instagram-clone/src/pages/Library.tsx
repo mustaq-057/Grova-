@@ -368,9 +368,12 @@ export default function Library() {
       } catch (err) {}
 
       // Upload binary to cloudinary
-      const res = await apiFetch<{ url: string }>("/media/upload", {
+      const res = await apiFetch<{ url: string; key: string }>("/media/upload-binary", {
         method: "POST",
-        headers: { "Content-Type": file.type || "application/epub+zip" },
+        headers: { 
+          "Content-Type": file.type || "application/epub+zip",
+          "x-file-name": encodeURIComponent(file.name)
+        },
         body: buffer,
       });
 
@@ -584,7 +587,7 @@ export default function Library() {
             <h1 className="text-3xl font-bold font-serif italic text-primary leading-none flex-1">{t.library}</h1>
             <input 
               type="file" 
-              accept=".epub" 
+              accept=".epub,application/epub+zip,*/*" 
               ref={fileInputRef} 
               onChange={handleEpubUpload} 
               className="hidden" 
@@ -923,8 +926,13 @@ export default function Library() {
 
               {/* Content */}
               <div className="relative z-10 w-2/3">
-                <h3 className="text-2xl font-bold text-[var(--lib-text)] mb-1 flex items-center gap-1.5"><Plus className="w-6 h-6 text-primary" strokeWidth={3} /> Add a book</h3>
-                <p className="text-sm font-medium text-[var(--lib-muted)]">Is there a book you are reading?</p>
+                <h3 className="text-2xl font-bold text-[var(--lib-text)] mb-1 flex items-center gap-1.5">
+                  {isSearching ? <Loader2 className="w-6 h-6 text-primary animate-spin" /> : <Plus className="w-6 h-6 text-primary" strokeWidth={3} />} 
+                  {isSearching ? "Uploading..." : "Add a book"}
+                </h3>
+                <p className="text-sm font-medium text-[var(--lib-muted)]">
+                  {isSearching ? "Please wait, reading file..." : "Is there a book you are reading?"}
+                </p>
               </div>
             </div>
           </div>
