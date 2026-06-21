@@ -82,6 +82,15 @@ export default function EReader() {
     return () => clearInterval(intervalId);
   }, [id, loading, epubData]);
 
+  // Jump to location from URL params (e.g. from Memorize notes)
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const loc = searchParams.get("location");
+    if (loc) {
+      setBookLocation(loc);
+    }
+  }, []);
+
   useEffect(() => {
     if (!id) return;
     setLoading(true);
@@ -162,6 +171,24 @@ export default function EReader() {
     syncDebounceRef.current = setTimeout(() => {
       setBookLocation(epubcifi);
       
+      // Track page read and update status to 'reading'
+      if (renditionRef.current) {
+         try {
+           const loc = renditionRef.current.currentLocation();
+           if (loc && loc.start && loc.start.displayed) {
+              const page = loc.start.displayed.page;
+              if (page && page > 0) {
+                 apiFetch(`/library/${id}/progress`, {
+                   method: "PUT",
+                   body: JSON.stringify({ page, status: "reading" })
+                 }).catch(e => console.error("Progress tracking failed:", e));
+              }
+           }
+         } catch (e) {
+           console.error("Could not extract page number", e);
+         }
+      }
+
       // Only broadcast if it's a local user action
       if (!isRemoteSync.current && duetMode) {
         apiFetch(`/library/${id}/sync`, { 

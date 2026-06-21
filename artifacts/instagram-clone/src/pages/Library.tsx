@@ -506,12 +506,6 @@ export default function Library() {
         {/* ── Sticky Search Header ── */}
         <div className="sticky top-0 z-20 backdrop-blur-md pt-[max(1rem,env(safe-area-inset-top))] px-4 pb-4 border-b border-[var(--lib-border)] bg-[var(--lib-header)] transition-colors duration-300">
           <div className="flex items-center gap-2 mb-3">
-            <button 
-              onClick={() => setLocation("/")}
-              className="p-1 -ml-1 rounded-full active:scale-90 transition-all hover:bg-[var(--lib-btn-hover)] text-[var(--lib-text)]"
-            >
-              <ChevronLeft className="w-8 h-8" />
-            </button>
             <h1 className="text-3xl font-bold font-serif italic text-primary leading-none flex-1">{t.library}</h1>
             <input 
               type="file" 
@@ -520,13 +514,6 @@ export default function Library() {
               onChange={handleEpubUpload} 
               className="hidden" 
             />
-            <button 
-              onClick={() => fileInputRef.current?.click()}
-              className="p-2 rounded-full active:scale-90 transition-all bg-primary/10 text-primary hover:bg-primary/20 flex items-center gap-1 text-xs font-bold"
-            >
-              <Plus className="w-4 h-4" />
-              Upload
-            </button>
             <button 
               onClick={() => setShowSettings(true)}
               className="p-2 rounded-full active:scale-90 transition-all hover:bg-[var(--lib-btn-hover)] text-[var(--lib-text)]"
@@ -538,7 +525,7 @@ export default function Library() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--lib-muted)]" />
           <input
             type="text"
-            placeholder={t.searchPlaceholder}
+            placeholder="Search book"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full bg-[var(--lib-input)] border border-[var(--lib-border)] rounded-2xl py-3 pl-10 pr-12 text-[var(--lib-text)] placeholder-[var(--lib-muted)] focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm transition-colors duration-300"
@@ -1119,7 +1106,12 @@ export default function Library() {
                     </div>
                     <div className="flex-1">
                       <p className="text-[10px] text-[var(--lib-muted)] font-bold uppercase tracking-wider mb-1 flex items-center justify-between">
-                        <span className="line-clamp-1 flex-1 mr-2">{note.bookTitle || "Unknown Book"}</span>
+                        <span 
+                           className="line-clamp-1 flex-1 mr-2 cursor-pointer hover:text-primary transition-colors"
+                           onClick={() => setLocation(`/read/${note.bookId}?location=${encodeURIComponent(note.chapterOrPage || "")}`)}
+                        >
+                          {note.bookTitle || "Unknown Book"}
+                        </span>
                         <span className="shrink-0">{new Date(note.timestamp).toLocaleDateString()}</span>
                       </p>
                       <p className="text-sm text-[var(--lib-text)] leading-relaxed">{note.text}</p>
