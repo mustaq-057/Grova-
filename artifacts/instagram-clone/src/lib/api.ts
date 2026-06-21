@@ -143,8 +143,15 @@ export async function apiFetchBlob(path: string, attempt = 0): Promise<{ blob: B
       signal,
       credentials: "include",
       cache: "no-store",
+      redirect: "manual",
       headers,
     });
+
+    if (res.status >= 300 && res.status < 400) {
+      throw new Error(
+        "Book download was redirected instead of proxied — update the app or try again in a moment.",
+      );
+    }
 
     if (res.status === 401 && attempt === 0 && !path.includes("/auth/login")) {
       const refreshed = await tryRefreshSession();

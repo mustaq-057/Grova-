@@ -29,9 +29,6 @@ function isPdfUrl(url: string): boolean {
   return false;
 }
 
-const DIRECT_PDF_HOSTS =
-  /archive\.org|gutenberg\.org|cloudinary\.com|cdn\.jsdelivr\.net|raw\.githubusercontent\.com|backblazeb2\.com/i;
-
 function isPdfBuffer(buffer: ArrayBuffer): boolean {
   if (buffer.byteLength < 4) return false;
   const v = new Uint8Array(buffer);
@@ -73,7 +70,21 @@ async function fetchPdfBlob(
 ): Promise<{ blob: Blob; contentType: string }> {
   const errors: string[] = [];
 
-  // Cloudinary / B2 need server proxy (CORS + auth) — never fetch directly from browser.
+  // Always load through our API — direct browser fetch hits CORS on archive.org, Gutenberg, Cloudinary, etc.
+  try {
+    const proxied = await apiFetchBlob(`/library/${bookId}/file`);
+    const buf = await proxied.blob.arrayBuffer();
+    if (isPdfBuffer(buf)) {
+      return {
+        blob: new Blob([buf], { type: "application/pdf" }),
+        contentType: proxied.contentType || "application/pdf",
+      };
+    }
+    errors.push("Server returned a file that is not a valid PDF.");
+  } catch (e) {
+    errors.push(e instanceof Error ? e.message : "Could not download book from server.");
+  }
+
   if (/cloudinary\.com|backblazeb2\.com/i.test(url)) {
     try {
       return await fetchViaMediaInline(url);
@@ -82,39 +93,10 @@ async function fetchPdfBlob(
     }
   }
 
-  if (DIRECT_PDF_HOSTS.test(url)) {
-    try {
-      const direct = await fetch(url);
-      if (direct.ok) {
-        const buf = await direct.arrayBuffer();
-        if (isPdfBuffer(buf)) {
-          return { blob: new Blob([buf], { type: "application/pdf" }), contentType: "application/pdf" };
-        }
-        errors.push("The download link returned a file that is not a PDF.");
-      } else {
-        errors.push(`Direct download failed (HTTP ${direct.status}).`);
-      }
-    } catch (e) {
-      errors.push(
-        "Direct download failed — " + (e instanceof Error ? e.message : "check your connection."),
-      );
-    }
-  }
-
-  try {
-    const proxied = await apiFetchBlob(`/library/${bookId}/file`);
-    const buf = await proxied.blob.arrayBuffer();
-    if (!isPdfBuffer(buf)) {
-      throw new Error("Server returned a file that is not a valid PDF.");
-    }
-    return {
-      blob: new Blob([buf], { type: "application/pdf" }),
-      contentType: proxied.contentType || "application/pdf",
-    };
-  } catch (e) {
-    const proxyMsg = e instanceof Error ? e.message : "Proxy download failed.";
-    throw new Error(errors[0] || proxyMsg);
-  }
+  throw new Error(
+    errors[0] ||
+      "Could not open this book. Try again, or remove it and re-add from search or upload.",
+  );
 }
 
 const PDF_PAGE_BUFFER = 3;

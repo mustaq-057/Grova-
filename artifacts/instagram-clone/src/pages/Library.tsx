@@ -133,6 +133,8 @@ export default function Library() {
   const [searchMeta, setSearchMeta] = useState<SearchMeta | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadSuccess, setUploadSuccess] = useState(false);
   const [catalogBooks, setCatalogBooks] = useState<SearchResult[]>([]);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
@@ -375,6 +377,8 @@ export default function Library() {
     }
 
     setIsUploading(true);
+    setUploadError(null);
+    setUploadSuccess(false);
     try {
       const title = file.name.replace(/\.pdf$/i, "");
       const author = "Unknown Author";
@@ -399,13 +403,12 @@ export default function Library() {
       });
 
       await loadBooks();
-      alert(libLang === "ar" ? "تم رفع الكتاب بنجاح!" : "Book uploaded successfully!");
+      setUploadSuccess(true);
+      window.setTimeout(() => setUploadSuccess(false), 4000);
     } catch (err: any) {
       console.error("Failed to upload PDF:", err);
-      alert(
-        (libLang === "ar" ? "فشل الرفع: " : "Failed to upload: ") +
-          (err?.message || "Unknown error"),
-      );
+      const message = err?.message || "Unknown error";
+      setUploadError(message);
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -929,8 +932,10 @@ export default function Library() {
           {/* Add a Book Banner */}
           <div className="px-4 mt-6">
             <div 
-              onClick={() => fileInputRef.current?.click()}
-              className="relative overflow-hidden rounded-3xl p-6 cursor-pointer group active:scale-[0.98] transition-transform shadow-sm border border-[var(--lib-border)] bg-[var(--lib-card)]"
+              onClick={() => { if (!isUploading) fileInputRef.current?.click(); }}
+              className={`relative overflow-hidden rounded-3xl p-6 group active:scale-[0.98] transition-transform shadow-sm border border-[var(--lib-border)] bg-[var(--lib-card)] ${
+                isUploading ? "opacity-70 pointer-events-none cursor-wait" : "cursor-pointer"
+              }`}
             >
               {/* Background Shapes */}
               <div className="absolute top-0 right-0 w-full h-full pointer-events-none overflow-hidden rounded-3xl opacity-30">
@@ -958,6 +963,17 @@ export default function Library() {
                     ? (libLang === "ar" ? "يرجى الانتظار..." : "Please wait, uploading PDF...")
                     : (libLang === "ar" ? "ارفع PDF من جهازك" : "Upload a PDF from your device")}
                 </p>
+                {uploadSuccess && !isUploading && (
+                  <p className="mt-2 text-xs text-emerald-400/90 leading-snug">
+                    {libLang === "ar" ? "تم رفع الكتاب بنجاح!" : "Book uploaded — tap it on your shelf to read."}
+                  </p>
+                )}
+                {uploadError && !isUploading && (
+                  <p className="mt-2 text-xs text-red-400/90 leading-snug">
+                    {libLang === "ar" ? "فشل الرفع: " : "Upload failed: "}
+                    {uploadError}
+                  </p>
+                )}
               </div>
             </div>
           </div>

@@ -137,19 +137,35 @@ export async function uploadMediaBinary(
   let res: Response;
   try {
     if (isPdfMime(mime)) {
+      // Prefer server upload first — more reliable on mobile than direct Cloudinary POST.
+      if (file.size <= JSON_UPLOAD_MAX_BYTES) {
+        try {
+          const dataUrl = await readFileAsDataUrl(file);
+          return await uploadMedia(dataUrl, mime, 0, fileName);
+        } catch {
+          /* try binary or direct Cloudinary below */
+        }
+      }
+
+      if (file.size <= 4 * 1024 * 1024) {
+        try {
+          res = await uploadViaBackendBinary(file, mime, fileName, controller, attempt);
+          if (res.ok) {
+            const body = (await res.json()) as { url?: string; secure_url?: string };
+            const url = body.secure_url || body.url || "";
+            if (url) return url;
+          }
+        } catch {
+          /* try direct Cloudinary below */
+        }
+      }
+
       try {
         return await uploadPdfToCloudinaryRaw(file, controller, attempt);
       } catch (cloudErr) {
-        if (file.size <= JSON_UPLOAD_MAX_BYTES) {
-          clearTimeout(timer);
-          try {
-            const dataUrl = await readFileAsDataUrl(file);
-            return uploadMedia(dataUrl, mime, 0, fileName);
-          } catch {
-            throw cloudErr;
-          }
-        }
-        res = await uploadViaBackendBinary(file, mime, fileName, controller, attempt);
+        throw cloudErr instanceof Error
+          ? cloudErr
+          : new Error("PDF upload failed. Check CLOUDINARY_URL on Vercel and try a smaller file.");
       }
     } else {
       const signRes = await fetch("/api/media/sign", {

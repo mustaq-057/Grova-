@@ -631,14 +631,8 @@ libraryRouter.get("/library/:id/file", authenticate, async (req, res) => {
       return res.status(400).json({ error: "Book URL is not a valid public link" });
     }
 
-    // On Vercel, avoid buffering large external PDFs — redirect for public hosts (not Cloudinary; use proxy fetch).
-    const isPublicExternal =
-      /archive\.org|gutenberg\.org|cdn\.jsdelivr\.net|raw\.githubusercontent\.com/i.test(epubUrl);
-    if (process.env.VERCEL && isPublicExternal && isSafeBookUrl(epubUrl)) {
-      return res.redirect(302, epubUrl);
-    }
-
-    // Cloudinary / B2 — server-side fetch (no redirect; client uses /api/media/inline).
+    // Always proxy through the API — HTTP redirects break CORS when the client reads the PDF as a blob.
+    // Cloudinary / B2 — server-side fetch (client may also use /api/media/inline).
     if (/cloudinary\.com|backblazeb2\.com/i.test(epubUrl)) {
       try {
         const upstream = await fetch(epubUrl);
