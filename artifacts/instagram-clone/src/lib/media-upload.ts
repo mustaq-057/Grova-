@@ -42,14 +42,17 @@ async function uploadPdfToCloudinaryRaw(
   file: File | Blob,
   controller: AbortController,
   attempt = 0,
-): Promise<string | null> {
+): Promise<string> {
   const signRes = await fetch("/api/media/sign?resourceType=raw", {
     headers: getAuthHeaders(),
     credentials: "include",
     signal: controller.signal,
   });
 
-  if (!signRes.ok) return null;
+  if (!signRes.ok) {
+    const err = (await signRes.json().catch(() => ({ error: "Cloudinary sign failed" }))) as { error?: string };
+    throw new Error(err.error || `Upload setup failed (HTTP ${signRes.status}). Check CLOUDINARY_URL on Vercel.`);
+  }
 
   const { signature, timestamp, apiKey, cloudName } = (await signRes.json()) as {
     signature: string;
@@ -57,6 +60,10 @@ async function uploadPdfToCloudinaryRaw(
     apiKey: string;
     cloudName: string;
   };
+
+  if (!cloudName || !apiKey) {
+    throw new Error("Cloudinary is misconfigured — cloudName or apiKey missing from sign response.");
+  }
 
   const formData = new FormData();
   formData.append("file", file);
@@ -78,10 +85,16 @@ async function uploadPdfToCloudinaryRaw(
     await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
     return uploadPdfToCloudinaryRaw(file, controller, attempt + 1);
   }
-  if (!res.ok) return null;
+  if (!res.ok) {
+    const errBody = (await res.json().catch(() => ({}))) as { error?: { message?: string } };
+    const msg = errBody.error?.message || `Cloudinary PDF upload failed (HTTP ${res.status})`;
+    throw new Error(msg);
+  }
 
   const body = (await res.json()) as { url?: string; secure_url?: string };
-  return body.secure_url || body.url || null;
+  const url = body.secure_url || body.url || "";
+  if (!url) throw new Error("Cloudinary upload returned no URL");
+  return url;
 }
 
 async function uploadViaBackendBinary(
@@ -124,16 +137,20 @@ export async function uploadMediaBinary(
   let res: Response;
   try {
     if (isPdfMime(mime)) {
-      const cloudUrl = await uploadPdfToCloudinaryRaw(file, controller, attempt);
-      if (cloudUrl) return cloudUrl;
-
-      if (file.size <= JSON_UPLOAD_MAX_BYTES) {
-        clearTimeout(timer);
-        const dataUrl = await readFileAsDataUrl(file);
-        return uploadMedia(dataUrl, mime, 0, fileName);
+      try {
+        return await uploadPdfToCloudinaryRaw(file, controller, attempt);
+      } catch (cloudErr) {
+        if (file.size <= JSON_UPLOAD_MAX_BYTES) {
+          clearTimeout(timer);
+          try {
+            const dataUrl = await readFileAsDataUrl(file);
+            return uploadMedia(dataUrl, mime, 0, fileName);
+          } catch {
+            throw cloudErr;
+          }
+        }
+        res = await uploadViaBackendBinary(file, mime, fileName, controller, attempt);
       }
-
-      res = await uploadViaBackendBinary(file, mime, fileName, controller, attempt);
     } else {
       const signRes = await fetch("/api/media/sign", {
         headers: getAuthHeaders(),

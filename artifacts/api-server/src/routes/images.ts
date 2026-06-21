@@ -10,6 +10,7 @@ import {
   resolveContentType,
   sniffBufferMime,
 } from "../lib/file-mime";
+import { requireCloudinaryCredentials } from "../lib/cloudinary-config";
 
 // Helper to normalize Express params (can be string or string[])
 function getParam(param: string | string[]): string {
@@ -143,6 +144,7 @@ router.post("/images/upload", rateLimiters.upload, authenticate, async (req, res
 
 router.get("/media/sign", authenticate, async (req, res) => {
   try {
+    const creds = requireCloudinaryCredentials();
     const timestamp = Math.round(new Date().getTime() / 1000);
     const resourceType =
       typeof req.query.resourceType === "string" && req.query.resourceType === "raw" ? "raw" : "auto";
@@ -150,24 +152,24 @@ router.get("/media/sign", authenticate, async (req, res) => {
     if (resourceType === "raw") paramsToSign.resource_type = "raw";
 
     const { v2: cloudinary } = await import("cloudinary");
-    if (!process.env.CLOUDINARY_API_SECRET) {
-      res.status(501).json({ error: "Cloudinary is not configured" });
-      return;
-    }
-    const signature = cloudinary.utils.api_sign_request(
-      paramsToSign,
-      process.env.CLOUDINARY_API_SECRET,
-    );
+    cloudinary.config({
+      cloud_name: creds.cloudName,
+      api_key: creds.apiKey,
+      api_secret: creds.apiSecret,
+      secure: true,
+    });
+    const signature = cloudinary.utils.api_sign_request(paramsToSign, creds.apiSecret);
     res.json({
       timestamp,
       signature,
-      apiKey: process.env.CLOUDINARY_API_KEY,
-      cloudName: process.env.CLOUDINARY_CLOUD_NAME,
+      apiKey: creds.apiKey,
+      cloudName: creds.cloudName,
       resourceType,
     });
   } catch (err) {
     console.error("Error generating signature:", err);
-    res.status(500).json({ error: "Failed to generate upload signature" });
+    const msg = err instanceof Error ? err.message : "Failed to generate upload signature";
+    res.status(err instanceof Error && err.message.includes("not configured") ? 501 : 500).json({ error: msg });
   }
 });
 

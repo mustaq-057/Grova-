@@ -18,7 +18,9 @@
     "db:cleanup": "pnpm --filter @workspace/scripts run cleanup",
     "typecheck:libs": "tsc --build",
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck",
-    "typecheck:grova": "pnpm --filter @workspace/instagram-clone run typecheck && pnpm --filter @workspace/api-server run typecheck"
+    "typecheck:grova": "pnpm --filter @workspace/instagram-clone run typecheck && pnpm --filter @workspace/api-server run typecheck",
+    "migrate:cloudinary": "pnpm --filter @workspace/api-server exec node scripts/migrate-cloudinary-only.mjs",
+    "test:cloudinary": "node scripts/test-cloudinary.mjs"
   },
   "private": true,
   "packageManager": "pnpm@9.15.9",

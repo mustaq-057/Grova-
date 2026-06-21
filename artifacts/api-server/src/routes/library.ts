@@ -631,15 +631,29 @@ libraryRouter.get("/library/:id/file", authenticate, async (req, res) => {
       return res.status(400).json({ error: "Book URL is not a valid public link" });
     }
 
-    // On Vercel, avoid buffering large PDFs — redirect browser to the source URL.
-    const wantsDirect = req.query.direct === "1" || Boolean(process.env.VERCEL);
-    if (
-      wantsDirect &&
-      /archive\.org|gutenberg\.org|cloudinary\.com|cdn\.jsdelivr\.net|raw\.githubusercontent\.com|backblazeb2\.com/i.test(
-        epubUrl,
-      )
-    ) {
+    // On Vercel, avoid buffering large external PDFs — redirect for public hosts (not Cloudinary; use proxy fetch).
+    const isPublicExternal =
+      /archive\.org|gutenberg\.org|cdn\.jsdelivr\.net|raw\.githubusercontent\.com/i.test(epubUrl);
+    if (process.env.VERCEL && isPublicExternal && isSafeBookUrl(epubUrl)) {
       return res.redirect(302, epubUrl);
+    }
+
+    // Cloudinary / B2 — server-side fetch (no redirect; client uses /api/media/inline).
+    if (/cloudinary\.com|backblazeb2\.com/i.test(epubUrl)) {
+      try {
+        const upstream = await fetch(epubUrl);
+        if (upstream.ok) {
+          const buffer = Buffer.from(await upstream.arrayBuffer());
+          if (isValidBookBuffer(buffer)) {
+            res.setHeader("Content-Type", "application/pdf");
+            res.setHeader("Cache-Control", "private, max-age=3600");
+            res.setHeader("Content-Disposition", "inline");
+            return res.send(buffer);
+          }
+        }
+      } catch {
+        /* fall through to candidates loop */
+      }
     }
 
     const candidates = epubUrl.includes("archive.org")

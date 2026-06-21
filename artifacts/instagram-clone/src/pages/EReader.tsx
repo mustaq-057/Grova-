@@ -3,6 +3,7 @@ import { useLocation, useParams } from "wouter";
 import { ReactReader, ReactReaderStyle } from "react-reader";
 import { ChevronLeft, Settings, Info, Type, Link as LinkIcon, MessageSquare, Send, X, Minus, Plus } from "lucide-react";
 import { apiFetch, apiFetchBlob } from "@/lib/api";
+import { getAuthHeaders } from "@/lib/session";
 import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/TextLayer.css";
 import "react-pdf/dist/Page/AnnotationLayer.css";
@@ -42,11 +43,44 @@ function isPdfContent(_contentType: string, buffer?: ArrayBuffer): boolean {
   return false;
 }
 
+async function fetchViaMediaInline(url: string): Promise<{ blob: Blob; contentType: string }> {
+  const params = new URLSearchParams({
+    url,
+    type: "application/pdf",
+    name: "book.pdf",
+  });
+  const headers = getAuthHeaders();
+  delete headers["Content-Type"];
+
+  const res = await fetch(`/api/media/inline?${params}`, {
+    credentials: "include",
+    headers,
+  });
+  if (!res.ok) {
+    const err = (await res.json().catch(() => ({ error: "Could not load PDF" }))) as { error?: string };
+    throw new Error(err.error || `Could not load PDF (HTTP ${res.status})`);
+  }
+  const buf = await res.arrayBuffer();
+  if (!isPdfBuffer(buf)) {
+    throw new Error("Stored file is not a valid PDF. Re-upload or pick a catalog book.");
+  }
+  return { blob: new Blob([buf], { type: "application/pdf" }), contentType: "application/pdf" };
+}
+
 async function fetchPdfBlob(
   bookId: string,
   url: string,
 ): Promise<{ blob: Blob; contentType: string }> {
   const errors: string[] = [];
+
+  // Cloudinary / B2 need server proxy (CORS + auth) — never fetch directly from browser.
+  if (/cloudinary\.com|backblazeb2\.com/i.test(url)) {
+    try {
+      return await fetchViaMediaInline(url);
+    } catch (e) {
+      errors.push(e instanceof Error ? e.message : "Cloud storage download failed.");
+    }
+  }
 
   if (DIRECT_PDF_HOSTS.test(url)) {
     try {

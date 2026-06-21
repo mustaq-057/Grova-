@@ -1,9 +1,9 @@
 /**
- * Re-upload media still pointing at the old Cloudinary account (djlbatypz)
- * into the NEW account configured in CLOUDINARY_URL, then rewrite DB URLs.
+ * Re-upload media still pointing at legacy Cloudinary accounts into the NEW account
+ * configured in CLOUDINARY_URL, then rewrite DB URLs. Also removes non-PDF library rows.
  *
- * Run from repo root:
- *   pnpm --filter @workspace/api-server exec node scripts/migrate-cloudinary-only.mjs
+ * Run from repo root (set CLOUDINARY_URL to the NEW account first):
+ *   pnpm migrate:cloudinary
  */
 import { config } from "dotenv";
 import crypto from "node:crypto";
@@ -17,7 +17,9 @@ config({ path: join(repoRoot, ".env") });
 
 const DATABASE_URL = process.env.DATABASE_URL;
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
-const OLD_CLOUD = "djlbatypz";
+
+/** Legacy Grova Cloudinary cloud names still referenced in DB URLs. */
+const LEGACY_CLOUDS = ["dd3b7rncf", "djlbatypz"];
 
 if (!DATABASE_URL) {
   console.error("Set DATABASE_URL in .env");
@@ -37,10 +39,11 @@ if (!match) {
   console.error("Invalid CLOUDINARY_URL format");
   process.exit(1);
 }
+const NEW_CLOUD = match[3].trim();
 cloudinary.config({
-  cloud_name: match[3],
-  api_key: match[1],
-  api_secret: match[2],
+  cloud_name: NEW_CLOUD,
+  api_key: match[1].trim(),
+  api_secret: match[2].trim(),
   secure: true,
 });
 
@@ -115,7 +118,20 @@ const urlCache = new Map();
 function needsMigration(url) {
   if (!url || typeof url !== "string") return false;
   if (!url.startsWith("http://") && !url.startsWith("https://")) return false;
-  return url.includes(`res.cloudinary.com/${OLD_CLOUD}/`);
+  return LEGACY_CLOUDS.some((cloud) => url.includes(`res.cloudinary.com/${cloud}/`));
+}
+
+function isPdfBookUrl(url) {
+  if (!url || typeof url !== "string") return false;
+  const lower = url.toLowerCase();
+  if (lower.includes(".pdf")) return true;
+  if (/cloudinary\.com/i.test(url)) return true;
+  if (/archive\.org|gutenberg\.org|jsdelivr\.net|githubusercontent\.com/i.test(url)) return true;
+  return false;
+}
+
+function isPdfBuffer(buf) {
+  return buf.length >= 4 && buf[0] === 0x25 && buf[1] === 0x50 && buf[2] === 0x44 && buf[3] === 0x46;
 }
 
 async function uploadBuffer(buffer, contentType, keyHint) {
@@ -192,11 +208,63 @@ async function tableExists(pool, name) {
   return r.rows.length > 0;
 }
 
+async function cleanupLibraryPdfs(pool) {
+  if (!(await tableExists(pool, "library_books"))) return { removed: 0, kept: 0 };
+
+  const books = await pool.query(`SELECT id, title, epub_url FROM library_books`);
+  let removed = 0;
+  let kept = 0;
+
+  for (const row of books.rows) {
+    const url = row.epub_url;
+    if (!url?.trim()) {
+      await pool.query(`DELETE FROM library_books WHERE id = $1`, [row.id]);
+      console.log(`  ✗ Removed (no URL): ${row.title}`);
+      removed++;
+      continue;
+    }
+    if (!isPdfBookUrl(url)) {
+      await pool.query(`DELETE FROM library_books WHERE id = $1`, [row.id]);
+      console.log(`  ✗ Removed (not PDF): ${row.title}`);
+      removed++;
+      continue;
+    }
+    if (needsMigration(url)) {
+      kept++;
+      continue;
+    }
+    try {
+      const res = await fetch(url, { method: "GET", headers: { Range: "bytes=0-3" } });
+      if (!res.ok) {
+        await pool.query(`DELETE FROM library_books WHERE id = $1`, [row.id]);
+        console.log(`  ✗ Removed (dead link HTTP ${res.status}): ${row.title}`);
+        removed++;
+        continue;
+      }
+      const buf = Buffer.from(await res.arrayBuffer());
+      if (!isPdfBuffer(buf) && !url.includes("cloudinary.com")) {
+        await pool.query(`DELETE FROM library_books WHERE id = $1`, [row.id]);
+        console.log(`  ✗ Removed (invalid PDF): ${row.title}`);
+        removed++;
+        continue;
+      }
+      kept++;
+    } catch {
+      kept++;
+    }
+  }
+
+  return { removed, kept };
+}
+
 async function main() {
-  console.log("\n☁️  Cloudinary migration (old djlbatypz → new account)\n");
+  console.log(`\n☁️  Cloudinary migration (${LEGACY_CLOUDS.join(", ")} → ${NEW_CLOUD})\n`);
   const pool = await createPool(DATABASE_URL);
 
   try {
+    await cloudinary.api.ping();
+    console.log(`✓ New Cloudinary account (${NEW_CLOUD}) is reachable\n`);
+
     const profiles = await pool.query(`SELECT id, avatar FROM profiles`);
     for (const row of profiles.rows) {
       const avatar = await migratePlainUrl(row.avatar);
@@ -217,13 +285,23 @@ async function main() {
     }
 
     if (await tableExists(pool, "library_books")) {
-      const books = await pool.query(`SELECT id, epub_url FROM library_books`);
+      console.log("📚 Migrating library PDF URLs…");
+      const books = await pool.query(`SELECT id, epub_url, cover_url FROM library_books`);
       for (const row of books.rows) {
         const epub = await migratePlainUrl(row.epub_url);
-        if (epub !== row.epub_url) {
-          await pool.query(`UPDATE library_books SET epub_url = $1 WHERE id = $2`, [epub, row.id]);
+        const cover = await migratePlainUrl(row.cover_url);
+        if (epub !== row.epub_url || cover !== row.cover_url) {
+          await pool.query(`UPDATE library_books SET epub_url = $1, cover_url = $2 WHERE id = $3`, [
+            epub,
+            cover,
+            row.id,
+          ]);
         }
       }
+
+      console.log("\n🧹 Cleaning invalid non-PDF library entries…");
+      const { removed, kept } = await cleanupLibraryPdfs(pool);
+      console.log(`   Kept ${kept} PDF books, removed ${removed} invalid entries`);
     }
 
     const msgCols = ["image_url", "gif_url", "file_data"];
