@@ -729,9 +729,38 @@ export default function Library() {
       {/* ── Main Dashboard ── */}
       {!searchQuery && libraryTab === "dashboard" && (
         <>
-          {/* Random Catalog Discovery */}
+          {/* Add a Book Banner */}
           <div className="px-4 mt-6">
-            <h3 className="text-lg font-bold mb-3 flex items-center justify-between">
+            <div 
+              onClick={() => fileInputRef.current?.click()}
+              className="relative overflow-hidden rounded-3xl p-6 cursor-pointer group active:scale-[0.98] transition-transform shadow-sm border border-[var(--lib-border)] bg-[var(--lib-card)]"
+            >
+              {/* Background Shapes */}
+              <div className="absolute top-0 right-0 w-full h-full pointer-events-none overflow-hidden rounded-3xl opacity-30">
+                {/* corner blobs */}
+                <div className="absolute -top-12 -right-12 w-32 h-32 bg-primary rounded-full blur-xl" />
+                <div className="absolute -bottom-16 -right-16 w-48 h-48 bg-primary rounded-full blur-xl" />
+                
+                {/* Plus marks */}
+                <Plus className="absolute top-8 right-12 w-6 h-6 text-primary opacity-40 rotate-12" strokeWidth={4} />
+                <Plus className="absolute bottom-12 left-1/2 w-10 h-10 text-primary opacity-40 rotate-45" strokeWidth={4} />
+                <Plus className="absolute top-1/2 right-1/4 w-8 h-8 text-primary opacity-40 -rotate-12" strokeWidth={4} />
+                
+                {/* Big Plus Mark */}
+                <Plus className="absolute -bottom-8 -right-8 w-40 h-40 text-primary opacity-50 group-hover:scale-110 group-hover:rotate-12 transition-transform duration-500" strokeWidth={3} />
+              </div>
+
+              {/* Content */}
+              <div className="relative z-10 w-2/3">
+                <h3 className="text-2xl font-bold text-[var(--lib-text)] mb-1">Add a book</h3>
+                <p className="text-sm font-medium text-[var(--lib-muted)]">Is there a book you are reading?</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Random Catalog Discovery */}
+          <div className="px-4 mt-8">
+            <h3 className="text-lg font-bold mb-3 flex items-center justify-between text-[var(--lib-text)]">
               <span>{t.catalog}</span>
             </h3>
             <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-2">
@@ -751,35 +780,6 @@ export default function Library() {
                   <p className="text-[10px] text-[var(--lib-muted)] line-clamp-1">{book.author}</p>
                 </div>
               ))}
-            </div>
-          </div>
-          {/* Add a Book Banner */}
-          <div className="px-4 mt-6">
-            <div 
-              onClick={() => fileInputRef.current?.click()}
-              className="relative overflow-hidden rounded-3xl p-6 cursor-pointer group active:scale-[0.98] transition-transform shadow-sm border border-[var(--lib-border)]"
-              style={{ backgroundColor: "#F7F6F0" }} // Off-white cream color from the image
-            >
-              {/* Background Shapes */}
-              <div className="absolute top-0 right-0 w-full h-full pointer-events-none overflow-hidden rounded-3xl">
-                {/* Dark Blue corner blob */}
-                <div className="absolute -top-12 -right-12 w-32 h-32 bg-[#2D7398] rounded-full blur-[2px]" />
-                <div className="absolute -bottom-16 -right-16 w-48 h-48 bg-[#2D7398] rounded-full blur-[2px]" />
-                
-                {/* Plus marks */}
-                <Plus className="absolute top-8 right-12 w-6 h-6 text-[#2D7398] opacity-10 rotate-12" strokeWidth={4} />
-                <Plus className="absolute bottom-12 left-1/2 w-10 h-10 text-[#2D7398] opacity-10 rotate-45" strokeWidth={4} />
-                <Plus className="absolute top-1/2 right-1/4 w-8 h-8 text-[#2D7398] opacity-10 -rotate-12" strokeWidth={4} />
-                
-                {/* Big Plus Mark */}
-                <Plus className="absolute -bottom-8 -right-8 w-40 h-40 text-[#82ADC1] opacity-90 group-hover:scale-110 transition-transform duration-500" strokeWidth={3} />
-              </div>
-
-              {/* Content */}
-              <div className="relative z-10 w-2/3">
-                <h3 className="text-2xl font-bold text-gray-700 mb-1">Add a book</h3>
-                <p className="text-sm font-medium text-[var(--lib-muted)]">Is there a book you are reading?</p>
-              </div>
             </div>
           </div>
 
@@ -1140,12 +1140,12 @@ export default function Library() {
       {/* ── Achievements View ── */}
       {!searchQuery && libraryTab === "achievements" && (
         <div className="min-h-[80vh] flex flex-col">
-          <div className="bg-[#1976D2] px-6 py-12 pb-24 text-[var(--lib-text)] rounded-b-[3rem] shadow-xl">
+          <div className="bg-[var(--lib-card)] border-b border-[var(--lib-border)] px-6 py-12 pb-24 text-[var(--lib-text)] rounded-b-[3rem] shadow-sm">
             <div className="flex items-center justify-between mb-3">
                <h2 className="text-4xl font-black">Achievement</h2>
-               <button className="p-2 bg-[var(--lib-input)] rounded-full hover:bg-white/20 transition-colors"><Settings className="w-5 h-5" /></button>
+               <button className="p-2 bg-[var(--lib-input)] rounded-full hover:bg-[var(--lib-btn-hover)] transition-colors text-[var(--lib-text)]"><Settings className="w-5 h-5" /></button>
             </div>
-            <p className="text-sm font-medium opacity-90 max-w-[80%] leading-relaxed">
+            <p className="text-sm font-medium text-[var(--lib-muted)] max-w-[80%] leading-relaxed">
               Books which you read are registered in achievement.
             </p>
           </div>
@@ -1826,41 +1826,41 @@ function LibraryAchievements({ stats, books }: { stats: any, books: ApiBook[] })
       id: "first_page",
       title: "First Page",
       desc: "Finish your first book",
-      icon: <BookOpen className="w-8 h-8 text-blue-400" />,
+      icon: <BookOpen className="w-8 h-8 text-primary" />,
       earned: finishedCount >= 1,
       progress: Math.min(finishedCount, 1) / 1,
-      bg: "from-blue-500/20 to-blue-900/20",
-      border: "border-blue-500/30"
+      bg: "from-primary/20 to-primary/5",
+      border: "border-primary/30"
     },
     {
       id: "bookworm",
       title: "Bookworm",
       desc: "Finish 10 books",
-      icon: <BookMarked className="w-8 h-8 text-purple-400" />,
+      icon: <BookMarked className="w-8 h-8 text-primary" />,
       earned: finishedCount >= 10,
       progress: Math.min(finishedCount, 10) / 10,
-      bg: "from-purple-500/20 to-purple-900/20",
-      border: "border-purple-500/30"
+      bg: "from-primary/20 to-primary/5",
+      border: "border-primary/30"
     },
     {
       id: "streak_master",
       title: "Streak Master",
       desc: "7-day reading streak",
-      icon: <Flame className="w-8 h-8 text-orange-400" />,
+      icon: <Flame className="w-8 h-8 text-primary" />,
       earned: stats.streakDays >= 7,
       progress: Math.min(stats.streakDays, 7) / 7,
-      bg: "from-orange-500/20 to-orange-900/20",
-      border: "border-orange-500/30"
+      bg: "from-primary/20 to-primary/5",
+      border: "border-primary/30"
     },
     {
       id: "marathon",
       title: "Marathon",
       desc: "100 hours total read time",
-      icon: <TrendingUp className="w-8 h-8 text-green-400" />,
+      icon: <TrendingUp className="w-8 h-8 text-primary" />,
       earned: stats.annualMinutes >= 6000, // 100 hrs
       progress: Math.min(stats.annualMinutes, 6000) / 6000,
-      bg: "from-green-500/20 to-green-900/20",
-      border: "border-green-500/30"
+      bg: "from-primary/20 to-primary/5",
+      border: "border-primary/30"
     }
   ];
 
