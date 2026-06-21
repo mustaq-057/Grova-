@@ -377,6 +377,10 @@ export default function Library() {
         body: buffer,
       });
 
+      // Calculate real total pages based on epub structure
+      await book.locations.generate(1024);
+      const totalPages = book.locations.total || 200;
+
       // Add to Library
       await apiFetch("/library", {
         method: "POST",
@@ -386,7 +390,7 @@ export default function Library() {
           coverUrl: null,
           description: metadata?.description || "Uploaded manually.",
           epubUrl: res.url,
-          totalPages: 100,
+          totalPages: totalPages,
           source: "Uploaded",
         }),
       });
@@ -1717,13 +1721,13 @@ function ShelfRow({
           variants={container}
           initial="hidden"
           animate="show"
-          className="flex gap-3 overflow-x-auto snap-x snap-mandatory pb-4 pt-1 px-1 scrollbar-hide"
+          className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3 pb-4 pt-1 px-1"
         >
           {books.map((book) => (
             <motion.div
               variants={item}
               key={book.id}
-              className={`w-[100px] shrink-0 snap-start cursor-pointer group relative ${dimmed ? "opacity-75 hover:opacity-100 transition-opacity" : ""}`}
+              className={`w-full cursor-pointer group relative ${dimmed ? "opacity-75 hover:opacity-100 transition-opacity" : ""}`}
               onClick={() => onOpen(book)}
               onContextMenu={(e) => onStatusChangeMenu && onStatusChangeMenu(e, book.id)}
             >
