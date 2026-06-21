@@ -122,7 +122,7 @@ export async function pingDatabase(): Promise<boolean> {
   }
 }
 
-async function verifyPostgresConnection(retries = 5): Promise<void> {
+async function verifyPostgresConnection(retries = process.env.VERCEL ? 2 : 5): Promise<void> {
   const pool = await ensurePool();
   let lastErr: unknown;
   for (let attempt = 1; attempt <= retries; attempt++) {

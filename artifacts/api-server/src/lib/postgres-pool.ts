@@ -33,9 +33,9 @@ export async function createPostgresPool(connectionString: string): Promise<PgPo
     neonConfig.webSocketConstructor = ws;
     return new NeonPool({
       connectionString: normalized,
-      max: 10,
+      max: process.env.VERCEL ? 3 : 10,
       idleTimeoutMillis: 10000,
-      connectionTimeoutMillis: 30000,
+      connectionTimeoutMillis: process.env.VERCEL ? 15000 : 30000,
     }) as unknown as PgPoolLike;
   }
 

@@ -5,15 +5,11 @@
   "outputDirectory": "dist",
   "framework": null,
   "functions": {
-    "api/healthz.mjs": {
-      "maxDuration": 10
-    },
     "api/index.mjs": {
       "maxDuration": 60
     }
   },
   "rewrites": [
-    { "source": "/api/healthz", "destination": "/api/healthz" },
     { "source": "/api/:path*", "destination": "/api" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],

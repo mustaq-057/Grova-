@@ -120,7 +120,9 @@ export async function apiFetch<T = unknown>(path: string, options?: RequestInit 
       return apiFetch<T>(path, options, attempt + 1);
     }
     if (isNetwork) {
-      throw new Error("Connection lost — check your internet and try again.");
+      throw new Error(
+        "Connection lost — the API did not respond. This is usually DATABASE_URL or ENCRYPTION_* on Vercel, not Cloudinary. Wait 30s and try again, or open /api/healthz for details.",
+      );
     }
     throw err;
   } finally {
@@ -172,7 +174,9 @@ export async function apiFetchBlob(path: string, attempt = 0): Promise<{ blob: B
       return apiFetchBlob(path, attempt + 1);
     }
     if (isNetwork) {
-      throw new Error("Connection lost — check your internet and try again.");
+      throw new Error(
+        "Connection lost — the API did not respond. This is usually DATABASE_URL or ENCRYPTION_* on Vercel, not Cloudinary. Wait 30s and try again, or open /api/healthz for details.",
+      );
     }
     throw err;
   } finally {
@@ -380,6 +384,7 @@ export const api = {
   primaryLogin: async (email: string, password: string): Promise<void> => {
     await apiFetch("/auth/primary-login", {
       method: "POST",
+      timeout: 90_000,
       body: JSON.stringify({
         email,
         password,
@@ -409,6 +414,7 @@ export const api = {
   login: async (userId: string, code: string): Promise<{ user: ApiUser; encryptionKey: string }> => {
     const data = (await apiFetch("/auth/login", {
       method: "POST",
+      timeout: 90_000,
       body: JSON.stringify({ userId, code }),
     })) as LoginResponse;
     if (data.token) saveSession(data.token, data.csrfToken, data.refreshToken);

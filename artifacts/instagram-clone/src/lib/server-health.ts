@@ -7,8 +7,8 @@ export type ApiHealth = {
 };
 
 /** Quick check that the API is reachable (via Vite proxy in dev or same origin in prod). */
-export async function probeApiHealth(timeoutMs = 12_000): Promise<ApiHealth> {
-  const attempts = 4;
+export async function probeApiHealth(timeoutMs = 20_000): Promise<ApiHealth> {
+  const attempts = 3;
   for (let attempt = 0; attempt < attempts; attempt++) {
     try {
       const ctrl = new AbortController();
@@ -22,11 +22,23 @@ export async function probeApiHealth(timeoutMs = 12_000): Promise<ApiHealth> {
       clearTimeout(timer);
       const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
       if (res.ok) {
+        const dbConfigured = data.dbConfigured === true || data.db === true;
+        const authConfigured = data.authConfigured === true;
+        const encryptionConfigured = data.encryptionConfigured === true;
+        if (data.status === "degraded" && !dbConfigured) {
+          return {
+            reachable: true,
+            authConfigured,
+            dbConfigured: false,
+            encryptionConfigured,
+            startupError: "Database not connected. Check DATABASE_URL (Neon pooled URL) on Vercel — Cloudinary is not required for login.",
+          };
+        }
         return {
           reachable: true,
-          authConfigured: data.authConfigured === true,
-          dbConfigured: data.dbConfigured === true || data.db === true,
-          encryptionConfigured: data.encryptionConfigured === true,
+          authConfigured,
+          dbConfigured,
+          encryptionConfigured,
         };
       }
       if (res.status === 503 && typeof data.error === "string") {

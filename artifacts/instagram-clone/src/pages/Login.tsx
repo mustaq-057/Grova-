@@ -130,9 +130,9 @@ export default memo(function Login() {
             ? "CORS blocked login. Add your site URL to ALLOWED_ORIGINS in Vercel (no trailing slash), then redeploy."
             : `Login API error: ${msg}. Health check passed — check Vercel → Logs for the /api function.`,
         );
-      } else if (/request failed|not found|failed to fetch|cannot reach/i.test(msg)) {
+      } else if (/connection lost|request failed|not found|failed to fetch|cannot reach/i.test(msg)) {
         setError(
-          "Cannot reach the login API. Open /api/healthz on your site — if it fails, redeploy on Vercel and check DATABASE_URL, ENCRYPTION_*, and PRIMARY_AUTH_* (Cloudinary is only needed for photo uploads).",
+          "Cannot reach the login API. Open /api/healthz in your browser — if it shows an error, fix DATABASE_URL and ENCRYPTION_* on Vercel (Cloudinary is only for photo/PDF uploads). Then redeploy.",
         );
       } else if (msg.toLowerCase().includes("invalid email or password")) {
         setError("Invalid email or password. Check PRIMARY_AUTH_EMAILS matches your email exactly on Vercel.");
@@ -164,10 +164,10 @@ export default memo(function Login() {
       setUser(user as ApiUser);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "";
-      if (msg.includes("fetch") || msg.includes("Failed") || msg.includes("Network") || msg.includes("API running")) {
+      if (msg.includes("fetch") || msg.includes("Failed") || msg.includes("Network") || msg.includes("API running") || msg.includes("Connection lost")) {
         setError(
           import.meta.env.PROD
-            ? "Cannot reach Grova right now. Check your connection and try again."
+            ? "Cannot reach Grova API. Open /api/healthz — fix DATABASE_URL or ENCRYPTION_* on Vercel if it shows degraded, then redeploy."
             : "Cannot reach the server. Run pnpm dev:grova and open http://localhost:5000",
         );
       } else if (msg.toLowerCase().includes("too many")) {
@@ -205,7 +205,7 @@ export default memo(function Login() {
         {serverOnline === false && (
           <div className="mb-4 rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
             {import.meta.env.PROD ? (
-              <>Cannot reach the Grova server. Check your internet connection and try again in a moment.</>
+              <>Cannot reach the Grova API. Open <code className="text-xs">/api/healthz</code> on your site — login needs DATABASE_URL and ENCRYPTION_*, not Cloudinary.</>
             ) : (
               <>
                 API offline. In the project folder run{" "}
