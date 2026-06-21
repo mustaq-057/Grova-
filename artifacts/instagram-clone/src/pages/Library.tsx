@@ -107,13 +107,13 @@ function BookCover({
       style={{ background: gradient }}
     >
       {/* Book spine simulation */}
-      <div className="absolute left-0 top-0 bottom-0 w-[12%] bg-black/20 border-r border-white/10 z-0" />
+      <div className="absolute left-0 top-0 bottom-0 w-[12%] bg-black/20 border-r border-[var(--lib-border)] z-0" />
       <div className="absolute inset-0 bg-gradient-to-tr from-black/40 via-transparent to-white/10 z-0 mix-blend-overlay" />
       
-      <span className={`${size === "sm" ? "text-3xl" : "text-5xl"} font-bold text-white/90 mb-2 font-serif z-10 drop-shadow-md`}>
+      <span className={`${size === "sm" ? "text-3xl" : "text-5xl"} font-bold text-[var(--lib-text)]/90 mb-2 font-serif z-10 drop-shadow-md`}>
         {initial}
       </span>
-      <p className="text-[10px] text-white/80 text-center line-clamp-3 leading-tight px-2 z-10 font-medium tracking-wide drop-shadow-md">{title}</p>
+      <p className="text-[10px] text-[var(--lib-muted)] text-center line-clamp-3 leading-tight px-2 z-10 font-medium tracking-wide drop-shadow-md">{title}</p>
     </div>
   );
 }
@@ -562,7 +562,7 @@ export default function Library() {
               className={`shrink-0 text-[9px] font-bold px-2.5 py-1 rounded-full border transition-all ${
                 !activeSource
                   ? "bg-white text-black border-white"
-                  : "bg-white/10 text-gray-400 border-white/20"
+                  : "bg-[var(--lib-input)] text-[var(--lib-muted)] border-[var(--lib-border)]"
               }`}
             >
               All ({searchResults.length})
@@ -614,10 +614,10 @@ export default function Library() {
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                   {localMatches.map((result) => (
                     <div key={result.id} className="bg-[var(--lib-card)] rounded-2xl overflow-hidden border border-[var(--lib-border)] flex flex-col group cursor-pointer transition-colors duration-300" onClick={() => openBook(result)}>
-                      <div className="aspect-[2/3] w-full bg-gray-900 relative overflow-hidden">
+                      <div className="aspect-[2/3] w-full bg-[var(--lib-bg)] relative overflow-hidden">
                         <BookCover coverUrl={result.coverUrl} title={result.title} />
                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                          <BookOpen className="w-8 h-8 text-white drop-shadow-md" />
+                          <BookOpen className="w-8 h-8 text-[var(--lib-text)] drop-shadow-md" />
                         </div>
                         <button
                           onClick={(e) => { e.stopPropagation(); deleteBook(result.id); }}
@@ -625,9 +625,9 @@ export default function Library() {
                           title="Remove from Shelf"
                         >
                           {deletingId === result.id ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--lib-text)]" />
                           ) : (
-                            <Trash2 className="w-3.5 h-3.5 text-white" />
+                            <Trash2 className="w-3.5 h-3.5 text-[var(--lib-text)]" />
                           )}
                         </button>
                       </div>
@@ -659,7 +659,7 @@ export default function Library() {
                 const isAdding = addingId === result.id;
                 return (
                   <div key={result.id} className="bg-[var(--lib-card)] rounded-2xl overflow-hidden border border-[var(--lib-border)] flex flex-col group cursor-pointer transition-colors duration-300" onClick={() => setSelectedPreviewBook(result)}>
-                    <div className="aspect-[2/3] w-full bg-gray-900 relative overflow-hidden">
+                    <div className="aspect-[2/3] w-full bg-[var(--lib-bg)] relative overflow-hidden">
                       <BookCover coverUrl={result.coverUrl} title={result.title} />
                       <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 p-3 backdrop-blur-sm">
                         {result.isLink ? (
@@ -667,7 +667,7 @@ export default function Library() {
                             href={result.epubUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="bg-white/20 text-white text-xs font-bold py-2 px-3 rounded-full flex items-center gap-1 border border-white/30 hover:bg-white/30 transition-colors"
+                            className="bg-white/20 text-[var(--lib-text)] text-xs font-bold py-2 px-3 rounded-full flex items-center gap-1 border border-white/30 hover:bg-white/30 transition-colors"
                           >
                             <ExternalLink className="w-3 h-3" /> Open HathiTrust
                           </a>
@@ -682,7 +682,7 @@ export default function Library() {
                             {result.coverUrl && (
                               <button
                                 onClick={(e) => { e.stopPropagation(); window.open(result.coverUrl as string, "_blank"); }}
-                                className="bg-white/20 text-white font-bold text-xs py-2 w-full rounded-full flex items-center justify-center gap-1.5 active:scale-95 transition-all border border-white/30 hover:bg-white/30"
+                                className="bg-white/20 text-[var(--lib-text)] font-bold text-xs py-2 w-full rounded-full flex items-center justify-center gap-1.5 active:scale-95 transition-all border border-white/30 hover:bg-white/30"
                               >
                                 <Download className="w-3 h-3" /> Cover
                               </button>
@@ -698,7 +698,7 @@ export default function Library() {
                             Add to Shelf
                           </button>
                         )}
-                        <p className="text-xs text-white text-center line-clamp-2 leading-tight">{result.description}</p>
+                        <p className="text-xs text-[var(--lib-text)] text-center line-clamp-2 leading-tight">{result.description}</p>
                       </div>
                     </div>
                     <div className="p-2.5 flex flex-col gap-0.5">
@@ -741,14 +741,14 @@ export default function Library() {
                   onClick={() => setSelectedPreviewBook(book as SearchResult)}
                   className="shrink-0 w-[120px] cursor-pointer group"
                 >
-                  <div className="aspect-[2/3] w-full bg-white/10 rounded-xl overflow-hidden shadow-md mb-2 relative group-hover:scale-105 transition-transform">
+                  <div className="aspect-[2/3] w-full bg-[var(--lib-input)] rounded-xl overflow-hidden shadow-md mb-2 relative group-hover:scale-105 transition-transform">
                     <BookCover coverUrl={book.coverUrl} title={book.title} size="sm" />
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <BookOpen className="w-8 h-8 text-white drop-shadow-md" />
+                      <BookOpen className="w-8 h-8 text-[var(--lib-text)] drop-shadow-md" />
                     </div>
                   </div>
                   <p className="font-bold text-xs line-clamp-2 leading-tight mb-0.5">{book.title}</p>
-                  <p className="text-[10px] text-gray-400 line-clamp-1">{book.author}</p>
+                  <p className="text-[10px] text-[var(--lib-muted)] line-clamp-1">{book.author}</p>
                 </div>
               ))}
             </div>
@@ -778,7 +778,7 @@ export default function Library() {
               {/* Content */}
               <div className="relative z-10 w-2/3">
                 <h3 className="text-2xl font-bold text-gray-700 mb-1">Add a book</h3>
-                <p className="text-sm font-medium text-gray-400">Is there a book you are reading?</p>
+                <p className="text-sm font-medium text-[var(--lib-muted)]">Is there a book you are reading?</p>
               </div>
             </div>
           </div>
@@ -833,13 +833,13 @@ export default function Library() {
                 {/* Top Right Delete Button */}
                 <button
                   onClick={(e) => { e.stopPropagation(); deleteBook(hero.id); }}
-                  className="absolute top-4 right-4 w-9 h-9 bg-black/40 backdrop-blur-md rounded-full items-center justify-center flex z-20 hover:bg-red-500/80 transition-colors border border-white/10 shadow-lg"
+                  className="absolute top-4 right-4 w-9 h-9 bg-black/40 backdrop-blur-md rounded-full items-center justify-center flex z-20 hover:bg-red-500/80 transition-colors border border-[var(--lib-border)] shadow-lg"
                   title="Remove from Shelf"
                 >
                   {deletingId === hero.id ? (
-                    <Loader2 className="w-4 h-4 animate-spin text-white" />
+                    <Loader2 className="w-4 h-4 animate-spin text-[var(--lib-text)]" />
                   ) : (
-                    <Trash2 className="w-4 h-4 text-white" />
+                    <Trash2 className="w-4 h-4 text-[var(--lib-text)]" />
                   )}
                 </button>
 
@@ -857,12 +857,12 @@ export default function Library() {
                       <Sparkles className="w-3 h-3" />
                       {hero.status === "reading" ? "Continue Reading" : "Up Next"}
                     </p>
-                    <h2 className="text-xl sm:text-2xl font-bold font-serif leading-tight mb-1 line-clamp-2 text-white drop-shadow-lg">{hero.title}</h2>
-                    <p className="text-gray-300 text-sm line-clamp-1 mb-4 drop-shadow-md">{hero.author}</p>
+                    <h2 className="text-xl sm:text-2xl font-bold font-serif leading-tight mb-1 line-clamp-2 text-[var(--lib-text)] drop-shadow-lg">{hero.title}</h2>
+                    <p className="text-[var(--lib-text)] text-sm line-clamp-1 mb-4 drop-shadow-md">{hero.author}</p>
 
                     {hero.totalPages > 0 && (
                       <div className="mb-4">
-                        <div className="w-full bg-white/10 rounded-full h-1.5 mb-2 overflow-hidden shadow-inner">
+                        <div className="w-full bg-[var(--lib-input)] rounded-full h-1.5 mb-2 overflow-hidden shadow-inner">
                           <motion.div
                             initial={{ width: 0 }}
                             animate={{ width: `${Math.min(100, (hero.currentPage / hero.totalPages) * 100)}%` }}
@@ -872,7 +872,7 @@ export default function Library() {
                             <div className="absolute inset-0 bg-white/30 animate-pulse" />
                           </motion.div>
                         </div>
-                        <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">
+                        <p className="text-[10px] font-medium text-[var(--lib-muted)] uppercase tracking-wide">
                           {hero.currentPage > 0
                             ? `${Math.round((hero.currentPage / hero.totalPages) * 100)}% Completed`
                             : `${hero.totalPages} Pages Total`}
@@ -890,7 +890,7 @@ export default function Library() {
                       </button>
                       <button
                         onClick={(e) => { e.stopPropagation(); setActiveNotesBook(hero); }}
-                        className="bg-white/10 backdrop-blur-md text-white border border-white/10 font-bold py-2 px-4 rounded-full text-sm flex items-center gap-1.5 active:scale-95 transition-all hover:bg-white/20"
+                        className="bg-[var(--lib-input)] backdrop-blur-md text-[var(--lib-text)] border border-[var(--lib-border)] font-bold py-2 px-4 rounded-full text-sm flex items-center gap-1.5 active:scale-95 transition-all hover:bg-white/20"
                       >
                         <MessageSquare className="w-4 h-4" />
                         Notes
@@ -1140,10 +1140,10 @@ export default function Library() {
       {/* ── Achievements View ── */}
       {!searchQuery && libraryTab === "achievements" && (
         <div className="min-h-[80vh] flex flex-col">
-          <div className="bg-[#1976D2] px-6 py-12 pb-24 text-white rounded-b-[3rem] shadow-xl">
+          <div className="bg-[#1976D2] px-6 py-12 pb-24 text-[var(--lib-text)] rounded-b-[3rem] shadow-xl">
             <div className="flex items-center justify-between mb-3">
                <h2 className="text-4xl font-black">Achievement</h2>
-               <button className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition-colors"><Settings className="w-5 h-5" /></button>
+               <button className="p-2 bg-[var(--lib-input)] rounded-full hover:bg-white/20 transition-colors"><Settings className="w-5 h-5" /></button>
             </div>
             <p className="text-sm font-medium opacity-90 max-w-[80%] leading-relaxed">
               Books which you read are registered in achievement.
@@ -1170,7 +1170,7 @@ export default function Library() {
             onClick={() => setLibraryTab("dashboard")} 
             className={`flex flex-col items-center gap-1 transition-all ${libraryTab === "dashboard" ? "text-primary scale-110" : "text-[var(--lib-muted)] hover:text-[var(--lib-text)]"}`}
           >
-            <div className={`p-2 rounded-full ${libraryTab === "dashboard" ? "bg-primary text-white" : ""}`}>
+            <div className={`p-2 rounded-full ${libraryTab === "dashboard" ? "bg-primary text-[var(--lib-text)]" : ""}`}>
               <BookOpen className="w-6 h-6" />
             </div>
           </button>
@@ -1178,7 +1178,7 @@ export default function Library() {
             onClick={() => setLibraryTab("memorize")} 
             className={`flex flex-col items-center gap-1 transition-all ${libraryTab === "memorize" ? "text-primary scale-110" : "text-[var(--lib-muted)] hover:text-[var(--lib-text)]"}`}
           >
-            <div className={`p-2 rounded-full ${libraryTab === "memorize" ? "bg-primary text-white" : ""}`}>
+            <div className={`p-2 rounded-full ${libraryTab === "memorize" ? "bg-primary text-[var(--lib-text)]" : ""}`}>
               <Lightbulb className="w-6 h-6" />
             </div>
           </button>
@@ -1186,7 +1186,7 @@ export default function Library() {
             onClick={() => setLibraryTab("achievements")} 
             className={`flex flex-col items-center gap-1 transition-all ${libraryTab === "achievements" ? "text-primary scale-110" : "text-[var(--lib-muted)] hover:text-[var(--lib-text)]"}`}
           >
-            <div className={`p-2 rounded-full ${libraryTab === "achievements" ? "bg-primary text-white" : ""}`}>
+            <div className={`p-2 rounded-full ${libraryTab === "achievements" ? "bg-primary text-[var(--lib-text)]" : ""}`}>
               <Medal className="w-6 h-6" />
             </div>
           </button>
@@ -1209,7 +1209,7 @@ export default function Library() {
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.9, y: -10 }}
           transition={{ duration: 0.15 }}
-          className="fixed z-50 bg-gray-900/90 backdrop-blur-md border border-white/20 rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+          className="fixed z-50 bg-[var(--lib-bg)]/90 backdrop-blur-md border border-[var(--lib-border)] rounded-2xl shadow-2xl overflow-hidden flex flex-col"
           style={{
             top: Math.min(statusMenu.y, window.innerHeight - 150),
             left: Math.min(statusMenu.x, window.innerWidth - 180),
@@ -1219,25 +1219,25 @@ export default function Library() {
         >
           <button
             onClick={() => changeStatus(statusMenu.bookId, { status: "reading" })}
-            className="px-4 py-3 text-left text-sm font-bold text-white hover:bg-white/10 active:bg-white/20 transition-colors border-b border-white/5"
+            className="px-4 py-3 text-left text-sm font-bold text-[var(--lib-text)] hover:bg-[var(--lib-input)] active:bg-white/20 transition-colors border-b border-[var(--lib-border)]"
           >
             Reading
           </button>
           <button
             onClick={() => changeStatus(statusMenu.bookId, { status: "paused" })}
-            className="px-4 py-3 text-left text-sm font-bold text-gray-300 hover:bg-white/10 active:bg-white/20 transition-colors border-b border-white/5"
+            className="px-4 py-3 text-left text-sm font-bold text-[var(--lib-text)] hover:bg-[var(--lib-input)] active:bg-white/20 transition-colors border-b border-[var(--lib-border)]"
           >
             Paused
           </button>
           <button
             onClick={() => changeStatus(statusMenu.bookId, { status: "gave_up" })}
-            className="px-4 py-3 text-left text-sm font-bold text-red-400 hover:bg-white/10 active:bg-white/20 transition-colors border-b border-white/5"
+            className="px-4 py-3 text-left text-sm font-bold text-red-400 hover:bg-[var(--lib-input)] active:bg-white/20 transition-colors border-b border-[var(--lib-border)]"
           >
             Give Up
           </button>
           <button
             onClick={() => changeStatus(statusMenu.bookId, { status: "finished" })}
-            className="px-4 py-3 text-left text-sm font-bold text-green-400 hover:bg-white/10 active:bg-white/20 transition-colors border-b border-white/5"
+            className="px-4 py-3 text-left text-sm font-bold text-green-400 hover:bg-[var(--lib-input)] active:bg-white/20 transition-colors border-b border-[var(--lib-border)]"
           >
             Finished ✓
           </button>
@@ -1248,7 +1248,7 @@ export default function Library() {
                 changeStatus(statusMenu.bookId, { favorite: !b.isFavorite });
               }
             }}
-            className="px-4 py-3 text-left text-sm font-bold text-pink-400 hover:bg-white/10 active:bg-white/20 transition-colors border-b border-white/5"
+            className="px-4 py-3 text-left text-sm font-bold text-pink-400 hover:bg-[var(--lib-input)] active:bg-white/20 transition-colors border-b border-[var(--lib-border)]"
           >
             {books.find(b => b.id === statusMenu.bookId)?.isFavorite ? "Unfavorite" : "Favorite ♥"}
           </button>
@@ -1258,7 +1258,7 @@ export default function Library() {
               if (b) setActiveNotesBook(b);
               setStatusMenu(null);
             }}
-            className="px-4 py-3 text-left text-sm font-bold text-primary hover:bg-white/10 active:bg-white/20 transition-colors flex items-center gap-2"
+            className="px-4 py-3 text-left text-sm font-bold text-primary hover:bg-[var(--lib-input)] active:bg-white/20 transition-colors flex items-center gap-2"
           >
             <MessageSquare className="w-4 h-4" />
             Reading Notes
@@ -1299,11 +1299,11 @@ export default function Library() {
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.95, opacity: 0, y: 20 }}
             transition={{ type: "spring", stiffness: 300, damping: 25 }}
-            className="bg-gray-900 border border-white/10 rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden"
+            className="bg-[var(--lib-bg)] border border-[var(--lib-border)] rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden"
           >
-            <div className="flex items-center justify-between p-5 border-b border-white/5">
-              <h2 className="text-xl font-bold font-serif text-white">Library Settings</h2>
-              <button onClick={() => setShowSettings(false)} className="p-1 hover:bg-white/10 rounded-full text-white active:scale-90 transition-transform">
+            <div className="flex items-center justify-between p-5 border-b border-[var(--lib-border)]">
+              <h2 className="text-xl font-bold font-serif text-[var(--lib-text)]">Library Settings</h2>
+              <button onClick={() => setShowSettings(false)} className="p-1 hover:bg-[var(--lib-input)] rounded-full text-[var(--lib-text)] active:scale-90 transition-transform">
                 <X className="w-6 h-6" />
               </button>
             </div>
@@ -1311,14 +1311,14 @@ export default function Library() {
             <div className="p-5 space-y-6">
               {/* Theme Settings */}
               <div>
-                <p className="text-sm font-bold text-gray-400 mb-3 uppercase tracking-wider">Theme</p>
+                <p className="text-sm font-bold text-[var(--lib-muted)] mb-3 uppercase tracking-wider">Theme</p>
                 <div className="flex gap-3">
                   {(["dark", "light", "sepia"] as const).map(th => (
                     <button
                       key={th}
                       onClick={() => setLibTheme(th)}
                       className={`flex-1 py-2 rounded-xl font-bold text-xs uppercase border-2 transition-all ${
-                        libTheme === th ? "border-primary text-primary bg-primary/10 shadow-[0_0_15px_rgba(var(--primary),0.2)]" : "border-white/10 text-gray-500 hover:border-white/30"
+                        libTheme === th ? "border-primary text-primary bg-primary/10 shadow-[0_0_15px_rgba(var(--primary),0.2)]" : "border-[var(--lib-border)] text-[var(--lib-muted)] hover:border-white/30"
                       }`}
                     >
                       {th}
@@ -1329,12 +1329,12 @@ export default function Library() {
 
               {/* Language Settings */}
               <div>
-                <p className="text-sm font-bold text-gray-400 mb-3 uppercase tracking-wider">Language</p>
+                <p className="text-sm font-bold text-[var(--lib-muted)] mb-3 uppercase tracking-wider">Language</p>
                 <div className="flex gap-3">
                   <button
                     onClick={() => setLibLang("en")}
                     className={`flex-1 py-2 rounded-xl font-bold text-xs border-2 transition-all ${
-                      libLang === "en" ? "border-primary text-primary bg-primary/10 shadow-[0_0_15px_rgba(var(--primary),0.2)]" : "border-white/10 text-gray-500 hover:border-white/30"
+                      libLang === "en" ? "border-primary text-primary bg-primary/10 shadow-[0_0_15px_rgba(var(--primary),0.2)]" : "border-[var(--lib-border)] text-[var(--lib-muted)] hover:border-white/30"
                     }`}
                   >
                     English
@@ -1342,7 +1342,7 @@ export default function Library() {
                   <button
                     onClick={() => setLibLang("ar")}
                     className={`flex-1 py-2 rounded-xl font-bold text-xs border-2 transition-all ${
-                      libLang === "ar" ? "border-primary text-primary bg-primary/10 shadow-[0_0_15px_rgba(var(--primary),0.2)]" : "border-white/10 text-gray-500 hover:border-white/30"
+                      libLang === "ar" ? "border-primary text-primary bg-primary/10 shadow-[0_0_15px_rgba(var(--primary),0.2)]" : "border-[var(--lib-border)] text-[var(--lib-muted)] hover:border-white/30"
                     }`}
                   >
                     العربية
@@ -1351,14 +1351,14 @@ export default function Library() {
               </div>
 
               {/* Library Focus Mode */}
-              <div className="pt-4 border-t border-white/5">
+              <div className="pt-4 border-t border-[var(--lib-border)]">
                 <div className="flex items-center justify-between gap-4">
                   <div>
-                    <p className="text-sm font-bold text-white mb-0.5 flex items-center">
+                    <p className="text-sm font-bold text-[var(--lib-text)] mb-0.5 flex items-center">
                       <BookOpen className="w-4 h-4 mr-1.5 text-primary" />
                       Focus Mode
                     </p>
-                    <p className="text-[11px] text-gray-400">Blocks all incoming calls, notifications, and menus.</p>
+                    <p className="text-[11px] text-[var(--lib-muted)]">Blocks all incoming calls, notifications, and menus.</p>
                   </div>
                   <button 
                     onClick={toggleLibraryMode}
@@ -1371,13 +1371,13 @@ export default function Library() {
 
               {/* Fullscreen Toggle */}
               <div>
-                <p className="text-sm font-bold text-gray-400 mb-3 uppercase tracking-wider">Display</p>
+                <p className="text-sm font-bold text-[var(--lib-muted)] mb-3 uppercase tracking-wider">Display</p>
                 <button
                   onClick={toggleFullscreen}
-                  className="w-full bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl py-3 px-4 flex items-center justify-between text-sm font-bold text-white transition-colors"
+                  className="w-full bg-[var(--lib-input)] hover:bg-[var(--lib-input)] border border-[var(--lib-border)] rounded-xl py-3 px-4 flex items-center justify-between text-sm font-bold text-[var(--lib-text)] transition-colors"
                 >
                   <div className="flex items-center gap-3">
-                    <Maximize className="w-5 h-5 text-gray-400" />
+                    <Maximize className="w-5 h-5 text-[var(--lib-muted)]" />
                     Toggle Fullscreen
                   </div>
                 </button>
@@ -1403,7 +1403,7 @@ export default function Library() {
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="bg-gray-900 border border-white/10 rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-md overflow-hidden relative z-10"
+            className="bg-[var(--lib-bg)] border border-[var(--lib-border)] rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-md overflow-hidden relative z-10"
           >
             <div className="relative aspect-[4/3] w-full bg-black overflow-hidden flex items-end justify-center pb-8">
               {/* Blurred background */}
@@ -1418,7 +1418,7 @@ export default function Library() {
               
               <button 
                 onClick={() => setSelectedPreviewBook(null)}
-                className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center bg-black/40 hover:bg-black/60 rounded-full text-white backdrop-blur-md z-10 transition-colors"
+                className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center bg-black/40 hover:bg-black/60 rounded-full text-[var(--lib-text)] backdrop-blur-md z-10 transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1437,16 +1437,16 @@ export default function Library() {
             <div className="p-6 text-center space-y-2">
               <motion.h2 
                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}
-                className="text-2xl font-bold font-serif text-white line-clamp-2 leading-tight"
+                className="text-2xl font-bold font-serif text-[var(--lib-text)] line-clamp-2 leading-tight"
               >{selectedPreviewBook.title}</motion.h2>
               <motion.p 
                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.25 }}
-                className="text-gray-400 text-sm font-medium"
+                className="text-[var(--lib-muted)] text-sm font-medium"
               >{selectedPreviewBook.author}</motion.p>
               {selectedPreviewBook.description && (
                 <motion.p 
                   initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}
-                  className="text-xs text-gray-500 line-clamp-4 mt-4 px-2 leading-relaxed"
+                  className="text-xs text-[var(--lib-muted)] line-clamp-4 mt-4 px-2 leading-relaxed"
                 >{selectedPreviewBook.description}</motion.p>
               )}
             </div>
@@ -1533,10 +1533,10 @@ function ShelfRow({
               onClick={() => onOpen(book)}
               onContextMenu={(e) => onStatusChangeMenu && onStatusChangeMenu(e, book.id)}
             >
-              <div className={`aspect-[2/3] w-full bg-gray-900 rounded-xl overflow-hidden shadow-md group-hover:shadow-xl transition-all duration-300 mb-2 relative ${grayscale ? "grayscale hover:grayscale-0" : ""}`}>
+              <div className={`aspect-[2/3] w-full bg-[var(--lib-bg)] rounded-xl overflow-hidden shadow-md group-hover:shadow-xl transition-all duration-300 mb-2 relative ${grayscale ? "grayscale hover:grayscale-0" : ""}`}>
                 {updatingStatus === book.id && (
                   <div className="absolute inset-0 bg-black/60 z-20 flex items-center justify-center backdrop-blur-sm">
-                    <Loader2 className="w-6 h-6 animate-spin text-white" />
+                    <Loader2 className="w-6 h-6 animate-spin text-[var(--lib-text)]" />
                   </div>
                 )}
                 <BookCover coverUrl={book.coverUrl} title={book.title} size="sm" />
@@ -1553,13 +1553,13 @@ function ShelfRow({
                 {onDelete && (
                   <button
                     onClick={(e) => { e.stopPropagation(); onDelete(book.id); }}
-                    className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/70 backdrop-blur-md rounded-full items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity flex z-10 hover:bg-red-500 hover:text-white"
+                    className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/70 backdrop-blur-md rounded-full items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity flex z-10 hover:bg-red-500 hover:text-[var(--lib-text)]"
                     title="Remove"
                   >
                     {deletingId === book.id ? (
-                      <Loader2 className="w-3 h-3 animate-spin text-white" />
+                      <Loader2 className="w-3 h-3 animate-spin text-[var(--lib-text)]" />
                     ) : (
-                      <Trash2 className="w-3 h-3 text-red-400 group-hover:text-white" />
+                      <Trash2 className="w-3 h-3 text-red-400 group-hover:text-[var(--lib-text)]" />
                     )}
                   </button>
                 )}
@@ -1671,16 +1671,16 @@ function NotesModal({
           animate={{ y: 0 }}
           exit={{ y: "100%" }}
           transition={{ type: "spring", damping: 25, stiffness: 200 }}
-          className="relative bg-gray-900 w-full h-[80vh] rounded-t-3xl shadow-2xl flex flex-col border-t border-white/10 overflow-hidden"
+          className="relative bg-[var(--lib-bg)] w-full h-[80vh] rounded-t-3xl shadow-2xl flex flex-col border-t border-[var(--lib-border)] overflow-hidden"
         >
-          <div className="flex items-center justify-between p-4 border-b border-white/5 shrink-0 bg-gray-900/50 backdrop-blur-md">
+          <div className="flex items-center justify-between p-4 border-b border-[var(--lib-border)] shrink-0 bg-[var(--lib-bg)]/50 backdrop-blur-md">
             <div>
-              <h3 className="font-bold text-lg flex items-center gap-2 text-white">
+              <h3 className="font-bold text-lg flex items-center gap-2 text-[var(--lib-text)]">
                 <MessageSquare className="w-5 h-5 text-primary" /> Notes
               </h3>
-              <p className="text-xs text-gray-400 line-clamp-1">{book.title}</p>
+              <p className="text-xs text-[var(--lib-muted)] line-clamp-1">{book.title}</p>
             </div>
-            <button onClick={onClose} className="p-2 bg-white/5 rounded-full hover:bg-white/10 text-white transition-colors">
+            <button onClick={onClose} className="p-2 bg-[var(--lib-input)] rounded-full hover:bg-[var(--lib-input)] text-[var(--lib-text)] transition-colors">
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -1694,7 +1694,7 @@ function NotesModal({
               <motion.div 
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className="flex flex-col items-center justify-center h-full text-gray-500 opacity-60"
+                className="flex flex-col items-center justify-center h-full text-[var(--lib-muted)] opacity-60"
               >
                 <MessageSquare className="w-12 h-12 mb-3" />
                 <p className="font-bold">No notes yet.</p>
@@ -1710,10 +1710,10 @@ function NotesModal({
                     key={note.id} 
                     className={`flex flex-col ${isMine ? "items-end" : "items-start"}`}
                   >
-                    <span className="text-[10px] text-gray-500 mb-1 px-1 font-bold uppercase tracking-wider">
+                    <span className="text-[10px] text-[var(--lib-muted)] mb-1 px-1 font-bold uppercase tracking-wider">
                       {isMine ? "You" : partnerName}
                     </span>
-                    <div className={`px-4 py-2.5 rounded-2xl max-w-[85%] ${isMine ? "bg-primary text-primary-foreground rounded-tr-sm shadow-[0_4px_14px_rgba(var(--primary),0.25)]" : "bg-white/10 text-white rounded-tl-sm border border-white/5"}`}>
+                    <div className={`px-4 py-2.5 rounded-2xl max-w-[85%] ${isMine ? "bg-primary text-primary-foreground rounded-tr-sm shadow-[0_4px_14px_rgba(var(--primary),0.25)]" : "bg-[var(--lib-input)] text-[var(--lib-text)] rounded-tl-sm border border-[var(--lib-border)]"}`}>
                       <p className="text-sm leading-snug">{note.text}</p>
                     </div>
                     <span className="text-[9px] text-gray-600 mt-1 px-1">
@@ -1725,14 +1725,14 @@ function NotesModal({
             )}
           </div>
 
-          <form onSubmit={handleSubmit} className="p-4 border-t border-white/5 bg-gray-900 shrink-0">
+          <form onSubmit={handleSubmit} className="p-4 border-t border-[var(--lib-border)] bg-[var(--lib-bg)] shrink-0">
             <div className="relative flex items-center">
               <input
                 type="text"
                 value={newNote}
                 onChange={(e) => setNewNote(e.target.value)}
                 placeholder="Leave a note..."
-                className="w-full bg-white/5 border border-white/10 rounded-full py-3 pl-4 pr-12 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all"
+                className="w-full bg-[var(--lib-input)] border border-[var(--lib-border)] rounded-full py-3 pl-4 pr-12 text-sm text-[var(--lib-text)] focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all"
               />
               <button
                 type="submit"
@@ -1797,7 +1797,7 @@ function LibraryStatsGraph({ weeklyData, monthlyData }: { weeklyData: { date: st
             <div key={i} className="flex-1 flex flex-col items-center gap-2 group">
               <div className="w-full relative h-full flex flex-col justify-end">
                 {/* Tooltip */}
-                <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-black text-white text-[10px] font-bold py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
+                <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-black text-[var(--lib-text)] text-[10px] font-bold py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
                   {Math.round(d.minutes)} min
                 </div>
                 <motion.div 
