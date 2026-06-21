@@ -587,7 +587,7 @@ export default function Library() {
             <h1 className="text-3xl font-bold font-serif italic text-primary leading-none flex-1">{t.library}</h1>
             <input 
               type="file" 
-              accept=".epub,application/epub+zip,*/*" 
+              accept=".epub,application/epub+zip,application/pdf" 
               ref={fileInputRef} 
               onChange={handleEpubUpload} 
               className="hidden" 
