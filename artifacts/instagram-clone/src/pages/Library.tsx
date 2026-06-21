@@ -2,9 +2,9 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Search, Book, Plus, BookOpen, ChevronLeft, ChevronRight, Trash2, CheckCircle2, Loader2, BookMarked, ExternalLink, Filter, X, MessageSquare, Send, Settings, Maximize, Download, Sparkles, Calendar, Flame, TrendingUp, Lightbulb, User, Medal, ArrowUpRight, BarChart3, Bookmark, Clock } from "lucide-react";
 import { useLocation } from "wouter";
 import { apiFetch, api } from "@/lib/api";
+import { uploadMediaFile } from "@/lib/media-upload";
 import { useAuth } from "@/lib/auth";
 import { InAppBrowser } from "@/components/InAppBrowser";
-import ePub from "epubjs";
 import { motion, AnimatePresence } from "framer-motion";
 
 type ApiBook = {
@@ -63,6 +63,7 @@ function titleToGradient(title: string): string {
 
 const SOURCE_COLORS: Record<string, string> = {
   "Open Library": "#4CAF50",
+  "English Classics": "#2196F3",
   "Gutendex": "#2196F3",
   "Internet Archive": "#FF9800",
   "Internet Archive (AR)": "#FF9800",
@@ -74,11 +75,18 @@ const SOURCE_COLORS: Record<string, string> = {
   "HathiTrust": "#E91E63"
 };
 
+function isPdfUrl(url: string): boolean {
+  const lower = url.toLowerCase();
+  if (lower.includes(".pdf")) return true;
+  if (/cloudinary\.com/i.test(url)) return true;
+  return false;
+}
+
 const RANDOM_CATALOG = [
-  { id: "c1", title: "كليلة ودمنة", author: "ابن المقفع", source: "Arabic Classics", totalPages: 300, epubUrl: "https://archive.org/download/book01129/book01129.epub", description: "أشهر حكايات الحيوان الرمزية في التراث العربي.", coverUrl: "https://archive.org/services/img/book01129" },
-  { id: "c2", title: "Pride and Prejudice", author: "Jane Austen", source: "Gutendex", totalPages: 350, epubUrl: "https://www.gutenberg.org/ebooks/1342.epub3.images", description: "A classic romance novel.", coverUrl: "https://www.gutenberg.org/cache/epub/1342/pg1342.cover.medium.jpg" },
-  { id: "c3", title: "Les Misérables", author: "Victor Hugo", source: "Gutendex", totalPages: 1400, epubUrl: "https://www.gutenberg.org/ebooks/135.epub3.images", description: "A French historical novel.", coverUrl: "https://www.gutenberg.org/cache/epub/135/pg135.cover.medium.jpg" },
-  { id: "c4", title: "Don Quijote", author: "Miguel de Cervantes", source: "Gutendex", totalPages: 1000, epubUrl: "https://www.gutenberg.org/ebooks/2000.epub3.images", description: "The classic Spanish novel.", coverUrl: "https://www.gutenberg.org/cache/epub/2000/pg2000.cover.medium.jpg" }
+  { id: "c1", title: "حديث الدار", author: "السيد علي الحسيني الميلاني", source: "Arabic Classics", totalPages: 38, epubUrl: "https://archive.org/download/hdesaddar/hdesaddar.pdf", description: "كتاب عربي PDF من Internet Archive.", coverUrl: "https://archive.org/services/img/hdesaddar" },
+  { id: "c2", title: "Pride and Prejudice", author: "Jane Austen", source: "Gutendex", totalPages: 350, epubUrl: "https://www.gutenberg.org/files/1342/1342-0.pdf", description: "A classic romance novel.", coverUrl: "https://www.gutenberg.org/cache/epub/1342/pg1342.cover.medium.jpg" },
+  { id: "c3", title: "Les Misérables", author: "Victor Hugo", source: "Gutendex", totalPages: 1400, epubUrl: "https://www.gutenberg.org/files/135/135-0.pdf", description: "A French historical novel.", coverUrl: "https://www.gutenberg.org/cache/epub/135/pg135.cover.medium.jpg" },
+  { id: "c4", title: "Don Quijote", author: "Miguel de Cervantes", source: "Gutendex", totalPages: 1000, epubUrl: "https://www.gutenberg.org/files/2000/2000-0.pdf", description: "The classic Spanish novel.", coverUrl: "https://www.gutenberg.org/cache/epub/2000/pg2000.cover.medium.jpg" }
 ];
 
 function BookCover({
@@ -185,7 +193,7 @@ export default function Library() {
   // Translations
   const t = {
     library: libLang === "ar" ? "المكتبة" : "Library",
-    searchPlaceholder: libLang === "ar" ? "ابحث في أكثر من 20 مليون كتاب..." : "Search 20M+ books (Arabic, English, French…)",
+    searchPlaceholder: libLang === "ar" ? "ابحث بالاسم — أكثر من 500 ألف PDF عربي..." : "Search by title — English & Arabic PDFs…",
     currentlyReading: libLang === "ar" ? "تقرأ حالياً" : "Currently Reading",
     myShelf: libLang === "ar" ? "رفي" : "My Shelf",
     partnerShelf: libLang === "ar" ? "رف الشريك" : "Partner's Shelf",
@@ -348,47 +356,25 @@ export default function Library() {
     }
   };
 
-  const handleEpubUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setIsSearching(true); // use as loading state
+
+    const isPdf = file.name.toLowerCase().endsWith(".pdf") || file.type === "application/pdf";
+    if (!isPdf) {
+      alert(libLang === "ar" ? "يرجى اختيار ملف PDF فقط." : "Please select a PDF file only.");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
+    setIsSearching(true);
     try {
-      const buffer = await file.arrayBuffer();
-      const isPdf = file.name.toLowerCase().endsWith(".pdf") || file.type === "application/pdf";
-      
-      let title = file.name.replace(/\.(epub|pdf)$/i, "");
-      let author = "Unknown Author";
-      let description = "Uploaded manually.";
-      
-      if (!isPdf) {
-        try {
-          const book = ePub(buffer);
-          await book.ready;
-          const metadata = await book.loaded.metadata;
-          title = metadata?.title || title;
-          author = metadata?.creator || author;
-          description = metadata?.description || description;
-        } catch (err) {
-          console.error("Failed to parse EPUB metadata", err);
-        }
-      }
+      const title = file.name.replace(/\.pdf$/i, "");
+      const author = "Unknown Author";
+      const description = "Uploaded manually.";
 
-      // Upload binary to cloudinary
-      const res = await apiFetch<{ url: string; key: string }>("/media/upload-binary", {
-        method: "POST",
-        headers: { 
-          "Content-Type": file.type || (isPdf ? "application/pdf" : "application/epub+zip"),
-          "x-file-name": encodeURIComponent(file.name)
-        },
-        body: file,
-        timeout: 180_000, // 3 minutes timeout for large files
-      });
+      const url = await uploadMediaFile(file, "application/pdf");
 
-      // We no longer calculate locations here because it takes too long on upload.
-      // Instead, EReader fixes the totalPages on the first page turn.
-      const totalPages = 100;
-
-      // Add to Library
       await apiFetch("/library", {
         method: "POST",
         body: JSON.stringify({
@@ -396,15 +382,15 @@ export default function Library() {
           author,
           coverUrl: null,
           description,
-          epubUrl: res.url,
-          totalPages,
+          epubUrl: url,
+          totalPages: 100,
           source: "Uploaded",
         }),
       });
 
       await loadBooks();
     } catch (err: any) {
-      console.error("Failed to upload EPUB:", err);
+      console.error("Failed to upload PDF:", err);
       alert("Failed to upload: " + (err?.message || "Unknown error"));
     } finally {
       setIsSearching(false);
@@ -414,7 +400,10 @@ export default function Library() {
 
   const addToLibrary = async (book: SearchResult) => {
     if (addingId === book.id || addedIds.has(book.id)) return;
-    if (!book.epubUrl?.trim()) return;
+    if (!book.epubUrl?.trim() || !isPdfUrl(book.epubUrl)) {
+      alert(libLang === "ar" ? "هذا الكتاب ليس PDF." : "This book is not a PDF.");
+      return;
+    }
     setAddingId(book.id);
     try {
       await apiFetch("/library", {
@@ -492,11 +481,17 @@ export default function Library() {
   const openBook = (book: ApiBook) => {
     if (!book.epubUrl?.trim()) {
       alert(libLang === "ar"
-        ? "لا يوجد ملف EPUB/PDF لهذا الكتاب. ابحث وأضف نسخة من نتائج البحث."
-        : "No EPUB/PDF file for this book. Search and add a copy with a download link.");
+        ? "لا يوجد ملف PDF لهذا الكتاب. ابحث وأضف نسخة من نتائج البحث."
+        : "No PDF file for this book. Search and add a copy with a download link.");
       return;
     }
-    if (book.isLink && !book.epubUrl.toLowerCase().includes(".epub") && !book.epubUrl.toLowerCase().includes(".pdf")) {
+    if (!isPdfUrl(book.epubUrl)) {
+      alert(libLang === "ar"
+        ? "هذا الكتاب ليس PDF. احذفه وأضف نسخة PDF من البحث."
+        : "This book is not a PDF. Remove it and add a PDF from search.");
+      return;
+    }
+    if (book.isLink && !book.epubUrl.toLowerCase().includes(".pdf")) {
       if (book.epubUrl) {
         setInAppBrowserUrl(book.epubUrl);
         return;
@@ -598,9 +593,9 @@ export default function Library() {
             <h1 className="text-3xl font-bold font-serif italic text-primary leading-none flex-1">{t.library}</h1>
             <input 
               type="file" 
-              accept=".epub,application/epub+zip,application/pdf" 
+              accept=".pdf,application/pdf" 
               ref={fileInputRef} 
-              onChange={handleEpubUpload} 
+              onChange={handlePdfUpload} 
               className="hidden" 
             />
             <button 
@@ -614,7 +609,7 @@ export default function Library() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--lib-muted)]" />
           <input
             type="text"
-            placeholder="Search book"
+            placeholder={t.searchPlaceholder}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onFocus={() => setIsSearchFocused(true)}
@@ -815,6 +810,9 @@ export default function Library() {
               </div>
           ) : displayedResults.length > 0 ? (
             <>
+            <p className="text-xs text-[var(--lib-muted)] mb-3">
+              {displayedResults.length} PDF{displayedResults.length !== 1 ? "s" : ""} matching &ldquo;{searchQuery}&rdquo;
+            </p>
             {selectedResultIds.size > 0 && (
               <div className="sticky bottom-20 z-30 mx-auto max-w-md">
                 <button
@@ -942,7 +940,7 @@ export default function Library() {
                   {isSearching ? "Uploading..." : "Add a book"}
                 </h3>
                 <p className="text-sm font-medium text-[var(--lib-muted)]">
-                  {isSearching ? "Please wait, reading file..." : "Is there a book you are reading?"}
+                  {isSearching ? "Please wait, uploading PDF..." : "Upload a PDF from your device"}
                 </p>
               </div>
             </div>
@@ -1285,7 +1283,7 @@ export default function Library() {
               <div className="flex flex-col items-center py-8 text-center text-[var(--lib-muted)]">
                 <BookMarked className="w-12 h-12 mb-4 opacity-30" />
                 <p className="text-sm font-bold text-[var(--lib-text)]">Your library is empty</p>
-                <p className="text-xs mt-1">Search millions of books above and add them to your shelf.</p>
+                <p className="text-xs mt-1">Search hundreds of thousands of PDF books above and add them to your shelf.</p>
               </div>
             )}
           </div>

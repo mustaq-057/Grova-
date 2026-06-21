@@ -40,13 +40,13 @@ export async function initGithubIndexer() {
         .then(r => r.json())
         .then((data: any) => {
           if (!data.tree) return;
-          const files = data.tree.filter((f: any) => f.path.toLowerCase().endsWith(".epub") || f.path.toLowerCase().endsWith(".pdf"));
+          const files = data.tree.filter((f: any) => f.path.toLowerCase().endsWith(".pdf"));
           
           files.forEach((f: any) => {
             // Extract filename without extension for title
             const filename = f.path.split("/").pop();
             if (!filename) return;
-            const title = filename.replace(/\.(epub|pdf)$/i, "").replace(/[-_]/g, " ");
+            const title = filename.replace(/\.pdf$/i, "").replace(/[-_]/g, " ");
             
             githubCache.push({
               id: `gh_${randomUUID().substring(0,8)}`,
@@ -75,10 +75,10 @@ export async function initGithubIndexer() {
           if (!Array.isArray(releases)) return;
           releases.forEach((release: any) => {
             (release.assets || []).forEach((asset: any) => {
-              if (asset.name.toLowerCase().endsWith(".epub")) {
+              if (asset.name.toLowerCase().endsWith(".pdf")) {
                 githubCache.push({
                   id: `gh_rel_${randomUUID().substring(0,8)}`,
-                  title: asset.name.replace(/\.epub$/i, "").replace(/[-_]/g, " "),
+                  title: asset.name.replace(/\.pdf$/i, "").replace(/[-_]/g, " "),
                   author: "Open Source Contributor",
                   epubUrl: asset.browser_download_url,
                   coverUrl: null,
@@ -96,7 +96,7 @@ export async function initGithubIndexer() {
 
     await Promise.allSettled(promises);
     isInitialized = true;
-    console.log(`[GitHub Indexer] Successfully indexed ${githubCache.length} direct EPUB/PDF files into memory.`);
+    console.log(`[GitHub Indexer] Successfully indexed ${githubCache.length} direct PDF files into memory.`);
   } catch (error) {
     console.error("[GitHub Indexer] Initialization failed:", error);
   }
@@ -111,8 +111,9 @@ export async function searchGithubIndex(query: string, limit = 6): Promise<Githu
   const lowerQuery = query.toLowerCase();
   
   const matches = githubCache.filter(book => 
-    book.title.toLowerCase().includes(lowerQuery) || 
-    book.author.toLowerCase().includes(lowerQuery)
+    book.epubUrl.toLowerCase().includes(".pdf") &&
+    (book.title.toLowerCase().includes(lowerQuery) || 
+    book.author.toLowerCase().includes(lowerQuery))
   );
   
   return matches.slice(0, limit);

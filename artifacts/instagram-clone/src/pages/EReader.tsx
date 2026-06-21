@@ -16,7 +16,28 @@ type LibraryBook = {
   epubUrl?: string | null;
   title?: string;
   author?: string;
+  currentPage?: number;
+  totalPages?: number;
 };
+
+function isPdfContent(contentType: string, url: string, buffer?: ArrayBuffer): boolean {
+  if (contentType.includes("application/pdf")) return true;
+  if (isPdfUrl(url)) return true;
+  if (buffer && buffer.byteLength >= 4) {
+    const v = new Uint8Array(buffer);
+    return v[0] === 0x25 && v[1] === 0x50 && v[2] === 0x44 && v[3] === 0x46;
+  }
+  return false;
+}
+
+function isPdfUrl(url: string): boolean {
+  const lower = url.toLowerCase();
+  if (lower.includes(".pdf")) return true;
+  if (/cloudinary\.com/i.test(url)) return true;
+  return false;
+}
+
+const PDF_PAGE_BUFFER = 3;
 
 type Theme = "parchment" | "sepia" | "obsidian" | "midnight";
 
@@ -159,6 +180,9 @@ export default function EReader() {
   const [showNoteModal, setShowNoteModal] = useState(false);
   const [noteText, setNoteText] = useState("");
   const [isSavingNote, setIsSavingNote] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const savedPageRef = useRef(0);
+  const [pdfWindow, setPdfWindow] = useState({ start: 1, end: 5 });
 
   useEffect(() => {
     localStorage.setItem("grova-reader-theme", theme);
@@ -208,8 +232,19 @@ export default function EReader() {
       try {
         const book = await apiFetch<LibraryBook>(`/library/${id}`);
         setBookTitle(book.title || "");
+        savedPageRef.current = book.currentPage || 0;
+        if (book.totalPages && book.totalPages > 0) setTotalPages(book.totalPages);
+
         if (!book.epubUrl?.trim()) {
           if (!cancelled) { setEpubData(null); setLoading(false); }
+          return;
+        }
+
+        if (!isPdfUrl(book.epubUrl)) {
+          if (!cancelled) {
+            setLoadError("This book is not a PDF. Only PDF books can be opened.");
+            setLoading(false);
+          }
           return;
         }
 
@@ -221,7 +256,7 @@ export default function EReader() {
           contentType = proxied.contentType;
         } catch (proxyErr) {
           const directUrl = book.epubUrl;
-          if (!/cdn\.jsdelivr\.net|cloudinary\.com|archive\.org|raw\.githubusercontent\.com/i.test(directUrl)) {
+          if (!/cdn\.jsdelivr\.net|cloudinary\.com|archive\.org|gutenberg\.org|raw\.githubusercontent\.com/i.test(directUrl)) {
             throw proxyErr;
           }
           const direct = await fetch(directUrl);
@@ -230,18 +265,21 @@ export default function EReader() {
           contentType = direct.headers.get("content-type") || "";
         }
 
-        const pdf =
-          book.epubUrl.toLowerCase().includes(".pdf") ||
-          contentType.includes("application/pdf");
+        const buf = await blob.arrayBuffer();
+        if (!isPdfContent(contentType, book.epubUrl, buf)) {
+          throw new Error("This file is not a valid PDF. Search again and pick a PDF result.");
+        }
 
-        const blobUrl = URL.createObjectURL(
-          pdf ? blob : new Blob([await blob.arrayBuffer()], { type: "application/epub+zip" }),
-        );
+        const blobUrl = URL.createObjectURL(new Blob([buf], { type: "application/pdf" }));
         blobUrlRef.current = blobUrl;
 
         if (!cancelled) {
-          setIsPdf(pdf);
+          setIsPdf(true);
           setEpubData(blobUrl);
+          if (savedPageRef.current > 0 && book.totalPages) {
+            setCurrentPage(savedPageRef.current);
+            setProgressPct(Math.round((savedPageRef.current / book.totalPages) * 100));
+          }
         } else {
           URL.revokeObjectURL(blobUrl);
         }
@@ -262,7 +300,7 @@ export default function EReader() {
         blobUrlRef.current = null;
       }
     };
-  }, [id]);
+  }, [id, retryCount]);
 
   useEffect(() => {
     window.localStorage.setItem("DND_LIBRARY_MODE", "true");
@@ -358,19 +396,25 @@ export default function EReader() {
   const handlePdfScroll = () => {
     if (!pdfContainerRef.current || totalPages === 0) return;
     const { scrollTop, scrollHeight, clientHeight } = pdfContainerRef.current;
-    
-    // Calculate current page based on scroll progress
+
     const scrollProgress = scrollTop / (scrollHeight - clientHeight || 1);
     let newPage = Math.max(1, Math.min(totalPages, Math.ceil(scrollProgress * totalPages)));
-    
-    // For very top of document:
     if (scrollTop === 0) newPage = 1;
-    
+
+    setPdfWindow({
+      start: Math.max(1, newPage - PDF_PAGE_BUFFER),
+      end: Math.min(totalPages, newPage + PDF_PAGE_BUFFER),
+    });
+
     if (newPage !== currentPage) {
       setCurrentPage(newPage);
       setProgressPct(Math.round((newPage / totalPages) * 100));
-      
-      // Debounced backend sync
+
+      if (lastPageRef.current !== null && newPage !== lastPageRef.current) {
+        sessionPagesReadRef.current += Math.abs(newPage - lastPageRef.current);
+      }
+      lastPageRef.current = newPage;
+
       if (syncDebounceRef.current) clearTimeout(syncDebounceRef.current);
       syncDebounceRef.current = setTimeout(() => {
         apiFetch(`/library/${id}/progress`, {
@@ -379,6 +423,12 @@ export default function EReader() {
         }).catch(() => {});
       }, 500);
     }
+  };
+
+  const scrollToSavedPage = (page: number, numPages: number) => {
+    if (!pdfContainerRef.current || page <= 1) return;
+    const ratio = (page - 1) / Math.max(numPages - 1, 1);
+    pdfContainerRef.current.scrollTop = ratio * (pdfContainerRef.current.scrollHeight - pdfContainerRef.current.clientHeight);
   };
 
   const t = THEMES[theme];
@@ -469,10 +519,20 @@ export default function EReader() {
             <h2 className="text-xl font-serif font-bold text-white mb-2">
               {loadError ? "Error Loading Book" : "No Digital Version Available"}
             </h2>
-            <p className="text-white/50 max-w-sm mb-6 text-sm">{loadError || "Search the library and add a book with an EPUB file."}</p>
-            <button onClick={() => setLocation("/library")} className="px-6 py-3 bg-primary text-primary-foreground font-bold rounded-full">
-              Back to Library
-            </button>
+            <p className="text-white/50 max-w-sm mb-6 text-sm">{loadError || "Search the library and add a PDF book."}</p>
+            <div className="flex gap-3">
+              {loadError && (
+                <button
+                  onClick={() => { setLoadError(null); setLoading(true); setRetryCount((c) => c + 1); }}
+                  className="px-6 py-3 bg-white/10 text-white font-bold rounded-full border border-white/20"
+                >
+                  Try Again
+                </button>
+              )}
+              <button onClick={() => setLocation("/library")} className="px-6 py-3 bg-primary text-primary-foreground font-bold rounded-full">
+                Back to Library
+              </button>
+            </div>
           </div>
         ) : isPdf ? (
           <div 
@@ -484,8 +544,23 @@ export default function EReader() {
               file={epubData} 
               onLoadSuccess={({ numPages }) => {
                 setTotalPages(numPages);
-                setCurrentPage(1);
+                const resume = savedPageRef.current;
+                const startPage = resume > 0 ? Math.min(resume, numPages) : 1;
+                setCurrentPage(startPage);
+                setProgressPct(Math.round((startPage / numPages) * 100));
+                setPdfWindow({
+                  start: Math.max(1, startPage - PDF_PAGE_BUFFER),
+                  end: Math.min(numPages, startPage + PDF_PAGE_BUFFER),
+                });
+                if (resume > 1) {
+                  setTimeout(() => scrollToSavedPage(resume, numPages), 300);
+                }
+                apiFetch(`/library/${id}/progress`, {
+                  method: "PUT",
+                  body: JSON.stringify({ page: startPage, status: "reading", totalPages: numPages }),
+                }).catch(() => {});
               }}
+              onLoadError={(err) => setLoadError(err?.message || "Failed to parse PDF")}
               className="flex flex-col items-center py-6 gap-6"
               loading={
                 <div className="flex flex-col items-center justify-center flex-1 text-white/50 h-full w-full py-20 gap-4">
@@ -494,16 +569,34 @@ export default function EReader() {
                 </div>
               }
             >
-              {Array.from(new Array(totalPages || 0), (el, index) => (
-                <Page 
-                  key={`page_${index + 1}`} 
-                  pageNumber={index + 1} 
-                  renderTextLayer={false} 
-                  renderAnnotationLayer={false}
-                  width={Math.min(window.innerWidth - 32, 800)}
-                  className="shadow-xl bg-white"
-                />
-              ))}
+              {totalPages > 0 && Array.from({ length: totalPages }, (_, i) => {
+                const pageNum = i + 1;
+                const pageWidth = Math.min(window.innerWidth - 32, 800);
+                const placeholderH = Math.round(pageWidth * 1.414) + 24;
+                const inWindow = pageNum >= pdfWindow.start && pageNum <= pdfWindow.end;
+                if (!inWindow) {
+                  return (
+                    <div
+                      key={`page_${pageNum}`}
+                      data-page={pageNum}
+                      style={{ height: placeholderH, width: pageWidth }}
+                      className="mb-4 mx-auto bg-white/5 rounded"
+                      aria-hidden
+                    />
+                  );
+                }
+                return (
+                  <div key={`page_${pageNum}`} data-page={pageNum} className="mb-4">
+                    <Page
+                      pageNumber={pageNum}
+                      renderTextLayer={true}
+                      renderAnnotationLayer={false}
+                      width={pageWidth}
+                      className="shadow-xl bg-white mx-auto"
+                    />
+                  </div>
+                );
+              })}
             </Document>
             
             {/* Always visible minimal footer with page numbers for PDF */}
@@ -514,43 +607,13 @@ export default function EReader() {
             </div>
           </div>
         ) : (
-          <div className="flex-1 flex flex-col w-full max-w-2xl mx-auto relative sm:rounded-lg overflow-hidden" style={{ backgroundColor: t.page }}>
-            <div className="flex-1 relative min-h-0 w-full h-full">
-              <div className="absolute inset-0">
-                <ReactReader
-                  url={epubData}
-                  showToc={false}
-                  epubInitOptions={{ openAs: "epub" }}
-                  location={bookLocation}
-                  locationChanged={locationChanged}
-                  getRendition={(rendition) => {
-                    renditionRef.current = rendition;
-                    applyBookRendition(rendition, theme, fontSize, lineHeight);
-                  }}
-                  tocChanged={() => {}}
-                  swipeable={false}
-                  epubOptions={{
-                    flow: "scrolled",
-                    manager: "continuous",
-                  }}
-                  readerStyles={{
-                    ...ReactReaderStyle,
-                    container: { ...ReactReaderStyle.container, width: "100%", height: "100%", background: t.page },
-                    readerArea: { ...ReactReaderStyle.readerArea, width: "100%", height: "100%", background: t.page },
-                    titleArea: { ...ReactReaderStyle.titleArea, display: "none" },
-                    tocArea: { ...ReactReaderStyle.tocArea, display: "none" },
-                    arrow: { display: "none" },
-                  }}
-                />
-              </div>
-            </div>
-            
-            {/* Always visible minimal footer with page numbers */}
-            <div className="h-8 flex items-center justify-center pointer-events-none opacity-40" style={{ backgroundColor: t.page, color: t.text }}>
-              <span className="text-[11px] font-bold tracking-widest uppercase">
-                {totalPages > 0 ? `Page ${currentPage} of ${totalPages}` : "Reading..."}
-              </span>
-            </div>
+          <div className="flex flex-col items-center justify-center flex-1 text-center px-6">
+            <Info className="w-12 h-12 text-white/30 mb-4" />
+            <h2 className="text-xl font-serif font-bold text-white mb-2">PDF Only</h2>
+            <p className="text-white/50 max-w-sm mb-6 text-sm">This book is not a PDF. Remove it and add a PDF from search results.</p>
+            <button onClick={() => setLocation("/library")} className="px-6 py-3 bg-primary text-primary-foreground font-bold rounded-full">
+              Back to Library
+            </button>
           </div>
         )}
       </div>

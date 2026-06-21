@@ -3,24 +3,22 @@ import { randomUUID } from "crypto";
 import db from "../lib/db";
 import { authenticate } from "../lib/auth-middleware";
 import type { AuthenticatedRequest } from "../types";
-import * as cheerio from "cheerio";
 import { searchGithubIndex } from "../lib/github-indexer";
 import {
   searchInternetArchive,
   searchOpenLibrary,
   searchShamelaCatalog,
   ARABIC_FEATURED,
+  ENGLISH_FEATURED,
+  isPdfBookUrl,
+  scoreBookMatch,
+  iaResolvePdfUrl,
 } from "../lib/library-sources";
 import { appConfig } from "../lib/config";
 
 const libraryRouter = Router();
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
-
-function safeText(html: string | undefined): string {
-  if (!html) return "";
-  return html.replace(/<[^>]*>?/gm, "").trim();
-}
 
 /** Detect if query contains Arabic characters */
 function isArabicQuery(q: string): boolean {
@@ -87,20 +85,29 @@ function gutenbergFetchCandidates(url: string): string[] {
   const m = url.match(/gutenberg\.org\/ebooks\/(\d+)/i);
   if (m) {
     const id = m[1];
-    out.push(
-      `https://www.gutenberg.org/cache/epub/${id}/pg${id}-images-3.epub`,
-      `https://www.gutenberg.org/cache/epub/${id}/pg${id}.epub`,
-      `https://www.gutenberg.org/ebooks/${id}.epub.noimages`,
-    );
+    out.push(`https://www.gutenberg.org/files/${id}/${id}-0.pdf`);
+  }
+  const filesMatch = url.match(/gutenberg\.org\/files\/(\d+)\//i);
+  if (filesMatch) {
+    const id = filesMatch[1];
+    out.push(`https://www.gutenberg.org/files/${id}/${id}-0.pdf`);
   }
   return [...new Set(out)];
 }
 
 function isValidBookBuffer(buf: Buffer): boolean {
   if (buf.length < 4) return false;
-  if (buf[0] === 0x25 && buf[1] === 0x50 && buf[2] === 0x44 && buf[3] === 0x46) return true;
-  if (buf[0] === 0x50 && buf[1] === 0x4b) return true;
-  return false;
+  // PDF-only library
+  return buf[0] === 0x25 && buf[1] === 0x50 && buf[2] === 0x44 && buf[3] === 0x46;
+}
+
+async function archivePdfCandidates(url: string): Promise<string[]> {
+  const out = [url];
+  const m = url.match(/archive\.org\/download\/([^/]+)/i);
+  if (!m?.[1]) return out;
+  const resolved = await iaResolvePdfUrl(m[1]);
+  if (resolved && !out.includes(resolved)) out.unshift(resolved);
+  return out;
 }
 
 async function fetchBookUpstream(url: string): Promise<{ buffer: Buffer; contentType: string } | null> {
@@ -131,11 +138,10 @@ libraryRouter.get("/library/search", authenticate, async (req, res) => {
   const enc = encodeURIComponent(query);
   const arabic = isArabicQuery(query);
   const exactLower = query.toLowerCase().trim();
-  const stopWords = new Set(["the", "and", "for", "with", "that", "this", "from"]);
-  const qTerms = exactLower.split(/\s+/).filter(w => w.length > 2 && !stopWords.has(w));
+  const MIN_MATCH_SCORE = 45;
 
   // ── Cache check ─────────────────────────────────────────────────────────
-  const cacheKey = query.toLowerCase();
+  const cacheKey = `pdf-v2:${query.toLowerCase()}`;
   const cached = getCached(cacheKey);
   if (cached) {
     return res.json({ results: cached.results, meta: { ...cached.meta, cached: true } });
@@ -149,16 +155,20 @@ libraryRouter.get("/library/search", authenticate, async (req, res) => {
   // Wikisource EN is irrelevant for Arabic queries. Skip them.
   // For English queries, Wikisource AR is also irrelevant — skip it too.
   const skipGutendex  = arabic;
-  const skipWikiEn    = arabic;
-  const skipWikiAr    = !arabic;
-  const skipWikiFr    = arabic;
-  const skipWikiDe    = arabic;
+  const skipWikiEn    = true; // EPUB-only export — PDF mode
+  const skipWikiAr    = true;
+  const skipWikiFr    = true;
+  const skipWikiDe    = true;
+  const skipStandard  = true; // EPUB-only
+  const skipFeedbooks = true; // EPUB-only
 
   if (skipGutendex) sourceMeta["Gutendex"]      = "skipped";
   if (skipWikiEn)   sourceMeta["Wikisource EN"] = "skipped";
   if (skipWikiAr)   sourceMeta["Wikisource AR"] = "skipped";
   if (skipWikiFr)   sourceMeta["Wikisource FR"] = "skipped";
   if (skipWikiDe)   sourceMeta["Wikisource DE"] = "skipped";
+  if (skipStandard) sourceMeta["Standard Ebooks"] = "skipped";
+  if (skipFeedbooks) sourceMeta["Feedbooks"] = "skipped";
 
   // ── Concurrent fetch ──────────────────────────────────────────────────────
 
@@ -167,21 +177,20 @@ libraryRouter.get("/library/search", authenticate, async (req, res) => {
     ? Promise.resolve(null)
     : fetch(`https://gutendex.com/books/?search=${enc}`);
 
-  // 2. Standard Ebooks
-  const standardUrl = `https://standardebooks.org/ebooks?query=${enc}`;
-  const standardFetch = skipGutendex ? Promise.resolve(null) : fetch(standardUrl, { signal: AbortSignal.timeout(6000) }).catch(() => null);
+  // 2. Standard Ebooks — skipped (EPUB-only)
+  const standardFetch = Promise.resolve(null);
 
-  // 3. Feedbooks Public Domain (OPDS)
-  const feedbooksFetch = fetch(`https://catalog.feedbooks.com/publicdomain/search.atom?query=${enc}`, { signal: AbortSignal.timeout(6000) }).catch(() => null);
+  // 3. Feedbooks — skipped (EPUB-only)
+  const feedbooksFetch = Promise.resolve(null);
 
   // 4. OAPEN Library (Academic PDFs)
   const oapenFetch = fetch(`https://library.oapen.org/rest/search?query=${enc}&expand=metadata,bitstreams`, { signal: AbortSignal.timeout(6000) }).catch(() => null);
 
-  // 5. Wikisources (Export to EPUB)
-  const wikiArFetch = skipWikiAr ? Promise.resolve(null) : fetch(`https://ar.wikisource.org/w/api.php?action=query&list=search&srsearch=${enc}&format=json&srlimit=6`);
-  const wikiEnFetch = skipWikiEn ? Promise.resolve(null) : fetch(`https://en.wikisource.org/w/api.php?action=query&list=search&srsearch=${enc}&format=json&srlimit=5`);
-  const wikiFrFetch = skipWikiFr ? Promise.resolve(null) : fetch(`https://fr.wikisource.org/w/api.php?action=query&list=search&srsearch=${enc}&format=json&srlimit=3`);
-  const wikiDeFetch = skipWikiDe ? Promise.resolve(null) : fetch(`https://de.wikisource.org/w/api.php?action=query&list=search&srsearch=${enc}&format=json&srlimit=3`);
+  // 5. Wikisources — skipped (EPUB-only export)
+  const wikiArFetch = Promise.resolve(null);
+  const wikiEnFetch = Promise.resolve(null);
+  const wikiFrFetch = Promise.resolve(null);
+  const wikiDeFetch = Promise.resolve(null);
 
   const [
     gutendexRes,
@@ -213,11 +222,15 @@ libraryRouter.get("/library/search", authenticate, async (req, res) => {
     return true;
   }
 
-  // ── Internet Archive + Open Library + Shamela/Arabic (millions of EPUBs) ──
+  // ── Internet Archive + Open Library + Shamela/Arabic ──
+  const shamelaPromise = arabic
+    ? searchShamelaCatalog(query, 15)
+    : Promise.resolve([]);
+
   const [iaSettled, olSettled, shamelaSettled] = await Promise.allSettled([
-    searchInternetArchive(query, { arabic, limit: arabic ? 12 : 8 }),
-    searchOpenLibrary(query, arabic ? 8 : 6),
-    searchShamelaCatalog(query, arabic ? 12 : 5),
+    searchInternetArchive(query, { arabic, limit: arabic ? 15 : 14 }),
+    searchOpenLibrary(query, arabic ? 8 : 10),
+    shamelaPromise,
   ]);
 
   const ingestCatalog = (settled: PromiseSettledResult<any[]>, label: string) => {
@@ -235,28 +248,25 @@ libraryRouter.get("/library/search", authenticate, async (req, res) => {
   };
 
   ingestCatalog(iaSettled, arabic ? "Internet Archive (AR)" : "Internet Archive");
-  ingestCatalog(shamelaSettled, "Shamela / Arabic");
+  if (arabic) ingestCatalog(shamelaSettled, "Shamela / Arabic");
+  else sourceMeta["Shamela / Arabic"] = "skipped";
   ingestCatalog(olSettled, "Open Library");
 
-  if (arabic) {
-    for (const feat of ARABIC_FEATURED) {
-      const q = query.trim();
-      if (
-        !q ||
-        feat.title.includes(q) ||
-        q.split(/\s+/).some((w) => w.length > 1 && feat.title.includes(w))
-      ) {
-        if (dedup(feat.title)) results.unshift(feat);
-      }
+  const featured = arabic ? ARABIC_FEATURED : ENGLISH_FEATURED;
+  for (const feat of featured) {
+    if (scoreBookMatch(query, feat) >= 60 && dedup(feat.title)) {
+      results.unshift(feat);
     }
-    sourceMeta["Arabic Classics"] = results.some((r) => r.source === "Arabic Classics") ? "ok" : "empty";
   }
+  sourceMeta[arabic ? "Arabic Classics" : "English Classics"] =
+    results.some((r) => r.source.includes("Classics")) ? "ok" : "empty";
 
   // ── 1. GitHub Curation Indexer (Blazing Fast In-Memory) ─────────────────
   try {
-    const githubResults = await searchGithubIndex(query, arabic ? 10 : 6);
+    const githubResults = await searchGithubIndex(query, arabic ? 12 : 8);
     let added = 0;
     for (const ghBook of githubResults) {
+      if (!isPdfBookUrl(ghBook.epubUrl)) continue;
       if (!dedup(ghBook.title)) continue;
       results.push(ghBook);
       added++;
@@ -269,7 +279,7 @@ libraryRouter.get("/library/search", authenticate, async (req, res) => {
   // ── 1.1 Global GitHub Search (Dynamic) ────────────────────────────────────
   try {
     // Search repositories that match the query and contain epub
-    const ghSearchRes = await fetch(`https://api.github.com/search/repositories?q=${enc}+epub&per_page=2`, {
+    const ghSearchRes = await fetch(`https://api.github.com/search/repositories?q=${enc}+pdf&per_page=2`, {
       headers: { "User-Agent": "Grova-App" },
       signal: AbortSignal.timeout(4000)
     });
@@ -286,16 +296,15 @@ libraryRouter.get("/library/search", authenticate, async (req, res) => {
           });
           if (treeRes.ok) {
             const treeData = await treeRes.json() as any;
-            const epubs = (treeData.tree || []).filter((f: any) => {
+            const pdfs = (treeData.tree || []).filter((f: any) => {
               const pathLower = f.path.toLowerCase();
-              if (!pathLower.endsWith(".epub")) return false;
-              if (pathLower.includes(exactLower)) return true;
-              if (qTerms.length === 0) return pathLower.includes(exactLower);
-              return qTerms.every(w => pathLower.includes(w));
+              if (!pathLower.endsWith(".pdf")) return false;
+              const fileTitle = pathLower.split("/").pop()?.replace(/\.pdf$/i, "").replace(/[-_]/g, " ") || "";
+              return scoreBookMatch(query, { title: fileTitle, author: repo.name }) >= MIN_MATCH_SCORE;
             });
-            if (epubs.length > 0) {
-              const file = epubs[0];
-              const title = file.path.split("/").pop()?.replace(/\.epub$/i, "").replace(/[-_]/g, " ") || repo.name;
+            if (pdfs.length > 0) {
+              const file = pdfs[0];
+              const title = file.path.split("/").pop()?.replace(/\.pdf$/i, "").replace(/[-_]/g, " ") || repo.name;
               if (dedup(title)) {
                 results.push({
                   id: `gh_global_${repo.id}`,
@@ -319,42 +328,9 @@ libraryRouter.get("/library/search", authenticate, async (req, res) => {
     sourceMeta["GitHub Global"] = "timeout";
   }
 
-  // ── 1.5 Standard Ebooks (English, High Quality EPUBs) ─────────────────────────
-  if (!skipGutendex) {
-    if (standardRes.status === "fulfilled" && (standardRes.value as Response | null)?.ok) {
-      try {
-        const html = await (standardRes.value as Response).text();
-        const $ = cheerio.load(html);
-        let added = 0;
-        $('ol.list > li').each((_, el) => {
-          if (added >= 3) return;
-          const title = $(el).find('p[property="schema:name"]').text().trim() || $(el).find('p.title a').text().trim();
-          const author = $(el).find('p.author').text().trim() || "Unknown Author";
-          const link = $(el).find('a').first().attr('href');
-          const cover = $(el).find('img').attr('src');
-          if (title && link && dedup(title)) {
-            const epubLinkId = link.replace('/ebooks/', '').replace(/\//g, '_');
-            results.push({
-              id: `se_${epubLinkId}`,
-              title,
-              author,
-              coverUrl: cover ? `https://standardebooks.org${cover.replace('/downloads/cover-thumbnail.jpg', '/downloads/cover.jpg')}` : null,
-              description: "High-quality public domain ebook.",
-              epubUrl: `https://standardebooks.org${link}/downloads/${epubLinkId}.epub`,
-              totalPages: 250,
-              source: "Standard Ebooks",
-            });
-            added++;
-          }
-        });
-        sourceMeta["Standard Ebooks"] = added > 0 ? "ok" : "empty";
-      } catch { sourceMeta["Standard Ebooks"] = "timeout"; }
-    } else {
-      sourceMeta["Standard Ebooks"] = standardRes.status === "rejected" ? "timeout" : "empty";
-    }
-  }
+  // ── 1.5 Standard Ebooks — skipped (PDF-only catalog) ─────────────────────
 
-  // ── 2. Gutendex / Project Gutenberg (English queries only) ───────────────
+  // ── 2. Gutendex / Project Gutenberg (PDF only) ───────────────────────────
   if (!skipGutendex) {
     if (gutendexRes.status === "fulfilled" && (gutendexRes.value as Response | null)?.ok) {
       try {
@@ -362,17 +338,14 @@ libraryRouter.get("/library/search", authenticate, async (req, res) => {
         let added = 0;
         for (const item of (data.results || []).slice(0, 6)) {
           if (!item.title || !dedup(item.title)) continue;
-          const fileUrl =
-            item.formats?.["application/epub+zip"] ||
-            item.formats?.["application/pdf"] ||
-            null;
+          const fileUrl = item.formats?.["application/pdf"] || null;
           if (!fileUrl) continue;
           results.push({
             id: `guten_${item.id}`,
             title: item.title,
             author: item.authors?.[0]?.name || "Unknown Author",
             coverUrl: item.formats?.["image/jpeg"] || null,
-            description: "Public domain ebook from Project Gutenberg.",
+            description: "Public domain PDF from Project Gutenberg.",
             epubUrl: fileUrl,
             totalPages: 200,
             source: "Gutendex",
@@ -386,36 +359,7 @@ libraryRouter.get("/library/search", authenticate, async (req, res) => {
     }
   }
 
-  // ── 3. Feedbooks Public Domain ──────────────────────────────────────────────
-  if (feedbooksRes.status === "fulfilled" && feedbooksRes.value?.ok) {
-    try {
-      const xml = await (feedbooksRes.value as Response).text();
-      const $ = cheerio.load(xml, { xmlMode: true });
-      let added = 0;
-      $('entry').slice(0, 3).each((_, el) => {
-        const title = $(el).find('title').first().text();
-        const author = $(el).find('author name').first().text() || "Unknown";
-        const epubUrl = $(el).find('link[type="application/epub+zip"]').attr('href');
-        const coverUrl = $(el).find('link[rel="http://opds-spec.org/image"]').attr('href');
-        if (title && epubUrl && dedup(title)) {
-          results.push({
-            id: `fb_${randomUUID().substring(0,8)}`,
-            title,
-            author,
-            coverUrl: coverUrl || null,
-            description: "High-quality public domain EPUB from Feedbooks.",
-            epubUrl,
-            totalPages: 200,
-            source: "Feedbooks",
-          });
-          added++;
-        }
-      });
-      sourceMeta["Feedbooks"] = added > 0 ? "ok" : "empty";
-    } catch { sourceMeta["Feedbooks"] = "timeout"; }
-  } else {
-    sourceMeta["Feedbooks"] = feedbooksRes.status === "rejected" ? "timeout" : "empty";
-  }
+  // ── 3. Feedbooks — skipped (PDF-only catalog) ──────────────────────────────
 
   // ── 4. OAPEN Library (Academic PDFs) ───────────────────────────────────────
   if (oapenRes.status === "fulfilled" && oapenRes.value?.ok) {
@@ -448,88 +392,28 @@ libraryRouter.get("/library/search", authenticate, async (req, res) => {
     sourceMeta["OAPEN"] = oapenRes.status === "rejected" ? "timeout" : "empty";
   }
 
-  // ── 5. Wikisources (Export to EPUB via ws-export) ─────────────────────────
-  const processWikisource = async (resResult: PromiseSettledResult<Response | null>, lang: string, label: string) => {
-    if (resResult.status === "fulfilled" && resResult.value?.ok) {
-      try {
-        const data = await (resResult.value as Response).json() as any;
-        let added = 0;
-        for (const item of (data.query?.search || []).slice(0, 4)) {
-          if (!item.title || !dedup(item.title)) continue;
-          // Direct EPUB export from Wikipedia's ws-export tool!
-          const epubUrl = `https://ws-export.wmcloud.org/?format=epub&lang=${lang}&page=${encodeURIComponent(item.title)}`;
-          results.push({
-            id: `wiki_${lang}_${item.pageid}`,
-            title: item.title,
-            author: `${label} Contributor`,
-            coverUrl: null,
-            description: safeText(item.snippet) || `Full-text from ${label}.`,
-            epubUrl,
-            totalPages: 50,
-            source: label,
-          });
-          added++;
-        }
-        sourceMeta[label] = added > 0 ? "ok" : "empty";
-      } catch { sourceMeta[label] = "timeout"; }
-    } else {
-      sourceMeta[label] = resResult.status === "rejected" ? "timeout" : "empty";
-    }
-  };
+  // ── 5. Wikisources — skipped (PDF-only catalog) ────────────────────────────
 
-  await Promise.all([
-    !skipWikiEn ? processWikisource(wikiEnRes, "en", "Wikisource EN") : Promise.resolve(),
-    !skipWikiAr ? processWikisource(wikiArRes, "ar", "Wikisource AR") : Promise.resolve(),
-    !skipWikiFr ? processWikisource(wikiFrRes, "fr", "Wikisource FR") : Promise.resolve(),
-    !skipWikiDe ? processWikisource(wikiDeRes, "de", "Wikisource DE") : Promise.resolve(),
-  ]);
+  // ── Filter to verified PDF links + relevance score ───────────────────────
+  let finalResults = results
+    .filter((r) => r.epubUrl && isPdfBookUrl(r.epubUrl))
+    .map((r) => ({ ...r, _score: scoreBookMatch(query, r) }))
+    .filter((r) => r._score >= MIN_MATCH_SCORE);
 
-
-  // ── Filter to ONLY include books with an EPUB link ──────────────────────────
-  let finalResults = results.filter(r => r.epubUrl && r.epubUrl.trim() !== "");
-
-  // ── Filter out completely irrelevant results ──────────────────────────────────
-  finalResults = finalResults.filter(r => {
-    const t = r.title.toLowerCase();
-    const a = (r.author || "").toLowerCase();
-    if (t.includes(exactLower) || a.includes(exactLower)) return true;
-    if (qTerms.length === 0) return t.includes(exactLower) || a.includes(exactLower);
-    
-    // Match only if ALL significant words are present
-    return qTerms.every(w => t.includes(w) || a.includes(w));
-  });
-
-  // ── Sort to boost exact matches ──────────────────────────────────────────────
   finalResults.sort((a, b) => {
-    const aExact = a.title.toLowerCase() === exactLower;
-    const bExact = b.title.toLowerCase() === exactLower;
-    if (aExact && !bExact) return -1;
-    if (!aExact && bExact) return 1;
-
-    const aContains = a.title.toLowerCase().includes(exactLower);
-    const bContains = b.title.toLowerCase().includes(exactLower);
-    if (aContains && !bContains) return -1;
-    if (!aContains && bContains) return 1;
-
-    // Favor sources with real downloadable files for Arabic
+    if (b._score !== a._score) return b._score - a._score;
     const sourceRank = (s: string) => {
-      if (s.includes("Shamela") || s === "Arabic Classics") return 0;
-      if (s.includes("Internet Archive")) return 1;
-      if (s === "Open Library") return 2;
-      if (s === "Gutendex" || s === "Standard Ebooks") return 3;
+      if (s.includes("Classics")) return 0;
+      if (s === "Gutendex" || s === "Open Library") return 1;
+      if (s.includes("Internet Archive")) return 2;
+      if (s.includes("Shamela")) return 2;
+      if (s === "OAPEN") return 3;
       return 4;
     };
-    const rankDiff = sourceRank(a.source) - sourceRank(b.source);
-    if (rankDiff !== 0) return rankDiff;
-
-    // Favor Standard Ebooks and Gutendex over Github Global if both match
-    const aIsGithub = a.source.includes("GitHub Global");
-    const bIsGithub = b.source.includes("GitHub Global");
-    if (!aIsGithub && bIsGithub) return -1;
-    if (aIsGithub && !bIsGithub) return 1;
-
-    return 0;
+    return sourceRank(a.source) - sourceRank(b.source);
   });
+
+  finalResults = finalResults.slice(0, 24).map(({ _score, ...r }) => r);
   // ── Cache and respond ──────────────────────────────────────────────────────
   const meta = { cached: false, sources: sourceMeta, total: finalResults.length };
   setCache(cacheKey, finalResults, { cached: false, sources: sourceMeta, total: finalResults.length });
@@ -702,9 +586,11 @@ libraryRouter.get("/library/:id/file", authenticate, async (req, res) => {
       return res.status(400).json({ error: "Book URL is not a valid public link" });
     }
 
-    const candidates = epubUrl.includes("gutenberg.org")
-      ? gutenbergFetchCandidates(epubUrl)
-      : [epubUrl];
+    const candidates = epubUrl.includes("archive.org")
+      ? await archivePdfCandidates(epubUrl)
+      : epubUrl.includes("gutenberg.org")
+        ? gutenbergFetchCandidates(epubUrl)
+        : [epubUrl];
 
     for (const url of candidates) {
       if (!isSafeBookUrl(url)) continue;
@@ -762,7 +648,7 @@ libraryRouter.post("/library/batch", authenticate, async (req: AuthenticatedRequ
     const added: { id: string; title: string }[] = [];
 
     for (const body of books.slice(0, 25)) {
-      if (!body?.title || !body?.epubUrl?.trim()) continue;
+      if (!body?.title || !body?.epubUrl?.trim() || !isPdfBookUrl(body.epubUrl)) continue;
       const id = randomUUID();
       const timestamp = new Date().toISOString();
       await db.execute(
@@ -798,6 +684,9 @@ libraryRouter.post("/library", authenticate, async (req: AuthenticatedRequest, r
   try {
     const body = req.body;
     if (!body.title) return res.status(400).json({ error: "title is required" });
+    if (body.epubUrl?.trim() && !isPdfBookUrl(body.epubUrl)) {
+      return res.status(400).json({ error: "Only PDF books are supported" });
+    }
 
     const id = randomUUID();
     const timestamp = new Date().toISOString();
