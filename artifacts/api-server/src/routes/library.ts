@@ -631,6 +631,17 @@ libraryRouter.get("/library/:id/file", authenticate, async (req, res) => {
       return res.status(400).json({ error: "Book URL is not a valid public link" });
     }
 
+    // On Vercel, avoid buffering large PDFs — redirect browser to the source URL.
+    const wantsDirect = req.query.direct === "1" || Boolean(process.env.VERCEL);
+    if (
+      wantsDirect &&
+      /archive\.org|gutenberg\.org|cloudinary\.com|cdn\.jsdelivr\.net|raw\.githubusercontent\.com|backblazeb2\.com/i.test(
+        epubUrl,
+      )
+    ) {
+      return res.redirect(302, epubUrl);
+    }
+
     const candidates = epubUrl.includes("archive.org")
       ? await archivePdfCandidates(epubUrl)
       : epubUrl.includes("gutenberg.org")

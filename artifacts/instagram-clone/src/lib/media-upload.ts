@@ -3,6 +3,8 @@ import { tryRefreshSession } from "./api";
 
 /** Use binary upload for files > 5MB to avoid base64 bloat; smaller files use base64 for better compatibility in strict WebViews. */
 const BINARY_UPLOAD_MIN_BYTES = 5 * 1024 * 1024;
+/** Vercel request body limit is ~4.5MB — keep JSON uploads under this. */
+const JSON_UPLOAD_MAX_BYTES = 3 * 1024 * 1024;
 
 const RETRYABLE_STATUS = new Set([408, 429, 502, 503, 504]);
 
@@ -12,7 +14,6 @@ function normalizeUploadMime(mime: string): string {
 
 function binaryUploadHeaders(contentType: string, fileName?: string): Record<string, string> {
   const auth = getAuthHeaders();
-  // auth includes Content-Type: application/json — must override with real file mime
   const headers: Record<string, string> = { ...auth, "Content-Type": contentType };
   if (fileName) {
     headers["X-File-Name"] = encodeURIComponent(fileName);
@@ -32,9 +33,55 @@ async function refreshSessionIfUnauthorized(status: number, attempt: number): Pr
   return false;
 }
 
-/** PDFs must use the backend raw upload — Cloudinary auto/upload mishandles PDFs and JSON base64 hits Vercel body limits. */
-function preferBackendBinaryUpload(mime: string): boolean {
+function isPdfMime(mime: string): boolean {
   return mime === "application/pdf" || mime.startsWith("application/pdf;");
+}
+
+/** Upload PDF directly to Cloudinary raw storage — bypasses Vercel body limits. */
+async function uploadPdfToCloudinaryRaw(
+  file: File | Blob,
+  controller: AbortController,
+  attempt = 0,
+): Promise<string | null> {
+  const signRes = await fetch("/api/media/sign?resourceType=raw", {
+    headers: getAuthHeaders(),
+    credentials: "include",
+    signal: controller.signal,
+  });
+
+  if (!signRes.ok) return null;
+
+  const { signature, timestamp, apiKey, cloudName } = (await signRes.json()) as {
+    signature: string;
+    timestamp: number;
+    apiKey: string;
+    cloudName: string;
+  };
+
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("api_key", apiKey);
+  formData.append("timestamp", String(timestamp));
+  formData.append("signature", signature);
+  formData.append("resource_type", "raw");
+
+  const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/raw/upload`, {
+    method: "POST",
+    body: formData,
+    signal: controller.signal,
+  });
+
+  if (await refreshSessionIfUnauthorized(res.status, attempt)) {
+    return uploadPdfToCloudinaryRaw(file, controller, attempt + 1);
+  }
+  if (RETRYABLE_STATUS.has(res.status) && attempt < 2) {
+    await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
+    return uploadPdfToCloudinaryRaw(file, controller, attempt + 1);
+  }
+  if (!res.ok) return null;
+
+  const body = (await res.json()) as { url?: string; secure_url?: string };
+  return body.secure_url || body.url || null;
 }
 
 async function uploadViaBackendBinary(
@@ -44,7 +91,7 @@ async function uploadViaBackendBinary(
   controller: AbortController,
   attempt: number,
 ): Promise<Response> {
-  const res = await fetch("/api/media/upload-binary", {
+  let res = await fetch("/api/media/upload-binary", {
     method: "POST",
     credentials: "include",
     headers: binaryUploadHeaders(mime, fileName),
@@ -52,7 +99,7 @@ async function uploadViaBackendBinary(
     signal: controller.signal,
   });
   if (await refreshSessionIfUnauthorized(res.status, attempt)) {
-    return fetch("/api/media/upload-binary", {
+    res = await fetch("/api/media/upload-binary", {
       method: "POST",
       credentials: "include",
       headers: binaryUploadHeaders(mime, fileName),
@@ -76,7 +123,16 @@ export async function uploadMediaBinary(
 
   let res: Response;
   try {
-    if (preferBackendBinaryUpload(mime)) {
+    if (isPdfMime(mime)) {
+      const cloudUrl = await uploadPdfToCloudinaryRaw(file, controller, attempt);
+      if (cloudUrl) return cloudUrl;
+
+      if (file.size <= JSON_UPLOAD_MAX_BYTES) {
+        clearTimeout(timer);
+        const dataUrl = await readFileAsDataUrl(file);
+        return uploadMedia(dataUrl, mime, 0, fileName);
+      }
+
       res = await uploadViaBackendBinary(file, mime, fileName, controller, attempt);
     } else {
       const signRes = await fetch("/api/media/sign", {
@@ -110,26 +166,25 @@ export async function uploadMediaBinary(
     }
     if (attempt < 2) {
       await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
-      return uploadMediaBinary(file, contentType, attempt + 1);
+      return uploadMediaBinary(file, contentType, attempt + 1, fileName);
     }
     throw err;
   } finally {
     clearTimeout(timer);
   }
 
-  // Only refresh session if the request hit our backend (401/403)
-  if (!res.url.includes("api.cloudinary.com") && await refreshSessionIfUnauthorized(res.status, attempt)) {
-    return uploadMediaBinary(file, contentType, attempt + 1);
+  if (!res.url.includes("api.cloudinary.com") && (await refreshSessionIfUnauthorized(res.status, attempt))) {
+    return uploadMediaBinary(file, contentType, attempt + 1, fileName);
   }
   if (RETRYABLE_STATUS.has(res.status) && attempt < 2) {
     await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
-    return uploadMediaBinary(file, contentType, attempt + 1);
+    return uploadMediaBinary(file, contentType, attempt + 1, fileName);
   }
   if (!res.ok) {
     const err = (await res.json().catch(() => ({ error: "Upload failed" }))) as { error?: string; message?: string };
     throw new Error(err.error ?? err.message ?? "Failed to upload to cloud storage");
   }
-  
+
   const body = (await res.json()) as { url?: string; secure_url?: string };
   return body.secure_url || body.url || "";
 }
@@ -146,7 +201,7 @@ export async function uploadMedia(dataUrl: string, contentType?: string, attempt
     for (let i = 0; i < len; i++) {
       bytes[i] = binaryString.charCodeAt(i);
     }
-    return uploadMediaBinary(new Blob([bytes], { type: mime }), mime);
+    return uploadMediaBinary(new Blob([bytes], { type: mime }), mime, 0, fileName);
   }
 
   const res = await fetch("/api/media/upload", {
@@ -160,11 +215,11 @@ export async function uploadMedia(dataUrl: string, contentType?: string, attempt
     }),
   });
   if (await refreshSessionIfUnauthorized(res.status, attempt)) {
-    return uploadMedia(dataUrl, contentType, attempt + 1);
+    return uploadMedia(dataUrl, contentType, attempt + 1, fileName);
   }
   if (RETRYABLE_STATUS.has(res.status) && attempt < 1) {
     await new Promise((r) => setTimeout(r, 600));
-    return uploadMedia(dataUrl, contentType, attempt + 1);
+    return uploadMedia(dataUrl, contentType, attempt + 1, fileName);
   }
   if (!res.ok) {
     const err = (await res.json().catch(() => ({ error: "Upload failed" }))) as { error?: string };
@@ -174,13 +229,13 @@ export async function uploadMedia(dataUrl: string, contentType?: string, attempt
   return body.url;
 }
 
-/** Upload a File/Blob — binary path to Cloudinary (best for mobile camera, docs, video). */
+/** Upload a File/Blob — PDFs go to Cloudinary raw; other media uses auto/binary paths. */
 export async function uploadMediaFile(file: File | Blob, contentType?: string): Promise<string> {
   const mime =
     normalizeUploadMime(contentType || (file instanceof File ? file.type : "") || "application/octet-stream");
 
   const fileName = file instanceof File ? file.name : undefined;
-  const useBinary = preferBackendBinaryUpload(mime) || file.size >= BINARY_UPLOAD_MIN_BYTES;
+  const useBinary = isPdfMime(mime) || file.size >= BINARY_UPLOAD_MIN_BYTES;
 
   if (useBinary) {
     return uploadMediaBinary(file, mime, 0, fileName);
