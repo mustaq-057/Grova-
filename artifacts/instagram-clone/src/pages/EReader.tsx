@@ -94,7 +94,7 @@ export default function EReader() {
   useEffect(() => {
     if (!id) return;
     setLoading(true);
-    apiFetch(`/library/${id}`).then(async (book: any) => {
+    apiFetch(`/library/${id}`).then((res: any) => res.json()).then(async (book: any) => {
       let finalUrl = book.epubUrl;
       if (!finalUrl) {
         setEpubData(null);

@@ -739,7 +739,7 @@ export default function Library() {
 
               {/* Content */}
               <div className="relative z-10 w-2/3">
-                <h3 className="text-2xl font-bold text-[var(--lib-text)] mb-1">Add a book</h3>
+                <h3 className="text-2xl font-bold text-[var(--lib-text)] mb-1 flex items-center gap-1.5"><Plus className="w-6 h-6 text-primary" strokeWidth={3} /> Add a book</h3>
                 <p className="text-sm font-medium text-[var(--lib-muted)]">Is there a book you are reading?</p>
               </div>
             </div>
@@ -1162,7 +1162,7 @@ export default function Library() {
             onClick={() => setLibraryTab("dashboard")} 
             className={`flex flex-col items-center gap-1 transition-all ${libraryTab === "dashboard" ? "text-primary scale-110" : "text-[var(--lib-muted)] hover:text-[var(--lib-text)]"}`}
           >
-            <div className={`p-2 rounded-full ${libraryTab === "dashboard" ? "bg-primary text-[var(--lib-text)]" : ""}`}>
+            <div className={`p-2 rounded-full ${libraryTab === "dashboard" ? "bg-primary text-primary-foreground" : ""}`}>
               <BookOpen className="w-6 h-6" />
             </div>
           </button>
@@ -1170,7 +1170,7 @@ export default function Library() {
             onClick={() => setLibraryTab("memorize")} 
             className={`flex flex-col items-center gap-1 transition-all ${libraryTab === "memorize" ? "text-primary scale-110" : "text-[var(--lib-muted)] hover:text-[var(--lib-text)]"}`}
           >
-            <div className={`p-2 rounded-full ${libraryTab === "memorize" ? "bg-primary text-[var(--lib-text)]" : ""}`}>
+            <div className={`p-2 rounded-full ${libraryTab === "memorize" ? "bg-primary text-primary-foreground" : ""}`}>
               <Lightbulb className="w-6 h-6" />
             </div>
           </button>
@@ -1178,7 +1178,7 @@ export default function Library() {
             onClick={() => setLibraryTab("achievements")} 
             className={`flex flex-col items-center gap-1 transition-all ${libraryTab === "achievements" ? "text-primary scale-110" : "text-[var(--lib-muted)] hover:text-[var(--lib-text)]"}`}
           >
-            <div className={`p-2 rounded-full ${libraryTab === "achievements" ? "bg-primary text-[var(--lib-text)]" : ""}`}>
+            <div className={`p-2 rounded-full ${libraryTab === "achievements" ? "bg-primary text-primary-foreground" : ""}`}>
               <Medal className="w-6 h-6" />
             </div>
           </button>
