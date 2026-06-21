@@ -65,6 +65,9 @@ const SOURCE_COLORS: Record<string, string> = {
   "Open Library": "#4CAF50",
   "Gutendex": "#2196F3",
   "Internet Archive": "#FF9800",
+  "Internet Archive (AR)": "#FF9800",
+  "Shamela / Arabic": "#009688",
+  "Arabic Classics": "#009688",
   "Shamela": "#009688",
   "Wikisource (EN)": "#9E9E9E",
   "Wikisource (AR)": "#607D8B",
@@ -72,7 +75,7 @@ const SOURCE_COLORS: Record<string, string> = {
 };
 
 const RANDOM_CATALOG = [
-  { id: "c1", title: "كليلة ودمنة", author: "ابن المقفع", source: "Shamela", totalPages: 300, epubUrl: "https://shamela.ws/book/23846", description: "أشهر حكايات الحيوان الرمزية في التراث العربي.", coverUrl: null, isLink: true },
+  { id: "c1", title: "كليلة ودمنة", author: "ابن المقفع", source: "Arabic Classics", totalPages: 300, epubUrl: "https://archive.org/download/book01129/book01129.epub", description: "أشهر حكايات الحيوان الرمزية في التراث العربي.", coverUrl: "https://archive.org/services/img/book01129" },
   { id: "c2", title: "Pride and Prejudice", author: "Jane Austen", source: "Gutendex", totalPages: 350, epubUrl: "https://www.gutenberg.org/ebooks/1342.epub3.images", description: "A classic romance novel.", coverUrl: "https://www.gutenberg.org/cache/epub/1342/pg1342.cover.medium.jpg" },
   { id: "c3", title: "Les Misérables", author: "Victor Hugo", source: "Gutendex", totalPages: 1400, epubUrl: "https://www.gutenberg.org/ebooks/135.epub3.images", description: "A French historical novel.", coverUrl: "https://www.gutenberg.org/cache/epub/135/pg135.cover.medium.jpg" },
   { id: "c4", title: "Don Quijote", author: "Miguel de Cervantes", source: "Gutendex", totalPages: 1000, epubUrl: "https://www.gutenberg.org/ebooks/2000.epub3.images", description: "The classic Spanish novel.", coverUrl: "https://www.gutenberg.org/cache/epub/2000/pg2000.cover.medium.jpg" }
@@ -136,6 +139,8 @@ export default function Library() {
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
   const [activeNotesBook, setActiveNotesBook] = useState<ApiBook | null>(null);
   const [selectedPreviewBook, setSelectedPreviewBook] = useState<SearchResult | null>(null);
+  const [selectedResultIds, setSelectedResultIds] = useState<Set<string>>(new Set());
+  const [batchAdding, setBatchAdding] = useState(false);
   const [activeTab, setActiveTab] = useState<"myShelf" | "partnerShelf" | "finished" | "favorites" | "paused" | "gaveUp">("myShelf");
   const [libraryTab, setLibraryTab] = useState<"dashboard" | "memorize" | "achievements">("dashboard");
   const [allNotes, setAllNotes] = useState<LibraryNote[]>([]);
@@ -370,6 +375,7 @@ export default function Library() {
 
   const addToLibrary = async (book: SearchResult) => {
     if (addingId === book.id || addedIds.has(book.id)) return;
+    if (!book.epubUrl?.trim()) return;
     setAddingId(book.id);
     try {
       await apiFetch("/library", {
@@ -386,11 +392,49 @@ export default function Library() {
       });
       setAddedIds((prev) => new Set([...prev, book.id]));
       await loadBooks();
-      // DO NOT immediately open book. User wants to see the "Read Now" and "Download Cover" buttons instead.
     } catch (err) {
       console.error("Failed to add book:", err);
     } finally {
       setAddingId(null);
+    }
+  };
+
+  const toggleResultSelection = (id: string) => {
+    setSelectedResultIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const addSelectedToLibrary = async () => {
+    if (batchAdding || selectedResultIds.size === 0) return;
+    const toAdd = searchResults.filter((r) => selectedResultIds.has(r.id) && r.epubUrl?.trim());
+    if (toAdd.length === 0) return;
+    setBatchAdding(true);
+    try {
+      await apiFetch("/library/batch", {
+        method: "POST",
+        body: JSON.stringify({
+          books: toAdd.map((b) => ({
+            title: b.title,
+            author: b.author,
+            coverUrl: b.coverUrl,
+            description: b.description,
+            totalPages: b.totalPages,
+            epubUrl: b.epubUrl,
+            source: b.source,
+          })),
+        }),
+      });
+      setAddedIds((prev) => new Set([...prev, ...toAdd.map((b) => b.id)]));
+      setSelectedResultIds(new Set());
+      await loadBooks();
+    } catch (err) {
+      console.error("Batch add failed:", err);
+    } finally {
+      setBatchAdding(false);
     }
   };
 
@@ -409,18 +453,16 @@ export default function Library() {
   const openBook = (book: ApiBook) => {
     if (!book.epubUrl?.trim()) {
       alert(libLang === "ar"
-        ? "لا يوجد ملف رقمي لهذا الكتاب. احذفه وأضف نسخة من نتائج البحث التي تحتوي EPUB أو PDF."
-        : "No digital file for this book. Remove it and re-add from search results with EPUB or PDF.");
+        ? "لا يوجد ملف EPUB/PDF لهذا الكتاب. ابحث وأضف نسخة من نتائج البحث."
+        : "No EPUB/PDF file for this book. Search and add a copy with a download link.");
       return;
     }
-    // Shamela and HathiTrust are web pages, not direct epub files
-    if (book.isLink || book.source === "Shamela" || book.source === "HathiTrust") {
+    if (book.isLink && !book.epubUrl.toLowerCase().includes(".epub") && !book.epubUrl.toLowerCase().includes(".pdf")) {
       if (book.epubUrl) {
         setInAppBrowserUrl(book.epubUrl);
         return;
       }
     }
-    // For standard EPUBs (or books without URLs that will use the fallback/error state), use our native EReader
     setLocation(`/read/${book.id}`);
   };
 
@@ -647,14 +689,37 @@ export default function Library() {
                 <p className="text-sm font-semibold">{t.loading}</p>
               </div>
           ) : displayedResults.length > 0 ? (
+            <>
+            {selectedResultIds.size > 0 && (
+              <div className="sticky bottom-20 z-30 mx-auto max-w-md">
+                <button
+                  onClick={addSelectedToLibrary}
+                  disabled={batchAdding}
+                  className="w-full bg-primary text-primary-foreground font-bold py-3.5 px-6 rounded-2xl shadow-2xl flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-70"
+                >
+                  {batchAdding ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
+                  Add {selectedResultIds.size} book{selectedResultIds.size > 1 ? "s" : ""} to shelf
+                </button>
+              </div>
+            )}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
               {displayedResults.map((result) => {
                 const alreadyAdded = addedIds.has(result.id);
                 const isAdding = addingId === result.id;
+                const isSelected = selectedResultIds.has(result.id);
                 return (
-                  <div key={result.id} className="bg-[var(--lib-card)] rounded-2xl overflow-hidden border border-[var(--lib-border)] flex flex-col group cursor-pointer transition-colors duration-300" onClick={() => setSelectedPreviewBook(result)}>
+                  <div key={result.id} className={`bg-[var(--lib-card)] rounded-2xl overflow-hidden border flex flex-col group cursor-pointer transition-colors duration-300 ${isSelected ? "border-primary ring-2 ring-primary/40" : "border-[var(--lib-border)]"}`} onClick={() => setSelectedPreviewBook(result)}>
                     <div className="aspect-[2/3] w-full bg-[var(--lib-bg)] relative overflow-hidden">
                       <BookCover coverUrl={result.coverUrl} title={result.title} />
+                      {!alreadyAdded && result.epubUrl && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); toggleResultSelection(result.id); }}
+                          className={`absolute top-2 left-2 z-20 w-7 h-7 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? "bg-primary border-primary text-primary-foreground" : "bg-black/50 border-white/60 text-white"}`}
+                          title="Select for batch add"
+                        >
+                          {isSelected ? "✓" : "+"}
+                        </button>
+                      )}
                       <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 p-3 backdrop-blur-sm">
                         {result.isLink ? (
                           <a
@@ -703,6 +768,7 @@ export default function Library() {
                 );
               })}
             </div>
+            </>
           ) : searchResults.length > 0 ? (
             <div className="text-center py-10 text-[var(--lib-muted)]">
               <Filter className="w-8 h-8 mx-auto mb-2 opacity-30" />

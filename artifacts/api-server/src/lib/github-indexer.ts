@@ -102,9 +102,8 @@ export async function initGithubIndexer() {
   }
 }
 
-export async function searchGithubIndex(query: string): Promise<GithubBook[]> {
+export async function searchGithubIndex(query: string, limit = 6): Promise<GithubBook[]> {
   if (!isInitialized) {
-    // Lazy initialize if not done
     await initGithubIndexer();
   }
   
@@ -116,6 +115,5 @@ export async function searchGithubIndex(query: string): Promise<GithubBook[]> {
     book.author.toLowerCase().includes(lowerQuery)
   );
   
-  // Return top 4 results
-  return matches.slice(0, 4);
+  return matches.slice(0, limit);
 }

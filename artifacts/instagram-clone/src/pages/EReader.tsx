@@ -1,72 +1,146 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useLocation, useParams } from "wouter";
 import { ReactReader, ReactReaderStyle } from "react-reader";
-import { ChevronLeft, Settings, Info, Type, Link as LinkIcon, MessageSquare, Send, X } from "lucide-react";
+import { ChevronLeft, Settings, Info, Type, Link as LinkIcon, MessageSquare, Send, X, Minus, Plus } from "lucide-react";
 import { apiFetch, apiFetchBlob } from "@/lib/api";
 
 type LibraryBook = {
   epubUrl?: string | null;
   title?: string;
+  author?: string;
 };
 
-type Theme = "obsidian" | "parchment" | "sepia" | "midnight";
+type Theme = "parchment" | "sepia" | "obsidian" | "midnight";
 
-const THEMES: Record<Theme, { bg: string, text: string, name: string, readerStyles: any }> = {
-  obsidian: {
-    name: "Obsidian",
-    bg: "#000000",
-    text: "#b3b3b3",
-    readerStyles: {
-      body: { background: '#000000', color: '#b3b3b3' },
-      p: { color: '#b3b3b3' },
-      h1: { color: '#ffffff' },
-      h2: { color: '#ffffff' },
-    }
-  },
+const THEMES: Record<Theme, { bg: string; text: string; name: string; page: string; readerStyles: Record<string, Record<string, string>> }> = {
   parchment: {
     name: "Parchment",
-    bg: "#FDF6E3",
-    text: "#3E362E",
+    bg: "#2c2416",
+    page: "#f4ead5",
+    text: "#2a2118",
     readerStyles: {
-      body: { background: '#FDF6E3', color: '#3E362E' },
-      p: { color: '#3E362E' },
-    }
+      body: { background: "#f4ead5", color: "#2a2118" },
+      p: { color: "#2a2118" },
+      h1: { color: "#1a1208" },
+      h2: { color: "#1a1208" },
+    },
   },
   sepia: {
-    name: "Sepia Sunset",
-    bg: "#4A3320",
-    text: "#E6C6A5",
+    name: "Sepia",
+    bg: "#1f1610",
+    page: "#e8d4b8",
+    text: "#3d2e1e",
     readerStyles: {
-      body: { background: '#4A3320', color: '#E6C6A5' },
-      p: { color: '#E6C6A5' },
-    }
+      body: { background: "#e8d4b8", color: "#3d2e1e" },
+      p: { color: "#3d2e1e" },
+    },
+  },
+  obsidian: {
+    name: "Obsidian",
+    bg: "#0a0a0a",
+    page: "#141414",
+    text: "#d4d4d4",
+    readerStyles: {
+      body: { background: "#141414", color: "#d4d4d4" },
+      p: { color: "#d4d4d4" },
+      h1: { color: "#ffffff" },
+    },
   },
   midnight: {
-    name: "Midnight Navy",
-    bg: "#0A192F",
-    text: "#CCD6F6",
+    name: "Midnight",
+    bg: "#050d1a",
+    page: "#0f1e33",
+    text: "#c8d6f0",
     readerStyles: {
-      body: { background: '#0A192F', color: '#CCD6F6' },
-      p: { color: '#CCD6F6' },
-    }
-  }
+      body: { background: "#0f1e33", color: "#c8d6f0" },
+      p: { color: "#c8d6f0" },
+    },
+  },
 };
 
+const BOOK_CSS = `
+  @import url('https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400&family=Lora:ital,wght@0,400;0,600;1,400&display=swap');
+  html { padding: 0 !important; margin: 0 !important; }
+  body {
+    font-family: 'Lora', 'Amiri', 'Georgia', 'Times New Roman', serif !important;
+    font-size: 1.35em !important;
+    line-height: 2 !important;
+    text-align: justify !important;
+    hyphens: auto !important;
+    padding: 2.5em 2em 3em !important;
+    max-width: 42em !important;
+    margin: 0 auto !important;
+    box-sizing: border-box !important;
+    letter-spacing: 0.01em !important;
+  }
+  body[dir="rtl"], [dir="rtl"] body {
+    font-family: 'Amiri', 'Traditional Arabic', serif !important;
+    text-align: right !important;
+    line-height: 2.2 !important;
+  }
+  p, div, li {
+    margin-bottom: 1.1em !important;
+    orphans: 3 !important;
+    widows: 3 !important;
+  }
+  h1, h2, h3 {
+    font-family: 'Lora', 'Amiri', Georgia, serif !important;
+    line-height: 1.4 !important;
+    margin: 1.5em 0 0.75em !important;
+    text-align: center !important;
+  }
+  img { max-width: 100% !important; height: auto !important; margin: 1em auto !important; display: block !important; }
+`;
+
+function applyBookRendition(rendition: any, theme: Theme, fontSize: number, lineHeight: number) {
+  const t = THEMES[theme];
+  rendition.themes.register("book", {
+    ...t.readerStyles,
+    body: {
+      ...t.readerStyles.body,
+      "font-size": `${fontSize}% !important`,
+      "line-height": `${lineHeight} !important`,
+    },
+  });
+  rendition.themes.select("book");
+  rendition.themes.fontSize(`${fontSize}%`);
+
+  rendition.hooks.content.register((contents: any) => {
+    const doc = contents.document;
+    const body = doc.body;
+    if (!body) return;
+    const text = body.textContent || "";
+    const isRtl = /[\u0600-\u06FF\u0750-\u077F]/.test(text.slice(0, 500));
+    doc.documentElement.setAttribute("dir", isRtl ? "rtl" : "ltr");
+    doc.documentElement.setAttribute("lang", isRtl ? "ar" : "en");
+
+    const style = doc.createElement("style");
+    style.textContent = BOOK_CSS.replace(
+      "line-height: 2 !important",
+      `line-height: ${lineHeight} !important`,
+    );
+    doc.head.appendChild(style);
+  });
+}
+
 export default function EReader() {
-  const [location, setLocation] = useLocation();
+  const [, setLocation] = useLocation();
   const { id } = useParams();
   const [bookLocation, setBookLocation] = useState<string | number>(0);
-  const [theme, setTheme] = useState<Theme>("obsidian");
+  const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem("grova-reader-theme") as Theme) || "parchment");
   const [showMenu, setShowMenu] = useState(true);
-  const [fontSize, setFontSize] = useState(100);
+  const [fontSize, setFontSize] = useState(() => Number(localStorage.getItem("grova-reader-font")) || 155);
+  const [lineHeight, setLineHeight] = useState(() => Number(localStorage.getItem("grova-reader-line")) || 2.1);
   const [showSettings, setShowSettings] = useState(false);
   const [duetMode, setDuetMode] = useState(false);
+  const [bookTitle, setBookTitle] = useState("");
+  const [progressPct, setProgressPct] = useState(0);
   const renditionRef = useRef<any>(null);
   const isRemoteSync = useRef(false);
   const sessionPagesReadRef = useRef(0);
   const lastPageRef = useRef<number | null>(null);
 
-  const [epubData, setEpubData] = useState<ArrayBuffer | string | null>(null);
+  const [epubData, setEpubData] = useState<string | null>(null);
   const [isPdf, setIsPdf] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -75,33 +149,36 @@ export default function EReader() {
   const [noteText, setNoteText] = useState("");
   const [isSavingNote, setIsSavingNote] = useState(false);
 
-  // Session tracking (1 minute intervals)
+  useEffect(() => {
+    localStorage.setItem("grova-reader-theme", theme);
+  }, [theme]);
+
+  useEffect(() => {
+    localStorage.setItem("grova-reader-font", String(fontSize));
+    localStorage.setItem("grova-reader-line", String(lineHeight));
+    if (renditionRef.current) {
+      applyBookRendition(renditionRef.current, theme, fontSize, lineHeight);
+    }
+  }, [theme, fontSize, lineHeight]);
+
   useEffect(() => {
     if (!id || loading || !epubData) return;
-    
-    // Set an interval to log a minute of reading
     const intervalId = setInterval(() => {
       if (document.visibilityState === "visible") {
         const pagesRead = sessionPagesReadRef.current;
-        sessionPagesReadRef.current = 0; // Reset after sending
-
+        sessionPagesReadRef.current = 0;
         apiFetch(`/library/${id}/session`, {
           method: "POST",
-          body: JSON.stringify({ durationMinutes: 1, pagesRead })
-        }).catch(err => console.error("Failed to log session:", err));
+          body: JSON.stringify({ durationMinutes: 1, pagesRead }),
+        }).catch(() => {});
       }
     }, 60000);
-
     return () => clearInterval(intervalId);
   }, [id, loading, epubData]);
 
-  // Jump to location from URL params (e.g. from Memorize notes)
   useEffect(() => {
-    const searchParams = new URLSearchParams(window.location.search);
-    const loc = searchParams.get("location");
-    if (loc) {
-      setBookLocation(loc);
-    }
+    const loc = new URLSearchParams(window.location.search).get("location");
+    if (loc) setBookLocation(loc);
   }, []);
 
   useEffect(() => {
@@ -119,11 +196,9 @@ export default function EReader() {
 
       try {
         const book = await apiFetch<LibraryBook>(`/library/${id}`);
+        setBookTitle(book.title || "");
         if (!book.epubUrl?.trim()) {
-          if (!cancelled) {
-            setEpubData(null);
-            setLoading(false);
-          }
+          if (!cancelled) { setEpubData(null); setLoading(false); }
           return;
         }
 
@@ -134,9 +209,8 @@ export default function EReader() {
           blob = proxied.blob;
           contentType = proxied.contentType;
         } catch (proxyErr) {
-          console.warn("Book proxy failed, trying direct download:", proxyErr);
           const directUrl = book.epubUrl;
-          if (!/cdn\.jsdelivr\.net|cloudinary\.com|raw\.githubusercontent\.com/i.test(directUrl)) {
+          if (!/cdn\.jsdelivr\.net|cloudinary\.com|archive\.org|raw\.githubusercontent\.com/i.test(directUrl)) {
             throw proxyErr;
           }
           const direct = await fetch(directUrl);
@@ -150,7 +224,7 @@ export default function EReader() {
           contentType.includes("application/pdf");
 
         const blobUrl = URL.createObjectURL(
-          pdf ? blob : new Blob([await blob.arrayBuffer()], { type: "application/epub+zip" })
+          pdf ? blob : new Blob([await blob.arrayBuffer()], { type: "application/epub+zip" }),
         );
         blobUrlRef.current = blobUrl;
 
@@ -161,7 +235,6 @@ export default function EReader() {
           URL.revokeObjectURL(blobUrl);
         }
       } catch (e) {
-        console.error(e);
         if (!cancelled) {
           setEpubData(null);
           setLoadError(e instanceof Error ? e.message : "Failed to load book");
@@ -181,12 +254,8 @@ export default function EReader() {
   }, [id]);
 
   useEffect(() => {
-    // DND MODE: Block notifications and chat while reading
     window.localStorage.setItem("DND_LIBRARY_MODE", "true");
-    // Hide menu initially if we want true zen mode on load
-    const timer = setTimeout(() => {
-      setShowMenu(false);
-    }, 3000);
+    const timer = setTimeout(() => setShowMenu(false), 3500);
     return () => {
       window.localStorage.removeItem("DND_LIBRARY_MODE");
       clearTimeout(timer);
@@ -209,63 +278,50 @@ export default function EReader() {
 
   const syncDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const locationChanged = (epubcifi: string) => {
-    // Clear any previous debounce
-    if (syncDebounceRef.current) {
-      clearTimeout(syncDebounceRef.current);
-    }
+  const locationChanged = useCallback((epubcifi: string) => {
+    if (syncDebounceRef.current) clearTimeout(syncDebounceRef.current);
 
-    // Debounce the state update and network sync to prevent UI thread locking
     syncDebounceRef.current = setTimeout(() => {
       setBookLocation(epubcifi);
-      
-      // Track page read and update status to 'reading'
+
       if (renditionRef.current) {
-         try {
-           const loc = renditionRef.current.currentLocation();
-           if (loc && loc.start && loc.start.displayed) {
-              const page = loc.start.displayed.page;
-              if (page && page > 0) {
-                 if (lastPageRef.current !== null && page !== lastPageRef.current) {
-                    sessionPagesReadRef.current += 1;
-                 }
-                 lastPageRef.current = page;
+        try {
+          const loc = renditionRef.current.currentLocation();
+          if (loc?.start?.displayed) {
+            const page = loc.start.displayed.page;
+            const total = loc.start.displayed.total;
+            if (total > 0) setProgressPct(Math.round((page / total) * 100));
 
-                 apiFetch(`/library/${id}/progress`, {
-                   method: "PUT",
-                   body: JSON.stringify({ page, status: "reading" })
-                 }).catch(e => console.error("Progress tracking failed:", e));
+            if (page > 0) {
+              if (lastPageRef.current !== null && page !== lastPageRef.current) {
+                sessionPagesReadRef.current += 1;
               }
-           }
-         } catch (e) {
-           console.error("Could not extract page number", e);
-         }
+              lastPageRef.current = page;
+              apiFetch(`/library/${id}/progress`, {
+                method: "PUT",
+                body: JSON.stringify({ page, status: "reading" }),
+              }).catch(() => {});
+            }
+          }
+        } catch { /* ignore */ }
       }
 
-      // Only broadcast if it's a local user action
       if (!isRemoteSync.current && duetMode) {
-        apiFetch(`/library/${id}/sync`, { 
-          method: "POST", 
-          body: JSON.stringify({ epubcifi }) 
-        }).catch(e => console.error("Sync failed:", e));
+        apiFetch(`/library/${id}/sync`, {
+          method: "POST",
+          body: JSON.stringify({ epubcifi }),
+        }).catch(() => {});
       }
-      
-      // Reset the flag
       isRemoteSync.current = false;
-    }, 300); // Wait 300ms after last page turn before syncing
-  };
-
-  const handleToggleMenu = () => {
-    setShowMenu(!showMenu);
-    if (showSettings) setShowSettings(false);
-  };
+    }, 300);
+  }, [duetMode, id]);
 
   const changeFontSize = (delta: number) => {
-    const newSize = Math.max(80, Math.min(200, fontSize + delta));
-    setFontSize(newSize);
-    if (renditionRef.current) {
-      renditionRef.current.themes.fontSize(`${newSize}%`);
-    }
+    setFontSize((s) => Math.max(110, Math.min(220, s + delta)));
+  };
+
+  const changeLineHeight = (delta: number) => {
+    setLineHeight((h) => Math.max(1.6, Math.min(2.8, Math.round((h + delta) * 10) / 10)));
   };
 
   const handleSaveNote = async () => {
@@ -274,10 +330,7 @@ export default function EReader() {
     try {
       await apiFetch(`/library/${id}/notes`, {
         method: "POST",
-        body: JSON.stringify({
-          text: noteText,
-          chapterOrPage: String(bookLocation) // Saving current location
-        })
+        body: JSON.stringify({ text: noteText, chapterOrPage: String(bookLocation) }),
       });
       window.dispatchEvent(new Event("LIBRARY_NOTES_UPDATED"));
       setShowNoteModal(false);
@@ -289,177 +342,182 @@ export default function EReader() {
     }
   };
 
-  return (
-    <div 
-      className="fixed inset-0 z-[100] transition-colors duration-500 flex flex-col"
-      style={{ backgroundColor: THEMES[theme].bg, color: THEMES[theme].text }}
-    >
-      {/* Hidden Menu Overlay Trigger (Center tap) */}
-      <div 
-        className="absolute inset-0 z-10 w-1/3 left-1/3" 
-        onClick={handleToggleMenu}
-      />
+  const t = THEMES[theme];
 
-      {/* Top Navbar */}
-      <div className={`absolute top-0 left-0 right-0 p-4 pt-10 z-20 flex justify-between items-center bg-black/40 backdrop-blur-md transition-opacity duration-300 ${showMenu ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
-        <button onClick={() => setLocation("/library")} className="p-2 rounded-full hover:bg-white/10 active:scale-90 text-white">
-          <ChevronLeft className="w-6 h-6" />
-        </button>
-        <div className="flex gap-2">
-          <button 
-            onClick={() => setDuetMode(!duetMode)} 
-            className={`p-2 rounded-full hover:bg-white/10 active:scale-90 ${duetMode ? 'text-primary drop-shadow-[0_0_8px_rgba(var(--primary),0.8)]' : 'text-white'}`}
-            title="Duet Mode (Sync Pages)"
-          >
-            <LinkIcon className="w-6 h-6" />
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex flex-col transition-colors duration-500"
+      style={{ backgroundColor: t.bg }}
+    >
+      {/* Tap center to toggle menu */}
+      <div className="absolute inset-0 z-10 w-1/3 left-1/3" onClick={() => { setShowMenu((m) => !m); setShowSettings(false); }} />
+
+      {/* Top bar */}
+      <div className={`absolute top-0 left-0 right-0 z-20 transition-opacity duration-300 ${showMenu ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
+        <div className="flex items-center justify-between px-4 pt-10 pb-3 bg-gradient-to-b from-black/70 to-transparent">
+          <button onClick={() => setLocation("/library")} className="p-2 rounded-full bg-black/30 text-white active:scale-90">
+            <ChevronLeft className="w-6 h-6" />
           </button>
-          <button 
-            onClick={() => setShowNoteModal(true)} 
-            className="p-2 rounded-full hover:bg-white/10 active:scale-90 text-white"
-            title="Take Note"
-          >
-            <MessageSquare className="w-6 h-6" />
-          </button>
-          <button 
-            onClick={() => setShowSettings(!showSettings)} 
-            className="p-2 rounded-full hover:bg-white/10 active:scale-90 text-white"
-          >
-            <Settings className="w-6 h-6" />
-          </button>
+          <div className="flex-1 mx-3 text-center min-w-0">
+            <p className="text-white/90 text-sm font-serif font-bold truncate">{bookTitle}</p>
+            {progressPct > 0 && <p className="text-white/50 text-[10px] mt-0.5">{progressPct}% through book</p>}
+          </div>
+          <div className="flex gap-1">
+            <button onClick={() => setDuetMode(!duetMode)} className={`p-2 rounded-full bg-black/30 active:scale-90 ${duetMode ? "text-primary" : "text-white"}`}>
+              <LinkIcon className="w-5 h-5" />
+            </button>
+            <button onClick={() => setShowNoteModal(true)} className="p-2 rounded-full bg-black/30 text-white active:scale-90">
+              <MessageSquare className="w-5 h-5" />
+            </button>
+            <button onClick={() => setShowSettings(!showSettings)} className="p-2 rounded-full bg-black/30 text-white active:scale-90">
+              <Settings className="w-5 h-5" />
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Settings Modal */}
+      {/* Settings panel */}
       {showSettings && (
-        <div className="absolute top-24 right-4 bg-gray-900 border border-white/10 rounded-2xl shadow-2xl p-4 z-30 w-64 text-white">
-          <h4 className="text-sm font-bold mb-3 opacity-70">THEME</h4>
-          <div className="flex justify-between mb-6">
-            {(Object.keys(THEMES) as Theme[]).map(t => (
-              <button 
-                key={t}
-                onClick={() => setTheme(t)}
-                className={`w-10 h-10 rounded-full border-2 ${theme === t ? "border-primary" : "border-transparent"}`}
-                style={{ backgroundColor: THEMES[t].bg }}
-              />
+        <div className="absolute top-28 right-4 left-4 sm:left-auto bg-[#1a1a1a]/95 border border-white/10 rounded-2xl shadow-2xl p-5 z-30 sm:w-72 text-white backdrop-blur-md">
+          <h4 className="text-xs font-bold mb-3 opacity-60 uppercase tracking-widest">Reading Theme</h4>
+          <div className="grid grid-cols-4 gap-2 mb-5">
+            {(Object.keys(THEMES) as Theme[]).map((th) => (
+              <button
+                key={th}
+                onClick={() => setTheme(th)}
+                className={`h-10 rounded-xl border-2 text-[9px] font-bold capitalize ${theme === th ? "border-primary scale-105" : "border-transparent"}`}
+                style={{ backgroundColor: THEMES[th].page, color: THEMES[th].text }}
+              >
+                {THEMES[th].name.slice(0, 3)}
+              </button>
             ))}
           </div>
 
-          <h4 className="text-sm font-bold mb-3 opacity-70">FONT SIZE</h4>
-          <div className="flex items-center justify-between bg-white/5 rounded-full p-1">
-            <button onClick={() => changeFontSize(-10)} className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/10">
-              <Type className="w-4 h-4" />
+          <h4 className="text-xs font-bold mb-2 opacity-60 uppercase tracking-widest">Text Size</h4>
+          <div className="flex items-center justify-between bg-white/5 rounded-xl p-1 mb-4">
+            <button onClick={() => changeFontSize(-10)} className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/10">
+              <Minus className="w-4 h-4" />
             </button>
             <span className="font-bold text-sm">{fontSize}%</span>
-            <button onClick={() => changeFontSize(10)} className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/10">
+            <button onClick={() => changeFontSize(10)} className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/10">
+              <Plus className="w-4 h-4" />
+            </button>
+          </div>
+
+          <h4 className="text-xs font-bold mb-2 opacity-60 uppercase tracking-widest">Line Spacing</h4>
+          <div className="flex items-center justify-between bg-white/5 rounded-xl p-1">
+            <button onClick={() => changeLineHeight(-0.1)} className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/10">
+              <Type className="w-3 h-3" />
+            </button>
+            <span className="font-bold text-sm">{lineHeight.toFixed(1)}×</span>
+            <button onClick={() => changeLineHeight(0.1)} className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/10">
               <Type className="w-5 h-5" />
             </button>
           </div>
         </div>
       )}
 
-      {/* Reader */}
-      <div className="flex-1 relative z-0 pb-10" style={{ height: "100vh" }}>
+      {/* Book viewport — paper page centered with shadow */}
+      <div className="flex-1 flex items-stretch justify-center px-0 sm:px-6 py-0 sm:py-4 relative z-0 min-h-0">
         {loading ? (
-          <div className="w-full h-full flex flex-col items-center justify-center text-white/50 space-y-4">
-            <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-            <p className="text-sm font-medium tracking-widest uppercase">Opening Book...</p>
+          <div className="flex flex-col items-center justify-center flex-1 text-white/50 gap-4">
+            <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+            <p className="text-sm font-serif tracking-wide">Opening your book…</p>
           </div>
         ) : !epubData ? (
-          <div className="w-full h-full flex flex-col items-center justify-center text-center px-6">
-            <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mb-6">
-              <Info className="w-10 h-10 text-white/30" />
-            </div>
-            <h2 className="text-2xl font-serif font-bold text-white mb-2">
+          <div className="flex flex-col items-center justify-center flex-1 text-center px-6">
+            <Info className="w-12 h-12 text-white/30 mb-4" />
+            <h2 className="text-xl font-serif font-bold text-white mb-2">
               {loadError ? "Error Loading Book" : "No Digital Version Available"}
             </h2>
-            <p className="text-white/50 max-w-sm mb-8">
-              {loadError || "This book has no downloadable file. Remove it and add again from search results that include EPUB or PDF."}
-            </p>
-            <button 
-              onClick={() => setLocation("/library")}
-              className="px-6 py-3 bg-primary text-primary-foreground font-bold rounded-full hover:scale-105 active:scale-95 transition-transform"
-            >
-              Return to Library
+            <p className="text-white/50 max-w-sm mb-6 text-sm">{loadError || "Search the library and add a book with an EPUB file."}</p>
+            <button onClick={() => setLocation("/library")} className="px-6 py-3 bg-primary text-primary-foreground font-bold rounded-full">
+              Back to Library
             </button>
           </div>
-        ) : isPdf && typeof epubData === "string" ? (
-          <div className="w-full h-full bg-white relative">
-             <iframe
-               src={epubData}
-               className="w-full h-full border-none absolute inset-0"
-               title="PDF Viewer"
-             />
+        ) : isPdf ? (
+          <div className="flex-1 max-w-3xl mx-auto w-full bg-white shadow-[0_0_60px_rgba(0,0,0,0.5)] rounded-none sm:rounded-lg overflow-hidden">
+            <iframe src={epubData} className="w-full h-full border-none" title="PDF Viewer" />
           </div>
         ) : (
-          <ReactReader
-            url={epubData}
-          epubInitOptions={{ openAs: 'epub' }}
-          location={bookLocation}
-          locationChanged={locationChanged}
-          getRendition={(rendition) => {
-            renditionRef.current = rendition;
-            rendition.themes.register('custom', THEMES[theme].readerStyles);
-            rendition.themes.select('custom');
-            rendition.themes.fontSize(`${fontSize}%`);
-          }}
-          tocChanged={() => {}}
-          swipeable
-          epubOptions={{
-            flow: "paginated",
-            manager: "continuous",
-            spread: "none"
-          }}
-          readerStyles={{
-            // Spread all required default styles first, then override what we need
-            ...ReactReaderStyle,
-            container:  { ...ReactReaderStyle.container,  width: '100%', height: '100%' },
-            readerArea: { ...ReactReaderStyle.readerArea, width: '100%', height: '100%', transition: 'background-color 0.5s' },
-            titleArea:  { ...ReactReaderStyle.titleArea,  display: 'none' },
-            tocArea:    { ...ReactReaderStyle.tocArea,    display: 'none' },
-            arrow:      { ...ReactReaderStyle.arrow,      background: 'transparent', padding: '0 20px', color: THEMES[theme].text, opacity: '0.3' },
-          }}
-        />
+          <div
+            className="flex-1 w-full max-w-2xl mx-auto relative shadow-[0_8px_40px_rgba(0,0,0,0.45),inset_0_0_0_1px_rgba(255,255,255,0.06)] sm:rounded-lg overflow-hidden"
+            style={{ backgroundColor: t.page }}
+          >
+            {/* Page edge shadow */}
+            <div className="absolute inset-y-0 left-0 w-3 bg-gradient-to-r from-black/10 to-transparent pointer-events-none z-10" />
+            <div className="absolute inset-y-0 right-0 w-3 bg-gradient-to-l from-black/10 to-transparent pointer-events-none z-10" />
+            <ReactReader
+              url={epubData}
+              epubInitOptions={{ openAs: "epub" }}
+              location={bookLocation}
+              locationChanged={locationChanged}
+              getRendition={(rendition) => {
+                renditionRef.current = rendition;
+                applyBookRendition(rendition, theme, fontSize, lineHeight);
+              }}
+              tocChanged={() => {}}
+              swipeable
+              epubOptions={{
+                flow: "paginated",
+                manager: "default",
+                spread: "auto",
+              }}
+              readerStyles={{
+                ...ReactReaderStyle,
+                container: { ...ReactReaderStyle.container, width: "100%", height: "100%", background: t.page },
+                readerArea: { ...ReactReaderStyle.readerArea, width: "100%", height: "100%", background: t.page },
+                titleArea: { ...ReactReaderStyle.titleArea, display: "none" },
+                tocArea: { ...ReactReaderStyle.tocArea, display: "none" },
+                arrow: {
+                  ...ReactReaderStyle.arrow,
+                  background: "rgba(0,0,0,0.15)",
+                  borderRadius: "50%",
+                  width: 44,
+                  height: 44,
+                  color: t.text,
+                  opacity: 0.7,
+                },
+              }}
+            />
+          </div>
         )}
       </div>
 
-      {/* Bottom Bar Scrubber */}
-      <div className={`absolute bottom-0 left-0 right-0 p-4 pb-8 z-20 bg-black/40 backdrop-blur-md transition-opacity duration-300 ${showMenu && !showNoteModal ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
-         <div className="flex justify-center text-xs font-bold uppercase tracking-wider text-white opacity-80">
-            Zen Mode Active
-         </div>
-      </div>
+      {/* Progress bar */}
+      {!loading && epubData && progressPct > 0 && (
+        <div className={`absolute bottom-0 left-0 right-0 z-20 transition-opacity duration-300 ${showMenu ? "opacity-100" : "opacity-0"}`}>
+          <div className="h-1 bg-black/30">
+            <div className="h-full bg-primary transition-all duration-500" style={{ width: `${progressPct}%` }} />
+          </div>
+        </div>
+      )}
 
-      {/* Take Note Modal */}
       {showNoteModal && (
         <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm flex flex-col justify-end">
-          <div className="bg-[var(--lib-card)] rounded-t-3xl p-6 h-[50vh] flex flex-col shadow-2xl animate-in slide-in-from-bottom-full duration-300" style={{ backgroundColor: THEMES[theme].bg, color: THEMES[theme].text }}>
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="font-bold flex items-center gap-2">
-                <MessageSquare className="w-5 h-5 text-primary" /> Note this thought
+          <div className="rounded-t-3xl p-6 h-[50vh] flex flex-col shadow-2xl" style={{ backgroundColor: t.page, color: t.text }}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-bold font-serif flex items-center gap-2">
+                <MessageSquare className="w-5 h-5 text-primary" /> Note
               </h3>
               <button onClick={() => setShowNoteModal(false)} className="p-2 hover:bg-black/10 rounded-full">
                 <X className="w-5 h-5" />
               </button>
             </div>
-            
             <textarea
-              className="w-full flex-1 bg-black/5 border border-black/10 rounded-xl p-4 resize-none focus:outline-none focus:ring-2 focus:ring-primary/50 text-base"
-              style={{ color: THEMES[theme].text }}
+              className="w-full flex-1 bg-black/5 border border-black/10 rounded-xl p-4 resize-none focus:outline-none focus:ring-2 focus:ring-primary/40 text-base font-serif leading-relaxed"
               placeholder="What did you learn from this page?"
               value={noteText}
               onChange={(e) => setNoteText(e.target.value)}
               autoFocus
             />
-
-            <div className="mt-4 flex justify-end">
-              <button 
-                onClick={handleSaveNote}
-                disabled={isSavingNote || !noteText.trim()}
-                className="bg-primary hover:bg-primary/90 text-white px-6 py-3 rounded-full font-bold flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-              >
-                {isSavingNote ? "Saving..." : <><Send className="w-4 h-4" /> Save Note</>}
-              </button>
-            </div>
+            <button
+              onClick={handleSaveNote}
+              disabled={isSavingNote || !noteText.trim()}
+              className="mt-4 self-end bg-primary text-primary-foreground px-6 py-3 rounded-full font-bold flex items-center gap-2 disabled:opacity-50"
+            >
+              {isSavingNote ? "Saving…" : <><Send className="w-4 h-4" /> Save</>}
+            </button>
           </div>
         </div>
       )}

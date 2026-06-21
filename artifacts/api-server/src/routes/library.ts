@@ -5,6 +5,12 @@ import { authenticate } from "../lib/auth-middleware";
 import type { AuthenticatedRequest } from "../types";
 import * as cheerio from "cheerio";
 import { searchGithubIndex } from "../lib/github-indexer";
+import {
+  searchInternetArchive,
+  searchOpenLibrary,
+  searchShamelaCatalog,
+  ARABIC_FEATURED,
+} from "../lib/library-sources";
 import { appConfig } from "../lib/config";
 
 const libraryRouter = Router();
@@ -169,8 +175,8 @@ libraryRouter.get("/library/search", authenticate, async (req, res) => {
   const oapenFetch = fetch(`https://library.oapen.org/rest/search?query=${enc}&expand=metadata,bitstreams`, { signal: AbortSignal.timeout(6000) }).catch(() => null);
 
   // 5. Wikisources (Export to EPUB)
-  const wikiArFetch = skipWikiAr ? Promise.resolve(null) : fetch(`https://ar.wikisource.org/w/api.php?action=query&list=search&srsearch=${enc}&format=json&srlimit=3`);
-  const wikiEnFetch = skipWikiEn ? Promise.resolve(null) : fetch(`https://en.wikisource.org/w/api.php?action=query&list=search&srsearch=${enc}&format=json&srlimit=3`);
+  const wikiArFetch = skipWikiAr ? Promise.resolve(null) : fetch(`https://ar.wikisource.org/w/api.php?action=query&list=search&srsearch=${enc}&format=json&srlimit=6`);
+  const wikiEnFetch = skipWikiEn ? Promise.resolve(null) : fetch(`https://en.wikisource.org/w/api.php?action=query&list=search&srsearch=${enc}&format=json&srlimit=5`);
   const wikiFrFetch = skipWikiFr ? Promise.resolve(null) : fetch(`https://fr.wikisource.org/w/api.php?action=query&list=search&srsearch=${enc}&format=json&srlimit=3`);
   const wikiDeFetch = skipWikiDe ? Promise.resolve(null) : fetch(`https://de.wikisource.org/w/api.php?action=query&list=search&srsearch=${enc}&format=json&srlimit=3`);
 
@@ -204,9 +210,48 @@ libraryRouter.get("/library/search", authenticate, async (req, res) => {
     return true;
   }
 
+  // ── Internet Archive + Open Library + Shamela/Arabic (millions of EPUBs) ──
+  const [iaSettled, olSettled, shamelaSettled] = await Promise.allSettled([
+    searchInternetArchive(query, { arabic, limit: arabic ? 12 : 8 }),
+    searchOpenLibrary(query, arabic ? 8 : 6),
+    searchShamelaCatalog(query, arabic ? 12 : 5),
+  ]);
+
+  const ingestCatalog = (settled: PromiseSettledResult<any[]>, label: string) => {
+    if (settled.status !== "fulfilled") {
+      sourceMeta[label] = "timeout";
+      return;
+    }
+    let added = 0;
+    for (const hit of settled.value) {
+      if (!dedup(hit.title)) continue;
+      results.push(hit);
+      added++;
+    }
+    sourceMeta[label] = added > 0 ? "ok" : "empty";
+  };
+
+  ingestCatalog(iaSettled, arabic ? "Internet Archive (AR)" : "Internet Archive");
+  ingestCatalog(shamelaSettled, "Shamela / Arabic");
+  ingestCatalog(olSettled, "Open Library");
+
+  if (arabic) {
+    for (const feat of ARABIC_FEATURED) {
+      const q = query.trim();
+      if (
+        !q ||
+        feat.title.includes(q) ||
+        q.split(/\s+/).some((w) => w.length > 1 && feat.title.includes(w))
+      ) {
+        if (dedup(feat.title)) results.unshift(feat);
+      }
+    }
+    sourceMeta["Arabic Classics"] = results.some((r) => r.source === "Arabic Classics") ? "ok" : "empty";
+  }
+
   // ── 1. GitHub Curation Indexer (Blazing Fast In-Memory) ─────────────────
   try {
-    const githubResults = await searchGithubIndex(query);
+    const githubResults = await searchGithubIndex(query, arabic ? 10 : 6);
     let added = 0;
     for (const ghBook of githubResults) {
       if (!dedup(ghBook.title)) continue;
@@ -306,7 +351,7 @@ libraryRouter.get("/library/search", authenticate, async (req, res) => {
       try {
         const data = await ((gutendexRes.value as Response)).json() as any;
         let added = 0;
-        for (const item of (data.results || []).slice(0, 3)) {
+        for (const item of (data.results || []).slice(0, 6)) {
           if (!item.title || !dedup(item.title)) continue;
           const fileUrl =
             item.formats?.["application/epub+zip"] ||
@@ -400,7 +445,7 @@ libraryRouter.get("/library/search", authenticate, async (req, res) => {
       try {
         const data = await (resResult.value as Response).json() as any;
         let added = 0;
-        for (const item of (data.query?.search || []).slice(0, 2)) {
+        for (const item of (data.query?.search || []).slice(0, 4)) {
           if (!item.title || !dedup(item.title)) continue;
           // Direct EPUB export from Wikipedia's ws-export tool!
           const epubUrl = `https://ws-export.wmcloud.org/?format=epub&lang=${lang}&page=${encodeURIComponent(item.title)}`;
@@ -446,6 +491,17 @@ libraryRouter.get("/library/search", authenticate, async (req, res) => {
     const bContains = b.title.toLowerCase().includes(exactLower);
     if (aContains && !bContains) return -1;
     if (!aContains && bContains) return 1;
+
+    // Favor sources with real downloadable files for Arabic
+    const sourceRank = (s: string) => {
+      if (s.includes("Shamela") || s === "Arabic Classics") return 0;
+      if (s.includes("Internet Archive")) return 1;
+      if (s === "Open Library") return 2;
+      if (s === "Gutendex" || s === "Standard Ebooks") return 3;
+      return 4;
+    };
+    const rankDiff = sourceRank(a.source) - sourceRank(b.source);
+    if (rankDiff !== 0) return rankDiff;
 
     // Favor Standard Ebooks and Gutendex over Github Global if both match
     const aIsGithub = a.source.includes("GitHub Global");
@@ -667,6 +723,47 @@ libraryRouter.get("/library/:id", authenticate, async (req, res) => {
   } catch (err) {
     console.error("Library GET/:id error:", err);
     return res.status(500).json({ error: "Failed to fetch book" });
+  }
+});
+
+// ─── BATCH ADD BOOKS ───────────────────────────────────────────────────────────
+libraryRouter.post("/library/batch", authenticate, async (req: AuthenticatedRequest, res) => {
+  try {
+    const books = Array.isArray(req.body?.books) ? req.body.books : [];
+    if (books.length === 0) return res.status(400).json({ error: "books array required" });
+
+    const authorId = req.user?.id || "mustaq";
+    const added: { id: string; title: string }[] = [];
+
+    for (const body of books.slice(0, 25)) {
+      if (!body?.title || !body?.epubUrl?.trim()) continue;
+      const id = randomUUID();
+      const timestamp = new Date().toISOString();
+      await db.execute(
+        `INSERT INTO library_books
+           (id, title, author, cover_url, description, epub_url, source, added_by, added_at, current_page, total_pages)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+        [
+          id,
+          body.title,
+          body.author || "Unknown Author",
+          body.coverUrl || null,
+          body.description || null,
+          body.epubUrl,
+          body.source || "Unknown",
+          authorId,
+          timestamp,
+          0,
+          body.totalPages || 100,
+        ],
+      );
+      added.push({ id, title: body.title });
+    }
+
+    return res.json({ success: true, added: added.length, books: added });
+  } catch (err) {
+    console.error("Library batch POST error:", err);
+    return res.status(500).json({ error: "Failed to batch add books" });
   }
 });
 
