@@ -3,6 +3,14 @@ import { useLocation, useParams } from "wouter";
 import { ReactReader, ReactReaderStyle } from "react-reader";
 import { ChevronLeft, Settings, Info, Type, Link as LinkIcon, MessageSquare, Send, X, Minus, Plus } from "lucide-react";
 import { apiFetch, apiFetchBlob } from "@/lib/api";
+import { Document, Page, pdfjs } from "react-pdf";
+import "react-pdf/dist/Page/TextLayer.css";
+import "react-pdf/dist/Page/AnnotationLayer.css";
+
+pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+  "pdfjs-dist/build/pdf.worker.min.mjs",
+  import.meta.url
+).toString();
 
 type LibraryBook = {
   epubUrl?: string | null;
@@ -139,6 +147,7 @@ export default function EReader() {
   const isRemoteSync = useRef(false);
   const sessionPagesReadRef = useRef(0);
   const lastPageRef = useRef<number | null>(null);
+  const pdfContainerRef = useRef<HTMLDivElement>(null);
 
   const [epubData, setEpubData] = useState<string | null>(null);
   const [isPdf, setIsPdf] = useState(false);
@@ -346,6 +355,32 @@ export default function EReader() {
     }
   };
 
+  const handlePdfScroll = () => {
+    if (!pdfContainerRef.current || totalPages === 0) return;
+    const { scrollTop, scrollHeight, clientHeight } = pdfContainerRef.current;
+    
+    // Calculate current page based on scroll progress
+    const scrollProgress = scrollTop / (scrollHeight - clientHeight || 1);
+    let newPage = Math.max(1, Math.min(totalPages, Math.ceil(scrollProgress * totalPages)));
+    
+    // For very top of document:
+    if (scrollTop === 0) newPage = 1;
+    
+    if (newPage !== currentPage) {
+      setCurrentPage(newPage);
+      setProgressPct(Math.round((newPage / totalPages) * 100));
+      
+      // Debounced backend sync
+      if (syncDebounceRef.current) clearTimeout(syncDebounceRef.current);
+      syncDebounceRef.current = setTimeout(() => {
+        apiFetch(`/library/${id}/progress`, {
+          method: "PUT",
+          body: JSON.stringify({ page: newPage, status: "reading", totalPages }),
+        }).catch(() => {});
+      }, 500);
+    }
+  };
+
   const t = THEMES[theme];
 
   return (
@@ -440,8 +475,43 @@ export default function EReader() {
             </button>
           </div>
         ) : isPdf ? (
-          <div className="flex-1 max-w-3xl mx-auto w-full bg-white shadow-xl rounded-none sm:rounded-lg overflow-hidden">
-            <iframe src={epubData} className="w-full h-full border-none" title="PDF Viewer" />
+          <div 
+            className="flex-1 max-w-3xl mx-auto w-full bg-[#323639] overflow-y-auto sm:rounded-lg shadow-2xl relative"
+            ref={pdfContainerRef}
+            onScroll={handlePdfScroll}
+          >
+            <Document 
+              file={epubData} 
+              onLoadSuccess={({ numPages }) => {
+                setTotalPages(numPages);
+                setCurrentPage(1);
+              }}
+              className="flex flex-col items-center py-6 gap-6"
+              loading={
+                <div className="flex flex-col items-center justify-center flex-1 text-white/50 h-full w-full py-20 gap-4">
+                  <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+                  <p className="text-sm font-serif tracking-wide">Loading PDF Document…</p>
+                </div>
+              }
+            >
+              {Array.from(new Array(totalPages || 0), (el, index) => (
+                <Page 
+                  key={`page_${index + 1}`} 
+                  pageNumber={index + 1} 
+                  renderTextLayer={false} 
+                  renderAnnotationLayer={false}
+                  width={Math.min(window.innerWidth - 32, 800)}
+                  className="shadow-xl bg-white"
+                />
+              ))}
+            </Document>
+            
+            {/* Always visible minimal footer with page numbers for PDF */}
+            <div className="fixed bottom-4 left-1/2 -translate-x-1/2 h-8 px-4 rounded-full flex items-center justify-center pointer-events-none opacity-40 z-20" style={{ backgroundColor: t.page, color: t.text }}>
+              <span className="text-[11px] font-bold tracking-widest uppercase shadow-black/50">
+                {totalPages > 0 ? `Page ${currentPage} of ${totalPages}` : "Loading..."}
+              </span>
+            </div>
           </div>
         ) : (
           <div className="flex-1 flex flex-col w-full max-w-2xl mx-auto relative sm:rounded-lg overflow-hidden" style={{ backgroundColor: t.page }}>
