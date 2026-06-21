@@ -381,6 +381,7 @@ export default function Library() {
           "x-file-name": encodeURIComponent(file.name)
         },
         body: file,
+        timeout: 180_000, // 3 minutes timeout for large files
       });
 
       // We no longer calculate locations here because it takes too long on upload.

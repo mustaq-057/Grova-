@@ -65,12 +65,13 @@ export async function tryRefreshSession(): Promise<boolean> {
   return refreshInFlight;
 }
 
-export async function apiFetch<T = unknown>(path: string, options?: RequestInit, attempt = 0): Promise<T> {
+export async function apiFetch<T = unknown>(path: string, options?: RequestInit & { timeout?: number }, attempt = 0): Promise<T> {
   const method = options?.method ?? "GET";
   const isRead = method === "GET" || method === "HEAD";
   const maxAttempts = isRead ? 2 : 2;
 
-  const { signal, cleanup } = mergeAbortSignal(options?.signal ?? undefined, FETCH_TIMEOUT_MS);
+  const timeoutToUse = options?.timeout ?? FETCH_TIMEOUT_MS;
+  const { signal, cleanup } = mergeAbortSignal(options?.signal ?? undefined, timeoutToUse);
   try {
     const res = await fetch(`${BASE}${path}`, {
       ...options,
