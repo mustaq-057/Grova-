@@ -445,36 +445,34 @@ export default function EReader() {
           </div>
         ) : (
           <div className="flex-1 flex flex-col w-full max-w-2xl mx-auto relative sm:rounded-lg overflow-hidden" style={{ backgroundColor: t.page }}>
-            <div className="flex-1 relative min-h-0">
-              <ReactReader
-                url={epubData}
-                showToc={false}
-                epubInitOptions={{ openAs: "epub" }}
-                location={bookLocation}
-                locationChanged={locationChanged}
-                getRendition={(rendition) => {
-                  renditionRef.current = rendition;
-                  applyBookRendition(rendition, theme, fontSize, lineHeight);
-                }}
-                tocChanged={() => {}}
-                swipeable
-                epubOptions={{
-                  flow: "paginated",
-                  manager: "default",
-                  spread: "auto",
-                }}
-                readerStyles={{
-                  ...ReactReaderStyle,
-                  container: { ...ReactReaderStyle.container, width: "100%", height: "100%", background: t.page },
-                  readerArea: { ...ReactReaderStyle.readerArea, width: "100%", height: "100%", background: t.page },
-                  titleArea: { ...ReactReaderStyle.titleArea, display: "none" },
-                  tocArea: { ...ReactReaderStyle.tocArea, display: "none" },
-                  arrow: {
-                    ...ReactReaderStyle.arrow,
-                    display: "none", 
-                  },
-                }}
-              />
+            <div className="flex-1 relative min-h-0 w-full h-full">
+              <div className="absolute inset-0">
+                <ReactReader
+                  url={epubData}
+                  showToc={false}
+                  epubInitOptions={{ openAs: "epub" }}
+                  location={bookLocation}
+                  locationChanged={locationChanged}
+                  getRendition={(rendition) => {
+                    renditionRef.current = rendition;
+                    applyBookRendition(rendition, theme, fontSize, lineHeight);
+                  }}
+                  tocChanged={() => {}}
+                  swipeable={false}
+                  epubOptions={{
+                    flow: "scrolled",
+                    manager: "continuous",
+                  }}
+                  readerStyles={{
+                    ...ReactReaderStyle,
+                    container: { ...ReactReaderStyle.container, width: "100%", height: "100%", background: t.page },
+                    readerArea: { ...ReactReaderStyle.readerArea, width: "100%", height: "100%", background: t.page },
+                    titleArea: { ...ReactReaderStyle.titleArea, display: "none" },
+                    tocArea: { ...ReactReaderStyle.tocArea, display: "none" },
+                    arrow: { display: "none" },
+                  }}
+                />
+              </div>
             </div>
             
             {/* Always visible minimal footer with page numbers */}
