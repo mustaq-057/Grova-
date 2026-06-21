@@ -133,10 +133,15 @@ export async function searchOpenLibrary(query: string, limit = 8): Promise<Catal
   };
 
   const hits: CatalogHit[] = [];
-  for (const doc of data.docs || []) {
-    if (!doc.title || !doc.ia?.length) continue;
-    const pdfUrl = await iaResolvePdfUrl(doc.ia[0]!);
-    if (!pdfUrl) continue;
+  const docs = data.docs || [];
+  const pdfUrls = await Promise.all(
+    docs.map((doc) => (doc.ia?.[0] ? iaResolvePdfUrl(doc.ia[0]) : Promise.resolve(null))),
+  );
+
+  for (let i = 0; i < docs.length; i++) {
+    const doc = docs[i];
+    const pdfUrl = pdfUrls[i];
+    if (!doc?.title || !pdfUrl) continue;
 
     hits.push({
       id: `ol_${(doc.key || "").replace(/\//g, "_")}`,

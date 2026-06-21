@@ -113,14 +113,11 @@ export default memo(function Home() {
     return () => clearInterval(interval);
   }, []);
 
-  // Ensure library focus mode and fullscreen are disabled when returning to home
+  // Ensure library focus mode is disabled when returning to home (keep fullscreen if user enabled it)
   useEffect(() => {
     if (localStorage.getItem("libraryMode") === "true") {
       localStorage.setItem("libraryMode", "false");
       window.dispatchEvent(new Event("LIBRARY_MODE_CHANGED"));
-    }
-    if (document.fullscreenElement && document.exitFullscreen) {
-      document.exitFullscreen().catch(() => {});
     }
   }, []);
 

@@ -140,6 +140,26 @@ async function fetchBookUpstream(url: string): Promise<{ buffer: Buffer; content
   return { buffer, contentType };
 }
 
+async function findExistingLibraryBook(
+  addedBy: string,
+  title: string,
+  epubUrl?: string | null,
+): Promise<{ id: string } | null> {
+  const normTitle = title.toLowerCase().trim();
+  const url = epubUrl?.trim() || "";
+  const result = await db.query(
+    `SELECT id FROM library_books
+     WHERE added_by = $1
+       AND (
+         LOWER(TRIM(title)) = $2
+         OR ($3 <> '' AND epub_url = $3)
+       )
+     LIMIT 1`,
+    [addedBy, normTitle, url],
+  );
+  return (result.rows[0] as { id: string } | undefined) ?? null;
+}
+
 // ─── GET CURATED CATALOG ─────────────────────────────────────────────────────
 libraryRouter.get("/library/catalog", authenticate, async (req, res) => {
   const category = typeof req.query.category === "string" ? req.query.category : undefined;
@@ -264,6 +284,8 @@ libraryRouter.get("/library/search", authenticate, async (req, res) => {
     ? searchShamelaCatalog(query, 15)
     : Promise.resolve([]);
 
+  const githubIndexPromise = searchGithubIndex(query, arabic ? 12 : 8).catch(() => [] as Awaited<ReturnType<typeof searchGithubIndex>>);
+
   const iaLangOpts = arabic
     ? { arabic: true, limit: 15 }
     : german
@@ -272,10 +294,11 @@ libraryRouter.get("/library/search", authenticate, async (req, res) => {
         ? { french: true, limit: 12 }
         : { limit: arabic ? 15 : 14 };
 
-  const [iaSettled, olSettled, shamelaSettled] = await Promise.allSettled([
+  const [iaSettled, olSettled, shamelaSettled, githubSettled] = await Promise.allSettled([
     searchInternetArchive(query, iaLangOpts),
     searchOpenLibrary(query, arabic ? 8 : 10),
     shamelaPromise,
+    githubIndexPromise,
   ]);
 
   const ingestCatalog = (settled: PromiseSettledResult<any[]>, label: string) => {
@@ -306,72 +329,22 @@ libraryRouter.get("/library/search", authenticate, async (req, res) => {
   sourceMeta[arabic ? "Arabic Classics" : "English Classics"] =
     results.some((r) => r.source.includes("Classics")) ? "ok" : "empty";
 
-  // ── 1. GitHub Curation Indexer (Blazing Fast In-Memory) ─────────────────
-  try {
-    const githubResults = await searchGithubIndex(query, arabic ? 12 : 8);
+  // GitHub in-memory index (runs in parallel with IA / OL above)
+  if (githubSettled.status === "fulfilled") {
     let added = 0;
-    for (const ghBook of githubResults) {
+    for (const ghBook of githubSettled.value) {
       if (!isPdfBookUrl(ghBook.epubUrl)) continue;
       if (!dedup(ghBook.title)) continue;
       results.push(ghBook);
       added++;
     }
     sourceMeta["GitHub Omni"] = added > 0 ? "ok" : "empty";
-  } catch (err) {
+  } else {
     sourceMeta["GitHub Omni"] = "timeout";
   }
 
-  // ── 1.1 Global GitHub Search (Dynamic) ────────────────────────────────────
-  try {
-    // Search repositories that match the query and contain epub
-    const ghSearchRes = await fetch(`https://api.github.com/search/repositories?q=${enc}+pdf&per_page=2`, {
-      headers: { "User-Agent": "Grova-App" },
-      signal: AbortSignal.timeout(4000)
-    });
-    
-    if (ghSearchRes.ok) {
-      const ghSearchData = await ghSearchRes.json() as any;
-      let added = 0;
-      for (const repo of (ghSearchData.items || [])) {
-        try {
-          // Fetch the file tree of the found repo
-          const treeRes = await fetch(`https://api.github.com/repos/${repo.full_name}/git/trees/${repo.default_branch}?recursive=1`, {
-            headers: { "User-Agent": "Grova-App" },
-            signal: AbortSignal.timeout(3000)
-          });
-          if (treeRes.ok) {
-            const treeData = await treeRes.json() as any;
-            const pdfs = (treeData.tree || []).filter((f: any) => {
-              const pathLower = f.path.toLowerCase();
-              if (!pathLower.endsWith(".pdf")) return false;
-              const fileTitle = pathLower.split("/").pop()?.replace(/\.pdf$/i, "").replace(/[-_]/g, " ") || "";
-              return scoreBookMatch(query, { title: fileTitle, author: repo.name }) >= MIN_MATCH_SCORE;
-            });
-            if (pdfs.length > 0) {
-              const file = pdfs[0];
-              const title = file.path.split("/").pop()?.replace(/\.pdf$/i, "").replace(/[-_]/g, " ") || repo.name;
-              if (dedup(title)) {
-                results.push({
-                  id: `gh_global_${repo.id}`,
-                  title,
-                  author: repo.owner?.login || "GitHub Open Source",
-                  coverUrl: null,
-                  description: repo.description || "Found via Global GitHub Search.",
-                  epubUrl: `https://cdn.jsdelivr.net/gh/${repo.full_name}@${repo.default_branch}/${file.path.split("/").map(encodeURIComponent).join("/")}`,
-                  totalPages: 250,
-                  source: `GitHub (${repo.owner?.login})`,
-                });
-                added++;
-              }
-            }
-          }
-        } catch (e) { /* ignore tree fetch errors */ }
-      }
-      sourceMeta["GitHub Global"] = added > 0 ? "ok" : "empty";
-    }
-  } catch (err) {
-    sourceMeta["GitHub Global"] = "timeout";
-  }
+  // GitHub Global tree walk removed — too slow on serverless; GitHub Omni + catalog cover millions of titles.
+  sourceMeta["GitHub Global"] = "skipped";
 
   // ── 1.5 Standard Ebooks — skipped (PDF-only catalog) ─────────────────────
 
@@ -502,23 +475,27 @@ libraryRouter.get("/library/stats", authenticate, async (req: AuthenticatedReque
     );
 
     let streakDays = 0;
-    const today = new Date();
-    today.setUTCHours(0, 0, 0, 0);
+    const todayStr = new Date().toISOString().split("T")[0]!;
+    const sessionDateSet = new Set(
+      sessions.rows.map((r) => {
+        const raw = r.date as string | Date;
+        if (typeof raw === "string") return raw.split("T")[0]!;
+        return raw.toISOString().split("T")[0]!;
+      }),
+    );
 
-    for (let i = 0; i < sessions.rows.length; i++) {
-      const rowDate = new Date(sessions.rows[i].date);
-      rowDate.setUTCHours(0, 0, 0, 0);
-      const diffTime = today.getTime() - rowDate.getTime();
-      const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
-
-      if (diffDays === streakDays || diffDays === streakDays + 1) {
-        if (diffDays !== streakDays) streakDays++;
-      } else if (diffDays > streakDays + 1) {
-        break; // streak broken
-      }
+    let cursor = new Date(todayStr + "T00:00:00.000Z");
+    if (!sessionDateSet.has(todayStr)) {
+      cursor.setUTCDate(cursor.getUTCDate() - 1);
+    }
+    while (true) {
+      const key = cursor.toISOString().split("T")[0]!;
+      if (!sessionDateSet.has(key)) break;
+      streakDays++;
+      cursor.setUTCDate(cursor.getUTCDate() - 1);
     }
 
-    const todayDate = new Date().toISOString().split("T")[0];
+    const todayDate = todayStr;
     const currentYear = todayDate.split("-")[0];
 
     const dailyResult = await db.query(
@@ -539,35 +516,47 @@ libraryRouter.get("/library/stats", authenticate, async (req: AuthenticatedReque
     const totalPagesRead = Number(totalMetricsResult.rows[0]?.total_pages) || 0;
     const avgTimePerPage = totalPagesRead > 0 ? (totalDuration / totalPagesRead).toFixed(1) : 0;
 
-    // Compute weekly data (last 7 days)
+    // Weekly totals in one query (last 7 days)
+    const weekStart = new Date(todayDate + "T00:00:00.000Z");
+    weekStart.setUTCDate(weekStart.getUTCDate() - 6);
+    const weekStartStr = weekStart.toISOString().split("T")[0]!;
+    const weeklyRows = await db.query(
+      `SELECT date, SUM(duration_minutes) AS total
+       FROM library_reading_sessions
+       WHERE user_id = $1 AND date >= $2
+       GROUP BY date`,
+      [userId, weekStartStr],
+    );
+    const weeklyMap = new Map<string, number>();
+    for (const row of weeklyRows.rows) {
+      const d = row.date as string | Date;
+      const key = typeof d === "string" ? d.split("T")[0]! : d.toISOString().split("T")[0]!;
+      weeklyMap.set(key, Number(row.total) || 0);
+    }
     const weeklyData = [];
     for (let i = 6; i >= 0; i--) {
-      const d = new Date();
-      d.setUTCHours(0, 0, 0, 0);
-      d.setDate(d.getDate() - i);
-      const dateStr = d.toISOString().split("T")[0];
-      const sumRes = await db.query(
-        `SELECT SUM(duration_minutes) as total FROM library_reading_sessions WHERE user_id = $1 AND date = $2`,
-        [userId, dateStr]
-      );
-      weeklyData.push({
-        date: dateStr,
-        minutes: Number(sumRes.rows[0]?.total || 0)
-      });
+      const d = new Date(todayDate + "T00:00:00.000Z");
+      d.setUTCDate(d.getUTCDate() - i);
+      const dateStr = d.toISOString().split("T")[0]!;
+      weeklyData.push({ date: dateStr, minutes: weeklyMap.get(dateStr) || 0 });
     }
 
-    // Compute monthly data (12 months of current year)
+    // Monthly totals in one query (current year)
+    const monthlyRows = await db.query(
+      `SELECT SUBSTRING(CAST(date AS TEXT), 6, 2) AS month, SUM(duration_minutes) AS total
+       FROM library_reading_sessions
+       WHERE user_id = $1 AND CAST(date AS TEXT) LIKE $2
+       GROUP BY SUBSTRING(CAST(date AS TEXT), 6, 2)`,
+      [userId, `${currentYear}-%`],
+    );
+    const monthlyMap = new Map<string, number>();
+    for (const row of monthlyRows.rows) {
+      monthlyMap.set(String(row.month), Number(row.total) || 0);
+    }
     const monthlyData = [];
     for (let i = 1; i <= 12; i++) {
       const monthStr = i.toString().padStart(2, "0");
-      const sumRes = await db.query(
-        `SELECT SUM(duration_minutes) as total FROM library_reading_sessions WHERE user_id = $1 AND CAST(date AS TEXT) LIKE $2`,
-        [userId, `${currentYear}-${monthStr}-%`]
-      );
-      monthlyData.push({
-        month: monthStr,
-        minutes: Number(sumRes.rows[0]?.total || 0)
-      });
+      monthlyData.push({ month: monthStr, minutes: monthlyMap.get(monthStr) || 0 });
     }
 
     const finishedResult = await db.query(
@@ -713,6 +702,11 @@ libraryRouter.post("/library/batch", authenticate, async (req: AuthenticatedRequ
 
     for (const body of books.slice(0, 25)) {
       if (!body?.title || !body?.epubUrl?.trim() || !isPdfBookUrl(body.epubUrl)) continue;
+      const dup = await findExistingLibraryBook(authorId, body.title, body.epubUrl);
+      if (dup) {
+        added.push({ id: dup.id, title: body.title });
+        continue;
+      }
       const id = randomUUID();
       const timestamp = new Date().toISOString();
       await db.execute(
@@ -755,6 +749,11 @@ libraryRouter.post("/library", authenticate, async (req: AuthenticatedRequest, r
     const id = randomUUID();
     const timestamp = new Date().toISOString();
     const authorId = req.user?.id || "mustaq";
+
+    const existing = await findExistingLibraryBook(authorId, body.title, body.epubUrl);
+    if (existing) {
+      return res.json({ success: true, id: existing.id, duplicate: true });
+    }
 
     await db.execute(
       `INSERT INTO library_books
@@ -830,14 +829,30 @@ libraryRouter.post("/library/:id/session", authenticate, async (req: Authenticat
     const userId = req.user?.id;
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
-    const date = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
-    const id = randomUUID();
+    const date = new Date().toISOString().split("T")[0];
+    const mins = Math.max(0, Number(durationMinutes) || 1);
+    const pages = Math.max(0, Number(pagesRead) || 0);
 
-    await db.execute(
-      `INSERT INTO library_reading_sessions (id, user_id, book_id, date, duration_minutes, pages_read)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [id, userId, req.params.id, date, durationMinutes || 1, pagesRead || 0]
+    const existing = await db.query(
+      `SELECT id FROM library_reading_sessions WHERE user_id = $1 AND book_id = $2 AND date = $3 LIMIT 1`,
+      [userId, req.params.id, date],
     );
+
+    if (existing.rows[0]) {
+      await db.execute(
+        `UPDATE library_reading_sessions
+         SET duration_minutes = duration_minutes + $1, pages_read = pages_read + $2
+         WHERE id = $3`,
+        [mins, pages, existing.rows[0].id],
+      );
+    } else {
+      const id = randomUUID();
+      await db.execute(
+        `INSERT INTO library_reading_sessions (id, user_id, book_id, date, duration_minutes, pages_read)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [id, userId, req.params.id, date, mins, pages],
+      );
+    }
     return res.json({ success: true });
   } catch (err) {
     console.error("Library POST session error:", err);

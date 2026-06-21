@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Search, Book, Plus, BookOpen, ChevronLeft, ChevronRight, Trash2, CheckCircle2, Loader2, BookMarked, ExternalLink, Filter, X, MessageSquare, Send, Settings, Maximize, Download, Sparkles, Calendar, Flame, TrendingUp, Lightbulb, User, Medal, ArrowUpRight, BarChart3, Bookmark, Clock } from "lucide-react";
 import { useLocation } from "wouter";
 import { apiFetch, api } from "@/lib/api";
@@ -51,6 +51,18 @@ type SearchMeta = {
   total: number;
   sources: Record<string, "ok" | "timeout" | "skipped" | "empty">;
 };
+
+type PendingUpload = {
+  id: string;
+  title: string;
+  author: string;
+  epubUrl: string;
+  fileName: string;
+};
+
+function normalizeBookTitle(title: string): string {
+  return title.toLowerCase().trim().replace(/\s+/g, " ");
+}
 
 /** Generate a vibrant gradient from a string (for books without covers) */
 function titleToGradient(title: string): string {
@@ -186,6 +198,15 @@ export default function Library() {
   };
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const searchAbortRef = useRef<AbortController | null>(null);
+  const [pendingUploads, setPendingUploads] = useState<PendingUpload[]>(() => {
+    try {
+      const raw = localStorage.getItem("grova-pending-uploads");
+      return raw ? (JSON.parse(raw) as PendingUpload[]) : [];
+    } catch {
+      return [];
+    }
+  });
   
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -296,6 +317,36 @@ export default function Library() {
   }, [loadBooks, loadNotes, loadStats, loadCatalog]);
 
   useEffect(() => {
+    localStorage.setItem("grova-pending-uploads", JSON.stringify(pendingUploads));
+  }, [pendingUploads]);
+
+  useEffect(() => {
+    const refreshLiveStats = () => {
+      if (document.visibilityState !== "visible") return;
+      loadStats();
+      loadBooks();
+    };
+    window.addEventListener("focus", refreshLiveStats);
+    document.addEventListener("visibilitychange", refreshLiveStats);
+    window.addEventListener("LIBRARY_STATS_UPDATED", refreshLiveStats);
+    const statsInterval = setInterval(() => {
+      if (document.visibilityState === "visible") loadStats();
+    }, 45000);
+    return () => {
+      window.removeEventListener("focus", refreshLiveStats);
+      document.removeEventListener("visibilitychange", refreshLiveStats);
+      window.removeEventListener("LIBRARY_STATS_UPDATED", refreshLiveStats);
+      clearInterval(statsInterval);
+    };
+  }, [loadStats, loadBooks]);
+
+  useEffect(() => {
+    if (localStorage.getItem("grova-fullscreen") === "true" && !document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    }
+  }, []);
+
+  useEffect(() => {
     if (!user) return;
     const sendHeartbeat = () => {
       if (document.visibilityState !== "visible" || !navigator.onLine) return;
@@ -316,30 +367,51 @@ export default function Library() {
     };
   }, [user]);
 
-  // Debounced auto-search — fires 600ms after the user stops typing
+  // Debounced search — keep prior results visible while fetching
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     const q = searchQuery.trim();
-    if (!q) { setSearchResults([]); setSearchMeta(null); setActiveSource(null); return; }
-    debounceRef.current = setTimeout(async () => {
-      addRecentSearch(q);
-      setIsSearching(true);
+    if (!q) {
       setSearchResults([]);
+      setSearchMeta(null);
       setActiveSource(null);
+      setIsSearching(false);
+      return;
+    }
+    debounceRef.current = setTimeout(async () => {
+      setIsSearching(true);
+      searchAbortRef.current?.abort();
+      const ctrl = new AbortController();
+      searchAbortRef.current = ctrl;
       try {
         const res = await apiFetch<{ results: SearchResult[]; meta?: SearchMeta }>(
-          `/library/search?q=${encodeURIComponent(q)}`
+          `/library/search?q=${encodeURIComponent(q)}`,
+          { signal: ctrl.signal },
         );
+        if (ctrl.signal.aborted) return;
         setSearchResults(res.results || []);
         setSearchMeta(res.meta || null);
       } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") return;
         console.error("Search failed:", err);
       } finally {
-        setIsSearching(false);
+        if (!ctrl.signal.aborted) setIsSearching(false);
       }
-    }, 600);
+    }, 400);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [searchQuery]);
+
+  const isBookOnShelf = useCallback(
+    (title: string, epubUrl?: string | null) => {
+      const norm = normalizeBookTitle(title);
+      return books.some(
+        (b) =>
+          normalizeBookTitle(b.title) === norm ||
+          (!!epubUrl && !!b.epubUrl && b.epubUrl === epubUrl),
+      );
+    },
+    [books],
+  );
 
   // Keep form submit working too (instant search on Enter)
   const handleSearch = async (e: React.FormEvent | string) => {
@@ -350,18 +422,62 @@ export default function Library() {
     if (typeof e === "string") setSearchQuery(q);
     addRecentSearch(q);
     setIsSearching(true);
-    setSearchResults([]);
-    setActiveSource(null);
+    searchAbortRef.current?.abort();
+    const ctrl = new AbortController();
+    searchAbortRef.current = ctrl;
     try {
       const res = await apiFetch<{ results: SearchResult[]; meta?: SearchMeta }>(
-        `/library/search?q=${encodeURIComponent(q)}`
+        `/library/search?q=${encodeURIComponent(q)}`,
+        { signal: ctrl.signal },
       );
       setSearchResults(res.results || []);
       setSearchMeta(res.meta || null);
     } catch (err) {
-      console.error("Search failed:", err);
+      if (!(err instanceof DOMException && err.name === "AbortError")) {
+        console.error("Search failed:", err);
+      }
     } finally {
       setIsSearching(false);
+    }
+  };
+
+  const addPendingToShelf = async (pending: PendingUpload, status: "reading" | "wishlist" = "reading") => {
+    if (isBookOnShelf(pending.title, pending.epubUrl)) {
+      setUploadError(libLang === "ar" ? "هذا الكتاب موجود بالفعل على الرف." : "This book is already on your shelf.");
+      setPendingUploads((prev) => prev.filter((p) => p.id !== pending.id));
+      return;
+    }
+    try {
+      await apiFetch("/library", {
+        method: "POST",
+        body: JSON.stringify({
+          title: pending.title,
+          author: pending.author,
+          coverUrl: null,
+          description: "Uploaded manually.",
+          epubUrl: pending.epubUrl,
+          totalPages: 100,
+          source: "Uploaded",
+        }),
+      });
+      if (status === "wishlist") {
+        const shelf = await apiFetch<ApiBook[]>("/library");
+        const added = shelf.find(
+          (b) => b.epubUrl === pending.epubUrl || normalizeBookTitle(b.title) === normalizeBookTitle(pending.title),
+        );
+        if (added) {
+          await apiFetch(`/library/${added.id}/status`, {
+            method: "PATCH",
+            body: JSON.stringify({ status: "wishlist" }),
+          });
+        }
+      }
+      setPendingUploads((prev) => prev.filter((p) => p.id !== pending.id));
+      await loadBooks();
+      setUploadSuccess(true);
+      window.setTimeout(() => setUploadSuccess(false), 4000);
+    } catch (err: any) {
+      setUploadError(err?.message || "Failed to add to shelf");
     }
   };
 
@@ -389,20 +505,14 @@ export default function Library() {
         throw new Error("Upload returned empty URL — check Cloudinary settings.");
       }
 
-      await apiFetch("/library", {
-        method: "POST",
-        body: JSON.stringify({
-          title,
-          author,
-          coverUrl: null,
-          description,
-          epubUrl: url,
-          totalPages: 100,
-          source: "Uploaded",
-        }),
-      });
-
-      await loadBooks();
+      const pending: PendingUpload = {
+        id: `pending_${Date.now()}`,
+        title,
+        author,
+        epubUrl: url,
+        fileName: file.name,
+      };
+      setPendingUploads((prev) => [pending, ...prev.filter((p) => p.epubUrl !== url)]);
       setUploadSuccess(true);
       window.setTimeout(() => setUploadSuccess(false), 4000);
     } catch (err: any) {
@@ -416,7 +526,12 @@ export default function Library() {
   };
 
   const addToLibrary = async (book: SearchResult) => {
-    if (addingId === book.id || addedIds.has(book.id)) return;
+    if (addingId === book.id || addedIds.has(book.id) || isBookOnShelf(book.title, book.epubUrl)) {
+      if (isBookOnShelf(book.title, book.epubUrl)) {
+        setAddedIds((prev) => new Set([...prev, book.id]));
+      }
+      return;
+    }
     if (!book.epubUrl?.trim() || !isPdfUrl(book.epubUrl)) {
       alert(libLang === "ar" ? "هذا الكتاب ليس PDF." : "This book is not a PDF.");
       return;
@@ -455,7 +570,9 @@ export default function Library() {
 
   const addSelectedToLibrary = async () => {
     if (batchAdding || selectedResultIds.size === 0) return;
-    const toAdd = searchResults.filter((r) => selectedResultIds.has(r.id) && r.epubUrl?.trim());
+    const toAdd = searchResults.filter(
+      (r) => selectedResultIds.has(r.id) && r.epubUrl?.trim() && !isBookOnShelf(r.title, r.epubUrl),
+    );
     if (toAdd.length === 0) return;
     setBatchAdding(true);
     try {
@@ -550,13 +667,42 @@ export default function Library() {
     return () => window.removeEventListener("click", dismiss);
   }, [statusMenu]);
 
-  // Filtered results based on active source chip
-  const displayedResults = activeSource
-    ? searchResults.filter((r) => r.source === activeSource)
-    : searchResults;
+  // Instant local catalog hits + API results merged (deduped by title)
+  const instantCatalogHits = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return [] as SearchResult[];
+    return catalogBooks
+      .filter((b) => b.title.toLowerCase().includes(q) || b.author.toLowerCase().includes(q))
+      .slice(0, 12);
+  }, [searchQuery, catalogBooks]);
 
-  // Unique sources present in results
-  const resultSources = [...new Set(searchResults.map((r) => r.source))];
+  const mergedSearchResults = useMemo(() => {
+    if (!searchQuery.trim()) return [] as SearchResult[];
+    const seen = new Set<string>();
+    const out: SearchResult[] = [];
+    for (const r of [...instantCatalogHits, ...searchResults]) {
+      const key = normalizeBookTitle(r.title);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(r);
+    }
+    return out;
+  }, [searchQuery, instantCatalogHits, searchResults]);
+
+  useEffect(() => {
+    if (mergedSearchResults.length === 0) return;
+    const onShelf = mergedSearchResults
+      .filter((r) => isBookOnShelf(r.title, r.epubUrl))
+      .map((r) => r.id);
+    if (onShelf.length === 0) return;
+    setAddedIds((prev) => new Set([...prev, ...onShelf]));
+  }, [mergedSearchResults, isBookOnShelf]);
+
+  const displayedResults = activeSource
+    ? mergedSearchResults.filter((r) => r.source === activeSource)
+    : mergedSearchResults;
+
+  const resultSources = [...new Set(mergedSearchResults.map((r) => r.source))];
 
   // Netflix-style shelves
   const { partner: authPartner } = useAuth();
@@ -684,10 +830,10 @@ export default function Library() {
                     
                     if (matches.length === 0) return (
                       <div 
-                        className="p-4 text-center text-primary font-bold text-sm cursor-pointer hover:bg-[var(--lib-input)]"
+                        className="p-4 text-center text-[var(--lib-muted)] text-sm cursor-pointer hover:bg-[var(--lib-input)]"
                         onMouseDown={(e) => { e.preventDefault(); handleSearch(searchQuery); }}
                       >
-                        Press Enter to search global catalog
+                        {isSearching ? "Searching…" : "Press Enter to search"}
                       </div>
                     );
 
@@ -718,7 +864,7 @@ export default function Library() {
                           className="p-3 bg-[var(--lib-input)] text-center text-xs font-bold text-primary cursor-pointer hover:bg-primary/10 transition-colors"
                           onMouseDown={(e) => { e.preventDefault(); handleSearch(searchQuery); setIsSearchFocused(false); }}
                         >
-                          Search global catalog for "{searchQuery}"
+                          Search all sources for &ldquo;{searchQuery}&rdquo;
                         </div>
                       </>
                     );
@@ -739,12 +885,12 @@ export default function Library() {
                   : "bg-[var(--lib-input)] text-[var(--lib-muted)] border-[var(--lib-border)]"
               }`}
             >
-              All ({searchResults.length})
+              All ({mergedSearchResults.length})
             </button>
             {resultSources.map((src) => {
               const color = SOURCE_COLORS[src] || "#607D8B";
               const isActive = activeSource === src;
-              const count = searchResults.filter((r) => r.source === src).length;
+              const count = mergedSearchResults.filter((r) => r.source === src).length;
               return (
                 <button
                   key={src}
@@ -815,21 +961,20 @@ export default function Library() {
             );
           })()}
 
-          {/* Global Matches */}
+          {/* Online search results */}
           <div>
-            <h3 className="text-lg font-bold mb-3 flex items-center">
-              <Search className="w-5 h-5 mr-2 text-muted-foreground" /> Global Catalog
-            </h3>
-            {isSearching ? (
+            {isSearching && displayedResults.length === 0 ? (
               <div className="flex flex-col items-center py-12 gap-3 text-[var(--lib-muted)]">
                 <Loader2 className="w-7 h-7 animate-spin text-primary" />
-                <p className="text-sm font-semibold">{t.loading}</p>
+                <p className="text-sm font-semibold">Searching…</p>
               </div>
           ) : displayedResults.length > 0 ? (
             <>
-            <p className="text-xs text-[var(--lib-muted)] mb-3">
-              {displayedResults.length} PDF{displayedResults.length !== 1 ? "s" : ""} matching &ldquo;{searchQuery}&rdquo;
-            </p>
+            {isSearching && (
+              <p className="text-[10px] text-[var(--lib-muted)] mb-2 flex items-center gap-1">
+                <Loader2 className="w-3 h-3 animate-spin" /> Updating results…
+              </p>
+            )}
             {selectedResultIds.size > 0 && (
               <div className="sticky bottom-20 z-30 mx-auto max-w-md">
                 <button
@@ -844,7 +989,7 @@ export default function Library() {
             )}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
               {displayedResults.map((result) => {
-                const alreadyAdded = addedIds.has(result.id);
+                const alreadyAdded = addedIds.has(result.id) || isBookOnShelf(result.title, result.epubUrl);
                 const isAdding = addingId === result.id;
                 const isSelected = selectedResultIds.has(result.id);
                 return (
@@ -965,7 +1110,7 @@ export default function Library() {
                 </p>
                 {uploadSuccess && !isUploading && (
                   <p className="mt-2 text-xs text-emerald-400/90 leading-snug">
-                    {libLang === "ar" ? "تم رفع الكتاب بنجاح!" : "Book uploaded — tap it on your shelf to read."}
+                    {libLang === "ar" ? "تم الرفع — اضغط «أضف إلى الرف» في قائمة الانتظار." : "PDF uploaded — tap Add to shelf in Read Later."}
                   </p>
                 )}
                 {uploadError && !isUploading && (
@@ -1028,7 +1173,11 @@ export default function Library() {
               </div>
             </div>
             
-            <LibraryStatsGraph weeklyData={stats.weeklyData} monthlyData={stats.monthlyData} />
+            <LibraryStatsGraph
+              key={`${stats.dailyMinutes}-${stats.totalPagesRead}-${stats.weeklyData.map((d) => d.minutes).join(".")}`}
+              weeklyData={stats.weeklyData}
+              monthlyData={stats.monthlyData}
+            />
           </div>
 
           {/* Hero – Currently Reading */}
@@ -1141,6 +1290,26 @@ export default function Library() {
                   <Bookmark className="w-4 h-4 text-primary" /> Books to read later
                 </h3>
               </div>
+              {pendingUploads.length > 0 && (
+                <div className="mb-3 space-y-2">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--lib-muted)]">Your files</p>
+                  {pendingUploads.map((p) => (
+                    <div key={p.id} className="flex items-center gap-2 bg-[var(--lib-input)] rounded-xl p-2 border border-[var(--lib-border)]">
+                      <Book className="w-4 h-4 text-primary shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-bold truncate">{p.title}</p>
+                        <p className="text-[10px] text-[var(--lib-muted)] truncate">{p.fileName}</p>
+                      </div>
+                      <button
+                        onClick={() => addPendingToShelf(p, "reading")}
+                        className="shrink-0 text-[10px] font-bold bg-primary text-primary-foreground px-2.5 py-1.5 rounded-full"
+                      >
+                        Add to shelf
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
               {books.filter(b => b.status === "wishlist").length > 0 ? (
                 <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2">
                   {books.filter(b => b.status === "wishlist").map(b => (
@@ -1149,15 +1318,19 @@ export default function Library() {
                     </div>
                   ))}
                 </div>
-              ) : (
+              ) : pendingUploads.length === 0 ? (
                 <div className="flex gap-2">
                   {[1,2,3,4].map(i => (
-                    <div key={i} onClick={() => { /* maybe open search */ }} className="w-12 h-12 shrink-0 rounded-full bg-[var(--lib-input)] border border-[var(--lib-border)] flex items-center justify-center text-[var(--lib-muted)] cursor-pointer hover:bg-[var(--lib-btn-hover)] transition-colors">
+                    <div
+                      key={i}
+                      onClick={() => { if (!isUploading) fileInputRef.current?.click(); }}
+                      className="w-12 h-12 shrink-0 rounded-full bg-[var(--lib-input)] border border-[var(--lib-border)] flex items-center justify-center text-[var(--lib-muted)] cursor-pointer hover:bg-[var(--lib-btn-hover)] transition-colors"
+                    >
                       <Plus className="w-5 h-5" />
                     </div>
                   ))}
                 </div>
-              )}
+              ) : null}
             </div>
 
             {/* Collection Tabs */}
@@ -1457,6 +1630,12 @@ export default function Library() {
             className="px-4 py-3 text-left text-sm font-bold text-[var(--lib-text)] hover:bg-[var(--lib-input)] active:bg-white/20 transition-colors border-b border-[var(--lib-border)]"
           >
             Reading
+          </button>
+          <button
+            onClick={() => changeStatus(statusMenu.bookId, { status: "wishlist" })}
+            className="px-4 py-3 text-left text-sm font-bold text-[var(--lib-text)] hover:bg-[var(--lib-input)] active:bg-white/20 transition-colors border-b border-[var(--lib-border)]"
+          >
+            Read Later
           </button>
           <button
             onClick={() => changeStatus(statusMenu.bookId, { status: "paused" })}
@@ -2055,6 +2234,9 @@ function LibraryStatsGraph({ weeklyData, monthlyData }: { weeklyData: { date: st
 
 function LibraryAchievements({ stats, books }: { stats: any, books: ApiBook[] }) {
   const finishedCount = books.filter(b => b.status === "finished").length;
+  const pagesRead = stats.totalPagesRead || 0;
+  const streak = stats.streakDays || 0;
+  const hoursThisYear = Math.round((stats.annualMinutes || 0) / 60);
   
   const badges = [
     {
@@ -2064,8 +2246,9 @@ function LibraryAchievements({ stats, books }: { stats: any, books: ApiBook[] })
       icon: <BookOpen className="w-8 h-8 text-primary" />,
       earned: finishedCount >= 1,
       progress: Math.min(finishedCount, 1) / 1,
-      bg: "from-primary/20 to-primary/5",
-      border: "border-primary/30"
+      stat: finishedCount >= 1 ? "Done!" : `${finishedCount}/1 finished`,
+      bg: "from-emerald-500/20 to-emerald-500/5",
+      border: "border-emerald-500/30"
     },
     {
       id: "bookworm",
@@ -2074,28 +2257,53 @@ function LibraryAchievements({ stats, books }: { stats: any, books: ApiBook[] })
       icon: <BookMarked className="w-8 h-8 text-primary" />,
       earned: finishedCount >= 10,
       progress: Math.min(finishedCount, 10) / 10,
-      bg: "from-primary/20 to-primary/5",
-      border: "border-primary/30"
+      stat: `${Math.min(finishedCount, 10)}/10 finished`,
+      bg: "from-blue-500/20 to-blue-500/5",
+      border: "border-blue-500/30"
     },
     {
       id: "streak_master",
       title: "Streak Master",
       desc: "7-day reading streak",
-      icon: <Flame className="w-8 h-8 text-primary" />,
-      earned: stats.streakDays >= 7,
-      progress: Math.min(stats.streakDays, 7) / 7,
-      bg: "from-primary/20 to-primary/5",
-      border: "border-primary/30"
+      icon: <Flame className="w-8 h-8 text-orange-400" />,
+      earned: streak >= 7,
+      progress: Math.min(streak, 7) / 7,
+      stat: `${Math.min(streak, 7)}/7 days`,
+      bg: "from-orange-500/20 to-orange-500/5",
+      border: "border-orange-500/30"
+    },
+    {
+      id: "page_turner",
+      title: "Page Turner",
+      desc: "Read 500 pages total",
+      icon: <TrendingUp className="w-8 h-8 text-primary" />,
+      earned: pagesRead >= 500,
+      progress: Math.min(pagesRead, 500) / 500,
+      stat: `${Math.min(pagesRead, 500)}/500 pages`,
+      bg: "from-violet-500/20 to-violet-500/5",
+      border: "border-violet-500/30"
     },
     {
       id: "marathon",
       title: "Marathon",
-      desc: "100 hours total read time",
-      icon: <TrendingUp className="w-8 h-8 text-primary" />,
-      earned: stats.annualMinutes >= 6000, // 100 hrs
-      progress: Math.min(stats.annualMinutes, 6000) / 6000,
-      bg: "from-primary/20 to-primary/5",
-      border: "border-primary/30"
+      desc: "100 hours read this year",
+      icon: <Medal className="w-8 h-8 text-yellow-400" />,
+      earned: stats.annualMinutes >= 6000,
+      progress: Math.min(stats.annualMinutes || 0, 6000) / 6000,
+      stat: `${hoursThisYear}/100 hrs`,
+      bg: "from-yellow-500/20 to-yellow-500/5",
+      border: "border-yellow-500/30"
+    },
+    {
+      id: "daily_reader",
+      title: "Daily Reader",
+      desc: "Read 15+ minutes today",
+      icon: <Clock className="w-8 h-8 text-primary" />,
+      earned: (stats.dailyMinutes || 0) >= 15,
+      progress: Math.min(stats.dailyMinutes || 0, 15) / 15,
+      stat: `${stats.dailyMinutes || 0}/15 min today`,
+      bg: "from-cyan-500/20 to-cyan-500/5",
+      border: "border-cyan-500/30"
     }
   ];
 
@@ -2106,22 +2314,27 @@ function LibraryAchievements({ stats, books }: { stats: any, books: ApiBook[] })
           key={b.id}
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: i * 0.1 }}
-          className={`relative overflow-hidden rounded-3xl p-5 border bg-gradient-to-br ${b.earned ? `${b.bg} ${b.border}` : "from-[var(--lib-card)] to-[var(--lib-card)] border-[var(--lib-border)] grayscale opacity-60"} flex flex-col items-center text-center shadow-sm`}
+          transition={{ delay: i * 0.08 }}
+          className={`relative overflow-hidden rounded-3xl p-5 border bg-gradient-to-br ${b.earned ? `${b.bg} ${b.border}` : "from-[var(--lib-card)] to-[var(--lib-card)] border-[var(--lib-border)] opacity-70"} flex flex-col items-center text-center shadow-sm`}
         >
           {b.earned && (
             <div className="absolute top-2 right-2">
               <CheckCircle2 className="w-5 h-5 text-green-500" />
             </div>
           )}
-          <div className="w-16 h-16 rounded-full bg-black/20 flex items-center justify-center mb-3 shadow-inner">
+          <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-3 shadow-inner ${b.earned ? "bg-black/20" : "bg-[var(--lib-input)]"}`}>
             {b.icon}
           </div>
           <h4 className="font-bold text-[var(--lib-text)] mb-1 leading-tight">{b.title}</h4>
-          <p className="text-[10px] text-[var(--lib-muted)] mb-4 leading-tight">{b.desc}</p>
+          <p className="text-[10px] text-[var(--lib-muted)] mb-2 leading-tight">{b.desc}</p>
+          <p className="text-[10px] font-bold text-primary mb-3">{b.stat}</p>
           
           <div className="w-full bg-black/20 rounded-full h-1.5 overflow-hidden">
-            <div className="bg-white/80 h-full rounded-full" style={{ width: `${b.progress * 100}%` }} />
+            <motion.div
+              initial={{ width: 0 }}
+              animate={{ width: `${b.progress * 100}%` }}
+              className="bg-primary h-full rounded-full"
+            />
           </div>
         </motion.div>
       ))}

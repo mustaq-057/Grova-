@@ -137,14 +137,11 @@ export async function uploadMediaBinary(
   let res: Response;
   try {
     if (isPdfMime(mime)) {
-      // Prefer server upload first — more reliable on mobile than direct Cloudinary POST.
-      if (file.size <= JSON_UPLOAD_MAX_BYTES) {
-        try {
-          const dataUrl = await readFileAsDataUrl(file);
-          return await uploadMedia(dataUrl, mime, 0, fileName);
-        } catch {
-          /* try binary or direct Cloudinary below */
-        }
+      // Direct Cloudinary upload first (bypasses Vercel body limits); fall back to server paths.
+      try {
+        return await uploadPdfToCloudinaryRaw(file, controller, attempt);
+      } catch {
+        /* try server upload below */
       }
 
       if (file.size <= 4 * 1024 * 1024) {
@@ -156,17 +153,24 @@ export async function uploadMediaBinary(
             if (url) return url;
           }
         } catch {
-          /* try direct Cloudinary below */
+          /* try JSON upload below */
         }
       }
 
-      try {
-        return await uploadPdfToCloudinaryRaw(file, controller, attempt);
-      } catch (cloudErr) {
-        throw cloudErr instanceof Error
-          ? cloudErr
-          : new Error("PDF upload failed. Check CLOUDINARY_URL on Vercel and try a smaller file.");
+      if (file.size <= JSON_UPLOAD_MAX_BYTES) {
+        try {
+          const dataUrl = await readFileAsDataUrl(file);
+          return await uploadMedia(dataUrl, mime, 0, fileName);
+        } catch (jsonErr) {
+          const msg = jsonErr instanceof Error ? jsonErr.message : "Upload failed";
+          if (/fetch|network|failed/i.test(msg)) {
+            throw new Error("Upload failed — check your connection, log in again, or verify CLOUDINARY_URL on Vercel.");
+          }
+          throw jsonErr instanceof Error ? jsonErr : new Error(msg);
+        }
       }
+
+      throw new Error("PDF upload failed. Try a file under 4 MB or check Cloudinary settings on Vercel.");
     } else {
       const signRes = await fetch("/api/media/sign", {
         headers: getAuthHeaders(),

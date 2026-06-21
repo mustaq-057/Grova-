@@ -61,16 +61,30 @@ export default memo(function Settings() {
 
   
   useEffect(() => {
-    const handleFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
+    const handleFullscreenChange = () => {
+      const active = !!document.fullscreenElement;
+      setIsFullscreen(active);
+      localStorage.setItem("grova-fullscreen", active ? "true" : "false");
+    };
     document.addEventListener("fullscreenchange", handleFullscreenChange);
     return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
   }, []);
 
+  useEffect(() => {
+    if (localStorage.getItem("grova-fullscreen") === "true" && !document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    }
+  }, []);
+
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(err => console.error("Error attempting to enable fullscreen:", err));
+      document.documentElement.requestFullscreen()
+        .then(() => localStorage.setItem("grova-fullscreen", "true"))
+        .catch((err) => console.error("Error attempting to enable fullscreen:", err));
     } else if (document.exitFullscreen) {
-      document.exitFullscreen().catch(err => console.error("Error attempting to exit fullscreen:", err));
+      document.exitFullscreen()
+        .then(() => localStorage.setItem("grova-fullscreen", "false"))
+        .catch((err) => console.error("Error attempting to exit fullscreen:", err));
     }
   };
 

@@ -244,7 +244,26 @@ export default function EReader() {
   const [isSavingNote, setIsSavingNote] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const savedPageRef = useRef(0);
-  const [pdfWindow, setPdfWindow] = useState({ start: 1, end: 5 });
+  const [pdfWindow, setPdfWindow] = useState({ start: 1, end: 1 });
+  const pdfExpandedRef = useRef(false);
+
+  const flushReadingSession = useCallback(() => {
+    if (!id) return;
+    const pagesRead = sessionPagesReadRef.current;
+    sessionPagesReadRef.current = 0;
+    if (pagesRead <= 0) return;
+    apiFetch(`/library/${id}/session`, {
+      method: "POST",
+      body: JSON.stringify({ durationMinutes: 1, pagesRead }),
+    })
+      .then(() => window.dispatchEvent(new Event("LIBRARY_STATS_UPDATED")))
+      .catch(() => {});
+  }, [id]);
+
+  const openPageNote = useCallback((pageNum: number) => {
+    setCurrentPage(pageNum);
+    setShowNoteModal(true);
+  }, []);
 
   useEffect(() => {
     localStorage.setItem("grova-reader-theme", theme);
@@ -267,11 +286,16 @@ export default function EReader() {
         apiFetch(`/library/${id}/session`, {
           method: "POST",
           body: JSON.stringify({ durationMinutes: 1, pagesRead }),
-        }).catch(() => {});
+        })
+          .then(() => window.dispatchEvent(new Event("LIBRARY_STATS_UPDATED")))
+          .catch(() => {});
       }
     }, 60000);
-    return () => clearInterval(intervalId);
-  }, [id, loading, epubData]);
+    return () => {
+      clearInterval(intervalId);
+      flushReadingSession();
+    };
+  }, [id, loading, epubData, flushReadingSession]);
 
   useEffect(() => {
     const loc = new URLSearchParams(window.location.search).get("location");
@@ -432,7 +456,10 @@ export default function EReader() {
     try {
       await apiFetch(`/library/${id}/notes`, {
         method: "POST",
-        body: JSON.stringify({ text: noteText, chapterOrPage: String(bookLocation) }),
+        body: JSON.stringify({
+          text: noteText,
+          chapterOrPage: isPdf ? `Page ${currentPage}` : String(bookLocation),
+        }),
       });
       window.dispatchEvent(new Event("LIBRARY_NOTES_UPDATED"));
       setShowNoteModal(false);
@@ -446,6 +473,8 @@ export default function EReader() {
 
   const handlePdfScroll = () => {
     if (!pdfContainerRef.current || totalPages === 0) return;
+    if (!pdfExpandedRef.current) pdfExpandedRef.current = true;
+
     const { scrollTop, scrollHeight, clientHeight } = pdfContainerRef.current;
 
     const scrollProgress = scrollTop / (scrollHeight - clientHeight || 1);
@@ -471,7 +500,9 @@ export default function EReader() {
         apiFetch(`/library/${id}/progress`, {
           method: "PUT",
           body: JSON.stringify({ page: newPage, status: "reading", totalPages }),
-        }).catch(() => {});
+        })
+          .then(() => window.dispatchEvent(new Event("LIBRARY_STATS_UPDATED")))
+          .catch(() => {});
       }, 500);
     }
   };
@@ -599,10 +630,15 @@ export default function EReader() {
                 const startPage = resume > 0 ? Math.min(resume, numPages) : 1;
                 setCurrentPage(startPage);
                 setProgressPct(Math.round((startPage / numPages) * 100));
-                setPdfWindow({
-                  start: Math.max(1, startPage - PDF_PAGE_BUFFER),
-                  end: Math.min(numPages, startPage + PDF_PAGE_BUFFER),
-                });
+                pdfExpandedRef.current = resume > 1;
+                setPdfWindow(
+                  resume > 1
+                    ? {
+                        start: Math.max(1, startPage - PDF_PAGE_BUFFER),
+                        end: Math.min(numPages, startPage + PDF_PAGE_BUFFER),
+                      }
+                    : { start: 1, end: 1 },
+                );
                 if (resume > 1) {
                   setTimeout(() => scrollToSavedPage(resume, numPages), 300);
                 }
@@ -637,13 +673,26 @@ export default function EReader() {
                   );
                 }
                 return (
-                  <div key={`page_${pageNum}`} data-page={pageNum} className="mb-4">
+                  <div
+                    key={`page_${pageNum}`}
+                    data-page={pageNum}
+                    className="mb-4 relative group cursor-pointer"
+                    onClick={() => openPageNote(pageNum)}
+                  >
+                    <button
+                      type="button"
+                      aria-label={`Note for page ${pageNum}`}
+                      className="absolute top-3 right-3 z-20 bg-black/55 text-white rounded-full p-2.5 shadow-lg border border-white/20 active:scale-95"
+                      onClick={(e) => { e.stopPropagation(); openPageNote(pageNum); }}
+                    >
+                      <MessageSquare className="w-4 h-4" />
+                    </button>
                     <Page
                       pageNumber={pageNum}
                       renderTextLayer={true}
                       renderAnnotationLayer={false}
                       width={pageWidth}
-                      className="shadow-xl bg-white mx-auto"
+                      className="shadow-xl bg-white mx-auto pointer-events-none"
                     />
                   </div>
                 );
@@ -680,10 +729,11 @@ export default function EReader() {
 
       {showNoteModal && (
         <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm flex flex-col justify-end">
-          <div className="rounded-t-3xl p-6 h-[50vh] flex flex-col shadow-2xl" style={{ backgroundColor: t.page, color: t.text }}>
+            <div className="rounded-t-3xl p-6 h-[50vh] flex flex-col shadow-2xl" style={{ backgroundColor: t.page, color: t.text }}>
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-bold font-serif flex items-center gap-2">
-                <MessageSquare className="w-5 h-5 text-primary" /> Note
+                <MessageSquare className="w-5 h-5 text-primary" />
+                {isPdf && currentPage > 0 ? `Note — Page ${currentPage}` : "Note"}
               </h3>
               <button onClick={() => setShowNoteModal(false)} className="p-2 hover:bg-black/10 rounded-full">
                 <X className="w-5 h-5" />
