@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Search, Book, Plus, BookOpen, ChevronLeft, ChevronRight, Trash2, CheckCircle2, Loader2, BookMarked, ExternalLink, Filter, X, MessageSquare, Send, Settings, Maximize, Download } from "lucide-react";
+import { Search, Book, Plus, BookOpen, ChevronLeft, ChevronRight, Trash2, CheckCircle2, Loader2, BookMarked, ExternalLink, Filter, X, MessageSquare, Send, Settings, Maximize, Download, Sparkles } from "lucide-react";
 import { useLocation } from "wouter";
 import { apiFetch, api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { InAppBrowser } from "@/components/InAppBrowser";
 import ePub from "epubjs";
+import { motion, AnimatePresence } from "framer-motion";
 
 type ApiBook = {
   id: string;
@@ -89,7 +90,7 @@ function BookCover({
     return (
       <img
         src={coverUrl}
-        className="w-full h-full object-cover"
+        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
         alt={title}
         onError={() => setErr(true)}
       />
@@ -100,13 +101,17 @@ function BookCover({
   const initial = (title.match(/[\u0600-\u06FF]/) ? title : title).charAt(0).toUpperCase();
   return (
     <div
-      className="w-full h-full flex flex-col items-center justify-center p-2"
+      className="relative w-full h-full flex flex-col items-center justify-center p-3 overflow-hidden transition-transform duration-700 group-hover:scale-105"
       style={{ background: gradient }}
     >
-      <span className={`${size === "sm" ? "text-2xl" : "text-4xl"} font-bold text-white/80 mb-1 font-serif`}>
+      {/* Book spine simulation */}
+      <div className="absolute left-0 top-0 bottom-0 w-[12%] bg-black/20 border-r border-white/10 z-0" />
+      <div className="absolute inset-0 bg-gradient-to-tr from-black/40 via-transparent to-white/10 z-0 mix-blend-overlay" />
+      
+      <span className={`${size === "sm" ? "text-3xl" : "text-5xl"} font-bold text-white/90 mb-2 font-serif z-10 drop-shadow-md`}>
         {initial}
       </span>
-      <p className="text-[9px] text-white/50 text-center line-clamp-2 leading-tight px-1">{title}</p>
+      <p className="text-[10px] text-white/80 text-center line-clamp-3 leading-tight px-2 z-10 font-medium tracking-wide drop-shadow-md">{title}</p>
     </div>
   );
 }
@@ -129,7 +134,7 @@ export default function Library() {
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
   const [activeNotesBook, setActiveNotesBook] = useState<ApiBook | null>(null);
   const [selectedPreviewBook, setSelectedPreviewBook] = useState<SearchResult | null>(null);
-  
+  const [activeTab, setActiveTab] = useState<"myShelf" | "partnerShelf" | "finished">("myShelf");
   // Settings State
   const [showSettings, setShowSettings] = useState(false);
   const [libLang, setLibLang] = useState<"en" | "ar">(() => (localStorage.getItem("grova-library-language") as "en" | "ar") || "en");
@@ -714,31 +719,38 @@ export default function Library() {
           </div>
 
           {/* Hero – Currently Reading */}
+          <AnimatePresence mode="wait">
           {hero && (
-            <div className="px-4 pt-6 pb-2">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              transition={{ duration: 0.5, ease: "easeOut" }}
+              className="px-4 pt-6 pb-2"
+            >
               <div
-                className="relative w-full rounded-3xl overflow-hidden shadow-2xl shadow-primary/20 cursor-pointer active:scale-[0.98] transition-transform"
+                className="relative w-full rounded-3xl overflow-hidden shadow-2xl cursor-pointer active:scale-[0.98] transition-transform group"
                 style={{ minHeight: "260px" }}
                 onClick={() => openBook(hero)}
               >
-                {/* Blurred BG */}
-                <div className="absolute inset-0">
+                {/* Blurred BG with Animated Glow */}
+                <div className="absolute inset-0 bg-black">
                   {hero.coverUrl ? (
                     <img
                       src={hero.coverUrl}
-                      className="w-full h-full object-cover blur-xl scale-110 opacity-50"
+                      className="w-full h-full object-cover blur-2xl scale-125 opacity-60 group-hover:scale-150 transition-transform duration-1000"
                       alt=""
                     />
                   ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-primary/30 to-black" />
+                    <div className="w-full h-full bg-gradient-to-br from-primary/40 to-black" />
                   )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-black/20" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-gray-950 via-gray-900/80 to-gray-900/20 mix-blend-multiply" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
                 </div>
                 
                 {/* Top Right Delete Button */}
                 <button
                   onClick={(e) => { e.stopPropagation(); deleteBook(hero.id); }}
-                  className="absolute top-4 right-4 w-9 h-9 bg-black/40 backdrop-blur-md rounded-full items-center justify-center flex z-20 hover:bg-red-500/50 transition-colors border border-white/10 shadow-lg"
+                  className="absolute top-4 right-4 w-9 h-9 bg-black/40 backdrop-blur-md rounded-full items-center justify-center flex z-20 hover:bg-red-500/80 transition-colors border border-white/10 shadow-lg"
                   title="Remove from Shelf"
                 >
                   {deletingId === hero.id ? (
@@ -749,44 +761,53 @@ export default function Library() {
                 </button>
 
                 {/* Content */}
-                <div className="relative z-10 flex gap-5 items-end p-5 pt-10">
-                  <div className="w-28 aspect-[2/3] rounded-xl overflow-hidden shadow-xl ring-1 ring-white/20 shrink-0">
+                <div className="relative z-10 flex gap-5 items-end p-5 pt-10 h-full">
+                  <motion.div 
+                    whileHover={{ scale: 1.05, rotateY: 5 }}
+                    className="w-28 aspect-[2/3] rounded-xl overflow-hidden shadow-[0_20px_40px_rgba(0,0,0,0.6)] ring-1 ring-white/20 shrink-0 relative z-20"
+                    style={{ perspective: "1000px" }}
+                  >
                     <BookCover coverUrl={hero.coverUrl} title={hero.title} />
-                  </div>
+                  </motion.div>
                   <div className="flex-1 pb-1 min-w-0">
-                    <p className="text-[11px] text-primary font-bold mb-1 uppercase tracking-widest">
-                      {hero.status === "reading" ? "Continue Reading" : "My Shelf"}
+                    <p className="text-[10px] text-primary/90 font-bold mb-1.5 uppercase tracking-widest flex items-center gap-1.5">
+                      <Sparkles className="w-3 h-3" />
+                      {hero.status === "reading" ? "Continue Reading" : "Up Next"}
                     </p>
-                    <h2 className="text-xl font-bold font-serif leading-tight mb-1 line-clamp-2">{hero.title}</h2>
-                    <p className="text-gray-400 text-sm line-clamp-1 mb-3">{hero.author}</p>
+                    <h2 className="text-xl sm:text-2xl font-bold font-serif leading-tight mb-1 line-clamp-2 text-white drop-shadow-lg">{hero.title}</h2>
+                    <p className="text-gray-300 text-sm line-clamp-1 mb-4 drop-shadow-md">{hero.author}</p>
 
                     {hero.totalPages > 0 && (
-                      <>
-                        <div className="w-full bg-white/10 rounded-full h-1 mb-1.5 overflow-hidden">
-                          <div
-                            className="bg-primary h-full rounded-full transition-all"
-                            style={{ width: `${Math.min(100, (hero.currentPage / hero.totalPages) * 100)}%` }}
-                          />
+                      <div className="mb-4">
+                        <div className="w-full bg-white/10 rounded-full h-1.5 mb-2 overflow-hidden shadow-inner">
+                          <motion.div
+                            initial={{ width: 0 }}
+                            animate={{ width: `${Math.min(100, (hero.currentPage / hero.totalPages) * 100)}%` }}
+                            transition={{ duration: 1, ease: "easeOut" }}
+                            className="bg-primary h-full rounded-full relative"
+                          >
+                            <div className="absolute inset-0 bg-white/30 animate-pulse" />
+                          </motion.div>
                         </div>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">
                           {hero.currentPage > 0
-                            ? `Page ${hero.currentPage} of ${hero.totalPages}`
-                            : `${hero.totalPages} pages`}
+                            ? `${Math.round((hero.currentPage / hero.totalPages) * 100)}% Completed`
+                            : `${hero.totalPages} Pages Total`}
                         </p>
-                      </>
+                      </div>
                     )}
 
-                    <div className="mt-3 flex gap-2 items-center">
+                    <div className="flex gap-2 items-center">
                       <button
                         onClick={(e) => { e.stopPropagation(); openBook(hero); }}
-                        className="bg-white text-black font-bold py-2 px-5 rounded-full text-sm flex items-center gap-1.5 active:scale-95 transition-transform"
+                        className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-2 px-5 rounded-full text-sm flex items-center gap-1.5 active:scale-95 transition-all shadow-lg shadow-primary/20"
                       >
                         <BookOpen className="w-4 h-4" />
-                        {hero.status === "reading" && hero.currentPage > 0 ? "Continue" : "Read"}
+                        {hero.status === "reading" && hero.currentPage > 0 ? "Resume" : "Start"}
                       </button>
                       <button
                         onClick={(e) => { e.stopPropagation(); setActiveNotesBook(hero); }}
-                        className="bg-white/10 text-white font-bold py-2 px-4 rounded-full text-sm flex items-center gap-1.5 active:scale-95 transition-transform hover:bg-white/20"
+                        className="bg-white/10 backdrop-blur-md text-white border border-white/10 font-bold py-2 px-4 rounded-full text-sm flex items-center gap-1.5 active:scale-95 transition-all hover:bg-white/20"
                       >
                         <MessageSquare className="w-4 h-4" />
                         Notes
@@ -795,58 +816,94 @@ export default function Library() {
                   </div>
                 </div>
               </div>
-            </div>
+            </motion.div>
           )}
+          </AnimatePresence>
 
-          <div className="space-y-8 px-4 py-6">
-            {/* My Shelf */}
-            <ShelfRow
-              title="My Shelf"
-              books={myShelf}
-              emptyMsg="No books yet. Search above to add one!"
-              onOpen={openBook}
-              onDelete={deleteBook}
-              deletingId={deletingId}
-              onStatusChangeMenu={(e, bookId) => {
-                e.preventDefault();
-                setStatusMenu({ bookId, x: e.clientX, y: e.clientY });
-              }}
-              updatingStatus={updatingStatus}
-            />
-            {/* Partner Shelf */}
-            {partnerShelf.length > 0 && (
-              <ShelfRow
-                title={t.partnerShelf}
-                books={partnerShelf}
-                emptyMsg=""
-                onOpen={openBook}
-                onDelete={deleteBook}
-                deletingId={deletingId}
-                onStatusChangeMenu={(e, bookId) => {
-                  e.preventDefault();
-                  setStatusMenu({ bookId, x: e.clientX, y: e.clientY });
-                }}
-                updatingStatus={updatingStatus}
-              />
-            )}
+          <div className="px-4 py-6">
+            {/* Tabs */}
+            <div className="flex gap-2 mb-6 bg-[var(--lib-input)] p-1 rounded-2xl border border-[var(--lib-border)]">
+              <button
+                onClick={() => setActiveTab("myShelf")}
+                className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${activeTab === "myShelf" ? "bg-[var(--lib-card)] text-[var(--lib-text)] shadow-sm" : "text-[var(--lib-muted)] hover:text-[var(--lib-text)]"}`}
+              >
+                My Shelf
+              </button>
+              {partnerShelf.length > 0 && (
+                <button
+                  onClick={() => setActiveTab("partnerShelf")}
+                  className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${activeTab === "partnerShelf" ? "bg-[var(--lib-card)] text-[var(--lib-text)] shadow-sm" : "text-[var(--lib-muted)] hover:text-[var(--lib-text)]"}`}
+                >
+                  {t.partnerShelf}
+                </button>
+              )}
+              {finishedBooks.length > 0 && (
+                <button
+                  onClick={() => setActiveTab("finished")}
+                  className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${activeTab === "finished" ? "bg-[var(--lib-card)] text-[var(--lib-text)] shadow-sm" : "text-[var(--lib-muted)] hover:text-[var(--lib-text)]"}`}
+                >
+                  Finished
+                </button>
+              )}
+            </div>
 
-            {/* Finished */}
-            {finishedBooks.length > 0 && (
-              <ShelfRow
-                title="Finished ✓"
-                books={finishedBooks}
-                emptyMsg=""
-                onOpen={openBook}
-                onDelete={deleteBook}
-                deletingId={deletingId}
-                grayscale
-                onStatusChangeMenu={(e, bookId) => {
-                  e.preventDefault();
-                  setStatusMenu({ bookId, x: e.clientX, y: e.clientY });
-                }}
-                updatingStatus={updatingStatus}
-              />
-            )}
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeTab}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.2 }}
+                className="space-y-8"
+              >
+                {activeTab === "myShelf" && (
+                  <ShelfRow
+                    title="My Collection"
+                    books={myShelf}
+                    emptyMsg="Your shelf is empty. Discover new worlds above!"
+                    onOpen={openBook}
+                    onDelete={deleteBook}
+                    deletingId={deletingId}
+                    onStatusChangeMenu={(e, bookId) => {
+                      e.preventDefault();
+                      setStatusMenu({ bookId, x: e.clientX, y: e.clientY });
+                    }}
+                    updatingStatus={updatingStatus}
+                  />
+                )}
+                {activeTab === "partnerShelf" && (
+                  <ShelfRow
+                    title={`${partnerDisplayName}'s Collection`}
+                    books={partnerShelf}
+                    emptyMsg=""
+                    onOpen={openBook}
+                    onDelete={deleteBook}
+                    deletingId={deletingId}
+                    onStatusChangeMenu={(e, bookId) => {
+                      e.preventDefault();
+                      setStatusMenu({ bookId, x: e.clientX, y: e.clientY });
+                    }}
+                    updatingStatus={updatingStatus}
+                  />
+                )}
+                {activeTab === "finished" && (
+                  <ShelfRow
+                    title="Completed Journeys ✓"
+                    books={finishedBooks}
+                    emptyMsg=""
+                    onOpen={openBook}
+                    onDelete={deleteBook}
+                    deletingId={deletingId}
+                    grayscale
+                    onStatusChangeMenu={(e, bookId) => {
+                      e.preventDefault();
+                      setStatusMenu({ bookId, x: e.clientX, y: e.clientY });
+                    }}
+                    updatingStatus={updatingStatus}
+                  />
+                )}
+              </motion.div>
+            </AnimatePresence>
 
             {/* Empty state */}
             {books.length === 0 && !loading && (
@@ -861,9 +918,14 @@ export default function Library() {
       )}
 
       {/* ── Status Menu Modal ── */}
+      <AnimatePresence>
       {statusMenu && (
-        <div
-          className="fixed z-50 bg-gray-900 border border-white/10 rounded-xl shadow-2xl overflow-hidden flex flex-col"
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9, y: -10 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.9, y: -10 }}
+          transition={{ duration: 0.15 }}
+          className="fixed z-50 bg-gray-900/90 backdrop-blur-md border border-white/20 rounded-2xl shadow-2xl overflow-hidden flex flex-col"
           style={{
             top: Math.min(statusMenu.y, window.innerHeight - 150),
             left: Math.min(statusMenu.x, window.innerWidth - 180),
@@ -900,8 +962,9 @@ export default function Library() {
             <MessageSquare className="w-4 h-4" />
             Reading Notes
           </button>
-        </div>
+        </motion.div>
       )}
+      </AnimatePresence>
 
       {/* ── Notes Modal ── */}
       {activeNotesBook && (
@@ -922,9 +985,21 @@ export default function Library() {
       )}
 
       {/* ── Settings Modal ── */}
+      <AnimatePresence>
       {showSettings && (
-        <div className="fixed inset-0 z-[110] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-gray-900 border border-white/10 rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[110] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+        >
+          <motion.div 
+            initial={{ scale: 0.95, opacity: 0, y: 20 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.95, opacity: 0, y: 20 }}
+            transition={{ type: "spring", stiffness: 300, damping: 25 }}
+            className="bg-gray-900 border border-white/10 rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden"
+          >
             <div className="flex items-center justify-between p-5 border-b border-white/5">
               <h2 className="text-xl font-bold font-serif text-white">Library Settings</h2>
               <button onClick={() => setShowSettings(false)} className="p-1 hover:bg-white/10 rounded-full text-white active:scale-90 transition-transform">
@@ -942,7 +1017,7 @@ export default function Library() {
                       key={th}
                       onClick={() => setLibTheme(th)}
                       className={`flex-1 py-2 rounded-xl font-bold text-xs uppercase border-2 transition-all ${
-                        libTheme === th ? "border-primary text-primary bg-primary/10" : "border-white/10 text-gray-500 hover:border-white/30"
+                        libTheme === th ? "border-primary text-primary bg-primary/10 shadow-[0_0_15px_rgba(var(--primary),0.2)]" : "border-white/10 text-gray-500 hover:border-white/30"
                       }`}
                     >
                       {th}
@@ -958,7 +1033,7 @@ export default function Library() {
                   <button
                     onClick={() => setLibLang("en")}
                     className={`flex-1 py-2 rounded-xl font-bold text-xs border-2 transition-all ${
-                      libLang === "en" ? "border-primary text-primary bg-primary/10" : "border-white/10 text-gray-500 hover:border-white/30"
+                      libLang === "en" ? "border-primary text-primary bg-primary/10 shadow-[0_0_15px_rgba(var(--primary),0.2)]" : "border-white/10 text-gray-500 hover:border-white/30"
                     }`}
                   >
                     English
@@ -966,7 +1041,7 @@ export default function Library() {
                   <button
                     onClick={() => setLibLang("ar")}
                     className={`flex-1 py-2 rounded-xl font-bold text-xs border-2 transition-all ${
-                      libLang === "ar" ? "border-primary text-primary bg-primary/10" : "border-white/10 text-gray-500 hover:border-white/30"
+                      libLang === "ar" ? "border-primary text-primary bg-primary/10 shadow-[0_0_15px_rgba(var(--primary),0.2)]" : "border-white/10 text-gray-500 hover:border-white/30"
                     }`}
                   >
                     العربية
@@ -986,7 +1061,7 @@ export default function Library() {
                   </div>
                   <button 
                     onClick={toggleLibraryMode}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${libraryMode ? "bg-primary" : "bg-white/20"}`}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${libraryMode ? "bg-primary shadow-[0_0_10px_rgba(var(--primary),0.5)]" : "bg-white/20"}`}
                   >
                     <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${libraryMode ? "translate-x-6" : "translate-x-1"}`} />
                   </button>
@@ -1007,58 +1082,87 @@ export default function Library() {
                 </button>
               </div>
             </div>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
       )}
+      </AnimatePresence>
 
       {/* ── Book Preview Modal ── */}
+      <AnimatePresence>
       {selectedPreviewBook && (
-        <div className="fixed inset-0 z-[120] bg-black/80 backdrop-blur-sm flex flex-col items-center justify-end sm:justify-center p-0 sm:p-4 animate-in fade-in duration-200">
-          <div className="bg-gray-900 border border-white/10 rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in slide-in-from-bottom-8 sm:zoom-in-95 duration-300">
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[120] bg-black/80 backdrop-blur-md flex flex-col items-center justify-end sm:justify-center p-0 sm:p-4"
+        >
+          <div className="absolute inset-0" onClick={() => setSelectedPreviewBook(null)} />
+          <motion.div 
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            exit={{ y: "100%" }}
+            transition={{ type: "spring", damping: 25, stiffness: 300 }}
+            className="bg-gray-900 border border-white/10 rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-md overflow-hidden relative z-10"
+          >
             <div className="relative aspect-[4/3] w-full bg-black overflow-hidden flex items-end justify-center pb-8">
               {/* Blurred background */}
-              <div className="absolute inset-0 opacity-40">
+              <div className="absolute inset-0 opacity-50">
                 {selectedPreviewBook.coverUrl ? (
-                   <img src={selectedPreviewBook.coverUrl} className="w-full h-full object-cover blur-2xl scale-110" alt="" />
+                   <img src={selectedPreviewBook.coverUrl} className="w-full h-full object-cover blur-2xl scale-125" alt="" />
                 ) : (
                    <div className="w-full h-full bg-gradient-to-br from-primary/30 to-black" />
                 )}
-                <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/60 to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/60 to-transparent mix-blend-multiply" />
               </div>
               
               <button 
                 onClick={() => setSelectedPreviewBook(null)}
-                className="absolute top-4 right-4 p-2 bg-black/40 hover:bg-black/60 rounded-full text-white backdrop-blur-md z-10 transition-colors"
+                className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center bg-black/40 hover:bg-black/60 rounded-full text-white backdrop-blur-md z-10 transition-colors"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
 
               {/* Book Cover */}
-              <div className="relative z-10 w-32 aspect-[2/3] rounded-xl shadow-2xl shadow-black/50 overflow-hidden ring-1 ring-white/20">
+              <motion.div 
+                initial={{ y: 20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ delay: 0.1 }}
+                className="relative z-10 w-32 aspect-[2/3] rounded-xl shadow-2xl shadow-black/60 overflow-hidden ring-1 ring-white/20"
+              >
                 <BookCover coverUrl={selectedPreviewBook.coverUrl} title={selectedPreviewBook.title} />
-              </div>
+              </motion.div>
             </div>
             
             <div className="p-6 text-center space-y-2">
-              <h2 className="text-2xl font-bold font-serif text-white line-clamp-2 leading-tight">{selectedPreviewBook.title}</h2>
-              <p className="text-gray-400 text-sm font-medium">{selectedPreviewBook.author}</p>
+              <motion.h2 
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}
+                className="text-2xl font-bold font-serif text-white line-clamp-2 leading-tight"
+              >{selectedPreviewBook.title}</motion.h2>
+              <motion.p 
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.25 }}
+                className="text-gray-400 text-sm font-medium"
+              >{selectedPreviewBook.author}</motion.p>
               {selectedPreviewBook.description && (
-                <p className="text-xs text-gray-500 line-clamp-3 mt-4 px-2">{selectedPreviewBook.description}</p>
+                <motion.p 
+                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}
+                  className="text-xs text-gray-500 line-clamp-4 mt-4 px-2 leading-relaxed"
+                >{selectedPreviewBook.description}</motion.p>
               )}
             </div>
 
-            <div className="p-6 pt-0 flex gap-3">
+            <div className="p-6 pt-2 pb-8 flex gap-3">
               <button
                 onClick={() => { addToLibrary(selectedPreviewBook); setSelectedPreviewBook(null); }}
-                className="flex-1 bg-primary text-primary-foreground font-bold py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 active:scale-95 transition-transform"
+                className="flex-1 bg-primary text-primary-foreground font-bold py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 hover:bg-primary/90 active:scale-95 transition-all shadow-lg shadow-primary/20"
               >
                 <BookOpen className="w-5 h-5" />
-                Read Now
+                Add to Shelf
               </button>
             </div>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
       )}
+      </AnimatePresence>
     </div>
     </>
   );
@@ -1089,24 +1193,46 @@ function ShelfRow({
   onStatusChangeMenu?: (e: React.MouseEvent, bookId: string) => void;
   updatingStatus?: string | null;
 }) {
+  const container: any = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: { staggerChildren: 0.05 }
+    }
+  };
+
+  const item: any = {
+    hidden: { opacity: 0, scale: 0.9, y: 10 },
+    show: { opacity: 1, scale: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 20 } }
+  };
+
   return (
     <div>
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-lg font-bold">{title}</h3>
-        <ChevronRight className="w-5 h-5 text-gray-600" />
+      <div className="flex items-center justify-between mb-4 px-1">
+        <h3 className="text-[15px] font-bold tracking-tight">{title}</h3>
+        <ChevronRight className="w-4 h-4 text-[var(--lib-muted)]" />
       </div>
       {books.length === 0 ? (
-        <p className="text-sm text-gray-600 py-4">{emptyMsg}</p>
+        <div className="flex flex-col items-center justify-center py-8 text-center bg-[var(--lib-card)] rounded-2xl border border-[var(--lib-border)] border-dashed">
+          <BookMarked className="w-8 h-8 mb-2 opacity-20 text-[var(--lib-text)]" />
+          <p className="text-xs font-medium text-[var(--lib-muted)]">{emptyMsg}</p>
+        </div>
       ) : (
-        <div className="flex gap-3 overflow-x-auto snap-x snap-mandatory pb-3 scrollbar-hide">
+        <motion.div 
+          variants={container}
+          initial="hidden"
+          animate="show"
+          className="flex gap-3 overflow-x-auto snap-x snap-mandatory pb-4 pt-1 px-1 scrollbar-hide"
+        >
           {books.map((book) => (
-            <div
+            <motion.div
+              variants={item}
               key={book.id}
-              className={`w-[100px] shrink-0 snap-start cursor-pointer group relative ${dimmed ? "opacity-75" : ""}`}
+              className={`w-[100px] shrink-0 snap-start cursor-pointer group relative ${dimmed ? "opacity-75 hover:opacity-100 transition-opacity" : ""}`}
               onClick={() => onOpen(book)}
               onContextMenu={(e) => onStatusChangeMenu && onStatusChangeMenu(e, book.id)}
             >
-              <div className={`aspect-[2/3] w-full bg-white/10 rounded-xl overflow-hidden shadow-md mb-1.5 relative ${grayscale ? "grayscale" : ""}`}>
+              <div className={`aspect-[2/3] w-full bg-gray-900 rounded-xl overflow-hidden shadow-md group-hover:shadow-xl transition-all duration-300 mb-2 relative ${grayscale ? "grayscale hover:grayscale-0" : ""}`}>
                 {updatingStatus === book.id && (
                   <div className="absolute inset-0 bg-black/60 z-20 flex items-center justify-center backdrop-blur-sm">
                     <Loader2 className="w-6 h-6 animate-spin text-white" />
@@ -1115,9 +1241,9 @@ function ShelfRow({
                 <BookCover coverUrl={book.coverUrl} title={book.title} size="sm" />
                 {/* Progress bar */}
                 {book.totalPages > 0 && book.currentPage > 0 && (
-                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/50 z-10">
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/50 z-10 backdrop-blur-sm">
                     <div
-                      className="h-full bg-primary"
+                      className="h-full bg-primary shadow-[0_0_8px_rgba(var(--primary),0.8)]"
                       style={{ width: `${Math.min(100, (book.currentPage / book.totalPages) * 100)}%` }}
                     />
                   </div>
@@ -1126,36 +1252,36 @@ function ShelfRow({
                 {onDelete && (
                   <button
                     onClick={(e) => { e.stopPropagation(); onDelete(book.id); }}
-                    className="absolute top-1 right-1 w-6 h-6 bg-black/70 rounded-full items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity flex z-10"
+                    className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/70 backdrop-blur-md rounded-full items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity flex z-10 hover:bg-red-500 hover:text-white"
                     title="Remove"
                   >
                     {deletingId === book.id ? (
                       <Loader2 className="w-3 h-3 animate-spin text-white" />
                     ) : (
-                      <Trash2 className="w-3 h-3 text-red-400" />
+                      <Trash2 className="w-3 h-3 text-red-400 group-hover:text-white" />
                     )}
                   </button>
                 )}
                 {/* Finished badge */}
                 {book.status === "finished" && (
-                  <div className="absolute top-1 left-1 z-10">
-                    <CheckCircle2 className="w-4 h-4 text-green-400 drop-shadow" />
+                  <div className="absolute top-1.5 left-1.5 z-10">
+                    <CheckCircle2 className="w-4 h-4 text-green-400 drop-shadow-md bg-black/20 rounded-full" />
                   </div>
                 )}
                 {/* Paused badge */}
                 {book.status === "paused" && (
-                  <div className="absolute top-1 left-1 z-10">
-                    <span className="w-4 h-4 bg-yellow-500 rounded-full flex items-center justify-center text-[8px] font-bold text-black drop-shadow">II</span>
+                  <div className="absolute top-1.5 left-1.5 z-10">
+                    <span className="w-4 h-4 bg-yellow-500 rounded-full flex items-center justify-center text-[8px] font-bold text-black drop-shadow-md">II</span>
                   </div>
                 )}
               </div>
-              <p className="font-bold text-[11px] line-clamp-1 leading-tight">{book.title}</p>
+              <p className="font-bold text-[11px] line-clamp-1 leading-tight group-hover:text-primary transition-colors">{book.title}</p>
               {book.source && (
-                <p className="text-[9px] text-gray-600 mt-0.5 line-clamp-1">{book.source}</p>
+                <p className="text-[9px] text-[var(--lib-muted)] mt-0.5 line-clamp-1">{book.source}</p>
               )}
-            </div>
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
       )}
     </div>
   );
@@ -1231,71 +1357,93 @@ function NotesModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex flex-col justify-end">
-      <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-gray-900 w-full h-[80vh] rounded-t-3xl shadow-2xl flex flex-col border-t border-white/10">
-        <div className="flex items-center justify-between p-4 border-b border-white/5 shrink-0">
-          <div>
-            <h3 className="font-bold text-lg flex items-center gap-2">
-              <MessageSquare className="w-5 h-5 text-primary" /> Notes
-            </h3>
-            <p className="text-xs text-gray-400 line-clamp-1">{book.title}</p>
-          </div>
-          <button onClick={onClose} className="p-2 bg-white/5 rounded-full hover:bg-white/10">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={scrollRef}>
-          {loading ? (
-            <div className="flex justify-center py-10">
-              <Loader2 className="w-6 h-6 animate-spin text-primary" />
+    <AnimatePresence>
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-[60] flex flex-col justify-end"
+      >
+        <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose} />
+        <motion.div 
+          initial={{ y: "100%" }}
+          animate={{ y: 0 }}
+          exit={{ y: "100%" }}
+          transition={{ type: "spring", damping: 25, stiffness: 200 }}
+          className="relative bg-gray-900 w-full h-[80vh] rounded-t-3xl shadow-2xl flex flex-col border-t border-white/10 overflow-hidden"
+        >
+          <div className="flex items-center justify-between p-4 border-b border-white/5 shrink-0 bg-gray-900/50 backdrop-blur-md">
+            <div>
+              <h3 className="font-bold text-lg flex items-center gap-2 text-white">
+                <MessageSquare className="w-5 h-5 text-primary" /> Notes
+              </h3>
+              <p className="text-xs text-gray-400 line-clamp-1">{book.title}</p>
             </div>
-          ) : notes.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-gray-500 opacity-60">
-              <MessageSquare className="w-12 h-12 mb-3" />
-              <p className="font-bold">No notes yet.</p>
-              <p className="text-sm text-center px-4 mt-1">Leave a spoiler-free thought for {partnerName}.</p>
-            </div>
-          ) : (
-            notes.map((note) => {
-              const isMine = note.authorId === myId;
-              return (
-                <div key={note.id} className={`flex flex-col ${isMine ? "items-end" : "items-start"}`}>
-                  <span className="text-[10px] text-gray-500 mb-1 px-1 font-bold uppercase tracking-wider">
-                    {isMine ? "You" : partnerName}
-                  </span>
-                  <div className={`px-4 py-2.5 rounded-2xl max-w-[85%] ${isMine ? "bg-primary text-primary-foreground rounded-tr-sm" : "bg-white/10 text-white rounded-tl-sm"}`}>
-                    <p className="text-sm leading-snug">{note.text}</p>
-                  </div>
-                  <span className="text-[9px] text-gray-600 mt-1 px-1">
-                    {new Date(note.timestamp).toLocaleDateString()}
-                  </span>
-                </div>
-              );
-            })
-          )}
-        </div>
-
-        <form onSubmit={handleSubmit} className="p-4 border-t border-white/5 bg-gray-900 shrink-0">
-          <div className="relative flex items-center">
-            <input
-              type="text"
-              value={newNote}
-              onChange={(e) => setNewNote(e.target.value)}
-              placeholder="Leave a note..."
-              className="w-full bg-white/5 border border-white/10 rounded-full py-3 pl-4 pr-12 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary"
-            />
-            <button
-              type="submit"
-              disabled={!newNote.trim() || adding}
-              className="absolute right-1 w-10 h-10 bg-primary text-primary-foreground rounded-full flex items-center justify-center disabled:opacity-50"
-            >
-              {adding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+            <button onClick={onClose} className="p-2 bg-white/5 rounded-full hover:bg-white/10 text-white transition-colors">
+              <X className="w-5 h-5" />
             </button>
           </div>
-        </form>
-      </div>
-    </div>
+
+          <div className="flex-1 overflow-y-auto p-4 space-y-4" ref={scrollRef}>
+            {loading ? (
+              <div className="flex justify-center py-10">
+                <Loader2 className="w-6 h-6 animate-spin text-primary" />
+              </div>
+            ) : notes.length === 0 ? (
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="flex flex-col items-center justify-center h-full text-gray-500 opacity-60"
+              >
+                <MessageSquare className="w-12 h-12 mb-3" />
+                <p className="font-bold">No notes yet.</p>
+                <p className="text-sm text-center px-4 mt-1">Leave a spoiler-free thought for {partnerName}.</p>
+              </motion.div>
+            ) : (
+              notes.map((note) => {
+                const isMine = note.authorId === myId;
+                return (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    key={note.id} 
+                    className={`flex flex-col ${isMine ? "items-end" : "items-start"}`}
+                  >
+                    <span className="text-[10px] text-gray-500 mb-1 px-1 font-bold uppercase tracking-wider">
+                      {isMine ? "You" : partnerName}
+                    </span>
+                    <div className={`px-4 py-2.5 rounded-2xl max-w-[85%] ${isMine ? "bg-primary text-primary-foreground rounded-tr-sm shadow-[0_4px_14px_rgba(var(--primary),0.25)]" : "bg-white/10 text-white rounded-tl-sm border border-white/5"}`}>
+                      <p className="text-sm leading-snug">{note.text}</p>
+                    </div>
+                    <span className="text-[9px] text-gray-600 mt-1 px-1">
+                      {new Date(note.timestamp).toLocaleDateString()}
+                    </span>
+                  </motion.div>
+                );
+              })
+            )}
+          </div>
+
+          <form onSubmit={handleSubmit} className="p-4 border-t border-white/5 bg-gray-900 shrink-0">
+            <div className="relative flex items-center">
+              <input
+                type="text"
+                value={newNote}
+                onChange={(e) => setNewNote(e.target.value)}
+                placeholder="Leave a note..."
+                className="w-full bg-white/5 border border-white/10 rounded-full py-3 pl-4 pr-12 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all"
+              />
+              <button
+                type="submit"
+                disabled={!newNote.trim() || adding}
+                className="absolute right-1 w-10 h-10 bg-primary text-primary-foreground rounded-full flex items-center justify-center disabled:opacity-50 transition-transform active:scale-95"
+              >
+                {adding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              </button>
+            </div>
+          </form>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
   );
 }

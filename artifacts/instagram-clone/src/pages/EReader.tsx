@@ -237,6 +237,7 @@ export default function EReader() {
         ) : (
           <ReactReader
             url={epubUrl}
+          epubInitOptions={{ openAs: 'epub' }}
           location={bookLocation}
           locationChanged={locationChanged}
           getRendition={(rendition) => {
