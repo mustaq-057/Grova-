@@ -354,43 +354,49 @@ export default function Library() {
     setIsSearching(true); // use as loading state
     try {
       const buffer = await file.arrayBuffer();
-      const book = ePub(buffer);
-      await book.ready;
-      const metadata = await book.loaded.metadata;
+      const isPdf = file.name.toLowerCase().endsWith(".pdf") || file.type === "application/pdf";
       
-      let coverUrl = null;
-      try {
-        const coverUrlRaw = await book.coverUrl();
-        if (coverUrlRaw) {
-          // It's a blob url, we won't upload the cover right now since we need to extract it as a file.
-          // Using generative gradient instead for simplicity.
+      let title = file.name.replace(/\.(epub|pdf)$/i, "");
+      let author = "Unknown Author";
+      let description = "Uploaded manually.";
+      
+      if (!isPdf) {
+        try {
+          const book = ePub(buffer);
+          await book.ready;
+          const metadata = await book.loaded.metadata;
+          title = metadata?.title || title;
+          author = metadata?.creator || author;
+          description = metadata?.description || description;
+        } catch (err) {
+          console.error("Failed to parse EPUB metadata", err);
         }
-      } catch (err) {}
+      }
 
       // Upload binary to cloudinary
       const res = await apiFetch<{ url: string; key: string }>("/media/upload-binary", {
         method: "POST",
         headers: { 
-          "Content-Type": file.type || "application/epub+zip",
+          "Content-Type": file.type || (isPdf ? "application/pdf" : "application/epub+zip"),
           "x-file-name": encodeURIComponent(file.name)
         },
         body: buffer,
       });
 
-      // Calculate real total pages based on epub structure
-      await book.locations.generate(1024);
-      const totalPages = (book.locations as any).total || 200;
+      // We no longer calculate locations here because it takes too long on upload.
+      // Instead, EReader fixes the totalPages on the first page turn.
+      const totalPages = 100;
 
       // Add to Library
       await apiFetch("/library", {
         method: "POST",
         body: JSON.stringify({
-          title: metadata?.title || file.name.replace(".epub", ""),
-          author: metadata?.creator || "Unknown Author",
+          title,
+          author,
           coverUrl: null,
-          description: metadata?.description || "Uploaded manually.",
+          description,
           epubUrl: res.url,
-          totalPages: totalPages,
+          totalPages,
           source: "Uploaded",
         }),
       });
