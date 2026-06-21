@@ -15,12 +15,13 @@ type ApiBook = {
   description: string | null;
   addedBy: string;
   addedAt: string;
-  status: "reading" | "finished" | "wishlist" | "paused";
+  status: "reading" | "finished" | "wishlist" | "paused" | "gave_up";
   currentPage: number;
   totalPages: number;
   epubUrl?: string | null;
   source?: string;
   isLink?: boolean;
+  isFavorite?: boolean;
 };
 
 type SearchResult = {
@@ -135,9 +136,10 @@ export default function Library() {
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
   const [activeNotesBook, setActiveNotesBook] = useState<ApiBook | null>(null);
   const [selectedPreviewBook, setSelectedPreviewBook] = useState<SearchResult | null>(null);
-  const [activeTab, setActiveTab] = useState<"myShelf" | "partnerShelf" | "finished">("myShelf");
+  const [activeTab, setActiveTab] = useState<"myShelf" | "partnerShelf" | "finished" | "favorites" | "paused" | "gaveUp">("myShelf");
   const [libraryTab, setLibraryTab] = useState<"dashboard" | "memorize" | "achievements">("dashboard");
   const [allNotes, setAllNotes] = useState<LibraryNote[]>([]);
+  const [stats, setStats] = useState({ streakDays: 0, dailyMinutes: 0, annualMinutes: 0 });
   // Settings State
   const [showSettings, setShowSettings] = useState(false);
   const [libLang, setLibLang] = useState<"en" | "ar">(() => (localStorage.getItem("grova-library-language") as "en" | "ar") || "en");
@@ -206,10 +208,24 @@ export default function Library() {
     }
   }, []);
 
+  const loadStats = useCallback(async () => {
+    try {
+      const data = await apiFetch<any>("/library/stats");
+      setStats({
+        streakDays: data.streakDays || 0,
+        dailyMinutes: data.dailyMinutes || 0,
+        annualMinutes: data.annualMinutes || 0
+      });
+    } catch (err) {
+      console.error("Failed to load stats:", err);
+    }
+  }, []);
+
   useEffect(() => {
     loadBooks();
     loadNotes();
-  }, [loadBooks, loadNotes]);
+    loadStats();
+  }, [loadBooks, loadNotes, loadStats]);
 
   useEffect(() => {
     if (!user) return;
@@ -378,15 +394,24 @@ export default function Library() {
     setLocation(`/read/${book.id}`);
   };
 
-  const changeStatus = async (bookId: string, status: ApiBook["status"]) => {
+  const changeStatus = async (bookId: string, options: { status?: ApiBook["status"], favorite?: boolean }) => {
     setUpdatingStatus(bookId);
     setStatusMenu(null);
     try {
       await apiFetch(`/library/${bookId}/status`, {
         method: "PATCH",
-        body: JSON.stringify({ status }),
+        body: JSON.stringify(options),
       });
-      setBooks((prev) => prev.map((b) => b.id === bookId ? { ...b, status } : b));
+      setBooks((prev) => prev.map((b) => {
+        if (b.id === bookId) {
+          return {
+            ...b,
+            ...(options.status ? { status: options.status } : {}),
+            ...(options.favorite !== undefined ? { isFavorite: options.favorite } : {})
+          };
+        }
+        return b;
+      }));
     } catch (err) {
       console.error("Failed to update status:", err);
     } finally {
@@ -715,25 +740,25 @@ export default function Library() {
           <div className="px-4 mt-6">
             <div className="grid grid-cols-2 gap-3 mb-3">
               <div className="bg-[var(--lib-card)] border border-[var(--lib-border)] rounded-2xl p-4 flex flex-col justify-center items-center shadow-sm">
-                <Calendar className="w-6 h-6 text-primary mb-2" />
-                <p className="text-[10px] text-[var(--lib-muted)] uppercase tracking-wider font-bold mb-1">Total Books</p>
-                <p className="text-xl font-serif font-bold text-[var(--lib-text)]">{myShelf.length + partnerShelf.length}</p>
+                <Flame className="w-6 h-6 text-orange-500 mb-2" />
+                <p className="text-[10px] text-[var(--lib-muted)] uppercase tracking-wider font-bold mb-1">Reading Streak</p>
+                <p className="text-xl font-serif font-bold text-[var(--lib-text)]">{stats.streakDays} <span className="text-xs font-normal">days</span></p>
               </div>
               <div className="bg-[var(--lib-card)] border border-[var(--lib-border)] rounded-2xl p-4 flex flex-col justify-center items-center shadow-sm">
-                <Flame className="w-6 h-6 text-orange-500 mb-2" />
-                <p className="text-[10px] text-[var(--lib-muted)] uppercase tracking-wider font-bold mb-1">Active Reads</p>
-                <p className="text-xl font-serif font-bold text-[var(--lib-text)]">{currentlyReading.length}</p>
+                <Calendar className="w-6 h-6 text-primary mb-2" />
+                <p className="text-[10px] text-[var(--lib-muted)] uppercase tracking-wider font-bold mb-1">Today's Read</p>
+                <p className="text-xl font-serif font-bold text-[var(--lib-text)]">{stats.dailyMinutes} <span className="text-xs font-normal">min</span></p>
               </div>
             </div>
             <div className="bg-[var(--lib-card)] border border-[var(--lib-border)] rounded-2xl p-4 flex items-center justify-around shadow-sm">
               <div className="text-center">
-                <p className="text-[10px] text-[var(--lib-muted)] uppercase tracking-wider font-bold mb-1">Pages Read</p>
-                <p className="text-xl font-serif font-bold text-primary">{totalPagesRead.toLocaleString()}</p>
+                <p className="text-[10px] text-[var(--lib-muted)] uppercase tracking-wider font-bold mb-1">Annual Stats</p>
+                <p className="text-xl font-serif font-bold text-primary">{(stats.annualMinutes / 60).toFixed(1)} <span className="text-xs font-normal">hrs</span></p>
               </div>
               <div className="w-px h-10 bg-[var(--lib-border)]" />
               <div className="text-center">
-                <p className="text-[10px] text-[var(--lib-muted)] uppercase tracking-wider font-bold mb-1">Hours Spent</p>
-                <p className="text-xl font-serif font-bold text-primary">{estimatedHours} <span className="text-xs font-normal">hrs</span></p>
+                <p className="text-[10px] text-[var(--lib-muted)] uppercase tracking-wider font-bold mb-1">Active Reads</p>
+                <p className="text-xl font-serif font-bold text-primary">{currentlyReading.length}</p>
               </div>
               <div className="w-px h-10 bg-[var(--lib-border)]" />
               <div className="text-center">
@@ -882,21 +907,39 @@ export default function Library() {
               <div className="flex gap-2 mb-4 bg-[var(--lib-input)] p-1 rounded-2xl border border-[var(--lib-border)] overflow-x-auto scrollbar-hide">
                 <button
                   onClick={() => setActiveTab("myShelf")}
-                  className={`flex-1 min-w-[80px] py-2 text-xs font-bold rounded-xl transition-all ${activeTab === "myShelf" ? "bg-[var(--lib-card)] text-[var(--lib-text)] shadow-sm" : "text-[var(--lib-muted)] hover:text-[var(--lib-text)]"}`}
+                  className={`shrink-0 min-w-[80px] py-2 px-3 text-xs font-bold rounded-xl transition-all ${activeTab === "myShelf" ? "bg-[var(--lib-card)] text-[var(--lib-text)] shadow-sm" : "text-[var(--lib-muted)] hover:text-[var(--lib-text)]"}`}
                 >
                   My Shelf
                 </button>
                 <button
                   onClick={() => setActiveTab("partnerShelf")}
-                  className={`flex-1 min-w-[80px] py-2 text-xs font-bold rounded-xl transition-all ${activeTab === "partnerShelf" ? "bg-[var(--lib-card)] text-[var(--lib-text)] shadow-sm" : "text-[var(--lib-muted)] hover:text-[var(--lib-text)]"}`}
+                  className={`shrink-0 min-w-[80px] py-2 px-3 text-xs font-bold rounded-xl transition-all ${activeTab === "partnerShelf" ? "bg-[var(--lib-card)] text-[var(--lib-text)] shadow-sm" : "text-[var(--lib-muted)] hover:text-[var(--lib-text)]"}`}
                 >
                   {partnerDisplayName}
                 </button>
                 <button
+                  onClick={() => setActiveTab("favorites")}
+                  className={`shrink-0 min-w-[80px] py-2 px-3 text-xs font-bold rounded-xl transition-all ${activeTab === "favorites" ? "bg-[var(--lib-card)] text-[var(--lib-text)] shadow-sm" : "text-[var(--lib-muted)] hover:text-[var(--lib-text)]"}`}
+                >
+                  Favorites
+                </button>
+                <button
                   onClick={() => setActiveTab("finished")}
-                  className={`flex-1 min-w-[80px] py-2 text-xs font-bold rounded-xl transition-all ${activeTab === "finished" ? "bg-[var(--lib-card)] text-[var(--lib-text)] shadow-sm" : "text-[var(--lib-muted)] hover:text-[var(--lib-text)]"}`}
+                  className={`shrink-0 min-w-[80px] py-2 px-3 text-xs font-bold rounded-xl transition-all ${activeTab === "finished" ? "bg-[var(--lib-card)] text-[var(--lib-text)] shadow-sm" : "text-[var(--lib-muted)] hover:text-[var(--lib-text)]"}`}
                 >
                   Finished
+                </button>
+                <button
+                  onClick={() => setActiveTab("paused")}
+                  className={`shrink-0 min-w-[80px] py-2 px-3 text-xs font-bold rounded-xl transition-all ${activeTab === "paused" ? "bg-[var(--lib-card)] text-[var(--lib-text)] shadow-sm" : "text-[var(--lib-muted)] hover:text-[var(--lib-text)]"}`}
+                >
+                  Paused
+                </button>
+                <button
+                  onClick={() => setActiveTab("gaveUp")}
+                  className={`shrink-0 min-w-[80px] py-2 px-3 text-xs font-bold rounded-xl transition-all ${activeTab === "gaveUp" ? "bg-[var(--lib-card)] text-[var(--lib-text)] shadow-sm" : "text-[var(--lib-muted)] hover:text-[var(--lib-text)]"}`}
+                >
+                  Gave Up
                 </button>
               </div>
 
@@ -943,6 +986,52 @@ export default function Library() {
                       title=""
                       books={finishedBooks}
                       emptyMsg="No finished books yet."
+                      onOpen={openBook}
+                      onDelete={deleteBook}
+                      deletingId={deletingId}
+                      grayscale
+                      onStatusChangeMenu={(e, bookId) => {
+                        e.preventDefault();
+                        setStatusMenu({ bookId, x: e.clientX, y: e.clientY });
+                      }}
+                      updatingStatus={updatingStatus}
+                    />
+                  )}
+                  {activeTab === "favorites" && (
+                    <ShelfRow
+                      title=""
+                      books={books.filter(b => b.isFavorite)}
+                      emptyMsg="No favorites yet."
+                      onOpen={openBook}
+                      onDelete={deleteBook}
+                      deletingId={deletingId}
+                      onStatusChangeMenu={(e, bookId) => {
+                        e.preventDefault();
+                        setStatusMenu({ bookId, x: e.clientX, y: e.clientY });
+                      }}
+                      updatingStatus={updatingStatus}
+                    />
+                  )}
+                  {activeTab === "paused" && (
+                    <ShelfRow
+                      title=""
+                      books={books.filter(b => b.status === "paused")}
+                      emptyMsg="No paused books."
+                      onOpen={openBook}
+                      onDelete={deleteBook}
+                      deletingId={deletingId}
+                      onStatusChangeMenu={(e, bookId) => {
+                        e.preventDefault();
+                        setStatusMenu({ bookId, x: e.clientX, y: e.clientY });
+                      }}
+                      updatingStatus={updatingStatus}
+                    />
+                  )}
+                  {activeTab === "gaveUp" && (
+                    <ShelfRow
+                      title=""
+                      books={books.filter(b => b.status === "gave_up")}
+                      emptyMsg="No given up books."
                       onOpen={openBook}
                       onDelete={deleteBook}
                       deletingId={deletingId}
@@ -1113,22 +1202,39 @@ export default function Library() {
           onClick={(e) => e.stopPropagation()}
         >
           <button
-            onClick={() => changeStatus(statusMenu.bookId, "reading")}
+            onClick={() => changeStatus(statusMenu.bookId, { status: "reading" })}
             className="px-4 py-3 text-left text-sm font-bold text-white hover:bg-white/10 active:bg-white/20 transition-colors border-b border-white/5"
           >
             Reading
           </button>
           <button
-            onClick={() => changeStatus(statusMenu.bookId, "paused")}
+            onClick={() => changeStatus(statusMenu.bookId, { status: "paused" })}
             className="px-4 py-3 text-left text-sm font-bold text-gray-300 hover:bg-white/10 active:bg-white/20 transition-colors border-b border-white/5"
           >
             Paused
           </button>
           <button
-            onClick={() => changeStatus(statusMenu.bookId, "finished")}
+            onClick={() => changeStatus(statusMenu.bookId, { status: "gave_up" })}
+            className="px-4 py-3 text-left text-sm font-bold text-red-400 hover:bg-white/10 active:bg-white/20 transition-colors border-b border-white/5"
+          >
+            Give Up
+          </button>
+          <button
+            onClick={() => changeStatus(statusMenu.bookId, { status: "finished" })}
             className="px-4 py-3 text-left text-sm font-bold text-green-400 hover:bg-white/10 active:bg-white/20 transition-colors border-b border-white/5"
           >
             Finished ✓
+          </button>
+          <button
+            onClick={() => {
+              const b = books.find(b => b.id === statusMenu.bookId);
+              if (b) {
+                changeStatus(statusMenu.bookId, { favorite: !b.isFavorite });
+              }
+            }}
+            className="px-4 py-3 text-left text-sm font-bold text-pink-400 hover:bg-white/10 active:bg-white/20 transition-colors border-b border-white/5"
+          >
+            {books.find(b => b.id === statusMenu.bookId)?.isFavorite ? "Unfavorite" : "Favorite ♥"}
           </button>
           <button
             onClick={() => {

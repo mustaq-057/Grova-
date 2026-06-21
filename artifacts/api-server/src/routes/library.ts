@@ -395,7 +395,8 @@ libraryRouter.get("/library", authenticate, async (req, res) => {
               added_at AS "addedAt",
               status,
               current_page AS "currentPage",
-              total_pages AS "totalPages"
+              total_pages AS "totalPages",
+              is_favorite AS "isFavorite"
        FROM library_books
        ORDER BY added_at DESC`
     );
@@ -403,6 +404,58 @@ libraryRouter.get("/library", authenticate, async (req, res) => {
   } catch (err) {
     console.error("Library GET error:", err);
     return res.status(500).json({ error: "Failed to fetch library" });
+  }
+});
+
+// ─── GET LIBRARY STATS ───────────────────────────────────────────────────────
+libraryRouter.get("/library/stats", authenticate, async (req: AuthenticatedRequest, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+    const sessions = await db.query(
+      `SELECT DISTINCT date FROM library_reading_sessions WHERE user_id = $1 ORDER BY date DESC`,
+      [userId]
+    );
+
+    let streakDays = 0;
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+
+    for (let i = 0; i < sessions.rows.length; i++) {
+      const rowDate = new Date(sessions.rows[i].date);
+      rowDate.setUTCHours(0, 0, 0, 0);
+      const diffTime = today.getTime() - rowDate.getTime();
+      const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+      if (diffDays === streakDays || diffDays === streakDays + 1) {
+        if (diffDays !== streakDays) streakDays++;
+      } else if (diffDays > streakDays + 1) {
+        break; // streak broken
+      }
+    }
+
+    const todayDate = new Date().toISOString().split("T")[0];
+    const currentYear = todayDate.split("-")[0];
+
+    const dailyResult = await db.query(
+      `SELECT SUM(duration_minutes) as total FROM library_reading_sessions WHERE user_id = $1 AND date = $2`,
+      [userId, todayDate]
+    );
+    
+    const annualResult = await db.query(
+      `SELECT SUM(duration_minutes) as total FROM library_reading_sessions WHERE user_id = $1 AND date LIKE $2`,
+      [userId, `${currentYear}-%`]
+    );
+
+    return res.json({
+      streakDays,
+      dailyMinutes: dailyResult.rows[0]?.total || 0,
+      annualMinutes: annualResult.rows[0]?.total || 0
+    });
+  } catch (err) {
+    console.error("Library stats GET error:", err);
+    return res.status(500).json({ error: "Failed to fetch stats" });
   }
 });
 
@@ -441,9 +494,9 @@ libraryRouter.get("/library/:id", authenticate, async (req, res) => {
               source,
               added_by AS "addedBy",
               added_at AS "addedAt",
-              status,
               current_page AS "currentPage",
-              total_pages AS "totalPages"
+              total_pages AS "totalPages",
+              is_favorite AS "isFavorite"
        FROM library_books WHERE id = $1`,
       [req.params.id]
     );
@@ -523,15 +576,45 @@ libraryRouter.post("/library/:id/sync", authenticate, async (req: AuthenticatedR
   }
 });
 
+// ─── ADD READING SESSION ───────────────────────────────────────────────────────
+libraryRouter.post("/library/:id/session", authenticate, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { durationMinutes } = req.body;
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+    const date = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+    const id = randomUUID();
+
+    await db.execute(
+      `INSERT INTO library_reading_sessions (id, user_id, book_id, date, duration_minutes)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [id, userId, req.params.id, date, durationMinutes || 1]
+    );
+    return res.json({ success: true });
+  } catch (err) {
+    console.error("Library POST session error:", err);
+    return res.status(500).json({ error: "Failed to log session" });
+  }
+});
+
 // ─── UPDATE BOOK STATUS ───────────────────────────────────────────────────────
 libraryRouter.patch("/library/:id/status", authenticate, async (req, res) => {
   try {
-    const { status } = req.body;
-    const validStatuses = ["reading", "finished", "wishlist", "paused"];
-    if (!validStatuses.includes(status)) {
-      return res.status(400).json({ error: "Invalid status" });
+    const { status, favorite } = req.body;
+    
+    if (status) {
+      const validStatuses = ["reading", "finished", "wishlist", "paused", "gave_up"];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({ error: "Invalid status" });
+      }
+      await db.execute(`UPDATE library_books SET status = $1 WHERE id = $2`, [status, req.params.id]);
     }
-    await db.execute(`UPDATE library_books SET status = $1 WHERE id = $2`, [status, req.params.id]);
+    
+    if (favorite !== undefined) {
+      await db.execute(`UPDATE library_books SET is_favorite = $1 WHERE id = $2`, [Boolean(favorite), req.params.id]);
+    }
+
     return res.json({ success: true });
   } catch (err) {
     console.error("Library PATCH status error:", err);

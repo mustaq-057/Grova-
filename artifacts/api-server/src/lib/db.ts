@@ -588,6 +588,7 @@ export async function initDb() {
     // Migrate existing library_books tables
     for (const sql of [
       "ALTER TABLE library_books ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'Unknown'",
+      "ALTER TABLE library_books ADD COLUMN IF NOT EXISTS is_favorite BOOLEAN DEFAULT FALSE"
     ]) {
       try {
         await db.execute(sql);
@@ -595,6 +596,16 @@ export async function initDb() {
         /* column may already exist */
       }
     }
+
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS library_reading_sessions (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        book_id TEXT NOT NULL,
+        date TEXT NOT NULL,
+        duration_minutes INTEGER DEFAULT 0
+      )
+    `);
 
     await db.execute(`
       CREATE TABLE IF NOT EXISTS library_notes (

@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useLocation, useParams } from "wouter";
 import { ReactReader, ReactReaderStyle } from "react-reader";
-import { ChevronLeft, Settings, Info, Type, Link as LinkIcon } from "lucide-react";
+import { ChevronLeft, Settings, Info, Type, Link as LinkIcon, MessageSquare, Send, X } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 
 type Theme = "obsidian" | "parchment" | "sepia" | "midnight";
@@ -61,6 +61,26 @@ export default function EReader() {
 
   const [epubData, setEpubData] = useState<ArrayBuffer | string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showNoteModal, setShowNoteModal] = useState(false);
+  const [noteText, setNoteText] = useState("");
+  const [isSavingNote, setIsSavingNote] = useState(false);
+
+  // Session tracking (1 minute intervals)
+  useEffect(() => {
+    if (!id || loading || !epubData) return;
+    
+    // Set an interval to log a minute of reading
+    const intervalId = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        apiFetch(`/library/${id}/session`, {
+          method: "POST",
+          body: JSON.stringify({ durationMinutes: 1 })
+        }).catch(err => console.error("Failed to log session:", err));
+      }
+    }, 60000);
+
+    return () => clearInterval(intervalId);
+  }, [id, loading, epubData]);
 
   useEffect(() => {
     if (!id) return;
@@ -168,6 +188,26 @@ export default function EReader() {
     }
   };
 
+  const handleSaveNote = async () => {
+    if (!noteText.trim() || !id) return;
+    setIsSavingNote(true);
+    try {
+      await apiFetch(`/library/${id}/notes`, {
+        method: "POST",
+        body: JSON.stringify({
+          text: noteText,
+          chapterOrPage: String(bookLocation) // Saving current location
+        })
+      });
+      setShowNoteModal(false);
+      setNoteText("");
+    } catch (err) {
+      console.error("Failed to save note:", err);
+    } finally {
+      setIsSavingNote(false);
+    }
+  };
+
   return (
     <div 
       className="fixed inset-0 z-[100] transition-colors duration-500 flex flex-col"
@@ -191,6 +231,13 @@ export default function EReader() {
             title="Duet Mode (Sync Pages)"
           >
             <LinkIcon className="w-6 h-6" />
+          </button>
+          <button 
+            onClick={() => setShowNoteModal(true)} 
+            className="p-2 rounded-full hover:bg-white/10 active:scale-90 text-white"
+            title="Take Note"
+          >
+            <MessageSquare className="w-6 h-6" />
           </button>
           <button 
             onClick={() => setShowSettings(!showSettings)} 
@@ -291,11 +338,46 @@ export default function EReader() {
       </div>
 
       {/* Bottom Bar Scrubber */}
-      <div className={`absolute bottom-0 left-0 right-0 p-4 pb-8 z-20 bg-black/40 backdrop-blur-md transition-opacity duration-300 ${showMenu ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
+      <div className={`absolute bottom-0 left-0 right-0 p-4 pb-8 z-20 bg-black/40 backdrop-blur-md transition-opacity duration-300 ${showMenu && !showNoteModal ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
          <div className="flex justify-center text-xs font-bold uppercase tracking-wider text-white opacity-80">
             Zen Mode Active
          </div>
       </div>
+
+      {/* Take Note Modal */}
+      {showNoteModal && (
+        <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm flex flex-col justify-end">
+          <div className="bg-[var(--lib-card)] rounded-t-3xl p-6 h-[50vh] flex flex-col shadow-2xl animate-in slide-in-from-bottom-full duration-300" style={{ backgroundColor: THEMES[theme].bg, color: THEMES[theme].text }}>
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="font-bold flex items-center gap-2">
+                <MessageSquare className="w-5 h-5 text-primary" /> Note this thought
+              </h3>
+              <button onClick={() => setShowNoteModal(false)} className="p-2 hover:bg-black/10 rounded-full">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <textarea
+              className="w-full flex-1 bg-black/5 border border-black/10 rounded-xl p-4 resize-none focus:outline-none focus:ring-2 focus:ring-primary/50 text-base"
+              style={{ color: THEMES[theme].text }}
+              placeholder="What did you learn from this page?"
+              value={noteText}
+              onChange={(e) => setNoteText(e.target.value)}
+              autoFocus
+            />
+
+            <div className="mt-4 flex justify-end">
+              <button 
+                onClick={handleSaveNote}
+                disabled={isSavingNote || !noteText.trim()}
+                className="bg-primary hover:bg-primary/90 text-white px-6 py-3 rounded-full font-bold flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              >
+                {isSavingNote ? "Saving..." : <><Send className="w-4 h-4" /> Save Note</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
