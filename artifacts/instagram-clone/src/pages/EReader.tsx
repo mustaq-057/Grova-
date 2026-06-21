@@ -460,9 +460,9 @@ export default function EReader() {
               tocChanged={() => {}}
               swipeable
               epubOptions={{
-                flow: "scrolled",
-                manager: "continuous",
-                spread: "none",
+                flow: "paginated",
+                manager: "default",
+                spread: "auto",
               }}
               readerStyles={{
                 ...ReactReaderStyle,
