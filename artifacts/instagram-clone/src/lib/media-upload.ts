@@ -65,36 +65,101 @@ async function uploadPdfToCloudinaryRaw(
     throw new Error("Cloudinary is misconfigured — cloudName or apiKey missing from sign response.");
   }
 
-  const formData = new FormData();
-  formData.append("file", file);
-  formData.append("api_key", apiKey);
-  formData.append("timestamp", String(timestamp));
-  formData.append("signature", signature);
-  formData.append("resource_type", "raw");
+  const totalSize = file.size;
+  const chunkSize = 6 * 1024 * 1024; // 6MB chunks
 
-  const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/raw/upload`, {
-    method: "POST",
-    body: formData,
-    signal: controller.signal,
-  });
+  if (totalSize <= chunkSize) {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("api_key", apiKey);
+    formData.append("timestamp", String(timestamp));
+    formData.append("signature", signature);
+    formData.append("resource_type", "raw");
 
-  if (await refreshSessionIfUnauthorized(res.status, attempt)) {
-    return uploadPdfToCloudinaryRaw(file, controller, attempt + 1);
-  }
-  if (RETRYABLE_STATUS.has(res.status) && attempt < 2) {
-    await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
-    return uploadPdfToCloudinaryRaw(file, controller, attempt + 1);
-  }
-  if (!res.ok) {
-    const errBody = (await res.json().catch(() => ({}))) as { error?: { message?: string } };
-    const msg = errBody.error?.message || `Cloudinary PDF upload failed (HTTP ${res.status})`;
-    throw new Error(msg);
-  }
+    const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/raw/upload`, {
+      method: "POST",
+      body: formData,
+      signal: controller.signal,
+    });
 
-  const body = (await res.json()) as { url?: string; secure_url?: string };
-  const url = body.secure_url || body.url || "";
-  if (!url) throw new Error("Cloudinary upload returned no URL");
-  return url;
+    if (await refreshSessionIfUnauthorized(res.status, attempt)) {
+      return uploadPdfToCloudinaryRaw(file, controller, attempt + 1);
+    }
+    if (RETRYABLE_STATUS.has(res.status) && attempt < 2) {
+      await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
+      return uploadPdfToCloudinaryRaw(file, controller, attempt + 1);
+    }
+    if (!res.ok) {
+      const errBody = (await res.json().catch(() => ({}))) as { error?: { message?: string } };
+      const msg = errBody.error?.message || `Cloudinary PDF upload failed (HTTP ${res.status})`;
+      throw new Error(msg);
+    }
+
+    const body = (await res.json()) as { url?: string; secure_url?: string };
+    const url = body.secure_url || body.url || "";
+    if (!url) throw new Error("Cloudinary upload returned no URL");
+    return url;
+  } else {
+    // Chunked upload for files > 6MB
+    const uniqueId = `cloudinary_chunked_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    let start = 0;
+    let finalUrl = "";
+
+    while (start < totalSize) {
+      const end = Math.min(start + chunkSize, totalSize);
+      const chunk = file.slice(start, end);
+      const contentRange = `bytes ${start}-${end - 1}/${totalSize}`;
+
+      let chunkAttempt = 0;
+      let success = false;
+      let chunkRes: any;
+
+      while (!success && chunkAttempt < 3) {
+        try {
+          const formData = new FormData();
+          formData.append("file", chunk);
+          formData.append("api_key", apiKey);
+          formData.append("timestamp", String(timestamp));
+          formData.append("signature", signature);
+          formData.append("resource_type", "raw");
+
+          const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/raw/upload`, {
+            method: "POST",
+            headers: {
+              "X-Unique-Upload-Id": uniqueId,
+              "Content-Range": contentRange,
+            },
+            body: formData,
+            signal: controller.signal,
+          });
+
+          if (!res.ok) {
+            const errBody = (await res.json().catch(() => ({}))) as { error?: { message?: string } };
+            const msg = errBody.error?.message || `HTTP ${res.status}`;
+            throw new Error(msg);
+          }
+
+          chunkRes = await res.json();
+          success = true;
+        } catch (err) {
+          chunkAttempt++;
+          if (chunkAttempt >= 3) {
+            throw err;
+          }
+          await new Promise((r) => setTimeout(r, 1000 * chunkAttempt));
+        }
+      }
+
+      if (end === totalSize) {
+        finalUrl = chunkRes.secure_url || chunkRes.url || "";
+      }
+
+      start = end;
+    }
+
+    if (!finalUrl) throw new Error("Cloudinary chunked upload returned no URL");
+    return finalUrl;
+  }
 }
 
 async function uploadViaBackendBinary(
@@ -131,7 +196,11 @@ export async function uploadMediaBinary(
 ): Promise<string> {
   const mime = normalizeUploadMime(contentType);
   const controller = new AbortController();
-  const timeoutMs = mime.startsWith("video/") ? 300_000 : 180_000;
+  const timeoutMs = isPdfMime(mime)
+    ? 600_000
+    : mime.startsWith("video/")
+    ? 300_000
+    : 180_000;
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
   let res: Response;
