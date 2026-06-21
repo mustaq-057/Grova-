@@ -722,7 +722,7 @@ export default function Library() {
           --lib-bg: #000000;
           --lib-text: #ffffff;
           --lib-header: rgba(0,0,0,0.9);
-          --lib-card: rgba(255,255,255,0.05);
+          --lib-card: #1c1c1e;
           --lib-border: rgba(255,255,255,0.1);
           --lib-input: rgba(255,255,255,0.1);
           --lib-muted: #9ca3af;
@@ -793,6 +793,13 @@ export default function Library() {
           {/* Autocomplete Dropdown */}
           <AnimatePresence>
             {isSearchFocused && (
+              !searchQuery ? recentSearches.length > 0 : (
+                books.some(b => 
+                  b.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                  b.author.toLowerCase().includes(searchQuery.toLowerCase())
+                )
+              )
+            ) && (
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -827,15 +834,6 @@ export default function Library() {
                       b.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
                       b.author.toLowerCase().includes(searchQuery.toLowerCase())
                     ).slice(0, 5);
-                    
-                    if (matches.length === 0) return (
-                      <div 
-                        className="p-4 text-center text-[var(--lib-muted)] text-sm cursor-pointer hover:bg-[var(--lib-input)]"
-                        onMouseDown={(e) => { e.preventDefault(); handleSearch(searchQuery); }}
-                      >
-                        {isSearching ? "Searching…" : "Press Enter to search"}
-                      </div>
-                    );
 
                     return (
                       <>
@@ -970,11 +968,7 @@ export default function Library() {
               </div>
           ) : displayedResults.length > 0 ? (
             <>
-            {isSearching && (
-              <p className="text-[10px] text-[var(--lib-muted)] mb-2 flex items-center gap-1">
-                <Loader2 className="w-3 h-3 animate-spin" /> Updating results…
-              </p>
-            )}
+
             {selectedResultIds.size > 0 && (
               <div className="sticky bottom-20 z-30 mx-auto max-w-md">
                 <button
@@ -1075,53 +1069,55 @@ export default function Library() {
       {!searchQuery && libraryTab === "dashboard" && (
         <>
           {/* Add a Book Banner */}
-          <div className="px-4 mt-6">
-            <div 
-              onClick={() => { if (!isUploading) fileInputRef.current?.click(); }}
-              className={`relative overflow-hidden rounded-3xl p-6 group active:scale-[0.98] transition-transform shadow-sm border border-[var(--lib-border)] bg-[var(--lib-card)] ${
-                isUploading ? "opacity-70 pointer-events-none cursor-wait" : "cursor-pointer"
-              }`}
-            >
-              {/* Background Shapes */}
-              <div className="absolute top-0 right-0 w-full h-full pointer-events-none overflow-hidden rounded-3xl opacity-30">
-                {/* corner blobs */}
-                <div className="absolute -top-12 -right-12 w-32 h-32 bg-primary rounded-full blur-xl" />
-                <div className="absolute -bottom-16 -right-16 w-48 h-48 bg-primary rounded-full blur-xl" />
-                
-                {/* Plus marks */}
-                <Plus className="absolute top-8 right-12 w-6 h-6 text-primary opacity-40 rotate-12" strokeWidth={4} />
-                <Plus className="absolute bottom-12 left-1/2 w-10 h-10 text-primary opacity-40 rotate-45" strokeWidth={4} />
-                <Plus className="absolute top-1/2 right-1/4 w-8 h-8 text-primary opacity-40 -rotate-12" strokeWidth={4} />
-                
-                {/* Big Plus Mark */}
-                <Plus className="absolute -bottom-8 -right-8 w-40 h-40 text-primary opacity-50 group-hover:scale-110 group-hover:rotate-12 transition-transform duration-500" strokeWidth={3} />
-              </div>
+          {!isSearchFocused && (
+            <div className="px-4 mt-6">
+              <div 
+                onClick={() => { if (!isUploading) fileInputRef.current?.click(); }}
+                className={`relative overflow-hidden rounded-3xl p-6 group active:scale-[0.98] transition-transform shadow-sm border border-[var(--lib-border)] bg-[var(--lib-card)] ${
+                  isUploading ? "opacity-70 pointer-events-none cursor-wait" : "cursor-pointer"
+                }`}
+              >
+                {/* Background Shapes */}
+                <div className="absolute top-0 right-0 w-full h-full pointer-events-none overflow-hidden rounded-3xl opacity-30">
+                  {/* corner blobs */}
+                  <div className="absolute -top-12 -right-12 w-32 h-32 bg-primary rounded-full blur-xl" />
+                  <div className="absolute -bottom-16 -right-16 w-48 h-48 bg-primary rounded-full blur-xl" />
+                  
+                  {/* Plus marks */}
+                  <Plus className="absolute top-8 right-12 w-6 h-6 text-primary opacity-40 rotate-12" strokeWidth={4} />
+                  <Plus className="absolute bottom-12 left-1/2 w-10 h-10 text-primary opacity-40 rotate-45" strokeWidth={4} />
+                  <Plus className="absolute top-1/2 right-1/4 w-8 h-8 text-primary opacity-40 -rotate-12" strokeWidth={4} />
+                  
+                  {/* Big Plus Mark */}
+                  <Plus className="absolute -bottom-8 -right-8 w-40 h-40 text-primary opacity-50 group-hover:scale-110 group-hover:rotate-12 transition-transform duration-500" strokeWidth={3} />
+                </div>
 
-              {/* Content */}
-              <div className="relative z-10 w-2/3">
-                <h3 className="text-2xl font-bold text-[var(--lib-text)] mb-1 flex items-center gap-1.5">
-                  {isUploading ? <Loader2 className="w-6 h-6 text-primary animate-spin" /> : <Plus className="w-6 h-6 text-primary" strokeWidth={3} />} 
-                  {isUploading ? (libLang === "ar" ? "جاري الرفع..." : "Uploading...") : (libLang === "ar" ? "أضف كتاباً" : "Add a book")}
-                </h3>
-                <p className="text-sm font-medium text-[var(--lib-muted)]">
-                  {isUploading
-                    ? (libLang === "ar" ? "يرجى الانتظار..." : "Please wait, uploading PDF...")
-                    : (libLang === "ar" ? "ارفع PDF من جهازك" : "Upload a PDF from your device")}
-                </p>
-                {uploadSuccess && !isUploading && (
-                  <p className="mt-2 text-xs text-emerald-400/90 leading-snug">
-                    {libLang === "ar" ? "تم الرفع — اضغط «أضف إلى الرف» في قائمة الانتظار." : "PDF uploaded — tap Add to shelf in Read Later."}
+                {/* Content */}
+                <div className="relative z-10 w-2/3">
+                  <h3 className="text-2xl font-bold text-[var(--lib-text)] mb-1 flex items-center gap-1.5">
+                    {isUploading ? <Loader2 className="w-6 h-6 text-primary animate-spin" /> : <Plus className="w-6 h-6 text-primary" strokeWidth={3} />} 
+                    {isUploading ? (libLang === "ar" ? "جاري الرفع..." : "Uploading...") : (libLang === "ar" ? "أضف كتاباً" : "Add a book")}
+                  </h3>
+                  <p className="text-sm font-medium text-[var(--lib-muted)]">
+                    {isUploading
+                      ? (libLang === "ar" ? "يرجى الانتظار..." : "Please wait, uploading PDF...")
+                      : (libLang === "ar" ? "ارفع PDF من جهازك" : "Upload a PDF from your device")}
                   </p>
-                )}
-                {uploadError && !isUploading && (
-                  <p className="mt-2 text-xs text-red-400/90 leading-snug">
-                    {libLang === "ar" ? "فشل الرفع: " : "Upload failed: "}
-                    {uploadError}
-                  </p>
-                )}
+                  {uploadSuccess && !isUploading && (
+                    <p className="mt-2 text-xs text-emerald-400/90 leading-snug">
+                      {libLang === "ar" ? "تم الرفع — اضغط «أضف إلى الرف» في قائمة الانتظار." : "PDF uploaded — tap Add to shelf in Read Later."}
+                    </p>
+                  )}
+                  {uploadError && !isUploading && (
+                    <p className="mt-2 text-xs text-red-400/90 leading-snug">
+                      {libLang === "ar" ? "فشل الرفع: " : "Upload failed: "}
+                      {uploadError}
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Random Catalog Discovery */}
           <div className="px-4 mt-8">
