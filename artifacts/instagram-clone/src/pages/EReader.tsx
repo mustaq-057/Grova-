@@ -144,6 +144,8 @@ export default function EReader() {
   const [isPdf, setIsPdf] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState<number>(0);
+  const [totalPages, setTotalPages] = useState<number>(0);
   const blobUrlRef = useRef<string | null>(null);
   const [showNoteModal, setShowNoteModal] = useState(false);
   const [noteText, setNoteText] = useState("");
@@ -290,6 +292,8 @@ export default function EReader() {
           if (loc?.start?.displayed) {
             const page = loc.start.displayed.page;
             const total = loc.start.displayed.total;
+            setCurrentPage(page);
+            setTotalPages(total);
             if (total > 0) setProgressPct(Math.round((page / total) * 100));
 
             if (page > 0) {
@@ -417,8 +421,8 @@ export default function EReader() {
         </div>
       )}
 
-      {/* Book viewport — paper page centered with shadow */}
-      <div className="flex-1 flex items-stretch justify-center px-0 sm:px-6 py-0 sm:py-4 relative z-0 min-h-0">
+      {/* Book viewport — paper page centered */}
+      <div className="flex-1 flex flex-col items-stretch justify-center px-0 sm:px-6 py-0 sm:py-4 relative z-0 min-h-0">
         {loading ? (
           <div className="flex flex-col items-center justify-center flex-1 text-white/50 gap-4">
             <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
@@ -436,46 +440,49 @@ export default function EReader() {
             </button>
           </div>
         ) : isPdf ? (
-          <div className="flex-1 max-w-3xl mx-auto w-full bg-white shadow-[0_0_60px_rgba(0,0,0,0.5)] rounded-none sm:rounded-lg overflow-hidden">
+          <div className="flex-1 max-w-3xl mx-auto w-full bg-white shadow-xl rounded-none sm:rounded-lg overflow-hidden">
             <iframe src={epubData} className="w-full h-full border-none" title="PDF Viewer" />
           </div>
         ) : (
-          <div
-            className="flex-1 w-full max-w-2xl mx-auto relative shadow-[0_8px_40px_rgba(0,0,0,0.45),inset_0_0_0_1px_rgba(255,255,255,0.06)] sm:rounded-lg overflow-hidden"
-            style={{ backgroundColor: t.page }}
-          >
-            {/* Page edge shadow */}
-            <div className="absolute inset-y-0 left-0 w-3 bg-gradient-to-r from-black/10 to-transparent pointer-events-none z-10" />
-            <div className="absolute inset-y-0 right-0 w-3 bg-gradient-to-l from-black/10 to-transparent pointer-events-none z-10" />
-            <ReactReader
-              url={epubData}
-              showToc={false}
-              epubInitOptions={{ openAs: "epub" }}
-              location={bookLocation}
-              locationChanged={locationChanged}
-              getRendition={(rendition) => {
-                renditionRef.current = rendition;
-                applyBookRendition(rendition, theme, fontSize, lineHeight);
-              }}
-              tocChanged={() => {}}
-              swipeable
-              epubOptions={{
-                flow: "paginated",
-                manager: "default",
-                spread: "auto",
-              }}
-              readerStyles={{
-                ...ReactReaderStyle,
-                container: { ...ReactReaderStyle.container, width: "100%", height: "100%", background: t.page },
-                readerArea: { ...ReactReaderStyle.readerArea, width: "100%", height: "100%", background: t.page },
-                titleArea: { ...ReactReaderStyle.titleArea, display: "none" },
-                tocArea: { ...ReactReaderStyle.tocArea, display: "none" },
-                arrow: {
-                  ...ReactReaderStyle.arrow,
-                  display: "none", // Hide the ugly pagination arrows for scrolled view
-                },
-              }}
-            />
+          <div className="flex-1 flex flex-col w-full max-w-2xl mx-auto relative sm:rounded-lg overflow-hidden" style={{ backgroundColor: t.page }}>
+            <div className="flex-1 relative min-h-0">
+              <ReactReader
+                url={epubData}
+                showToc={false}
+                epubInitOptions={{ openAs: "epub" }}
+                location={bookLocation}
+                locationChanged={locationChanged}
+                getRendition={(rendition) => {
+                  renditionRef.current = rendition;
+                  applyBookRendition(rendition, theme, fontSize, lineHeight);
+                }}
+                tocChanged={() => {}}
+                swipeable
+                epubOptions={{
+                  flow: "paginated",
+                  manager: "default",
+                  spread: "auto",
+                }}
+                readerStyles={{
+                  ...ReactReaderStyle,
+                  container: { ...ReactReaderStyle.container, width: "100%", height: "100%", background: t.page },
+                  readerArea: { ...ReactReaderStyle.readerArea, width: "100%", height: "100%", background: t.page },
+                  titleArea: { ...ReactReaderStyle.titleArea, display: "none" },
+                  tocArea: { ...ReactReaderStyle.tocArea, display: "none" },
+                  arrow: {
+                    ...ReactReaderStyle.arrow,
+                    display: "none", 
+                  },
+                }}
+              />
+            </div>
+            
+            {/* Always visible minimal footer with page numbers */}
+            <div className="h-8 flex items-center justify-center pointer-events-none opacity-40" style={{ backgroundColor: t.page, color: t.text }}>
+              <span className="text-[11px] font-bold tracking-widest uppercase">
+                {totalPages > 0 ? `Page ${currentPage} of ${totalPages}` : "Reading..."}
+              </span>
+            </div>
           </div>
         )}
       </div>
