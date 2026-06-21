@@ -8,6 +8,8 @@ import {
   searchInternetArchive,
   searchOpenLibrary,
   searchShamelaCatalog,
+  searchBookCatalog,
+  catalogAsHits,
   ARABIC_FEATURED,
   ENGLISH_FEATURED,
   isPdfBookUrl,
@@ -23,6 +25,14 @@ const libraryRouter = Router();
 /** Detect if query contains Arabic characters */
 function isArabicQuery(q: string): boolean {
   return /[\u0600-\u06FF]/.test(q);
+}
+
+function isGermanQuery(q: string): boolean {
+  return /[äöüßÄÖÜ]/.test(q) || /\b(und|der|die|das|ein|eine|nicht|mit|für|deutsch)\b/i.test(q);
+}
+
+function isFrenchQuery(q: string): boolean {
+  return /[àâçéèêëïîôùûü]/i.test(q) || /\b(les|des|une|dans|pour|français|avec)\b/i.test(q);
 }
 
 // ─── In-Memory Search Cache (TTL: 10 min) ───────────────────────────────────
@@ -130,6 +140,22 @@ async function fetchBookUpstream(url: string): Promise<{ buffer: Buffer; content
   return { buffer, contentType };
 }
 
+// ─── GET CURATED CATALOG ─────────────────────────────────────────────────────
+libraryRouter.get("/library/catalog", authenticate, async (req, res) => {
+  const category = typeof req.query.category === "string" ? req.query.category : undefined;
+  const q = (req.query.q as string || "").trim();
+  try {
+    const books = q ? searchBookCatalog(q, 40) : catalogAsHits();
+    const filtered = category
+      ? books.filter((b) => b.source.toLowerCase().includes(category.toLowerCase()))
+      : books;
+    return res.json({ books: filtered.slice(0, 40) });
+  } catch (err) {
+    console.error("Library catalog GET error:", err);
+    return res.status(500).json({ error: "Failed to fetch catalog" });
+  }
+});
+
 // ─── OMNI-SEARCH ENGINE (Federated 6-Source Aggregator) ─────────────────────
 libraryRouter.get("/library/search", authenticate, async (req, res) => {
   const query = (req.query.q as string || "").trim();
@@ -137,6 +163,8 @@ libraryRouter.get("/library/search", authenticate, async (req, res) => {
 
   const enc = encodeURIComponent(query);
   const arabic = isArabicQuery(query);
+  const german = !arabic && isGermanQuery(query);
+  const french = !arabic && !german && isFrenchQuery(query);
   const exactLower = query.toLowerCase().trim();
   const MIN_MATCH_SCORE = 45;
 
@@ -222,13 +250,30 @@ libraryRouter.get("/library/search", authenticate, async (req, res) => {
     return true;
   }
 
+  // ── Curated catalog (instant, no network) ───────────────────────────────
+  let catalogAdded = 0;
+  for (const hit of searchBookCatalog(query, 16)) {
+    if (!dedup(hit.title)) continue;
+    results.push(hit);
+    catalogAdded++;
+  }
+  sourceMeta["Curated Catalog"] = catalogAdded > 0 ? "ok" : "empty";
+
   // ── Internet Archive + Open Library + Shamela/Arabic ──
   const shamelaPromise = arabic
     ? searchShamelaCatalog(query, 15)
     : Promise.resolve([]);
 
+  const iaLangOpts = arabic
+    ? { arabic: true, limit: 15 }
+    : german
+      ? { german: true, limit: 12 }
+      : french
+        ? { french: true, limit: 12 }
+        : { limit: arabic ? 15 : 14 };
+
   const [iaSettled, olSettled, shamelaSettled] = await Promise.allSettled([
-    searchInternetArchive(query, { arabic, limit: arabic ? 15 : 14 }),
+    searchInternetArchive(query, iaLangOpts),
     searchOpenLibrary(query, arabic ? 8 : 10),
     shamelaPromise,
   ]);
@@ -403,7 +448,7 @@ libraryRouter.get("/library/search", authenticate, async (req, res) => {
   finalResults.sort((a, b) => {
     if (b._score !== a._score) return b._score - a._score;
     const sourceRank = (s: string) => {
-      if (s.includes("Classics")) return 0;
+      if (s.includes("Classics") || s === "Curated Catalog" || s.includes("Self-Help") || s.includes("Comics")) return 0;
       if (s === "Gutendex" || s === "Open Library") return 1;
       if (s.includes("Internet Archive")) return 2;
       if (s.includes("Shamela")) return 2;
@@ -413,7 +458,7 @@ libraryRouter.get("/library/search", authenticate, async (req, res) => {
     return sourceRank(a.source) - sourceRank(b.source);
   });
 
-  finalResults = finalResults.slice(0, 24).map(({ _score, ...r }) => r);
+  finalResults = finalResults.slice(0, 28).map(({ _score, ...r }) => r);
   // ── Cache and respond ──────────────────────────────────────────────────────
   const meta = { cached: false, sources: sourceMeta, total: finalResults.length };
   setCache(cacheKey, finalResults, { cached: false, sources: sourceMeta, total: finalResults.length });

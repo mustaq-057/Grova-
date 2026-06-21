@@ -17,13 +17,11 @@ let isInitialized = false;
 const REPOS_TREES = [
   { repo: "canaveensetia/Books", branch: "master", label: "Tech & Productivity" },
   { repo: "rishabhmodi03/BOOKS", branch: "master", label: "General Collection" },
-  { repo: "ikrukov/epub", branch: "master", label: "Public Domain Tech" },
   { repo: "Abdalrahman-Alhamod/Books", branch: "main", label: "Arabic & Engineering" },
+  { repo: "EbookFoundation/free-programming-books", branch: "main", label: "Programming PDFs" },
 ];
 
-const REPOS_RELEASES = [
-  { repo: "rockneverdies55/quran-epub", label: "Quranic & Islamic EPUBs" }
-];
+const REPOS_RELEASES: { repo: string; label: string }[] = [];
 
 export async function initGithubIndexer() {
   if (isInitialized) return;

@@ -32,6 +32,37 @@ async function refreshSessionIfUnauthorized(status: number, attempt: number): Pr
   return false;
 }
 
+/** PDFs must use the backend raw upload — Cloudinary auto/upload mishandles PDFs and JSON base64 hits Vercel body limits. */
+function preferBackendBinaryUpload(mime: string): boolean {
+  return mime === "application/pdf" || mime.startsWith("application/pdf;");
+}
+
+async function uploadViaBackendBinary(
+  file: File | Blob,
+  mime: string,
+  fileName: string | undefined,
+  controller: AbortController,
+  attempt: number,
+): Promise<Response> {
+  const res = await fetch("/api/media/upload-binary", {
+    method: "POST",
+    credentials: "include",
+    headers: binaryUploadHeaders(mime, fileName),
+    body: file,
+    signal: controller.signal,
+  });
+  if (await refreshSessionIfUnauthorized(res.status, attempt)) {
+    return fetch("/api/media/upload-binary", {
+      method: "POST",
+      credentials: "include",
+      headers: binaryUploadHeaders(mime, fileName),
+      body: file,
+      signal: controller.signal,
+    });
+  }
+  return res;
+}
+
 export async function uploadMediaBinary(
   file: File | Blob,
   contentType: string,
@@ -40,39 +71,36 @@ export async function uploadMediaBinary(
 ): Promise<string> {
   const mime = normalizeUploadMime(contentType);
   const controller = new AbortController();
-  const timeoutMs = mime.startsWith("video/") ? 300_000 : 120_000;
+  const timeoutMs = mime.startsWith("video/") ? 300_000 : 180_000;
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
   let res: Response;
   try {
-    const signRes = await fetch("/api/media/sign", {
-      headers: getAuthHeaders(),
-      credentials: "include",
-      signal: controller.signal,
-    });
-    
-    if (signRes.ok) {
-      const { signature, timestamp, apiKey, cloudName } = await signRes.json();
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("api_key", apiKey);
-      formData.append("timestamp", String(timestamp));
-      formData.append("signature", signature);
-
-      res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`, {
-        method: "POST",
-        body: formData,
-        signal: controller.signal,
-      });
+    if (preferBackendBinaryUpload(mime)) {
+      res = await uploadViaBackendBinary(file, mime, fileName, controller, attempt);
     } else {
-      // Fallback to Express backend if signature endpoint isn't supported/configured
-      res = await fetch("/api/media/upload-binary", {
-        method: "POST",
+      const signRes = await fetch("/api/media/sign", {
+        headers: getAuthHeaders(),
         credentials: "include",
-        headers: binaryUploadHeaders(mime, fileName),
-        body: file,
         signal: controller.signal,
       });
+
+      if (signRes.ok) {
+        const { signature, timestamp, apiKey, cloudName } = await signRes.json();
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("api_key", apiKey);
+        formData.append("timestamp", String(timestamp));
+        formData.append("signature", signature);
+
+        res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`, {
+          method: "POST",
+          body: formData,
+          signal: controller.signal,
+        });
+      } else {
+        res = await uploadViaBackendBinary(file, mime, fileName, controller, attempt);
+      }
     }
   } catch (err) {
     clearTimeout(timer);
@@ -151,8 +179,8 @@ export async function uploadMediaFile(file: File | Blob, contentType?: string): 
   const mime =
     normalizeUploadMime(contentType || (file instanceof File ? file.type : "") || "application/octet-stream");
 
-  const useBinary = file.size >= BINARY_UPLOAD_MIN_BYTES;
   const fileName = file instanceof File ? file.name : undefined;
+  const useBinary = preferBackendBinaryUpload(mime) || file.size >= BINARY_UPLOAD_MIN_BYTES;
 
   if (useBinary) {
     return uploadMediaBinary(file, mime, 0, fileName);

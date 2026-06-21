@@ -1,15 +1,17 @@
 /** Federated book catalog helpers — Internet Archive, Open Library, Arabic/English PDF discovery */
 
-export type CatalogHit = {
-  id: string;
-  title: string;
-  author: string;
-  coverUrl: string | null;
-  description: string;
-  epubUrl: string; // holds PDF download URL (legacy column name)
-  totalPages: number;
-  source: string;
-};
+import {
+  BOOK_CATALOG,
+  catalogAsHits,
+  searchBookCatalog,
+  ARABIC_FEATURED as CATALOG_ARABIC_FEATURED,
+  ENGLISH_FEATURED as CATALOG_ENGLISH_FEATURED,
+  catalogByCategory,
+  type CatalogHit,
+} from "./book-catalog";
+
+export type { CatalogHit };
+export { BOOK_CATALOG, catalogAsHits, searchBookCatalog, catalogByCategory };
 
 function iaPdfUrl(identifier: string, filename: string): string {
   return `https://archive.org/download/${identifier}/${encodeURIComponent(filename)}`;
@@ -63,13 +65,16 @@ export function scoreBookMatch(query: string, hit: { title: string; author?: str
   return 0;
 }
 
-/** Internet Archive — millions of PDF texts (Arabic + English) */
+/** Internet Archive — millions of PDF texts (Arabic + English + DE + FR) */
 export async function searchInternetArchive(
   query: string,
-  opts: { arabic?: boolean; limit?: number } = {},
+  opts: { arabic?: boolean; german?: boolean; french?: boolean; limit?: number } = {},
 ): Promise<CatalogHit[]> {
   const limit = opts.limit ?? (opts.arabic ? 15 : 12);
-  const langClause = opts.arabic ? "language:Arabic AND " : "";
+  let langClause = "";
+  if (opts.arabic) langClause = "language:Arabic AND ";
+  else if (opts.german) langClause = "language:German AND ";
+  else if (opts.french) langClause = "language:French AND ";
   const q = `${langClause}mediatype:texts AND format:PDF AND (title:(${query}) OR creator:(${query}) OR ${query})`;
   const url = `https://archive.org/advancedsearch.php?q=${encodeURIComponent(q)}&fl[]=identifier,title,creator,description&rows=${limit}&output=json`;
 
@@ -185,20 +190,22 @@ export async function searchShamelaCatalog(query: string, limit = 12): Promise<C
   return hits;
 }
 
-export const ARABIC_FEATURED: CatalogHit[] = [
-  {
-    id: "feat_hdesaddar",
-    title: "حديث الدار",
-    author: "السيد علي الحسيني الميلاني",
-    coverUrl: "https://archive.org/services/img/hdesaddar",
-    description: "حديث الدار — كتاب عربي PDF من Internet Archive.",
-    epubUrl: "https://archive.org/download/hdesaddar/hdesaddar.pdf",
-    totalPages: 38,
-    source: "Arabic Classics",
-  },
-];
+export const ARABIC_FEATURED: CatalogHit[] = CATALOG_ARABIC_FEATURED.length > 0
+  ? CATALOG_ARABIC_FEATURED
+  : [
+      {
+        id: "feat_hdesaddar",
+        title: "حديث الدار",
+        author: "السيد علي الحسيني الميلاني",
+        coverUrl: "https://archive.org/services/img/hdesaddar",
+        description: "حديث الدار — كتاب عربي PDF من Internet Archive.",
+        epubUrl: "https://archive.org/download/hdesaddar/hdesaddar.pdf",
+        totalPages: 38,
+        source: "Arabic Classics",
+      },
+    ];
 
-export const ENGLISH_FEATURED: CatalogHit[] = [];
+export const ENGLISH_FEATURED: CatalogHit[] = CATALOG_ENGLISH_FEATURED;
 
 export function isPdfBookUrl(url: string): boolean {
   const lower = url.toLowerCase().split("?")[0] ?? "";
@@ -206,5 +213,6 @@ export function isPdfBookUrl(url: string): boolean {
   // Cloudinary / uploaded PDFs often omit extension in URL
   if (/cloudinary\.com/i.test(url) && /\/raw\//i.test(url)) return true;
   if (/res\.cloudinary\.com/i.test(url)) return true;
+  if (/backblazeb2\.com/i.test(url)) return true;
   return false;
 }

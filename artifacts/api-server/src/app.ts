@@ -97,6 +97,7 @@ const corsOptions = {
     "X-Primary-Token",
     "X-Client-Id",
     "X-Client-Origin",
+    "X-File-Name",
   ],
 };
 

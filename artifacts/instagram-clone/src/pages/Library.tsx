@@ -82,9 +82,7 @@ function isPdfUrl(url: string): boolean {
   return false;
 }
 
-const RANDOM_CATALOG = [
-  { id: "c1", title: "حديث الدار", author: "السيد علي الحسيني الميلاني", source: "Arabic Classics", totalPages: 38, epubUrl: "https://archive.org/download/hdesaddar/hdesaddar.pdf", description: "كتاب عربي PDF من Internet Archive.", coverUrl: "https://archive.org/services/img/hdesaddar" },
-];
+const RANDOM_CATALOG: SearchResult[] = [];
 
 function BookCover({
   coverUrl,
@@ -134,6 +132,8 @@ export default function Library() {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searchMeta, setSearchMeta] = useState<SearchMeta | null>(null);
   const [isSearching, setIsSearching] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [catalogBooks, setCatalogBooks] = useState<SearchResult[]>([]);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [inAppBrowserUrl, setInAppBrowserUrl] = useState<string | null>(null);
@@ -273,15 +273,25 @@ export default function Library() {
     }
   }, []);
 
+  const loadCatalog = useCallback(async () => {
+    try {
+      const data = await apiFetch<{ books: SearchResult[] }>("/library/catalog");
+      setCatalogBooks(data.books || []);
+    } catch (err) {
+      console.error("Failed to load catalog:", err);
+    }
+  }, []);
+
   useEffect(() => {
     loadBooks();
     loadNotes();
     loadStats();
+    loadCatalog();
     
     const handleNotesUpdate = () => loadNotes();
     window.addEventListener("LIBRARY_NOTES_UPDATED", handleNotesUpdate);
     return () => window.removeEventListener("LIBRARY_NOTES_UPDATED", handleNotesUpdate);
-  }, [loadBooks, loadNotes, loadStats]);
+  }, [loadBooks, loadNotes, loadStats, loadCatalog]);
 
   useEffect(() => {
     if (!user) return;
@@ -364,13 +374,16 @@ export default function Library() {
       return;
     }
 
-    setIsSearching(true);
+    setIsUploading(true);
     try {
       const title = file.name.replace(/\.pdf$/i, "");
       const author = "Unknown Author";
       const description = "Uploaded manually.";
 
       const url = await uploadMediaFile(file, "application/pdf");
+      if (!url?.trim()) {
+        throw new Error("Upload returned empty URL — check Cloudinary settings.");
+      }
 
       await apiFetch("/library", {
         method: "POST",
@@ -386,11 +399,15 @@ export default function Library() {
       });
 
       await loadBooks();
+      alert(libLang === "ar" ? "تم رفع الكتاب بنجاح!" : "Book uploaded successfully!");
     } catch (err: any) {
       console.error("Failed to upload PDF:", err);
-      alert("Failed to upload: " + (err?.message || "Unknown error"));
+      alert(
+        (libLang === "ar" ? "فشل الرفع: " : "Failed to upload: ") +
+          (err?.message || "Unknown error"),
+      );
     } finally {
-      setIsSearching(false);
+      setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
@@ -933,11 +950,13 @@ export default function Library() {
               {/* Content */}
               <div className="relative z-10 w-2/3">
                 <h3 className="text-2xl font-bold text-[var(--lib-text)] mb-1 flex items-center gap-1.5">
-                  {isSearching ? <Loader2 className="w-6 h-6 text-primary animate-spin" /> : <Plus className="w-6 h-6 text-primary" strokeWidth={3} />} 
-                  {isSearching ? "Uploading..." : "Add a book"}
+                  {isUploading ? <Loader2 className="w-6 h-6 text-primary animate-spin" /> : <Plus className="w-6 h-6 text-primary" strokeWidth={3} />} 
+                  {isUploading ? (libLang === "ar" ? "جاري الرفع..." : "Uploading...") : (libLang === "ar" ? "أضف كتاباً" : "Add a book")}
                 </h3>
                 <p className="text-sm font-medium text-[var(--lib-muted)]">
-                  {isSearching ? "Please wait, uploading PDF..." : "Upload a PDF from your device"}
+                  {isUploading
+                    ? (libLang === "ar" ? "يرجى الانتظار..." : "Please wait, uploading PDF...")
+                    : (libLang === "ar" ? "ارفع PDF من جهازك" : "Upload a PDF from your device")}
                 </p>
               </div>
             </div>
@@ -949,7 +968,7 @@ export default function Library() {
               <span>{t.catalog}</span>
             </h3>
             <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-2">
-              {RANDOM_CATALOG.map((book) => (
+              {(catalogBooks.length > 0 ? catalogBooks : RANDOM_CATALOG).map((book) => (
                 <div
                   key={book.id}
                   onClick={() => setSelectedPreviewBook(book as SearchResult)}
