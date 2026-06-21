@@ -126,6 +126,7 @@ export default memo(function Home() {
 
   const shortcuts = [
     { href: "/chat", icon: MessageCircle, label: "Chat", desc: "Messages & calls" },
+    { href: "/library", icon: BookOpen, label: "Library", desc: "Shared books" },
     { href: "/dua", icon: BookOpen, label: "Duas", desc: "Shared prayers" },
     { href: "/memories", icon: Heart, label: "Memories", desc: "Your moments" },
     { href: "/library", icon: BookOpen, label: "Library", desc: "Shared books" },

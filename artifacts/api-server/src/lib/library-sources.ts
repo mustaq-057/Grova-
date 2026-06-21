@@ -196,50 +196,9 @@ export const ARABIC_FEATURED: CatalogHit[] = [
     totalPages: 38,
     source: "Arabic Classics",
   },
-  {
-    id: "feat_abu971",
-    title: "الحركيون",
-    author: "تراث",
-    coverUrl: "https://archive.org/services/img/abu_971",
-    description: "كتاب عربي PDF مجاني.",
-    epubUrl: "https://archive.org/download/abu_971/abu_971.pdf",
-    totalPages: 200,
-    source: "Arabic Classics",
-  },
 ];
 
-export const ENGLISH_FEATURED: CatalogHit[] = [
-  {
-    id: "feat_pride",
-    title: "Pride and Prejudice",
-    author: "Jane Austen",
-    coverUrl: "https://www.gutenberg.org/cache/epub/1342/pg1342.cover.medium.jpg",
-    description: "Classic English novel — Project Gutenberg PDF.",
-    epubUrl: "https://www.gutenberg.org/files/1342/1342-0.pdf",
-    totalPages: 350,
-    source: "English Classics",
-  },
-  {
-    id: "feat_frankenstein",
-    title: "Frankenstein",
-    author: "Mary Shelley",
-    coverUrl: "https://www.gutenberg.org/cache/epub/84/pg84.cover.medium.jpg",
-    description: "Gothic classic — Project Gutenberg PDF.",
-    epubUrl: "https://www.gutenberg.org/files/84/84-0.pdf",
-    totalPages: 280,
-    source: "English Classics",
-  },
-  {
-    id: "feat_alice",
-    title: "Alice's Adventures in Wonderland",
-    author: "Lewis Carroll",
-    coverUrl: "https://www.gutenberg.org/cache/epub/11/pg11.cover.medium.jpg",
-    description: "Beloved children's classic — Project Gutenberg PDF.",
-    epubUrl: "https://www.gutenberg.org/files/11/11-0.pdf",
-    totalPages: 120,
-    source: "English Classics",
-  },
-];
+export const ENGLISH_FEATURED: CatalogHit[] = [];
 
 export function isPdfBookUrl(url: string): boolean {
   const lower = url.toLowerCase().split("?")[0] ?? "";

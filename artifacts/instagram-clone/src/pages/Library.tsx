@@ -84,9 +84,6 @@ function isPdfUrl(url: string): boolean {
 
 const RANDOM_CATALOG = [
   { id: "c1", title: "حديث الدار", author: "السيد علي الحسيني الميلاني", source: "Arabic Classics", totalPages: 38, epubUrl: "https://archive.org/download/hdesaddar/hdesaddar.pdf", description: "كتاب عربي PDF من Internet Archive.", coverUrl: "https://archive.org/services/img/hdesaddar" },
-  { id: "c2", title: "Pride and Prejudice", author: "Jane Austen", source: "Gutendex", totalPages: 350, epubUrl: "https://www.gutenberg.org/files/1342/1342-0.pdf", description: "A classic romance novel.", coverUrl: "https://www.gutenberg.org/cache/epub/1342/pg1342.cover.medium.jpg" },
-  { id: "c3", title: "Les Misérables", author: "Victor Hugo", source: "Gutendex", totalPages: 1400, epubUrl: "https://www.gutenberg.org/files/135/135-0.pdf", description: "A French historical novel.", coverUrl: "https://www.gutenberg.org/cache/epub/135/pg135.cover.medium.jpg" },
-  { id: "c4", title: "Don Quijote", author: "Miguel de Cervantes", source: "Gutendex", totalPages: 1000, epubUrl: "https://www.gutenberg.org/files/2000/2000-0.pdf", description: "The classic Spanish novel.", coverUrl: "https://www.gutenberg.org/cache/epub/2000/pg2000.cover.medium.jpg" }
 ];
 
 function BookCover({
