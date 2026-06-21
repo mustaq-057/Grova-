@@ -380,7 +380,7 @@ export default function Library() {
           "Content-Type": file.type || (isPdf ? "application/pdf" : "application/epub+zip"),
           "x-file-name": encodeURIComponent(file.name)
         },
-        body: buffer,
+        body: file,
       });
 
       // We no longer calculate locations here because it takes too long on upload.
@@ -402,9 +402,9 @@ export default function Library() {
       });
 
       await loadBooks();
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to upload EPUB:", err);
-      alert("Failed to upload EPUB.");
+      alert("Failed to upload: " + (err?.message || "Unknown error"));
     } finally {
       setIsSearching(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
