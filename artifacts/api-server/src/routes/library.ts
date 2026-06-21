@@ -46,25 +46,24 @@ function setCache(key: string, results: any[], meta: any): void {
   searchCache.set(key, { results, meta, ts: Date.now() });
 }
 
-const ALLOWED_BOOK_HOSTS = [
-  "gutenberg.org",
-  "standardebooks.org",
-  "cdn.jsdelivr.net",
-  "raw.githubusercontent.com",
-  "github.com",
-  "objects.githubusercontent.com",
-  "res.cloudinary.com",
-  "library.oapen.org",
-  "ws-export.wmcloud.org",
-  "feedbooks.com",
-  "catalog.feedbooks.com",
-  "shamela.ws",
-];
+function isPrivateHost(hostname: string): boolean {
+  const h = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  if (h === "localhost" || h.endsWith(".localhost")) return true;
+  if (h === "127.0.0.1" || h.startsWith("127.")) return true;
+  if (h.startsWith("10.")) return true;
+  if (h.startsWith("192.168.")) return true;
+  if (h.startsWith("169.254.")) return true;
+  if (h === "::1" || h.startsWith("fc") || h.startsWith("fd")) return true;
+  return false;
+}
 
-function isAllowedBookUrl(url: string): boolean {
+/** Block SSRF to internal networks; allow any public https/http book host. */
+function isSafeBookUrl(url: string): boolean {
   try {
-    const host = new URL(url).hostname.replace(/^www\./, "");
-    return ALLOWED_BOOK_HOSTS.some((h) => host === h || host.endsWith(`.${h}`));
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return false;
+    if (isPrivateHost(parsed.hostname)) return false;
+    return true;
   } catch {
     return false;
   }
@@ -75,6 +74,47 @@ function guessBookContentType(url: string): string {
   if (lower.includes(".pdf")) return "application/pdf";
   if (lower.includes(".epub")) return "application/epub+zip";
   return "application/octet-stream";
+}
+
+function gutenbergFetchCandidates(url: string): string[] {
+  const out = [url];
+  const m = url.match(/gutenberg\.org\/ebooks\/(\d+)/i);
+  if (m) {
+    const id = m[1];
+    out.push(
+      `https://www.gutenberg.org/cache/epub/${id}/pg${id}-images-3.epub`,
+      `https://www.gutenberg.org/cache/epub/${id}/pg${id}.epub`,
+      `https://www.gutenberg.org/ebooks/${id}.epub.noimages`,
+    );
+  }
+  return [...new Set(out)];
+}
+
+function isValidBookBuffer(buf: Buffer): boolean {
+  if (buf.length < 4) return false;
+  if (buf[0] === 0x25 && buf[1] === 0x50 && buf[2] === 0x44 && buf[3] === 0x46) return true;
+  if (buf[0] === 0x50 && buf[1] === 0x4b) return true;
+  return false;
+}
+
+async function fetchBookUpstream(url: string): Promise<{ buffer: Buffer; contentType: string } | null> {
+  const upstream = await fetch(url, {
+    headers: {
+      "User-Agent": "Mozilla/5.0 (compatible; Grova-Library/1.0)",
+      Accept: "application/epub+zip,application/pdf,*/*",
+    },
+    signal: AbortSignal.timeout(90_000),
+    redirect: "follow",
+  });
+  if (!upstream.ok) return null;
+
+  const buffer = Buffer.from(await upstream.arrayBuffer());
+  if (!isValidBookBuffer(buffer)) return null;
+
+  const contentType =
+    upstream.headers.get("content-type")?.split(";")[0]?.trim() ||
+    guessBookContentType(url);
+  return { buffer, contentType };
 }
 
 // ─── OMNI-SEARCH ENGINE (Federated 6-Source Aggregator) ─────────────────────
@@ -269,8 +309,8 @@ libraryRouter.get("/library/search", authenticate, async (req, res) => {
         for (const item of (data.results || []).slice(0, 3)) {
           if (!item.title || !dedup(item.title)) continue;
           const fileUrl =
-            item.formats?.["application/pdf"] ||
             item.formats?.["application/epub+zip"] ||
+            item.formats?.["application/pdf"] ||
             null;
           if (!fileUrl) continue;
           results.push({
@@ -576,29 +616,29 @@ libraryRouter.get("/library/:id/file", authenticate, async (req, res) => {
     if (!epubUrl?.trim()) {
       return res.status(404).json({ error: "No file URL for this book" });
     }
-    if (!isAllowedBookUrl(epubUrl)) {
-      return res.status(400).json({ error: "Book source not allowed" });
+    if (!isSafeBookUrl(epubUrl)) {
+      return res.status(400).json({ error: "Book URL is not a valid public link" });
     }
 
-    const upstream = await fetch(epubUrl, {
-      headers: { "User-Agent": "Grova-Library/1.0" },
-      signal: AbortSignal.timeout(60_000),
-      redirect: "follow",
-    });
-    if (!upstream.ok) {
-      return res.status(502).json({ error: `Upstream returned HTTP ${upstream.status}` });
+    const candidates = epubUrl.includes("gutenberg.org")
+      ? gutenbergFetchCandidates(epubUrl)
+      : [epubUrl];
+
+    for (const url of candidates) {
+      if (!isSafeBookUrl(url)) continue;
+      try {
+        const fetched = await fetchBookUpstream(url);
+        if (!fetched) continue;
+        res.setHeader("Content-Type", fetched.contentType);
+        res.setHeader("Cache-Control", "private, max-age=3600");
+        res.setHeader("Content-Disposition", "inline");
+        return res.send(fetched.buffer);
+      } catch {
+        /* try next candidate */
+      }
     }
 
-    const contentType =
-      upstream.headers.get("content-type")?.split(";")[0]?.trim() ||
-      guessBookContentType(epubUrl);
-
-    res.setHeader("Content-Type", contentType);
-    res.setHeader("Cache-Control", "private, max-age=3600");
-    res.setHeader("Content-Disposition", "inline");
-
-    const buffer = Buffer.from(await upstream.arrayBuffer());
-    return res.send(buffer);
+    return res.status(502).json({ error: "Could not download book file from source" });
   } catch (err) {
     console.error("Library file proxy error:", err);
     return res.status(500).json({ error: "Failed to fetch book file" });

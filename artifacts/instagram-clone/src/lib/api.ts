@@ -127,6 +127,58 @@ export async function apiFetch<T = unknown>(path: string, options?: RequestInit,
   }
 }
 
+/** Download binary book files (EPUB/PDF) through the authenticated API proxy. */
+export async function apiFetchBlob(path: string, attempt = 0): Promise<{ blob: Blob; contentType: string }> {
+  const { signal, cleanup } = mergeAbortSignal(undefined, 120_000);
+  try {
+    const headers = getAuthHeaders();
+    delete headers["Content-Type"];
+    headers["Accept"] = "application/epub+zip,application/pdf,*/*";
+
+    const res = await fetch(`${BASE}${path}`, {
+      method: "GET",
+      signal,
+      credentials: "include",
+      cache: "no-store",
+      headers,
+    });
+
+    if (res.status === 401 && attempt === 0 && !path.includes("/auth/login")) {
+      const refreshed = await tryRefreshSession();
+      if (refreshed) {
+        cleanup();
+        return apiFetchBlob(path, attempt + 1);
+      }
+    }
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: "Request failed" })) as { error?: string };
+      throw new Error(err.error || `Request failed (HTTP ${res.status})`);
+    }
+
+    return {
+      blob: await res.blob(),
+      contentType: res.headers.get("content-type") || "",
+    };
+  } catch (err) {
+    const isNetwork =
+      err instanceof TypeError ||
+      (err instanceof DOMException && err.name === "AbortError") ||
+      (err instanceof Error && /fetch|network|failed|abort/i.test(err.message));
+    if (isNetwork && attempt < 1) {
+      cleanup();
+      await sleep(400);
+      return apiFetchBlob(path, attempt + 1);
+    }
+    if (isNetwork) {
+      throw new Error("Connection lost — check your internet and try again.");
+    }
+    throw err;
+  } finally {
+    cleanup();
+  }
+}
+
 export type ApiUser = {
   id: "me" | "wife";
   username: string;

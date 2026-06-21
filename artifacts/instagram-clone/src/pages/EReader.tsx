@@ -2,8 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useLocation, useParams } from "wouter";
 import { ReactReader, ReactReaderStyle } from "react-reader";
 import { ChevronLeft, Settings, Info, Type, Link as LinkIcon, MessageSquare, Send, X } from "lucide-react";
-import { apiFetch } from "@/lib/api";
-import { getAuthHeaders } from "@/lib/session";
+import { apiFetch, apiFetchBlob } from "@/lib/api";
 
 type LibraryBook = {
   epubUrl?: string | null;
@@ -71,7 +70,7 @@ export default function EReader() {
   const [isPdf, setIsPdf] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const pdfBlobRef = useRef<string | null>(null);
+  const blobUrlRef = useRef<string | null>(null);
   const [showNoteModal, setShowNoteModal] = useState(false);
   const [noteText, setNoteText] = useState("");
   const [isSavingNote, setIsSavingNote] = useState(false);
@@ -113,9 +112,9 @@ export default function EReader() {
       setLoading(true);
       setLoadError(null);
       setIsPdf(false);
-      if (pdfBlobRef.current) {
-        URL.revokeObjectURL(pdfBlobRef.current);
-        pdfBlobRef.current = null;
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
       }
 
       try {
@@ -128,29 +127,38 @@ export default function EReader() {
           return;
         }
 
-        const response = await fetch(`/api/library/${id}/file`, {
-          credentials: "include",
-          headers: getAuthHeaders(),
-        });
-        if (!response.ok) throw new Error(`Could not load book file (HTTP ${response.status})`);
-
-        const contentType = response.headers.get("content-type") || "";
-        const urlIsPdf = book.epubUrl.toLowerCase().includes(".pdf");
-        const pdf = urlIsPdf || contentType.includes("application/pdf");
-
-        if (pdf) {
-          const blob = await response.blob();
-          const blobUrl = URL.createObjectURL(blob);
-          pdfBlobRef.current = blobUrl;
-          if (!cancelled) {
-            setIsPdf(true);
-            setEpubData(blobUrl);
-          } else {
-            URL.revokeObjectURL(blobUrl);
+        let blob: Blob;
+        let contentType = "";
+        try {
+          const proxied = await apiFetchBlob(`/library/${id}/file`);
+          blob = proxied.blob;
+          contentType = proxied.contentType;
+        } catch (proxyErr) {
+          console.warn("Book proxy failed, trying direct download:", proxyErr);
+          const directUrl = book.epubUrl;
+          if (!/cdn\.jsdelivr\.net|cloudinary\.com|raw\.githubusercontent\.com/i.test(directUrl)) {
+            throw proxyErr;
           }
+          const direct = await fetch(directUrl);
+          if (!direct.ok) throw proxyErr;
+          blob = await direct.blob();
+          contentType = direct.headers.get("content-type") || "";
+        }
+
+        const pdf =
+          book.epubUrl.toLowerCase().includes(".pdf") ||
+          contentType.includes("application/pdf");
+
+        const blobUrl = URL.createObjectURL(
+          pdf ? blob : new Blob([await blob.arrayBuffer()], { type: "application/epub+zip" })
+        );
+        blobUrlRef.current = blobUrl;
+
+        if (!cancelled) {
+          setIsPdf(pdf);
+          setEpubData(blobUrl);
         } else {
-          const buffer = await response.arrayBuffer();
-          if (!cancelled) setEpubData(buffer);
+          URL.revokeObjectURL(blobUrl);
         }
       } catch (e) {
         console.error(e);
@@ -165,9 +173,9 @@ export default function EReader() {
 
     return () => {
       cancelled = true;
-      if (pdfBlobRef.current) {
-        URL.revokeObjectURL(pdfBlobRef.current);
-        pdfBlobRef.current = null;
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
       }
     };
   }, [id]);
