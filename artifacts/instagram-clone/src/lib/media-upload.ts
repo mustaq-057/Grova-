@@ -144,7 +144,7 @@ export async function uploadMediaBinary(
         /* try server upload below */
       }
 
-      if (file.size <= 4 * 1024 * 1024) {
+      if (file.size <= 200 * 1024 * 1024) {
         try {
           res = await uploadViaBackendBinary(file, mime, fileName, controller, attempt);
           if (res.ok) {
@@ -170,7 +170,7 @@ export async function uploadMediaBinary(
         }
       }
 
-      throw new Error("PDF upload failed. Try a file under 4 MB or check Cloudinary settings on Vercel.");
+      throw new Error("PDF upload failed. Try a file under 200 MB or check Cloudinary settings on Vercel.");
     } else {
       const signRes = await fetch("/api/media/sign", {
         headers: getAuthHeaders(),

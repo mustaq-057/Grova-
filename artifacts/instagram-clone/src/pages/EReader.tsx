@@ -70,6 +70,27 @@ async function fetchPdfBlob(
 ): Promise<{ blob: Blob; contentType: string }> {
   const errors: string[] = [];
 
+  // Try direct fetch first for Cloudinary/B2 to bypass Vercel 4.5MB limits
+  if (/cloudinary\.com|backblazeb2\.com/i.test(url)) {
+    try {
+      const res = await fetch(url);
+      if (res.ok) {
+        const buf = await res.arrayBuffer();
+        if (isPdfBuffer(buf)) {
+          return {
+            blob: new Blob([buf], { type: "application/pdf" }),
+            contentType: "application/pdf",
+          };
+        }
+        errors.push("Direct fetch returned a file that is not a valid PDF.");
+      } else {
+        errors.push(`Direct fetch failed with HTTP ${res.status}`);
+      }
+    } catch (e) {
+      errors.push(e instanceof Error ? e.message : "Direct fetch failed (CORS/Network).");
+    }
+  }
+
   // Always load through our API — direct browser fetch hits CORS on archive.org, Gutenberg, Cloudinary, etc.
   try {
     const proxied = await apiFetchBlob(`/library/${bookId}/file`);

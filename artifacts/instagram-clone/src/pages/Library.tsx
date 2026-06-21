@@ -1866,13 +1866,23 @@ export default function Library() {
             </div>
 
             <div className="p-6 pt-2 pb-8 flex gap-3">
-              <button
-                onClick={() => { addToLibrary(selectedPreviewBook); setSelectedPreviewBook(null); }}
-                className="flex-1 bg-primary text-primary-foreground font-bold py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 hover:bg-primary/90 active:scale-95 transition-all shadow-lg shadow-primary/20"
-              >
-                <BookOpen className="w-5 h-5" />
-                Add to Shelf
-              </button>
+              {isBookOnShelf(selectedPreviewBook.title, selectedPreviewBook.epubUrl) ? (
+                <button
+                  disabled
+                  className="flex-1 bg-[var(--lib-input)] text-[var(--lib-muted)] border border-[var(--lib-border)] font-bold py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 cursor-not-allowed opacity-60"
+                >
+                  <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                  Already in Shelf
+                </button>
+              ) : (
+                <button
+                  onClick={() => { addToLibrary(selectedPreviewBook); setSelectedPreviewBook(null); }}
+                  className="flex-1 bg-primary text-primary-foreground font-bold py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 hover:bg-primary/90 active:scale-95 transition-all shadow-lg shadow-primary/20"
+                >
+                  <BookOpen className="w-5 h-5" />
+                  Add to Shelf
+                </button>
+              )}
             </div>
           </motion.div>
         </motion.div>
