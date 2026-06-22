@@ -267,7 +267,7 @@ export const BOOK_CATALOG: CatalogEntry[] = [
     totalPages: 220,
     source: "Internet Archive",
     category: "Mustaq's Picks",
-    tags: ["arabic", "islamic", "self-help"],
+    tags: ["arabic", "islamic", "self-help", "i missed a prayer", "islam jamal"],
   },
   {
     id: "cat_cant_hurt_me",

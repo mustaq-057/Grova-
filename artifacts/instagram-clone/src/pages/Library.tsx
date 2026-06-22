@@ -525,7 +525,8 @@ export default function Library() {
           canvas.width = viewport.width;
 
           if (ctx) {
-            await page.render({ canvasContext: ctx, viewport }).promise;
+            const renderContext: any = { canvasContext: ctx, viewport, canvas };
+            await page.render(renderContext).promise;
             const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/jpeg", 0.8));
             if (blob) {
               const coverFile = new File([blob], "cover.jpg", { type: "image/jpeg" });
@@ -641,11 +642,12 @@ export default function Library() {
 
   const deleteBook = async (id: string) => {
     setDeletingId(id);
+    setBooks((prev) => prev.filter((b) => b.id !== id));
     try {
       await apiFetch(`/library/${id}`, { method: "DELETE" });
-      setBooks((prev) => prev.filter((b) => b.id !== id));
     } catch (err) {
       console.error("Failed to delete book:", err);
+      await loadBooks();
     } finally {
       setDeletingId(null);
     }
@@ -1435,6 +1437,7 @@ export default function Library() {
                         setStatusMenu({ bookId, x: e.clientX, y: e.clientY });
                       }}
                       updatingStatus={updatingStatus}
+                      isLoading={loading}
                     />
                   )}
                   {activeTab === "partnerShelf" && (
@@ -1450,6 +1453,7 @@ export default function Library() {
                         setStatusMenu({ bookId, x: e.clientX, y: e.clientY });
                       }}
                       updatingStatus={updatingStatus}
+                      isLoading={loading}
                     />
                   )}
                   {activeTab === "finished" && (
@@ -1466,6 +1470,7 @@ export default function Library() {
                         setStatusMenu({ bookId, x: e.clientX, y: e.clientY });
                       }}
                       updatingStatus={updatingStatus}
+                      isLoading={loading}
                     />
                   )}
                   {activeTab === "favorites" && (
@@ -1481,6 +1486,7 @@ export default function Library() {
                         setStatusMenu({ bookId, x: e.clientX, y: e.clientY });
                       }}
                       updatingStatus={updatingStatus}
+                      isLoading={loading}
                     />
                   )}
                   {activeTab === "paused" && (
@@ -1496,6 +1502,7 @@ export default function Library() {
                         setStatusMenu({ bookId, x: e.clientX, y: e.clientY });
                       }}
                       updatingStatus={updatingStatus}
+                      isLoading={loading}
                     />
                   )}
                   {activeTab === "gaveUp" && (
@@ -1512,6 +1519,7 @@ export default function Library() {
                         setStatusMenu({ bookId, x: e.clientX, y: e.clientY });
                       }}
                       updatingStatus={updatingStatus}
+                      isLoading={loading}
                     />
                   )}
                 </motion.div>
@@ -1941,6 +1949,7 @@ function ShelfRow({
   grayscale = false,
   onStatusChangeMenu,
   updatingStatus,
+  isLoading,
 }: {
   title: string;
   books: ApiBook[];
@@ -1952,6 +1961,7 @@ function ShelfRow({
   grayscale?: boolean;
   onStatusChangeMenu?: (e: React.MouseEvent, bookId: string) => void;
   updatingStatus?: string | null;
+  isLoading?: boolean;
 }) {
   const container: any = {
     hidden: { opacity: 0 },
@@ -1972,7 +1982,13 @@ function ShelfRow({
         <h3 className="text-[15px] font-bold tracking-tight">{title}</h3>
         <ChevronRight className="w-4 h-4 text-[var(--lib-muted)]" />
       </div>
-      {books.length === 0 ? (
+      {isLoading && books.length === 0 ? (
+        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3 pb-4 pt-1 px-1">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="aspect-[2/3] w-full bg-[var(--lib-border)]/50 animate-pulse rounded-xl" />
+          ))}
+        </div>
+      ) : books.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-8 text-center bg-[var(--lib-card)] rounded-2xl border border-[var(--lib-border)] border-dashed">
           <BookMarked className="w-8 h-8 mb-2 opacity-20 text-[var(--lib-text)]" />
           <p className="text-xs font-medium text-[var(--lib-muted)]">{emptyMsg}</p>

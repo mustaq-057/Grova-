@@ -75,7 +75,7 @@ export async function searchInternetArchive(
   if (opts.arabic) langClause = "language:Arabic AND ";
   else if (opts.german) langClause = "language:German AND ";
   else if (opts.french) langClause = "language:French AND ";
-  const q = `${langClause}mediatype:texts AND format:PDF AND access-restricted-item:false AND (title:(${query}) OR creator:(${query}) OR ${query})`;
+  const q = `${langClause}mediatype:texts AND format:PDF AND -access-restricted-item:true AND (title:(${query}) OR creator:(${query}) OR ${query})`;
   const url = `https://archive.org/advancedsearch.php?q=${encodeURIComponent(q)}&fl[]=identifier,title,creator,description&rows=${limit}&output=json`;
 
   const res = await fetch(url, {
@@ -159,7 +159,7 @@ export async function searchOpenLibrary(query: string, limit = 8): Promise<Catal
 
 /** Arabic Islamic library — 500k+ PDFs (Arabic queries only) */
 export async function searchShamelaCatalog(query: string, limit = 12): Promise<CatalogHit[]> {
-  const q = `collection:booksbylanguage_arabic AND format:PDF AND access-restricted-item:false AND (title:(${query}) OR creator:(${query}) OR ${query})`;
+  const q = `collection:booksbylanguage_arabic AND format:PDF AND -access-restricted-item:true AND (title:(${query}) OR creator:(${query}) OR ${query})`;
   const url = `https://archive.org/advancedsearch.php?q=${encodeURIComponent(q)}&fl[]=identifier,title,creator,description&rows=${limit}&output=json`;
 
   const res = await fetch(url, {
@@ -219,5 +219,6 @@ export function isPdfBookUrl(url: string): boolean {
   if (/cloudinary\.com/i.test(url) && /\/raw\//i.test(url)) return true;
   if (/res\.cloudinary\.com/i.test(url)) return true;
   if (/backblazeb2\.com/i.test(url)) return true;
+  if (/archive\.org\/download\//i.test(url)) return true;
   return false;
 }
