@@ -649,17 +649,28 @@ libraryRouter.get("/library/:id/file", authenticate, async (req, res) => {
           fetchUrl = await getSignedUrl(s3 as any, command as any, { expiresIn: 3600 });
         }
 
-        const upstream = await fetch(fetchUrl);
+        const upstream = await fetch(fetchUrl, {
+          signal: AbortSignal.timeout(60_000),
+          headers: { Accept: "application/pdf,*/*" },
+        });
         if (upstream.ok) {
-          const buffer = Buffer.from(await upstream.arrayBuffer());
+          const raw = Buffer.from(await upstream.arrayBuffer());
+          // Decompress gzip if Cloudinary delivers it compressed
+          let buffer = raw;
+          if (raw[0] === 0x1f && raw[1] === 0x8b) {
+            const { gunzipSync } = await import("zlib");
+            try { buffer = Buffer.from(gunzipSync(raw)); } catch { buffer = raw; }
+          }
           if (isValidBookBuffer(buffer)) {
             res.setHeader("Content-Type", "application/pdf");
             res.setHeader("Cache-Control", "private, max-age=3600");
             res.setHeader("Content-Disposition", "inline");
             return res.send(buffer);
+          } else {
+            console.error("Buffer not a valid PDF (first 4 bytes):", Array.from(buffer.slice(0,4)));
           }
         } else {
-           console.error("Upstream B2/Cloudinary fetch failed:", upstream.status, await upstream.text());
+           console.error("Upstream B2/Cloudinary fetch failed:", upstream.status, await upstream.text().catch(() => ""));
         }
       } catch (err) {
         console.error("Error fetching from B2/Cloudinary:", err);

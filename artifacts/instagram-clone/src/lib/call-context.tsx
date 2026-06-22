@@ -160,7 +160,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
     }
   }, [user, partnerId, partnerName, partnerAvatar, pushCallSignal, endCall, callState]);
 
-  // Fetch pending call signals on mount/login
+  // Fetch pending call signals on mount/login (one-shot)
   useEffect(() => {
     if (!user) return;
     api.getCallSignals().then((signals) => {
@@ -169,6 +169,25 @@ export function CallProvider({ children }: { children: ReactNode }) {
       }
     }).catch(err => console.error("Failed to fetch pending call signals:", err));
   }, [user, handleCallSignal]);
+
+  // Background poll — ensures Sara hears the ring even on non-Messages pages.
+  // Only poll when no call is active (active calls get signals via Messages SSE/poll).
+  useEffect(() => {
+    if (!user || callState) return;
+    let active = true;
+    const poll = async () => {
+      if (!active) return;
+      try {
+        const signals = await api.getCallSignals();
+        if (!active) return;
+        for (const sig of signals) {
+          handleCallSignal(sig.event, sig.data);
+        }
+      } catch { /* ignore network errors */ }
+    };
+    const id = window.setInterval(poll, 2500);
+    return () => { active = false; window.clearInterval(id); };
+  }, [user, callState, handleCallSignal]);
 
   return (
     <CallContext.Provider value={{
