@@ -406,11 +406,12 @@ export default function Library() {
       const norm = normalizeBookTitle(title);
       return books.some(
         (b) =>
-          normalizeBookTitle(b.title) === norm ||
-          (!!epubUrl && !!b.epubUrl && b.epubUrl === epubUrl),
+          b.addedBy === user?.id &&
+          (normalizeBookTitle(b.title) === norm ||
+          (!!epubUrl && !!b.epubUrl && b.epubUrl === epubUrl)),
       );
     },
-    [books],
+    [books, user?.id],
   );
 
   // Keep form submit working too (instant search on Enter)
