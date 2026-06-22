@@ -2263,7 +2263,7 @@ function LibraryStatsGraph({ weeklyData, monthlyData }: { weeklyData: { date: st
                   initial={{ height: 0 }}
                   animate={{ height: `${Math.max(heightPct, 2)}%` }}
                   transition={{ type: "spring", stiffness: 100, damping: 15, delay: i * 0.05 }}
-                  className="w-full bg-primary rounded-t-sm opacity-80 group-hover:opacity-100 transition-opacity"
+                  className="w-full bg-gradient-to-t from-blue-600 to-blue-400 rounded-t-sm opacity-90 group-hover:opacity-100 transition-opacity shadow-[0_0_10px_rgba(59,130,246,0.3)]"
                 />
               </div>
               <span className="text-[8px] sm:text-[9px] font-bold text-[var(--lib-muted)] uppercase">{getLabel(d)}</span>
