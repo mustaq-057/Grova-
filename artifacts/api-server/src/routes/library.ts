@@ -624,7 +624,32 @@ libraryRouter.get("/library/:id/file", authenticate, async (req, res) => {
     // Cloudinary / B2 — server-side fetch (client may also use /api/media/inline).
     if (/cloudinary\.com|backblazeb2\.com/i.test(epubUrl)) {
       try {
-        const upstream = await fetch(epubUrl);
+        let fetchUrl = epubUrl;
+        
+        // If it's B2 and we have keys, sign the URL to access private buckets
+        if (/backblazeb2\.com/i.test(epubUrl) && process.env.B2_KEY_ID && process.env.B2_APPLICATION_KEY) {
+          const { S3Client, GetObjectCommand } = await import("@aws-sdk/client-s3");
+          const { getSignedUrl } = await import("@aws-sdk/s3-request-presigner");
+          
+          const s3 = new S3Client({
+            region: process.env.AWS_REGION || "us-east-005",
+            endpoint: process.env.B2_ENDPOINT,
+            credentials: { 
+              accessKeyId: process.env.B2_KEY_ID, 
+              secretAccessKey: process.env.B2_APPLICATION_KEY 
+            },
+          });
+          
+          const bucket = process.env.B2_BUCKET_NAME!;
+          const urlObj = new URL(epubUrl);
+          // Extract the S3 Key from the URL path
+          const key = urlObj.pathname.split(`/${bucket}/`)[1] || urlObj.pathname.replace(/^\//, '');
+          
+          const command = new GetObjectCommand({ Bucket: bucket, Key: key });
+          fetchUrl = await getSignedUrl(s3 as any, command as any, { expiresIn: 3600 });
+        }
+
+        const upstream = await fetch(fetchUrl);
         if (upstream.ok) {
           const buffer = Buffer.from(await upstream.arrayBuffer());
           if (isValidBookBuffer(buffer)) {
@@ -633,8 +658,11 @@ libraryRouter.get("/library/:id/file", authenticate, async (req, res) => {
             res.setHeader("Content-Disposition", "inline");
             return res.send(buffer);
           }
+        } else {
+           console.error("Upstream B2/Cloudinary fetch failed:", upstream.status, await upstream.text());
         }
-      } catch {
+      } catch (err) {
+        console.error("Error fetching from B2/Cloudinary:", err);
         /* fall through to candidates loop */
       }
     }

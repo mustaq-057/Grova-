@@ -37,129 +37,56 @@ function isPdfMime(mime: string): boolean {
   return mime === "application/pdf" || mime.startsWith("application/pdf;");
 }
 
-/** Upload PDF directly to Cloudinary raw storage — bypasses Vercel body limits. */
-async function uploadPdfToCloudinaryRaw(
+/** Upload PDF directly to Backblaze B2 via presigned URL — bypasses Vercel body limits. */
+async function uploadPdfToB2(
   file: File | Blob,
   controller: AbortController,
   attempt = 0,
 ): Promise<string> {
-  const signRes = await fetch("/api/media/sign?resourceType=raw", {
+  // 1. Get presigned upload URL from backend
+  const signRes = await fetch("/api/media/b2-sign", {
     headers: getAuthHeaders(),
     credentials: "include",
     signal: controller.signal,
   });
 
   if (!signRes.ok) {
-    const err = (await signRes.json().catch(() => ({ error: "Cloudinary sign failed" }))) as { error?: string };
-    throw new Error(err.error || `Upload setup failed (HTTP ${signRes.status}). Check CLOUDINARY_URL on Vercel.`);
+    const err = (await signRes.json().catch(() => ({ error: "B2 sign failed" }))) as { error?: string };
+    throw new Error(err.error || `Upload setup failed (HTTP ${signRes.status}). Check B2 Environment Variables.`);
   }
 
-  const { signature, timestamp, apiKey, cloudName } = (await signRes.json()) as {
-    signature: string;
-    timestamp: number;
-    apiKey: string;
-    cloudName: string;
+  const { uploadUrl, fileUrl } = (await signRes.json()) as {
+    uploadUrl: string;
+    fileUrl: string;
   };
 
-  if (!cloudName || !apiKey) {
-    throw new Error("Cloudinary is misconfigured — cloudName or apiKey missing from sign response.");
+  if (!uploadUrl || !fileUrl) {
+    throw new Error("B2 is misconfigured — uploadUrl or fileUrl missing from sign response.");
   }
 
-  const totalSize = file.size;
-  const chunkSize = 6 * 1024 * 1024; // 6MB chunks
+  // 2. PUT the file directly to Backblaze B2
+  const res = await fetch(uploadUrl, {
+    method: "PUT",
+    body: file,
+    headers: {
+      "Content-Type": "application/pdf",
+    },
+    signal: controller.signal,
+  });
 
-  if (totalSize <= chunkSize) {
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("api_key", apiKey);
-    formData.append("timestamp", String(timestamp));
-    formData.append("signature", signature);
-    formData.append("resource_type", "raw");
-
-    const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/raw/upload`, {
-      method: "POST",
-      body: formData,
-      signal: controller.signal,
-    });
-
-    if (await refreshSessionIfUnauthorized(res.status, attempt)) {
-      return uploadPdfToCloudinaryRaw(file, controller, attempt + 1);
-    }
-    if (RETRYABLE_STATUS.has(res.status) && attempt < 2) {
-      await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
-      return uploadPdfToCloudinaryRaw(file, controller, attempt + 1);
-    }
-    if (!res.ok) {
-      const errBody = (await res.json().catch(() => ({}))) as { error?: { message?: string } };
-      const msg = errBody.error?.message || `Cloudinary PDF upload failed (HTTP ${res.status})`;
-      throw new Error(msg);
-    }
-
-    const body = (await res.json()) as { url?: string; secure_url?: string };
-    const url = body.secure_url || body.url || "";
-    if (!url) throw new Error("Cloudinary upload returned no URL");
-    return url;
-  } else {
-    // Chunked upload for files > 6MB
-    const uniqueId = `cloudinary_chunked_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-    let start = 0;
-    let finalUrl = "";
-
-    while (start < totalSize) {
-      const end = Math.min(start + chunkSize, totalSize);
-      const chunk = file.slice(start, end);
-      const contentRange = `bytes ${start}-${end - 1}/${totalSize}`;
-
-      let chunkAttempt = 0;
-      let success = false;
-      let chunkRes: any;
-
-      while (!success && chunkAttempt < 3) {
-        try {
-          const formData = new FormData();
-          formData.append("file", chunk);
-          formData.append("api_key", apiKey);
-          formData.append("timestamp", String(timestamp));
-          formData.append("signature", signature);
-          formData.append("resource_type", "raw");
-
-          const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/raw/upload`, {
-            method: "POST",
-            headers: {
-              "X-Unique-Upload-Id": uniqueId,
-              "Content-Range": contentRange,
-            },
-            body: formData,
-            signal: controller.signal,
-          });
-
-          if (!res.ok) {
-            const errBody = (await res.json().catch(() => ({}))) as { error?: { message?: string } };
-            const msg = errBody.error?.message || `HTTP ${res.status}`;
-            throw new Error(msg);
-          }
-
-          chunkRes = await res.json();
-          success = true;
-        } catch (err) {
-          chunkAttempt++;
-          if (chunkAttempt >= 3) {
-            throw err;
-          }
-          await new Promise((r) => setTimeout(r, 1000 * chunkAttempt));
-        }
-      }
-
-      if (end === totalSize) {
-        finalUrl = chunkRes.secure_url || chunkRes.url || "";
-      }
-
-      start = end;
-    }
-
-    if (!finalUrl) throw new Error("Cloudinary chunked upload returned no URL");
-    return finalUrl;
+  if (await refreshSessionIfUnauthorized(res.status, attempt)) {
+    return uploadPdfToB2(file, controller, attempt + 1);
   }
+  if (RETRYABLE_STATUS.has(res.status) && attempt < 2) {
+    await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
+    return uploadPdfToB2(file, controller, attempt + 1);
+  }
+  if (!res.ok) {
+    const msg = `Backblaze B2 PDF upload failed (HTTP ${res.status})`;
+    throw new Error(msg);
+  }
+
+  return fileUrl;
 }
 
 async function uploadViaBackendBinary(
@@ -208,9 +135,8 @@ export async function uploadMediaBinary(
     if (isPdfMime(mime)) {
       const errors: string[] = [];
 
-      // Direct Cloudinary upload first (bypasses Vercel body limits); fall back to server paths.
       try {
-        return await uploadPdfToCloudinaryRaw(file, controller, attempt);
+        return await uploadPdfToB2(file, controller, attempt);
       } catch (err) {
         errors.push(`Direct upload: ${err instanceof Error ? err.message : String(err)}`);
       }
