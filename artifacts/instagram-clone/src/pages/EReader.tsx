@@ -571,8 +571,6 @@ export default function EReader() {
       className="fixed inset-0 z-[100] flex flex-col transition-colors duration-500"
       style={{ backgroundColor: t.bg }}
     >
-      {/* Tap center to toggle menu */}
-      <div className="absolute inset-0 z-10 w-1/3 left-1/3" onClick={() => { setShowMenu((m) => !m); setShowSettings(false); }} />
 
       {/* Top bar */}
       <div className={`absolute top-0 left-0 right-0 z-20 transition-opacity duration-300 ${showMenu ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
@@ -678,6 +676,11 @@ export default function EReader() {
             className="flex-1 max-w-3xl mx-auto w-full bg-[#323639] overflow-y-auto sm:rounded-lg shadow-2xl relative"
             ref={pdfContainerRef}
             onScroll={handlePdfScroll}
+            onClick={(e) => {
+              if ((e.target as HTMLElement).closest('button')) return;
+              setShowMenu((m) => !m);
+              setShowSettings(false);
+            }}
           >
             <Document 
               file={epubData} 
@@ -733,8 +736,7 @@ export default function EReader() {
                   <div
                     key={`page_${pageNum}`}
                     data-page={pageNum}
-                    className="mb-4 relative group cursor-pointer"
-                    onClick={() => openPageNote(pageNum)}
+                    className="mb-4 relative group"
                   >
                     <button
                       type="button"
