@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useLocation, useParams } from "wouter";
 import { ReactReader, ReactReaderStyle } from "react-reader";
-import { ChevronLeft, Settings, Info, Type, Link as LinkIcon, MessageSquare, Send, X, Minus, Plus } from "lucide-react";
+import { ChevronLeft, Settings, Info, Type, Link as LinkIcon, MessageSquare, Send, X, Minus, Plus, Maximize, Minimize } from "lucide-react";
 import { apiFetch, apiFetchBlob } from "@/lib/api";
 import { getAuthHeaders } from "@/lib/session";
 import { Document, Page, pdfjs } from "react-pdf";
@@ -244,6 +244,7 @@ export default function EReader() {
   const [fontSize, setFontSize] = useState(() => Number(localStorage.getItem("grova-reader-font")) || 155);
   const [lineHeight, setLineHeight] = useState(() => Number(localStorage.getItem("grova-reader-line")) || 2.1);
   const [showSettings, setShowSettings] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [duetMode, setDuetMode] = useState(false);
   const [bookTitle, setBookTitle] = useState("");
   const [progressPct, setProgressPct] = useState(0);
@@ -401,11 +402,40 @@ export default function EReader() {
   useEffect(() => {
     window.localStorage.setItem("DND_LIBRARY_MODE", "true");
     const timer = setTimeout(() => setShowMenu(false), 3500);
+
+    const handleFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+
+    const meta = document.querySelector('meta[name="viewport"]');
+    if (meta) {
+      meta.setAttribute("content", "width=device-width, initial-scale=1.0, viewport-fit=cover, height=device-height");
+    }
+
     return () => {
       window.localStorage.removeItem("DND_LIBRARY_MODE");
       clearTimeout(timer);
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+      if (meta) {
+        meta.setAttribute("content", "width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover, height=device-height");
+      }
     };
   }, []);
+
+  const toggleFullscreen = async () => {
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen();
+        setIsFullscreen(true);
+      } else {
+        await document.exitFullscreen();
+        setIsFullscreen(false);
+      }
+    } catch (e) {
+      setIsFullscreen(!isFullscreen);
+    }
+    setShowMenu(false);
+    setShowSettings(false);
+  };
 
   useEffect(() => {
     const handleRemoteSync = (e: Event) => {
@@ -585,6 +615,12 @@ export default function EReader() {
             ))}
           </div>
 
+          <h4 className="text-xs font-bold mb-2 opacity-60 uppercase tracking-widest">Display</h4>
+          <button onClick={toggleFullscreen} className="w-full flex items-center justify-between bg-white/5 hover:bg-white/10 rounded-xl p-3 font-bold text-sm mb-5 transition-colors">
+            {isFullscreen ? "Exit Full Screen" : "Full Screen Mode"}
+            {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+          </button>
+
           <h4 className="text-xs font-bold mb-2 opacity-60 uppercase tracking-widest">Text Size</h4>
           <div className="flex items-center justify-between bg-white/5 rounded-xl p-1 mb-4">
             <button onClick={() => changeFontSize(-10)} className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/10">
@@ -739,12 +775,12 @@ export default function EReader() {
         )}
       </div>
 
-      {/* Progress bar */}
+      {/* Bottom progress bar */}
       {!loading && epubData && progressPct > 0 && (
-        <div className={`absolute bottom-0 left-0 right-0 z-20 transition-opacity duration-300 ${showMenu ? "opacity-100" : "opacity-0"}`}>
-          <div className="h-1 bg-black/30">
-            <div className="h-full bg-primary transition-all duration-500" style={{ width: `${progressPct}%` }} />
-          </div>
+        <div
+          className={`absolute bottom-0 left-0 right-0 h-1 bg-black/20 z-20 transition-opacity duration-300 ${!showMenu && !isFullscreen ? "opacity-100" : "opacity-0"}`}
+        >
+          <div className="h-full bg-primary transition-all duration-500" style={{ width: `${progressPct}%` }} />
         </div>
       )}
 

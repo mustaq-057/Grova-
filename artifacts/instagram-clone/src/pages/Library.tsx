@@ -2269,7 +2269,7 @@ function LibraryStatsGraph({ weeklyData, monthlyData }: { weeklyData: { date: st
         {data.map((d, i) => {
           const heightPct = (d.minutes / maxMinutes) * 100;
           return (
-            <div key={i} className="flex-1 flex flex-col items-center gap-2 group">
+            <div key={i} className="flex-1 flex flex-col items-center gap-2 group h-full">
               <div className="w-full relative h-full flex flex-col justify-end">
                 {/* Tooltip */}
                 <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-black text-[var(--lib-text)] text-[10px] font-bold py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">

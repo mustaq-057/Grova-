@@ -20,7 +20,7 @@ function iaPdfUrl(identifier: string, filename: string): string {
 export async function iaResolvePdfUrl(identifier: string): Promise<string | null> {
   try {
     const res = await fetch(`https://archive.org/metadata/${identifier}`, {
-      headers: { "User-Agent": "Grova-Library/1.0" },
+      headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" },
       signal: AbortSignal.timeout(8000),
     });
     if (!res.ok) return null;
@@ -79,7 +79,7 @@ export async function searchInternetArchive(
   const url = `https://archive.org/advancedsearch.php?q=${encodeURIComponent(q)}&fl[]=identifier,title,creator,description&rows=${limit}&output=json`;
 
   const res = await fetch(url, {
-    headers: { "User-Agent": "Grova-Library/1.0" },
+    headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" },
     signal: AbortSignal.timeout(12000),
   });
   if (!res.ok) return [];
@@ -116,7 +116,7 @@ export async function searchInternetArchive(
 export async function searchOpenLibrary(query: string, limit = 8): Promise<CatalogHit[]> {
   const url = `https://openlibrary.org/search.json?q=${encodeURIComponent(query)}&has_fulltext=true&limit=${limit}`;
   const res = await fetch(url, {
-    headers: { "User-Agent": "Grova-Library/1.0" },
+    headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" },
     signal: AbortSignal.timeout(12000),
   });
   if (!res.ok) return [];
