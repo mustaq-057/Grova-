@@ -70,12 +70,12 @@ export async function searchInternetArchive(
   query: string,
   opts: { arabic?: boolean; german?: boolean; french?: boolean; limit?: number } = {},
 ): Promise<CatalogHit[]> {
-  const limit = opts.limit ?? (opts.arabic ? 15 : 12);
+  const limit = opts.limit ?? (opts.arabic ? 15 : 25);
   let langClause = "";
   if (opts.arabic) langClause = "language:Arabic AND ";
   else if (opts.german) langClause = "language:German AND ";
   else if (opts.french) langClause = "language:French AND ";
-  const q = `${langClause}mediatype:texts AND format:PDF AND (title:(${query}) OR creator:(${query}) OR ${query})`;
+  const q = `${langClause}mediatype:texts AND format:PDF AND access-restricted-item:false AND (title:(${query}) OR creator:(${query}) OR ${query})`;
   const url = `https://archive.org/advancedsearch.php?q=${encodeURIComponent(q)}&fl[]=identifier,title,creator,description&rows=${limit}&output=json`;
 
   const res = await fetch(url, {
@@ -159,7 +159,7 @@ export async function searchOpenLibrary(query: string, limit = 8): Promise<Catal
 
 /** Arabic Islamic library — 500k+ PDFs (Arabic queries only) */
 export async function searchShamelaCatalog(query: string, limit = 12): Promise<CatalogHit[]> {
-  const q = `collection:booksbylanguage_arabic AND format:PDF AND (title:(${query}) OR creator:(${query}) OR ${query})`;
+  const q = `collection:booksbylanguage_arabic AND format:PDF AND access-restricted-item:false AND (title:(${query}) OR creator:(${query}) OR ${query})`;
   const url = `https://archive.org/advancedsearch.php?q=${encodeURIComponent(q)}&fl[]=identifier,title,creator,description&rows=${limit}&output=json`;
 
   const res = await fetch(url, {

@@ -415,18 +415,29 @@ libraryRouter.get("/library/search", authenticate, async (req, res) => {
   // ── Filter to verified PDF links + relevance score ───────────────────────
   let finalResults = results
     .filter((r) => r.epubUrl && isPdfBookUrl(r.epubUrl))
-    .map((r) => ({ ...r, _score: scoreBookMatch(query, r) }))
+    .map((r) => {
+      let score = scoreBookMatch(query, r);
+      // Massive priority boost for Internet Archive to guarantee they surface first
+      if (r.source.includes("Internet Archive") || r.source.includes("Shamela")) {
+        score += 30; 
+      }
+      return { ...r, _score: score };
+    })
     .filter((r) => r._score >= MIN_MATCH_SCORE);
 
   finalResults.sort((a, b) => {
+    // 1. Sort by score first
     if (b._score !== a._score) return b._score - a._score;
+    
+    // 2. Tie-breaker: strict source priority (Tiered System)
     const sourceRank = (s: string) => {
-      if (s.includes("Classics") || s === "Curated Catalog" || s.includes("Self-Help") || s.includes("Comics")) return 0;
-      if (s === "Gutendex" || s === "Open Library") return 1;
-      if (s.includes("Internet Archive")) return 2;
-      if (s.includes("Shamela")) return 2;
-      if (s === "OAPEN") return 3;
-      return 4;
+      if (s.includes("Internet Archive")) return 0; // Tier 1: IA (Primary Source)
+      if (s.includes("Shamela")) return 0;          // Tier 1: IA Arabic
+      if (s === "Open Library") return 1;           // Tier 2: Open Library
+      if (s.includes("Classics") || s === "Curated Catalog" || s.includes("Self-Help") || s.includes("Comics")) return 2; // Tier 3: Local Fallback
+      if (s === "Gutendex") return 3;
+      if (s === "OAPEN") return 4;
+      return 5;
     };
     return sourceRank(a.source) - sourceRank(b.source);
   });
