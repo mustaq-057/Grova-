@@ -58,6 +58,8 @@ type PendingUpload = {
   author: string;
   epubUrl: string;
   fileName: string;
+  coverUrl?: string | null;
+  totalPages?: number;
 };
 
 function normalizeBookTitle(title: string): string {
@@ -454,10 +456,10 @@ export default function Library() {
         body: JSON.stringify({
           title: pending.title,
           author: pending.author,
-          coverUrl: null,
+          coverUrl: pending.coverUrl || null,
           description: "Uploaded manually.",
           epubUrl: pending.epubUrl,
-          totalPages: 100,
+          totalPages: pending.totalPages || 100,
           source: "Uploaded",
         }),
       });
@@ -499,7 +501,41 @@ export default function Library() {
     try {
       const title = file.name.replace(/\.pdf$/i, "");
       const author = "Unknown Author";
-      const description = "Uploaded manually.";
+
+      // Extract totalPages and cover image using pdfjs
+      let extractedTotalPages = 100;
+      let extractedCoverUrl: string | null = null;
+      try {
+        const { pdfjs } = await import("react-pdf");
+        pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+          "pdfjs-dist/build/pdf.worker.min.mjs",
+          import.meta.url
+        ).toString();
+
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+        extractedTotalPages = pdf.numPages;
+
+        if (extractedTotalPages > 0) {
+          const page = await pdf.getPage(1);
+          const viewport = page.getViewport({ scale: 1.0 });
+          const canvas = document.createElement("canvas");
+          const ctx = canvas.getContext("2d");
+          canvas.height = viewport.height;
+          canvas.width = viewport.width;
+
+          if (ctx) {
+            await page.render({ canvasContext: ctx, viewport }).promise;
+            const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/jpeg", 0.8));
+            if (blob) {
+              const coverFile = new File([blob], "cover.jpg", { type: "image/jpeg" });
+              extractedCoverUrl = await uploadMediaFile(coverFile, "image/jpeg");
+            }
+          }
+        }
+      } catch (pdfErr) {
+        console.error("Failed to extract PDF cover/pages:", pdfErr);
+      }
 
       const url = await uploadMediaFile(file, "application/pdf");
       if (!url?.trim()) {
@@ -512,6 +548,8 @@ export default function Library() {
         author,
         epubUrl: url,
         fileName: file.name,
+        coverUrl: extractedCoverUrl,
+        totalPages: extractedTotalPages,
       };
       setPendingUploads((prev) => [pending, ...prev.filter((p) => p.epubUrl !== url)]);
       setUploadSuccess(true);
