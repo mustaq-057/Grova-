@@ -105,6 +105,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
     setCallSignal(null);
     setCallState({ status: "outgoing", type });
     setIncomingCall(null);
+    
+    api.sendCallNotification(user.id, type).catch(err => console.error("Failed to send call notification:", err));
   }, [user]);
 
   const acceptCall = useCallback(() => {

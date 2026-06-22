@@ -534,6 +534,9 @@ export const api = {
     [k: string]: unknown;
   }) => apiFetch<{ ok: boolean }>("/call/signal", { method: "POST", body: JSON.stringify(data) }),
 
+  sendCallNotification: (from: string, callType: "audio" | "video") =>
+    apiFetch<{ ok: boolean }>("/call/notify", { method: "POST", body: JSON.stringify({ from, callType }) }),
+
   getCallRtcConfig: () =>
     apiFetch<{ iceServers: RTCIceServer[] }>("/call/rtc-config"),
 
