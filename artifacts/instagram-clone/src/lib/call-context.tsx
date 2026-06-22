@@ -4,7 +4,8 @@ import { useAuth } from "./auth";
 import CallScreen, { IncomingCallOverlay } from "@/components/CallScreen";
 import { isChatBlocked } from "./client-memory";
 import { readSessionSnapshot } from "./profile-cache";
-import { callStartedText, callEndedText } from "./call-chat-log";
+import { callStartedText, callEndedText, missedCallText } from "./call-chat-log";
+import { openLiveChannel, type LiveChannel } from "./sse-client";
 
 export type CallType = "audio" | "video";
 
@@ -76,9 +77,13 @@ export function CallProvider({ children }: { children: ReactNode }) {
     setCallSignal(null);
     setIncomingCall(null);
     
-    if (hadSession && !opts?.fromRemote) {
-      const durationSec = startedAt ? Math.max(0, Math.floor((Date.now() - startedAt) / 1000)) : 0;
-      void sendCallLogMsg(callEndedText(type, durationSec));
+    if (callRoleRef.current === "outgoing") {
+      if (hadSession) {
+        const durationSec = startedAt ? Math.max(0, Math.floor((Date.now() - startedAt) / 1000)) : 0;
+        void sendCallLogMsg(callEndedText(type, durationSec));
+      } else {
+        void sendCallLogMsg(missedCallText(type));
+      }
     }
   }, [sendCallLogMsg]);
 
@@ -170,11 +175,12 @@ export function CallProvider({ children }: { children: ReactNode }) {
     }).catch(err => console.error("Failed to fetch pending call signals:", err));
   }, [user, handleCallSignal]);
 
-  // Background poll — ensures Sara hears the ring even on non-Messages pages.
-  // Only poll when no call is active (active calls get signals via Messages SSE/poll).
+  // Real-time signaling channel (SSE or polling fallback)
   useEffect(() => {
-    if (!user || callState) return;
+    if (!user) return;
     let active = true;
+    let channel: LiveChannel | null = null;
+
     const poll = async () => {
       if (!active) return;
       try {
@@ -185,9 +191,37 @@ export function CallProvider({ children }: { children: ReactNode }) {
         }
       } catch { /* ignore network errors */ }
     };
-    const id = window.setInterval(poll, 2500);
-    return () => { active = false; window.clearInterval(id); };
-  }, [user, callState, handleCallSignal]);
+
+    openLiveChannel(user.id, poll).then((ch) => {
+      if (!active) {
+        if (ch?.mode === "poll") ch.stop();
+        if (ch?.mode === "sse") ch.eventSource.close();
+        return;
+      }
+      channel = ch;
+      if (channel?.mode === "sse") {
+        const es = channel.eventSource;
+        const handler = (e: MessageEvent) => {
+          if (!active) return;
+          try {
+            handleCallSignal(e.type, JSON.parse(e.data));
+          } catch {}
+        };
+        es.addEventListener("call-offer", handler);
+        es.addEventListener("call-answer", handler);
+        es.addEventListener("call-ice", handler);
+        es.addEventListener("call-end", handler);
+        es.addEventListener("call-reject", handler);
+        es.addEventListener("call-ring", handler);
+      }
+    });
+
+    return () => { 
+      active = false; 
+      if (channel?.mode === "poll") channel.stop();
+      if (channel?.mode === "sse") channel.eventSource.close();
+    };
+  }, [user, handleCallSignal]);
 
   return (
     <CallContext.Provider value={{

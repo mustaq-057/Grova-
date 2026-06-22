@@ -51,6 +51,9 @@ self.addEventListener("push", (event) => {
   let body = "New message";
   let title = "Grova";
   let requireInteraction = false;
+  let actions = [];
+  let vibrate = [];
+  let tag = "default";
   
   if (event.data) {
     try {
@@ -60,6 +63,9 @@ self.addEventListener("push", (event) => {
       if (typeof payload?.title === "string") title = payload.title;
       if (payload?.type === "call") {
         requireInteraction = true;
+        actions = [{ action: "answer", title: "Answer" }];
+        vibrate = [500, 110, 500, 110, 450, 110, 200, 110, 170, 40, 450, 110, 200, 110, 170, 40, 500];
+        tag = "incoming-call";
       }
     } catch {
       body = event.data.text();
@@ -71,12 +77,18 @@ self.addEventListener("push", (event) => {
     badge: "/favicon.svg",
     data: { targetPath },
     requireInteraction,
+    actions: actions.length > 0 ? actions : undefined,
+    vibrate: vibrate.length > 0 ? vibrate : undefined,
+    tag: tag,
   };
   event.waitUntil(self.registration.showNotification(title, options));
 });
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const targetPath = event.notification.data?.targetPath || "/chat";
+  let targetPath = event.notification.data?.targetPath || "/chat";
+  if (event.action === "answer") {
+    targetPath = "/chat";
+  }
   event.waitUntil(clients.openWindow(targetPath));
 });

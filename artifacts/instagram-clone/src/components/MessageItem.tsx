@@ -521,6 +521,13 @@ export const MessageItem = memo(function MessageItem({
     // Format timestamp nicely for the call log (e.g. 9:41 PM)
     const timeString = new Date(msg.timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 
+    const isMissedRed = isMissed;
+    const bgColor = isMissedRed ? "bg-red-500/10 hover:bg-red-500/20 active:bg-red-500/30" : "bg-[#262626] hover:bg-[#2e2e2e] active:bg-[#333]";
+    const borderColor = isMissedRed ? "border-red-500/20" : "border-white/5";
+    const iconContainerColor = isMissedRed ? "bg-red-500/20" : "bg-white/20";
+    const textColor = isMissedRed ? "text-red-500" : "text-white";
+    const timeColor = isMissedRed ? "text-red-500/70" : "text-white/60";
+
     return (
       <div 
         className={`flex ${isMe ? "justify-end" : "justify-start"} my-1 px-4 max-w-full`}
@@ -528,29 +535,29 @@ export const MessageItem = memo(function MessageItem({
       >
         <button
           onClick={() => startCall(isVideoLog ? "video" : "audio")}
-          className="flex items-center gap-3 bg-[#262626] hover:bg-[#2e2e2e] active:bg-[#333] transition-colors rounded-3xl px-4 py-3 max-w-[85%] sm:max-w-[70%] border border-white/5 text-left"
+          className={`flex items-center gap-3 transition-colors rounded-3xl px-4 py-3 max-w-[85%] sm:max-w-[70%] border text-left ${bgColor} ${borderColor}`}
         >
           {/* Circular Icon Container */}
-          <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+          <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 ${iconContainerColor}`}>
             {isVideoLog ? (
-              <Video className="w-6 h-6 text-white" fill="currentColor" />
+              <Video className={`w-6 h-6 ${textColor}`} fill="currentColor" />
             ) : isMissed ? (
-              <PhoneMissed className="w-6 h-6 text-red-500" />
+              <PhoneMissed className={`w-6 h-6 ${textColor}`} />
             ) : isEnded ? (
-              <PhoneOff className="w-6 h-6 text-white" />
+              <PhoneOff className={`w-6 h-6 ${textColor}`} />
             ) : isOutgoing ? (
-              <PhoneForwarded className="w-6 h-6 text-white" />
+              <PhoneForwarded className={`w-6 h-6 ${textColor}`} />
             ) : (
-              <Phone className="w-6 h-6 text-white" fill="currentColor" />
+              <Phone className={`w-6 h-6 ${textColor}`} fill="currentColor" />
             )}
           </div>
           
           {/* Text Content */}
           <div className="flex flex-col flex-1 min-w-0">
-            <p className="text-white font-semibold text-[15px] truncate">
+            <p className={`font-semibold text-[15px] truncate ${textColor}`}>
               {title}
             </p>
-            <p className="text-white/60 text-[13px] mt-0.5">
+            <p className={`text-[13px] mt-0.5 ${timeColor}`}>
               {timeString} {durationStr ? ` · ${durationStr}` : ''}
             </p>
           </div>

@@ -19,7 +19,12 @@ export function callEndedText(callType: "audio" | "video", durationSec: number, 
   return `📞 ${kind} call ended · ${formatChatTime(at)} · ${formatCallDuration(durationSec)}`;
 }
 
-const CALL_LOG_RE = /^📞 (Audio|Video) call (started|ended) · /;
+export function missedCallText(callType: "audio" | "video", at = new Date()): string {
+  const kind = callType === "video" ? "video" : "audio";
+  return `📞 Missed ${kind} call · ${formatChatTime(at)}`;
+}
+
+const CALL_LOG_RE = /^📞 (Audio|Video|Missed) /;
 
 export function isCallLogMessage(text?: string): boolean {
   return Boolean(text && CALL_LOG_RE.test(text));
