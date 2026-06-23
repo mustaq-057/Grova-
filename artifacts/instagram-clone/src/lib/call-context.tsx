@@ -42,7 +42,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const callConnectedAtRef = useRef(0);
   const callLoggedStartRef = useRef(false);
   const activeCallTypeRef = useRef<CallType>("audio");
-  const callRoleRef = useRef<"outgoing" | "incoming">("outgoing");
+  const callRoleRef = useRef<"outgoing" | "incoming" | "none">("none");
 
   const partnerId = user?.id === "me" ? "wife" : "me";
   const partnerName = authPartner?.name ?? readSessionSnapshot()?.partner?.name ?? "Partner";
@@ -70,14 +70,17 @@ export function CallProvider({ children }: { children: ReactNode }) {
     const type = activeCallTypeRef.current;
     const startedAt = callConnectedAtRef.current;
     const hadSession = callLoggedStartRef.current;
+    const role = callRoleRef.current;
     
+    // Crucial: reset role so we don't log multiple times if endCall is called repeatedly
+    callRoleRef.current = "none";
     callLoggedStartRef.current = false;
     callConnectedAtRef.current = 0;
     setCallState(null);
     setCallSignal(null);
     setIncomingCall(null);
     
-    if (callRoleRef.current === "outgoing") {
+    if (role === "outgoing") {
       if (hadSession) {
         const durationSec = startedAt ? Math.max(0, Math.floor((Date.now() - startedAt) / 1000)) : 0;
         void sendCallLogMsg(callEndedText(type, durationSec));
