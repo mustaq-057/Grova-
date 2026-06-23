@@ -206,8 +206,8 @@ export function StickerzPicker({ onSelect, onClose }: StickerzPickerProps) {
             </div>
           </div>
         ) : step === "caption" ? (
-          <div className="flex-1 flex flex-col items-center justify-center p-6 space-y-6">
-            <div className="w-40 h-40 rounded-2xl overflow-hidden bg-white/5 border border-white/10 p-2 shadow-xl">
+          <div className="flex-1 overflow-y-auto flex flex-col items-center p-6 gap-6">
+            <div className="w-40 h-40 shrink-0 rounded-2xl overflow-hidden bg-white/5 border border-white/10 p-2 shadow-xl mt-4">
               <img src={uploadPreview} alt="preview" className="w-full h-full object-contain" />
             </div>
             <input
@@ -215,10 +215,10 @@ export function StickerzPicker({ onSelect, onClose }: StickerzPickerProps) {
               placeholder="Give it a caption (e.g., 'angry cat')"
               value={uploadCaption}
               onChange={(e) => setUploadCaption(e.target.value)}
-              className="w-full max-w-sm bg-[#2a2a2a] text-white text-center rounded-xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-primary/50"
+              className="w-full max-w-sm shrink-0 bg-[#2a2a2a] text-white text-center rounded-xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-primary/50"
               autoFocus
             />
-            <div className="flex gap-3 w-full max-w-sm">
+            <div className="flex gap-3 w-full max-w-sm shrink-0 mt-auto pb-8">
               <button
                 type="button"
                 onClick={() => setStep("crop")}
