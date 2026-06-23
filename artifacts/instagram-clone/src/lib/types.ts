@@ -7,6 +7,7 @@ export type CouplePrefs = {
   noteMe?: string;
   noteWife?: string;
   quickEmojis?: string[];
+  customStickerz?: any[];
 };
 
 export interface ScheduledMessage {

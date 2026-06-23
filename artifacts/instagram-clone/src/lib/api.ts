@@ -598,7 +598,7 @@ export const api = {
     data: Partial<
       Pick<
         CouplePrefs,
-        "chatTheme" | "appTheme" | "readReceipts" | "showPresence" | "notifications" | "quickEmojis"
+        "chatTheme" | "appTheme" | "readReceipts" | "showPresence" | "notifications" | "quickEmojis" | "customStickerz"
       >
     >,
   ) => apiFetch<CouplePrefs>("/couple/prefs", { method: "PUT", body: JSON.stringify(data) }),

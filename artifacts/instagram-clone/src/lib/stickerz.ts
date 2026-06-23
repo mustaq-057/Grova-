@@ -1,4 +1,5 @@
 import { registerLocalBlobUrl } from "./media-url";
+import { api } from "./api";
 
 export type StickerCategory =
   | "Custom"
@@ -89,6 +90,8 @@ export function addCustomSticker(url: string, caption: string): CustomSticker {
   localStorage.setItem(CUSTOM_STICKERZ_STORAGE_KEY, JSON.stringify(custom));
   // Fire event to re-render picker
   window.dispatchEvent(new Event("custom_stickerz_updated"));
+  // Sync to backend
+  api.updateCouplePrefs({ customStickerz: custom }).catch(() => {});
   return newSticker;
 }
 
@@ -98,6 +101,7 @@ export function removeCustomSticker(id: string) {
   if (filtered.length !== custom.length) {
     localStorage.setItem(CUSTOM_STICKERZ_STORAGE_KEY, JSON.stringify(filtered));
     window.dispatchEvent(new Event("custom_stickerz_updated"));
+    api.updateCouplePrefs({ customStickerz: filtered }).catch(() => {});
   }
 }
 

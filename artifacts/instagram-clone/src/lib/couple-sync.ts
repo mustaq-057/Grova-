@@ -39,6 +39,16 @@ export function applyCouplePrefs(prefs: CouplePrefs) {
   readReceipts = prefs.readReceipts;
   showPresence = prefs.showPresence;
   notifications = prefs.notifications ?? true;
+  
+  if (prefs.customStickerz) {
+    const prev = localStorage.getItem("grova_custom_stickerz");
+    const next = JSON.stringify(prefs.customStickerz);
+    if (prev !== next) {
+      localStorage.setItem("grova_custom_stickerz", next);
+      window.dispatchEvent(new Event("custom_stickerz_updated"));
+    }
+  }
+
   window.dispatchEvent(new CustomEvent(PREFS_CHANGED, { detail: prefs }));
 }
 

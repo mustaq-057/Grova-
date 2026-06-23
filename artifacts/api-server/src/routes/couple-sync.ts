@@ -35,11 +35,22 @@ function prefsFromRows(rows: { key: string; value: string }[]) {
   const prefs: Record<string, string> = {};
   for (const row of rows) prefs[row.key] = row.value;
   let quickEmojis: string[] = [];
+  let customStickerz: any[] = [];
   try {
     if (prefs.quick_emojis) {
       const parsed = JSON.parse(prefs.quick_emojis) as unknown;
       if (Array.isArray(parsed)) {
         quickEmojis = parsed.filter((e): e is string => typeof e === "string").slice(0, 5);
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  try {
+    if (prefs.custom_stickerz) {
+      const parsed = JSON.parse(prefs.custom_stickerz) as unknown;
+      if (Array.isArray(parsed)) {
+        customStickerz = parsed;
       }
     }
   } catch {
@@ -54,6 +65,7 @@ function prefsFromRows(rows: { key: string; value: string }[]) {
     noteMe: noteIfFresh(prefs.note_me || ""),
     noteWife: noteIfFresh(prefs.note_wife || ""),
     quickEmojis,
+    customStickerz,
   };
 }
 
@@ -73,13 +85,14 @@ router.get("/couple/prefs", rateLimiters.read, authenticate, async (_req, res) =
 });
 
 router.put("/couple/prefs", rateLimiters.messages, authenticate, async (req, res) => {
-  const { chatTheme, appTheme, readReceipts, showPresence, notifications, quickEmojis } = req.body as {
+  const { chatTheme, appTheme, readReceipts, showPresence, notifications, quickEmojis, customStickerz } = req.body as {
     chatTheme?: string;
     appTheme?: string;
     readReceipts?: boolean;
     showPresence?: boolean;
     notifications?: boolean;
     quickEmojis?: string[];
+    customStickerz?: any[];
   };
   try {
     const upsert = async (key: string, value: string) => {
@@ -96,6 +109,9 @@ router.put("/couple/prefs", rateLimiters.messages, authenticate, async (req, res
     if (notifications !== undefined) await upsert("notifications", notifications ? "on" : "off");
     if (quickEmojis !== undefined) {
       await upsert("quick_emojis", JSON.stringify(quickEmojis.slice(0, 5)));
+    }
+    if (customStickerz !== undefined) {
+      await upsert("custom_stickerz", JSON.stringify(customStickerz));
     }
 
     const payload = await loadPrefsPayload();
