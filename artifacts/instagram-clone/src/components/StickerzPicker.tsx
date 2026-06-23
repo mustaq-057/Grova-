@@ -173,7 +173,7 @@ export function StickerzPicker({ onSelect, onClose }: StickerzPickerProps) {
         )}
 
         {step === "crop" ? (
-          <div className="flex-1 flex flex-col min-h-0 p-4 space-y-4 pb-8">
+          <div className="flex-1 flex flex-col min-h-0 p-4 space-y-4 pb-24">
             <div className="relative flex-1 min-h-0 rounded-2xl overflow-hidden bg-black border border-white/10">
               <Cropper
                 image={uploadPreview}
@@ -220,7 +220,7 @@ export function StickerzPicker({ onSelect, onClose }: StickerzPickerProps) {
               className="w-full max-w-sm shrink-0 bg-[#2a2a2a] text-white text-center rounded-xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-primary/50"
               autoFocus
             />
-            <div className="flex gap-3 w-full max-w-sm shrink-0 mt-auto pb-8">
+            <div className="flex gap-3 w-full max-w-sm shrink-0 mt-auto pb-24">
               <button
                 type="button"
                 onClick={() => setStep("crop")}
