@@ -18,6 +18,7 @@ interface DoodleCanvasProps {
   isLiveMode?: boolean;
   partnerId?: string;
   onGoLive?: () => void;
+  onStopLive?: () => void;
 }
 
 const BACKGROUND_WHITE = "#FFFFFF";
@@ -101,7 +102,7 @@ function isBackgroundPixel(r: number, g: number, b: number, a: number, bg: strin
   return Math.abs(r - br) < 8 && Math.abs(g - bg2) < 8 && Math.abs(b - bb) < 8;
 }
 
-export default function DoodleCanvas({ onClose, onSend, onError, onDrawStart, isLiveMode, partnerId, onGoLive }: DoodleCanvasProps) {
+export default function DoodleCanvas({ onClose, onSend, onError, onDrawStart, isLiveMode, partnerId, onGoLive, onStopLive }: DoodleCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const colorScrollRef = useRef<HTMLDivElement>(null);
@@ -216,7 +217,7 @@ export default function DoodleCanvas({ onClose, onSend, onError, onDrawStart, is
         void api.syncDoodleStrokes(partnerId, pendingStrokesRef.current, color, brushSize);
         pendingStrokesRef.current = [];
       }
-    }, 100);
+    }, 500);
 
     return () => clearInterval(intervalId);
   }, [isLiveMode, partnerId, color, brushSize]);
@@ -224,8 +225,7 @@ export default function DoodleCanvas({ onClose, onSend, onError, onDrawStart, is
   useEffect(() => {
     if (!isLiveMode) return;
 
-    const handleSync = (e: Event) => {
-      const data = (e as CustomEvent).detail;
+    const processSyncData = (data: any) => {
       const canvas = canvasRef.current;
       const ctx = canvas?.getContext("2d");
       const rect = canvas?.getBoundingClientRect();
@@ -263,8 +263,28 @@ export default function DoodleCanvas({ onClose, onSend, onError, onDrawStart, is
       ctx.restore();
     };
 
+    const handleSync = (e: Event) => {
+      const data = (e as CustomEvent).detail;
+      processSyncData(data);
+    };
+
     window.addEventListener("doodle_sync_event", handleSync);
-    return () => window.removeEventListener("doodle_sync_event", handleSync);
+
+    // Poll for Vercel multi-instance fallback
+    const pollId = setInterval(() => {
+      void api.getDoodleSignals().then((res) => {
+        if (res.signals && res.signals.length > 0) {
+          for (const signal of res.signals) {
+            processSyncData(signal);
+          }
+        }
+      }).catch(() => {});
+    }, 1000);
+
+    return () => {
+      window.removeEventListener("doodle_sync_event", handleSync);
+      clearInterval(pollId);
+    };
   }, [isLiveMode, saveHistory]);
 
   const getPoint = (e: React.PointerEvent): Point => {
@@ -649,6 +669,17 @@ export default function DoodleCanvas({ onClose, onSend, onError, onDrawStart, is
             >
               <Radio className="w-4 h-4 animate-pulse" />
               Go Live
+            </button>
+          )}
+
+          {isLiveMode && onStopLive && (
+            <button
+              onClick={onStopLive}
+              className="px-3 h-[34px] flex items-center justify-center bg-white/20 text-white rounded-full shrink-0 active:scale-95 transition-transform font-bold text-sm gap-1.5"
+              aria-label="Stop Live"
+            >
+              <Radio className="w-4 h-4" />
+              Stop Live
             </button>
           )}
 

@@ -108,7 +108,7 @@ export const MessageItem = memo(function MessageItem({
     if ((msg.variant as string) === "doodle_invite") {
       const checkExpiry = () => {
         const elapsed = Date.now() - new Date(msg.timestamp).getTime();
-        setDoodleExpired(elapsed > 30000);
+        setDoodleExpired(elapsed > 60000);
       };
       checkExpiry();
       const interval = setInterval(checkExpiry, 1000);

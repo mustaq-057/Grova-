@@ -713,4 +713,6 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ partnerId, strokes, color, brushSize, clear }),
     }),
+
+  getDoodleSignals: () => apiFetch<{ signals: any[] }>("/doodle/signals"),
 };

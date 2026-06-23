@@ -1939,6 +1939,10 @@ export default function Messages() {
 
   const openMediaMessage = useCallback(async (msg: ApiMessage, stack?: ApiMessage[]) => {
     if ((msg.variant as string) === "doodle_invite") {
+      if (Date.now() - new Date(msg.timestamp).getTime() > 60000) {
+        toast.error("This live doodle session has expired.");
+        return;
+      }
       setDoodleLiveMode(true);
       setDoodleOpen(true);
       return;
@@ -3424,6 +3428,7 @@ export default function Messages() {
               onSend={handleDoodleSend}
               isLiveMode={doodleLiveMode}
               partnerId={partnerId}
+              onStopLive={() => setDoodleLiveMode(false)}
               onGoLive={() => {
                 setDoodleLiveMode(true);
                 void sendMsgRef.current({
