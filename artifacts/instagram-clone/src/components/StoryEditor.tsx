@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { X, Check, Type, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { createPortal } from "react-dom";
+import ReactDOM from "react-dom";
 import { api } from "../lib/api";
 
 interface StoryEditorProps {
@@ -31,6 +31,8 @@ export function StoryEditor({ file, onClose, onComplete }: StoryEditorProps) {
   const dragRef = useRef<{ isDragging: boolean; startX: number; startY: number; initialX: number; initialY: number }>({
     isDragging: false, startX: 0, startY: 0, initialX: 0, initialY: 0
   });
+
+  const isVideo = file.type.startsWith("video");
 
   useEffect(() => {
     const url = URL.createObjectURL(file);
@@ -68,46 +70,64 @@ export function StoryEditor({ file, onClose, onComplete }: StoryEditorProps) {
   const bakeAndUpload = async () => {
     setUploading(true);
     try {
-      const img = new Image();
-      img.src = imageUrl;
-      await new Promise((res) => (img.onload = res));
+      let finalBlob: Blob | File = file;
+      let textOverlayObj = null;
 
-      const canvas = document.createElement("canvas");
-      canvas.width = img.width;
-      canvas.height = img.height;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) throw new Error("No canvas context");
+      if (!isVideo) {
+        // Bake text onto image
+        const img = new Image();
+        img.src = imageUrl;
+        await new Promise((res) => (img.onload = res));
 
-      // Draw the original image
-      ctx.drawImage(img, 0, 0);
+        const canvas = document.createElement("canvas");
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) throw new Error("No canvas context");
 
-      // Draw the text
-      if (text.trim()) {
-        const scaleX = img.width / window.innerWidth;
-        const scaleY = img.height / window.innerHeight;
-        
-        ctx.font = `bold ${Math.round(40 * scaleY)}px ${fontFamily}`;
-        ctx.fillStyle = textColor;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        
-        // Add a subtle shadow for readability
-        ctx.shadowColor = "rgba(0,0,0,0.5)";
-        ctx.shadowBlur = 10 * scaleY;
-        ctx.shadowOffsetX = 2 * scaleY;
-        ctx.shadowOffsetY = 2 * scaleY;
+        ctx.drawImage(img, 0, 0);
 
-        ctx.fillText(text, position.x * scaleX, position.y * scaleY);
+        if (text.trim()) {
+          const scaleX = img.width / window.innerWidth;
+          const scaleY = img.height / window.innerHeight;
+          
+          ctx.font = `bold ${Math.round(40 * scaleY)}px ${fontFamily}`;
+          ctx.fillStyle = textColor;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          
+          ctx.shadowColor = "rgba(0,0,0,0.5)";
+          ctx.shadowBlur = 10 * scaleY;
+          ctx.shadowOffsetX = 2 * scaleY;
+          ctx.shadowOffsetY = 2 * scaleY;
+
+          ctx.fillText(text, position.x * scaleX, position.y * scaleY);
+        }
+
+        const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/jpeg", 0.8));
+        if (!blob) throw new Error("Canvas export failed");
+        finalBlob = blob;
+      } else {
+        // For video, we save text styling as an overlay metadata
+        if (text.trim()) {
+          textOverlayObj = {
+            text,
+            fontFamily,
+            textColor,
+            x: position.x / window.innerWidth,
+            y: position.y / window.innerHeight
+          };
+        }
       }
 
-      const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/jpeg", 0.8));
-      if (!blob) throw new Error("Canvas export failed");
-
       // Upload to B2
-      const { url } = await api.uploadStoryToB2(blob);
+      const { url } = await api.uploadStoryToB2(finalBlob, isVideo ? "video" : "image");
       
       // Save to DB
-      await api.addStory({ mediaUrl: url });
+      await api.addStory({ 
+        mediaUrl: url, 
+        text_overlay: textOverlayObj ? JSON.stringify(textOverlayObj) : undefined 
+      });
       
       onComplete();
     } catch (err) {
@@ -117,7 +137,7 @@ export function StoryEditor({ file, onClose, onComplete }: StoryEditorProps) {
     }
   };
 
-  return createPortal(
+  return ReactDOM.createPortal(
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -125,7 +145,11 @@ export function StoryEditor({ file, onClose, onComplete }: StoryEditorProps) {
       className="fixed inset-0 z-[400] bg-black flex flex-col font-sans touch-none"
     >
       <div className="absolute inset-0">
-        {imageUrl && <img src={imageUrl} alt="preview" className="w-full h-full object-cover" />}
+        {imageUrl && isVideo ? (
+          <video src={imageUrl} autoPlay loop muted playsInline className="w-full h-full object-cover" />
+        ) : imageUrl ? (
+          <img src={imageUrl} alt="preview" className="w-full h-full object-cover" />
+        ) : null}
         <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/40 pointer-events-none" />
       </div>
 
@@ -134,8 +158,8 @@ export function StoryEditor({ file, onClose, onComplete }: StoryEditorProps) {
           <button onClick={onClose} className="p-2 text-white hover:bg-white/10 rounded-full">
             <X className="w-7 h-7 drop-shadow-md" />
           </button>
-          <button onClick={() => setIsTyping(true)} className="p-2 text-white hover:bg-white/10 rounded-full">
-            <Type className="w-7 h-7 drop-shadow-md" />
+          <button onClick={() => setIsTyping(true)} className="p-2 text-white hover:bg-white/10 rounded-full flex items-center justify-center">
+            <span className="font-serif font-bold text-[26px] drop-shadow-md leading-none">Aa</span>
           </button>
         </div>
       )}

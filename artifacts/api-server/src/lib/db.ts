@@ -296,6 +296,14 @@ export async function initDb() {
       )
     `);
 
+    for (const sql of ["ALTER TABLE stories ADD COLUMN IF NOT EXISTS text_overlay TEXT"]) {
+      try {
+        await db.execute(sql);
+      } catch {
+        // column may exist
+      }
+    }
+
     await db.execute(`
       CREATE TABLE IF NOT EXISTS post_reactions (
         post_id TEXT NOT NULL,

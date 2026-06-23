@@ -239,12 +239,14 @@ router.get("/media/b2-sign-story", authenticate, async (req, res) => {
 
     // We generate a unique file key for a story
     const fileId = crypto.randomUUID();
-    const key = `stories/${fileId}.jpg`;
+    const isVideo = req.query.type === "video";
+    const key = `stories/${fileId}.${isVideo ? "mp4" : "jpg"}`;
+    const contentType = isVideo ? "video/mp4" : "image/jpeg";
 
     const command = new PutObjectCommand({
       Bucket: bucket,
       Key: key,
-      ContentType: "image/jpeg",
+      ContentType: contentType,
     });
 
     const uploadUrl = await getSignedUrl(s3 as any, command as any, { expiresIn: 3600 });

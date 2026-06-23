@@ -326,6 +326,7 @@ export type ApiStory = {
   kind: "story" | "reel";
   createdAt: string;
   expiresAt: string;
+  textOverlay?: string;
 };
 
 
@@ -672,21 +673,22 @@ export const api = {
 
   getStories: () => apiFetch<ApiStory[]>("/stories"),
 
-  addStory: (story: { mediaUrl: string; kind?: "story" | "reel" }) =>
+  addStory: (story: { mediaUrl: string; kind?: "story" | "reel"; text_overlay?: string }) =>
     apiFetch<ApiStory>("/stories", { method: "POST", body: JSON.stringify(story) }),
 
   deleteStory: (id: string) => apiFetch<{ success: boolean }>(`/stories/${id}`, { method: "DELETE" }),
 
-  uploadStoryToB2: async (blob: Blob): Promise<{ url: string; key: string }> => {
+  uploadStoryToB2: async (blob: Blob, type?: "image" | "video"): Promise<{ url: string; key: string }> => {
     // 1. Get the pre-signed URL from our new endpoint
-    const { uploadUrl, fileUrl, key } = await apiFetch<{ uploadUrl: string; fileUrl: string; key: string }>("/media/b2-sign-story");
+    const query = type === "video" ? "?type=video" : "";
+    const { uploadUrl, fileUrl, key } = await apiFetch<{ uploadUrl: string; fileUrl: string; key: string }>(`/media/b2-sign-story${query}`);
     
     // 2. Upload the binary blob directly to Backblaze B2
     const res = await fetch(uploadUrl, {
       method: "PUT",
       body: blob,
       headers: {
-        "Content-Type": "image/jpeg",
+        "Content-Type": type === "video" ? "video/mp4" : "image/jpeg",
       },
     });
 
