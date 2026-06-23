@@ -64,13 +64,13 @@ const SchedulePicker = ({ onClose, onSchedule }: { onClose: () => void, onSchedu
       <div className="absolute inset-0" onClick={onClose} />
       <motion.div 
         initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
-        className="relative bg-[#1c1c1c] rounded-t-[28px] p-6 text-white pb-[env(safe-area-inset-bottom,20px)]"
+        className="relative bg-[#1c1c1c] rounded-t-[28px] p-6 text-white pb-[env(safe-area-inset-bottom,20px)] max-h-[80svh] flex flex-col"
       >
-        <div className="w-12 h-1.5 bg-white/20 rounded-full mx-auto mb-6" />
-        <h3 className="text-xl font-bold mb-4">Schedule Message</h3>
+        <div className="w-12 h-1.5 bg-white/20 rounded-full mx-auto mb-6 shrink-0" />
+        <h3 className="text-xl font-bold mb-4 shrink-0">Schedule Message</h3>
         
         {mode === "chips" ? (
-          <div className="flex flex-col gap-3 max-h-[50vh] overflow-y-auto pr-1 pb-2">
+          <div className="flex flex-col gap-3 flex-1 overflow-y-auto pr-1 pb-2">
             <button 
               onClick={() => onSchedule(new Date(Date.now() + 10 * 60 * 1000))}
               className="w-full bg-white/10 hover:bg-white/20 p-4 rounded-2xl text-left font-medium transition-colors shrink-0"
@@ -108,7 +108,7 @@ const SchedulePicker = ({ onClose, onSchedule }: { onClose: () => void, onSchedu
             </button>
           </div>
         ) : (
-          <div className="flex flex-col gap-4 max-h-[50vh] overflow-y-auto pr-1 pb-2">
+          <div className="flex flex-col gap-4 flex-1 overflow-y-auto pr-1 pb-2">
             <div>
               <label className="block text-sm text-white/50 mb-1 ml-1">Date</label>
               <input 
