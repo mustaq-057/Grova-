@@ -1504,6 +1504,7 @@ export default function Messages() {
       // this is likely a layout shift (like an image loading).
       const isLayoutShift = Math.abs(scrollTop - lastScrollTopRef.current) < 5 && scrollHeight !== lastScrollHeightRef.current;
       
+      const prevScrollTop = lastScrollTopRef.current;
       lastScrollTopRef.current = scrollTop;
       lastScrollHeightRef.current = scrollHeight;
 
@@ -1513,7 +1514,7 @@ export default function Messages() {
       }
 
       // If user manually scrolls up, instantly break the "stick"
-      const isScrollingUp = scrollTop < lastScrollTopRef.current;
+      const isScrollingUp = scrollTop < prevScrollTop;
       if (isScrollingUp) {
         stickToBottomRef.current = false;
       }
