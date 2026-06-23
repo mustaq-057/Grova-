@@ -677,6 +677,26 @@ export const api = {
 
   deleteStory: (id: string) => apiFetch<{ success: boolean }>(`/stories/${id}`, { method: "DELETE" }),
 
+  uploadStoryToB2: async (blob: Blob): Promise<{ url: string; key: string }> => {
+    // 1. Get the pre-signed URL from our new endpoint
+    const { uploadUrl, fileUrl, key } = await apiFetch<{ uploadUrl: string; fileUrl: string; key: string }>("/media/b2-sign-story");
+    
+    // 2. Upload the binary blob directly to Backblaze B2
+    const res = await fetch(uploadUrl, {
+      method: "PUT",
+      body: blob,
+      headers: {
+        "Content-Type": "image/jpeg",
+      },
+    });
+
+    if (!res.ok) {
+      throw new Error("Failed to upload story to B2");
+    }
+
+    return { url: fileUrl, key };
+  },
+
   pinMessage: (userId: string, messageId: string) =>
     apiFetch<{ success: boolean; pinnedAt: string }>("/pin", {
       method: "POST",

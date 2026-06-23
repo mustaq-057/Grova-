@@ -3,13 +3,15 @@ import { X, Image as ImageIcon, RefreshCcw, Zap, ZapOff, Film } from "lucide-rea
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import vintageCameraImg from "../vintage-camera.png";
+import { StoryEditor } from "./StoryEditor";
 
 interface CameraOverlayProps {
-  onClose: () => void;
-  onCapture: (file: File) => void;
+  onClose: (uploaded?: boolean) => void;
+  onCapture?: (file: File) => void;
+  mode?: "chat" | "story";
 }
 
-export function CameraOverlay({ onClose, onCapture }: CameraOverlayProps) {
+export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverlayProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -18,6 +20,7 @@ export function CameraOverlay({ onClose, onCapture }: CameraOverlayProps) {
   const [aspectRatio, setAspectRatio] = useState<"Full" | "16:9" | "4:3" | "1:1">("Full");
   const [error, setError] = useState<string | null>(null);
   const [vintageMode, setVintageMode] = useState(false);
+  const [storyFile, setStoryFile] = useState<File | null>(null);
   
   const [zoom, setZoom] = useState(1);
   const pinchStartRef = useRef<{ dist: number, zoom: number } | null>(null);
@@ -156,14 +159,22 @@ export function CameraOverlay({ onClose, onCapture }: CameraOverlayProps) {
     canvas.toBlob((blob) => {
       if (!blob) return;
       const file = new File([blob], `capture-${Date.now()}.jpg`, { type: "image/jpeg" });
-      onCapture(file);
+      if (mode === "story") {
+        setStoryFile(file);
+      } else if (onCapture) {
+        onCapture(file);
+      }
     }, "image/jpeg", 0.7);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    onCapture(file);
+    if (mode === "story") {
+      setStoryFile(file);
+    } else if (onCapture) {
+      onCapture(file);
+    }
   };
 
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -198,6 +209,10 @@ export function CameraOverlay({ onClose, onCapture }: CameraOverlayProps) {
     newZoom = Math.max(1, Math.min(newZoom, 5));
     setZoom(newZoom);
   };
+
+  if (storyFile) {
+    return <StoryEditor file={storyFile} onClose={() => setStoryFile(null)} onComplete={() => onClose(true)} />;
+  }
 
   return createPortal(
     <AnimatePresence>

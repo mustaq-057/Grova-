@@ -215,6 +215,49 @@ router.get("/media/b2-sign", authenticate, async (req, res) => {
   }
 });
 
+router.get("/media/b2-sign-story", authenticate, async (req, res) => {
+  try {
+    const { S3Client, PutObjectCommand } = await import("@aws-sdk/client-s3");
+    const { getSignedUrl } = await import("@aws-sdk/s3-request-presigner");
+
+    const region = process.env.AWS_REGION || "us-east-005";
+    const endpoint = process.env.B2_ENDPOINT;
+    const bucket = process.env.B2_BUCKET_NAME;
+    const accessKeyId = process.env.B2_KEY_ID;
+    const secretAccessKey = process.env.B2_APPLICATION_KEY;
+
+    if (!endpoint || !bucket || !accessKeyId || !secretAccessKey) {
+      res.status(501).json({ error: "Backblaze B2 is not configured in Environment Variables." });
+      return;
+    }
+
+    const s3 = new S3Client({
+      region,
+      endpoint,
+      credentials: { accessKeyId, secretAccessKey },
+    });
+
+    // We generate a unique file key for a story
+    const fileId = crypto.randomUUID();
+    const key = `stories/${fileId}.jpg`;
+
+    const command = new PutObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      ContentType: "image/jpeg",
+    });
+
+    const uploadUrl = await getSignedUrl(s3 as any, command as any, { expiresIn: 3600 });
+    // The final URL where the file will be accessible (if public) or identifiable (for proxy)
+    const fileUrl = `${endpoint}/${bucket}/${key}`;
+
+    res.json({ uploadUrl, fileUrl, key });
+  } catch (err) {
+    console.error("Error generating B2 story presigned URL:", err);
+    res.status(500).json({ error: "Failed to generate B2 story upload URL" });
+  }
+});
+
 router.post("/media/upload", rateLimiters.upload, authenticate, async (req, res) => {
   await handleMediaUpload(req, res);
 });

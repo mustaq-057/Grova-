@@ -1,9 +1,9 @@
 import { useEffect, useState, memo } from "react";
 import { Link } from "wouter";
-import { MessageCircle, BookOpen, Heart, ImagePlus, Shield, Clock } from "lucide-react";
+import { MessageCircle, BookOpen, Heart, ImagePlus, Shield, Clock, Plus } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAuth } from "@/lib/auth";
-import { api, type ApiUser } from "@/lib/api";
+import { api, type ApiUser, type ApiStory } from "@/lib/api";
 import { isEncryptionReady } from "@/lib/crypto";
 import { AvatarImage } from "@/components/AvatarImage";
 import { PostFeed } from "@/components/PostFeed";
@@ -13,6 +13,8 @@ import { getStoredAppTheme, APP_THEME_CHANGED } from "@/lib/app-theme";
 import { readSessionSnapshot } from "@/lib/profile-cache";
 import { parsePresenceResponse } from "@/lib/presence-api";
 import { USER_TIMEZONES } from "@/lib/timezones";
+import { CameraOverlay } from "@/components/CameraOverlay";
+import { StoryViewer } from "@/components/StoryViewer";
 
 
 export default memo(function Home() {
@@ -25,6 +27,9 @@ export default memo(function Home() {
   const [indiaTime, setIndiaTime] = useState("");
   const [appTheme, setAppTheme] = useState(getStoredAppTheme);
   const [loadingPartner, setLoadingPartner] = useState(() => !authPartner && !readSessionSnapshot()?.partner);
+  const [stories, setStories] = useState<ApiStory[]>([]);
+  const [showCamera, setShowCamera] = useState(false);
+  const [viewingStories, setViewingStories] = useState<ApiStory[] | null>(null);
 
   const partnerId = user?.id === "me" ? "wife" : "me";
 
@@ -119,7 +124,21 @@ export default memo(function Home() {
       localStorage.setItem("libraryMode", "false");
       window.dispatchEvent(new Event("LIBRARY_MODE_CHANGED"));
     }
+    
+    // Fetch stories
+    api.getStories().then(setStories).catch(console.error);
   }, []);
+
+  const handleStoryComplete = (uploaded?: boolean) => {
+    setShowCamera(false);
+    api.getStories().then(setStories).catch(console.error);
+    if (uploaded) {
+      api.postActivity({ type: "story", fromName: user?.name ?? "You", text: "Added a new story" }).catch(console.error);
+    }
+  };
+
+  const myStories = stories.filter(s => s.authorId === user?.id);
+  const partnerStories = partner ? stories.filter(s => s.authorId === partner.id) : [];
 
   const shortcuts = [
     { href: "/chat", icon: MessageCircle, label: "Chat", desc: "Messages & calls" },
@@ -144,11 +163,45 @@ export default memo(function Home() {
         )}
       </motion.div>
 
+      {/* Stories Bar */}
+      <div className="flex gap-4 px-4 py-4 overflow-x-auto hide-scrollbar">
+        {/* Add Story Button / My Stories */}
+        <div className="flex flex-col items-center gap-1">
+          <div className="relative">
+            <div 
+              className={`p-0.5 rounded-full ${myStories.length > 0 ? "bg-gradient-to-tr from-yellow-400 to-primary" : ""}`}
+              onClick={() => myStories.length > 0 ? setViewingStories(myStories) : setShowCamera(true)}
+            >
+              <AvatarImage src={user?.avatar} userId={user?.id ?? "me"} alt="Your story" className="w-16 h-16 rounded-full border-2 border-background object-cover bg-neutral-800" />
+            </div>
+            {myStories.length === 0 && (
+              <button 
+                onClick={() => setShowCamera(true)}
+                className="absolute bottom-0 right-0 w-6 h-6 bg-blue-500 rounded-full border-2 border-background flex items-center justify-center"
+              >
+                <Plus className="w-4 h-4 text-white" strokeWidth={3} />
+              </button>
+            )}
+          </div>
+          <span className="text-[10px] text-muted-foreground font-medium">Your Story</span>
+        </div>
+
+        {/* Partner Stories */}
+        {partner && partnerStories.length > 0 && (
+          <div className="flex flex-col items-center gap-1 cursor-pointer" onClick={() => setViewingStories(partnerStories)}>
+            <div className="p-0.5 rounded-full bg-gradient-to-tr from-yellow-400 to-primary">
+              <AvatarImage src={partner.avatar} userId={partner.id} alt="Partner story" className="w-16 h-16 rounded-full border-2 border-background object-cover bg-neutral-800" />
+            </div>
+            <span className="text-[10px] text-muted-foreground font-medium">{partner.name}</span>
+          </div>
+        )}
+      </div>
+
       <motion.div 
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.1, duration: 0.3 }}
-        className="px-4 py-8 text-center"
+        className="px-4 py-4 text-center"
       >
         <p className={`text-sm text-muted-foreground ${appTheme === 'library' ? 'library-home-subtitle' : ''}`}>Welcome back</p>
         <h1 className={`text-2xl font-bold mt-1 ${appTheme === 'library' ? 'library-home-name' : ''}`}>{user?.name ?? "You"}</h1>
@@ -278,6 +331,14 @@ export default memo(function Home() {
       </motion.div>
 
       <PostFeed focusPostId={focusPostId} focusCommentId={focusCommentId} />
+
+      {showCamera && (
+        <CameraOverlay mode="story" onClose={handleStoryComplete} />
+      )}
+
+      {viewingStories && (
+        <StoryViewer stories={viewingStories} onClose={() => setViewingStories(null)} />
+      )}
     </div>
   );
 });
