@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Phone, PhoneOff, Video, VideoOff, Mic, MicOff, Volume2, VolumeX, SwitchCamera, ChevronDown, AlertCircle, MonitorUp } from "lucide-react";
+import { Phone, PhoneOff, Video, VideoOff, Mic, MicOff, Volume2, Volume1, VolumeX, SwitchCamera, ChevronDown, AlertCircle, MonitorUp, PictureInPicture, Gauge } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@/lib/api";
 
@@ -100,6 +100,11 @@ export default function CallScreen({
   const [isMinimized, setIsMinimized] = useState(false);
   const [poorConnection, setPoorConnection] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [isReconnecting, setIsReconnecting] = useState(false);
+  const [audioOutput, setAudioOutput] = useState<"speaker" | "earpiece">("speaker");
+  const [lowDataMode, setLowDataMode] = useState(false);
+  
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   const audioCtxRef = useRef<AudioContext | null>(null);
   const ringtoneAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -315,9 +320,13 @@ export default function CallScreen({
         };
 
         pc.onconnectionstatechange = () => {
-          if (pc.connectionState === "connected") setConnected(true);
+          if (pc.connectionState === "connected") {
+            setConnected(true);
+            setIsReconnecting(false);
+            if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+          }
           if (pc.connectionState === "disconnected" || pc.connectionState === "failed") {
-            handleEnd();
+            void handleIceRestart();
           }
         };
 
@@ -449,6 +458,83 @@ export default function CallScreen({
     }
   };
 
+  const handleIceRestart = useCallback(async () => {
+    if (!pcRef.current) return;
+    setIsReconnecting(true);
+    try {
+      if (typeof pcRef.current.restartIce === "function") {
+        pcRef.current.restartIce();
+        const offer = await pcRef.current.createOffer({ iceRestart: true });
+        await pcRef.current.setLocalDescription(offer);
+        onSendSignal({ type: "offer", senderId: myId, sdp: offer, callType: call.type });
+      }
+      
+      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = setTimeout(() => {
+        handleEnd();
+      }, 15000);
+    } catch (e) {
+      console.error("ICE Restart failed", e);
+      handleEnd();
+    }
+  }, [myId, call.type, onSendSignal, handleEnd]);
+
+  const togglePiP = async () => {
+    try {
+      if (document.pictureInPictureElement) {
+        await document.exitPictureInPicture();
+      } else if (remoteVideoRef.current && document.pictureInPictureEnabled) {
+        await remoteVideoRef.current.requestPictureInPicture();
+      }
+    } catch (err) {
+      console.error("PiP failed", err);
+    }
+  };
+
+  const toggleAudioOutput = async () => {
+    const nextMode = audioOutput === "speaker" ? "earpiece" : "speaker";
+    setAudioOutput(nextMode);
+    
+    if (remoteAudioRef.current && typeof (remoteAudioRef.current as any).setSinkId === "function") {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const outputs = devices.filter(d => d.kind === "audiooutput");
+        const earpiece = outputs.find(d => d.deviceId === "communications" || d.label.toLowerCase().includes("earpiece"));
+        const speaker = outputs.find(d => d.deviceId === "default" || d.label.toLowerCase().includes("speaker"));
+        
+        const targetId = nextMode === "earpiece" ? (earpiece?.deviceId || "") : (speaker?.deviceId || "");
+        await (remoteAudioRef.current as any).setSinkId(targetId);
+      } catch (err) {
+        console.error("Failed to set audio output", err);
+      }
+    }
+  };
+
+  const toggleLowDataMode = async () => {
+    if (!pcRef.current || call.type !== "video") return;
+    const nextMode = !lowDataMode;
+    setLowDataMode(nextMode);
+    
+    try {
+      const sender = pcRef.current.getSenders().find(s => s.track?.kind === "video");
+      if (sender && sender.track) {
+        const params = sender.getParameters();
+        if (!params.encodings) params.encodings = [{}];
+        
+        if (nextMode) {
+          params.encodings[0].maxBitrate = 150000;
+          params.encodings[0].scaleResolutionDownBy = 2;
+        } else {
+          delete params.encodings[0].maxBitrate;
+          params.encodings[0].scaleResolutionDownBy = 1;
+        }
+        await sender.setParameters(params);
+      }
+    } catch (err) {
+      console.error("Failed to set Low Data Mode", err);
+    }
+  };
+
   // Signal Handling
   useEffect(() => {
     const pc = pcRef.current;
@@ -519,7 +605,14 @@ export default function CallScreen({
     >
       <audio ref={remoteAudioRef} autoPlay playsInline className="sr-only" aria-hidden />
 
-      {poorConnection && (
+      {isReconnecting && (
+        <div className="absolute inset-0 z-[250] bg-black/60 backdrop-blur-md flex flex-col items-center justify-center pointer-events-none">
+          <div className="w-12 h-12 border-4 border-white/20 border-t-white rounded-full animate-spin mb-4" />
+          <p className="text-white font-medium text-lg drop-shadow-lg">Reconnecting...</p>
+        </div>
+      )}
+
+      {poorConnection && !isReconnecting && (
         <div className="absolute top-[80px] inset-x-0 z-[200] flex justify-center pointer-events-none">
           <div className="bg-red-500/90 text-white text-xs font-medium px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-lg backdrop-blur-sm animate-pulse">
             <AlertCircle className="w-4 h-4" />
@@ -596,17 +689,20 @@ export default function CallScreen({
           </div>
 
           {/* Bottom Controls */}
-          <div className="absolute bottom-0 inset-x-0 pb-safe pt-24 bg-gradient-to-t from-black/80 to-transparent z-20 flex justify-center items-end pb-8 gap-6 px-6">
-            <ControlButton icon={videoOff ? <VideoOff /> : <Video />} onClick={toggleVideo} active={videoOff} label="Video" />
-            <ControlButton icon={muted ? <MicOff /> : <Mic />} onClick={toggleMute} active={muted} label="Mute" />
-            <ControlButton icon={<SwitchCamera />} onClick={flipCamera} label="Flip" />
-            <ControlButton icon={<MonitorUp />} onClick={toggleScreenShare} active={isScreenSharing} label="Share" />
-            <button
-              onClick={handleEnd}
-              className="w-16 h-16 bg-red-500 rounded-full flex items-center justify-center text-white transition-transform active:scale-90 hover:bg-red-600 shadow-lg"
-            >
-              <PhoneOff fill="currentColor" stroke="none" className="w-7 h-7" />
-            </button>
+          <div className="absolute bottom-0 inset-x-0 pb-safe pt-24 bg-gradient-to-t from-black/80 to-transparent z-20 flex justify-center items-end pb-8 gap-4 px-2 overflow-x-auto snap-x no-scrollbar">
+            <div className="flex gap-4 px-4 snap-center items-end">
+              <ControlButton icon={videoOff ? <VideoOff /> : <Video />} onClick={toggleVideo} active={videoOff} label="Video" />
+              <ControlButton icon={muted ? <MicOff /> : <Mic />} onClick={toggleMute} active={muted} label="Mute" />
+              <ControlButton icon={<SwitchCamera />} onClick={flipCamera} label="Flip" />
+              <ControlButton icon={<PictureInPicture />} onClick={togglePiP} label="PiP" />
+              <ControlButton icon={<Gauge />} onClick={toggleLowDataMode} active={lowDataMode} label={lowDataMode ? "Data Saver" : "HD"} />
+              <button
+                onClick={handleEnd}
+                className="w-14 h-14 bg-red-500 rounded-full flex items-center justify-center text-white transition-transform active:scale-90 hover:bg-red-600 shadow-lg shrink-0 ml-2"
+              >
+                <PhoneOff fill="currentColor" stroke="none" className="w-6 h-6" />
+              </button>
+            </div>
           </div>
         </div>
       ) : (
@@ -635,7 +731,7 @@ export default function CallScreen({
           {/* Bottom Controls */}
           <div className="relative z-10 pb-safe pb-10 flex flex-col items-center">
             <div className="flex items-center justify-center gap-6 mb-8">
-              <ControlButton icon={speakerOff ? <VolumeX /> : <Volume2 />} onClick={() => setSpeakerOff(!speakerOff)} active={!speakerOff} label="Speaker" />
+              <ControlButton icon={audioOutput === "speaker" ? <Volume2 /> : <Volume1 />} onClick={toggleAudioOutput} active={audioOutput === "speaker"} label={audioOutput === "speaker" ? "Speaker" : "Earpiece"} />
               <ControlButton icon={muted ? <MicOff /> : <Mic />} onClick={toggleMute} active={muted} label="Mute" />
             </div>
             <button
