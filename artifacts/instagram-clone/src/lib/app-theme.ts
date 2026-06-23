@@ -306,11 +306,7 @@ export function getPhotoScrimGradient(themeId: AppThemeId, dark: boolean): strin
       ? "linear-gradient(180deg, rgba(30,20,15,0.5) 0%, rgba(20,10,5,0.85) 100%)"
       : "linear-gradient(180deg, rgba(250,240,230,0.4) 0%, rgba(240,230,215,0.7) 100%)";
   }
-  if (themeId === "vintage-polaroid") {
-    return dark
-      ? "linear-gradient(180deg, rgba(30,25,20,0.4) 0%, rgba(15,10,5,0.85) 100%)"
-      : "linear-gradient(180deg, rgba(235,225,215,0.4) 0%, rgba(215,205,190,0.7) 100%)";
-  }
+
   return dark
     ? "linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.88) 100%)"
     : "linear-gradient(180deg, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.88) 100%)";
