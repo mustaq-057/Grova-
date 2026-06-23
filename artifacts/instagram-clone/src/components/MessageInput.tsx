@@ -20,6 +20,7 @@ const CustomPaletteIcon = () => <Palette className="w-[26px] h-[26px] text-white
 const CustomFileIcon = () => <FileIcon className="w-[26px] h-[26px] text-white" strokeWidth={1.6} />;
 
 interface MessageInputProps {
+  draftKey?: string;
   /** Called with trimmed text when user sends (input state stays inside this component for perf). */
   onSendMessage: (text: string, fontStyle?: "default" | "edo" | "italian" | "allura") => void;
   onInputActivity?: (value: string) => void;
@@ -68,8 +69,16 @@ export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputPro
   recordingTime,
   disabled,
   replyPreview,
+  draftKey,
 }, ref) {
-  const [input, setInput] = useState("");
+  const [input, setInput] = useState(() => {
+    if (draftKey) {
+      try {
+        return sessionStorage.getItem(draftKey) || "";
+      } catch {}
+    }
+    return "";
+  });
   const [fontStyle, setFontStyle] = useState<"default" | "edo" | "italian" | "allura">("default");
   const [openPicker, setOpenPicker] = useState<OpenPicker>(null);
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
@@ -80,6 +89,15 @@ export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputPro
   const { theme } = useChatTheme();
 
   useImperativeHandle(ref, () => inputRef.current as HTMLTextAreaElement);
+
+  useEffect(() => {
+    if (draftKey) {
+      try {
+        if (input) sessionStorage.setItem(draftKey, input);
+        else sessionStorage.removeItem(draftKey);
+      } catch {}
+    }
+  }, [input, draftKey]);
 
   // Avoid auto-focus on mobile — it pops the keyboard and causes scroll flicker.
   useEffect(() => {
@@ -98,9 +116,12 @@ export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputPro
     lastSentTimeRef.current = now;
 
     setInput("");
+    if (draftKey) {
+      try { sessionStorage.removeItem(draftKey); } catch {}
+    }
     if (inputRef.current) inputRef.current.style.height = 'auto';
     onSendMessage(text, fontStyle);
-  }, [input, disabled, recording, onSendMessage, fontStyle]);
+  }, [input, disabled, recording, onSendMessage, fontStyle, draftKey]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {

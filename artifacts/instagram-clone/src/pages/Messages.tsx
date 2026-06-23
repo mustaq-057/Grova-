@@ -3421,6 +3421,7 @@ export default function Messages() {
             />
           ) : (
             <MessageInput
+              draftKey={activeThread ? `chat_draft_${activeThread}` : "chat_draft_main"}
               ref={messageInputRef}
               onInputActivity={handleInputActivity}
               onSendMessage={sendText}

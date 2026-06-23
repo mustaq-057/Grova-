@@ -1,6 +1,7 @@
 import { registerLocalBlobUrl } from "./media-url";
 
 export type StickerCategory =
+  | "Custom"
   | "Forest Romance"
   | "Cozy Night"
   | "Islamic Couple"
@@ -58,6 +59,39 @@ export const CUSTOM_STICKERZ: CustomSticker[] = [
   { id: "pookie-32", url: "/stickerz/imagecopy32.png", caption: "fox and buuny", category: "Matching Profile" },
 ];
 
+export const CUSTOM_STICKERZ_STORAGE_KEY = "grova_custom_stickerz";
+
+export function getCustomStickers(): CustomSticker[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(CUSTOM_STICKERZ_STORAGE_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw);
+  } catch (e) {
+    console.error("Failed to parse custom stickerz", e);
+    return [];
+  }
+}
+
+export function getAllStickers(): CustomSticker[] {
+  return [...getCustomStickers(), ...CUSTOM_STICKERZ];
+}
+
+export function addCustomSticker(url: string, caption: string): CustomSticker {
+  const custom = getCustomStickers();
+  const newSticker: CustomSticker = {
+    id: `custom-${Date.now()}`,
+    url,
+    caption,
+    category: "Custom",
+  };
+  custom.unshift(newSticker);
+  localStorage.setItem(CUSTOM_STICKERZ_STORAGE_KEY, JSON.stringify(custom));
+  // Fire event to re-render picker
+  window.dispatchEvent(new Event("custom_stickerz_updated"));
+  return newSticker;
+}
+
 let preloaded = false;
 
 export function preloadStickerz() {
@@ -66,7 +100,7 @@ export function preloadStickerz() {
   
   // Immediately inject preload links into the head so the browser's native network stack handles it optimally
   const doPreload = () => {
-    CUSTOM_STICKERZ.forEach((sticker) => {
+    getAllStickers().forEach((sticker) => {
       const link = document.createElement("link");
       link.rel = "preload";
       link.as = "image";

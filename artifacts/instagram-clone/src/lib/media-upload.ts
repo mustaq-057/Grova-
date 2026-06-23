@@ -124,10 +124,10 @@ export async function uploadMediaBinary(
   const mime = normalizeUploadMime(contentType);
   const controller = new AbortController();
   const timeoutMs = isPdfMime(mime)
-    ? 600_000
-    : mime.startsWith("video/")
-    ? 300_000
-    : 180_000;
+    ? 3600_000 // 1 hour
+    : mime.startsWith("video/") || mime.startsWith("audio/")
+    ? 3600_000 // 1 hour
+    : 300_000; // 5 minutes
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
   let res: Response;

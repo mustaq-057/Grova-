@@ -53,5 +53,27 @@ export function useChatTheme() {
     };
   }
 
+  if (appTheme === "vintage-polaroid") {
+    theme = {
+      ...theme,
+      id: "vintage-polaroid",
+      bubbleColor: "#9c3b3b", // Faded polaroid red
+      bubbleBorder: "#9c3b3b",
+      textColor: "#f4f1ea", // Paper white
+      partnerTextColor: "#2d2420" // Ink black on their paper bubble
+    };
+  }
+
+  if (appTheme === "sara-lavender") {
+    theme = {
+      ...theme,
+      id: "sara-lavender",
+      bubbleColor: "#9b72aa", // Soft lavender
+      bubbleBorder: "#8e659b",
+      textColor: "#f8f4fa", // Whiteish-pink text
+      partnerTextColor: "#4a3b52" // Deep purple for partner's bubble
+    };
+  }
+
   return { themeId, theme };
 }

@@ -1,8 +1,8 @@
 import { memo, useMemo } from "react";
 import { createPortal } from "react-dom";
 
-const NAMES = ["Sara", "♡ Sara", "sara", "SARA", "Sara ♡", "my Sara"];
-const SARA_COLORS = ["#ffb7c9", "#ff6b9d", "#fd79a8", "#e84393", "#f8a5c2", "#ffc8d8", "#ffe4ec", "#ff85a8"];
+const NAMES = ["sara", "sara ♡", "i love you", "my sara"];
+const SARA_COLORS = ["#d8b4e2", "#e8c7e8", "#f3d8ed", "#c7b4e2", "#e2b4d8"]; // Soft lavenders and lilacs
 
 type Flake = {
   id: number;
@@ -16,24 +16,24 @@ type Flake = {
   spin: number;
   color: string;
   depth: number;
-  glow: number;
+  blur: number;
 };
 
 export const FallingNamesOverlay = memo(function FallingNamesOverlay() {
   const flakes = useMemo<Flake[]>(() => {
-    return Array.from({ length: 36 }, (_, i) => ({
+    return Array.from({ length: 15 }, (_, i) => ({
       id: i,
       label: NAMES[i % NAMES.length]!,
-      left: Math.random() * 100,
-      size: 16 + Math.random() * 28,
-      delay: Math.random() * 16,
-      duration: 10 + Math.random() * 9,
-      drift: (Math.random() - 0.5) * 100,
-      sway: 24 + Math.random() * 48,
-      spin: (Math.random() - 0.5) * 220,
+      left: 5 + Math.random() * 90,
+      size: 14 + Math.random() * 20,
+      delay: Math.random() * 15,
+      duration: 18 + Math.random() * 15, // slower falling
+      drift: (Math.random() - 0.5) * 60, // less drift
+      sway: 15 + Math.random() * 25, // less sway
+      spin: (Math.random() - 0.5) * 15, // minimal rotation (-7.5 to 7.5 deg)
       color: SARA_COLORS[i % SARA_COLORS.length]!,
-      depth: 0.65 + Math.random() * 0.35,
-      glow: 0.35 + Math.random() * 0.45,
+      depth: 0.5 + Math.random() * 0.5,
+      blur: Math.random() > 0.6 ? 2 + Math.random() * 3 : 0, // depth of field effect
     }));
   }, []);
 
@@ -49,23 +49,22 @@ export const FallingNamesOverlay = memo(function FallingNamesOverlay() {
           0%, 100% { margin-left: 0; }
           50% { margin-left: var(--sway); }
         }
-        @keyframes nameShimmer {
-          0%, 100% { filter: brightness(1); }
-          50% { filter: brightness(1.15); }
-        }
       `}</style>
       {flakes.map((f) => (
         <span
           key={f.id}
-          className="absolute top-0 font-bold select-none whitespace-nowrap"
+          className="absolute top-0 select-none whitespace-nowrap"
           style={{
             left: `${f.left}%`,
             fontSize: `${f.size}px`,
             color: f.color,
-            opacity: 0.72 * f.depth,
-            fontFamily: '"Segoe Script", "Brush Script MT", "Snell Roundhand", "Apple Chancery", cursive',
-            textShadow: `0 0 ${12 + f.glow * 20}px rgba(255, 133, 168, ${f.glow}), 0 2px 14px rgba(232, 67, 147, 0.45)`,
-            animation: `nameFall ${f.duration}s linear ${f.delay}s infinite, nameSway ${3.2 + f.duration * 0.12}s ease-in-out ${f.delay}s infinite alternate, nameShimmer ${4 + Math.random() * 3}s ease-in-out ${f.delay * 0.3}s infinite`,
+            opacity: 0.8 * f.depth,
+            fontFamily: '"Playfair Display", Georgia, serif',
+            fontStyle: 'italic',
+            letterSpacing: '1px',
+            filter: f.blur ? `blur(${f.blur}px)` : 'none',
+            textShadow: '0 2px 8px rgba(0,0,0,0.1)',
+            animation: `nameFall ${f.duration}s linear ${f.delay}s infinite, nameSway ${4 + f.duration * 0.15}s ease-in-out ${f.delay}s infinite alternate`,
             // @ts-expect-error css vars
             "--drift": `${f.drift}px`,
             "--sway": `${f.sway}px`,

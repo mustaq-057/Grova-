@@ -148,10 +148,10 @@ export default memo(function Home() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.1, duration: 0.3 }}
-        className="px-4 py-8 text-center"
+        className="px-4 py-8 text-center theme-home-welcome"
       >
-        <p className={`text-sm text-muted-foreground ${appTheme === 'library' ? 'library-home-subtitle' : ''}`}>Welcome back</p>
-        <h1 className={`text-2xl font-bold mt-1 ${appTheme === 'library' ? 'library-home-name' : ''}`}>{user?.name ?? "You"}</h1>
+        <p className={`text-sm text-muted-foreground theme-home-subtitle ${appTheme === 'library' ? 'library-home-subtitle' : ''}`}>Welcome back</p>
+        <h1 className={`text-2xl font-bold mt-1 theme-home-name ${appTheme === 'library' ? 'library-home-name' : ''}`}>{user?.name ?? "You"}</h1>
         {loadingPartner ? (
           <div className="flex items-center justify-center gap-3 mt-6">
             <div className="w-16 h-16 rounded-full bg-secondary/50 animate-pulse" />
@@ -164,16 +164,16 @@ export default memo(function Home() {
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.2, duration: 0.3 }}
-              className={`relative flex items-center justify-center gap-5 sm:gap-7 mt-8 mb-6 w-full max-w-[340px] mx-auto cursor-pointer active:scale-[0.98] transition-transform ${appTheme === 'library' ? 'library-locket-container' : ''} ${appTheme === 'mint' ? 'home-avatar-mint-glow' : ''}`}
+              className={`theme-home-avatar-container relative flex items-center justify-center gap-5 sm:gap-7 mt-8 mb-6 w-full max-w-[340px] mx-auto cursor-pointer active:scale-[0.98] transition-transform ${appTheme === 'library' ? 'library-locket-container' : ''} ${appTheme === 'mint' ? 'home-avatar-mint-glow' : ''}`}
             >
-              <div className="relative z-10">
+              <div className="relative z-10 theme-home-avatar-wrapper">
                 <AvatarImage
                   src={user?.avatar}
                   userId={user?.id ?? "me"}
                   alt=""
-                  className={`w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-[3px] border-primary/40 shadow-[0_0_20px_rgba(var(--primary),0.25)] bg-background ${appTheme === 'library' ? 'library-locket' : ''}`}
+                  className={`theme-home-avatar w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-[3px] border-primary/40 shadow-[0_0_20px_rgba(var(--primary),0.25)] bg-background ${appTheme === 'library' ? 'library-locket' : ''}`}
                 />
-                <div className="absolute bottom-0 right-0 w-5 h-5 sm:w-6 sm:h-6 bg-green-500 rounded-full border-[3px] border-background z-20 shadow-sm" aria-label="You are online" />
+                <div className="theme-home-presence absolute bottom-0 right-0 w-5 h-5 sm:w-6 sm:h-6 bg-green-500 rounded-full border-[3px] border-background z-20 shadow-sm" aria-label="You are online" />
               </div>
 
               <motion.div
@@ -196,15 +196,15 @@ export default memo(function Home() {
                 />
               </motion.div>
 
-              <div className="relative z-10">
+              <div className="relative z-10 theme-home-avatar-wrapper">
                 <AvatarImage
                   src={partner.avatar}
                   userId={partner.id}
                   alt=""
-                  className={`w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-[3px] border-primary/40 shadow-[0_0_20px_rgba(var(--primary),0.25)] bg-background ${appTheme === 'library' ? 'library-locket' : ''}`}
+                  className={`theme-home-avatar w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-[3px] border-primary/40 shadow-[0_0_20px_rgba(var(--primary),0.25)] bg-background ${appTheme === 'library' ? 'library-locket' : ''}`}
                 />
                 <div
-                  className={`absolute bottom-0 right-0 w-5 h-5 sm:w-6 sm:h-6 rounded-full border-[3px] border-background z-20 shadow-sm ${partnerOnline ? "bg-green-500" : "bg-gray-400"}`}
+                  className={`theme-home-presence absolute bottom-0 right-0 w-5 h-5 sm:w-6 sm:h-6 rounded-full border-[3px] border-background z-20 shadow-sm ${partnerOnline ? "bg-green-500" : "bg-gray-400"}`}
                   aria-label={partnerOnline ? "Partner is online" : "Partner is offline"}
                 />
               </div>
@@ -231,13 +231,13 @@ export default memo(function Home() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3, duration: 0.3 }}
-          className="flex items-center justify-center gap-4 mt-6"
+          className="theme-home-clocks flex items-center justify-center gap-4 mt-6"
         >
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-secondary/50 rounded-full">
+          <div className="theme-home-clock-badge flex items-center gap-2 px-3 py-1.5 bg-secondary/50 rounded-full">
             <Clock className="w-3.5 h-3.5 text-primary" />
             <span className="text-xs font-medium">Morocco: {moroccoTime}</span>
           </div>
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-secondary/50 rounded-full">
+          <div className="theme-home-clock-badge flex items-center gap-2 px-3 py-1.5 bg-secondary/50 rounded-full">
             <Clock className="w-3.5 h-3.5 text-primary" />
             <span className="text-xs font-medium">India: {indiaTime}</span>
           </div>
@@ -261,16 +261,16 @@ export default memo(function Home() {
                 transition={{ delay: 0.3 + (i * 0.05) }}
                 whileHover={{ scale: 1.02, y: -2 }}
                 whileTap={{ scale: 0.98 }}
-                className={`p-4 bg-gradient-to-br from-card to-card/50 border border-border/50 rounded-2xl hover:border-primary/40 hover:shadow-lg transition-all cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${appTheme === 'library' ? 'library-shortcut-card' : ''}`}
+                className={`theme-home-shortcut-card p-4 bg-gradient-to-br from-card to-card/50 border border-border/50 rounded-2xl hover:border-primary/40 hover:shadow-lg transition-all cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${appTheme === 'library' ? 'library-shortcut-card' : ''}`}
                 role="button"
                 tabIndex={0}
                 aria-label={`Navigate to ${s.label}: ${s.desc}`}
               >
-                <div className={`w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mb-3 group-hover:bg-primary/20 transition-colors ${appTheme === 'library' ? 'library-shortcut-icon-wrapper' : ''}`}>
-                  <Icon className={`w-5 h-5 text-primary ${appTheme === 'library' ? 'library-shortcut-icon' : ''}`} aria-hidden="true" />
+                <div className={`theme-home-shortcut-icon-wrapper w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mb-3 group-hover:bg-primary/20 transition-colors ${appTheme === 'library' ? 'library-shortcut-icon-wrapper' : ''}`}>
+                  <Icon className={`theme-home-shortcut-icon w-5 h-5 text-primary ${appTheme === 'library' ? 'library-shortcut-icon' : ''}`} aria-hidden="true" />
                 </div>
-                <p className={`font-semibold text-sm ${appTheme === 'library' ? 'library-shortcut-title' : ''}`}>{s.label}</p>
-                <p className={`text-xs text-muted-foreground mt-0.5 ${appTheme === 'library' ? 'library-shortcut-desc' : ''}`}>{s.desc}</p>
+                <p className={`theme-home-shortcut-title font-semibold text-sm ${appTheme === 'library' ? 'library-shortcut-title' : ''}`}>{s.label}</p>
+                <p className={`theme-home-shortcut-desc text-xs text-muted-foreground mt-0.5 ${appTheme === 'library' ? 'library-shortcut-desc' : ''}`}>{s.desc}</p>
               </motion.div>
             </Link>
           );

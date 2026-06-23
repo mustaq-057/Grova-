@@ -1,8 +1,10 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { getLocalBlobUrl } from "@/lib/media-url";
 import { X, Search } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { CUSTOM_STICKERZ, type CustomSticker } from "@/lib/stickerz";
+import { CUSTOM_STICKERZ, type CustomSticker, getAllStickers, addCustomSticker } from "@/lib/stickerz";
+import { uploadMediaFile } from "@/lib/media-upload";
+import { Plus, Loader2 } from "lucide-react";
 
 interface StickerzPickerProps {
   onSelect: (sticker: CustomSticker) => void;
@@ -11,13 +13,48 @@ interface StickerzPickerProps {
 
 export function StickerzPicker({ onSelect, onClose }: StickerzPickerProps) {
   const [searchQuery, setSearchQuery] = useState("");
-  
+  const [stickers, setStickers] = useState(getAllStickers);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadPreview, setUploadPreview] = useState<string>("");
+  const [uploadCaption, setUploadCaption] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    const onUpdate = () => setStickers(getAllStickers());
+    window.addEventListener("custom_stickerz_updated", onUpdate);
+    return () => window.removeEventListener("custom_stickerz_updated", onUpdate);
+  }, []);
+
   const filteredStickers = useMemo(() => {
     const query = searchQuery.toLowerCase().trim();
     return query 
-      ? CUSTOM_STICKERZ.filter(s => s.caption.toLowerCase().includes(query) || s.category.toLowerCase().includes(query))
-      : CUSTOM_STICKERZ;
-  }, [searchQuery]);
+      ? stickers.filter(s => s.caption.toLowerCase().includes(query) || s.category.toLowerCase().includes(query))
+      : stickers;
+  }, [searchQuery, stickers]);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadFile(file);
+    setUploadPreview(URL.createObjectURL(file));
+    setUploadCaption("");
+  };
+
+  const handleSave = async () => {
+    if (!uploadFile) return;
+    setIsSaving(true);
+    try {
+      const url = await uploadMediaFile(uploadFile, uploadFile.type);
+      addCustomSticker(url, uploadCaption || "custom sticker");
+      setUploadFile(null);
+      setUploadPreview("");
+    } catch (err) {
+      console.error("Failed to upload custom sticker", err);
+      alert("Failed to save sticker. Please try again.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   return (
     <>
@@ -58,13 +95,53 @@ export function StickerzPicker({ onSelect, onClose }: StickerzPickerProps) {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-4 pb-24">
+        {uploadFile ? (
+          <div className="flex-1 flex flex-col items-center justify-center p-6 space-y-6">
+            <div className="w-40 h-40 rounded-2xl overflow-hidden bg-white/5 border border-white/10 p-2 shadow-xl">
+              <img src={uploadPreview} alt="preview" className="w-full h-full object-contain" />
+            </div>
+            <input
+              type="text"
+              placeholder="Give it a caption (e.g., 'angry cat')"
+              value={uploadCaption}
+              onChange={(e) => setUploadCaption(e.target.value)}
+              className="w-full max-w-sm bg-[#2a2a2a] text-white text-center rounded-xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-primary/50"
+              autoFocus
+            />
+            <div className="flex gap-3 w-full max-w-sm">
+              <button
+                type="button"
+                onClick={() => setUploadFile(null)}
+                disabled={isSaving}
+                className="flex-1 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-medium transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={isSaving}
+                className="flex-1 py-3 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-medium transition-colors flex items-center justify-center"
+              >
+                {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : "Save"}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex-1 overflow-y-auto px-4 pb-24">
           {filteredStickers.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-white/50">
               <p>No stickerz found</p>
             </div>
           ) : (
             <div className="grid grid-cols-4 gap-2">
+              <label className="group flex flex-col items-center justify-center gap-1 p-1.5 rounded-xl border border-dashed border-white/20 hover:border-white/50 hover:bg-white/5 transition-all cursor-pointer">
+                <input type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+                <div className="w-full aspect-square rounded-lg flex items-center justify-center">
+                  <Plus className="w-8 h-8 text-white/50 group-hover:text-white/80" />
+                </div>
+                <span className="text-[9px] text-center text-white/50 w-full leading-tight">Add Custom</span>
+              </label>
               {filteredStickers.map((sticker) => (
                 <button
                   key={sticker.id}
@@ -89,6 +166,7 @@ export function StickerzPicker({ onSelect, onClose }: StickerzPickerProps) {
             </div>
           )}
         </div>
+        )}
       </motion.div>
     </>
   );

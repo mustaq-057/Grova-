@@ -129,7 +129,7 @@ function BookCover({
       {/* Book spine simulation */}
       <div className="absolute left-0 top-0 bottom-0 w-[12%] bg-black/20 border-r border-[var(--lib-border)] z-0" />
       <div className="absolute inset-0 bg-gradient-to-tr from-black/40 via-transparent to-white/10 z-0 mix-blend-overlay" />
-      
+
       <span className={`${size === "sm" ? "text-3xl" : "text-5xl"} font-bold text-[var(--lib-text)]/90 mb-2 font-serif z-10 drop-shadow-md`}>
         {initial}
       </span>
@@ -174,8 +174,8 @@ export default function Library() {
     totalPagesRead: number;
     avgTimePerPage: number;
     booksRead: number;
-    weeklyData: { date: string; minutes: number }[];
-    monthlyData: { month: string; minutes: number }[];
+    weeklyData: { date: string; pages: number }[];
+    monthlyData: { month: string; pages: number }[];
   }>({
     streakDays: 0,
     dailyMinutes: 0,
@@ -189,7 +189,7 @@ export default function Library() {
   // Settings State
   const [showSettings, setShowSettings] = useState(false);
   const [libLang, setLibLang] = useState<"en" | "ar">(() => (localStorage.getItem("grova-library-language") as "en" | "ar") || "en");
-  const [libTheme, setLibTheme] = useState<"dark" | "light" | "sepia">(() => (localStorage.getItem("grova-library-theme") as "dark" | "light" | "sepia") || "dark");
+  const [libTheme, setLibTheme] = useState<"dark" | "light" | "sepia" | "mocha" | "sage" | "rosewater" | "abyss">(() => (localStorage.getItem("grova-library-theme") as any) || "dark");
   const [libraryMode, setLibraryMode] = useState(() => localStorage.getItem("libraryMode") === "true");
 
   const toggleLibraryMode = () => {
@@ -209,7 +209,7 @@ export default function Library() {
       return [];
     }
   });
-  
+
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Translations
@@ -252,7 +252,7 @@ export default function Library() {
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(() => {});
+      document.documentElement.requestFullscreen().catch(() => { });
     } else {
       if (document.exitFullscreen) {
         document.exitFullscreen();
@@ -312,7 +312,7 @@ export default function Library() {
     loadNotes();
     loadStats();
     loadCatalog();
-    
+
     const handleNotesUpdate = () => loadNotes();
     window.addEventListener("LIBRARY_NOTES_UPDATED", handleNotesUpdate);
     return () => window.removeEventListener("LIBRARY_NOTES_UPDATED", handleNotesUpdate);
@@ -344,7 +344,7 @@ export default function Library() {
 
   useEffect(() => {
     if (localStorage.getItem("grova-fullscreen") === "true" && !document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(() => {});
+      document.documentElement.requestFullscreen().catch(() => { });
     }
   }, []);
 
@@ -352,7 +352,7 @@ export default function Library() {
     if (!user) return;
     const sendHeartbeat = () => {
       if (document.visibilityState !== "visible" || !navigator.onLine) return;
-      api.heartbeat(user.id, { inLibrary: true }).catch(() => {});
+      api.heartbeat(user.id, { inLibrary: true }).catch(() => { });
     };
     sendHeartbeat();
     const interval = setInterval(sendHeartbeat, 10000);
@@ -365,7 +365,7 @@ export default function Library() {
     return () => {
       clearInterval(interval);
       document.removeEventListener("visibilitychange", onVisibilityChange);
-      api.heartbeat(user.id, { inLibrary: false }).catch(() => {}); // clear when leaving
+      api.heartbeat(user.id, { inLibrary: false }).catch(() => { }); // clear when leaving
     };
   }, [user]);
 
@@ -410,7 +410,7 @@ export default function Library() {
         (b) =>
           b.addedBy === user?.id &&
           (normalizeBookTitle(b.title) === norm ||
-          (!!epubUrl && !!b.epubUrl && b.epubUrl === epubUrl)),
+            (!!epubUrl && !!b.epubUrl && b.epubUrl === epubUrl)),
       );
     },
     [books, user?.id],
@@ -750,10 +750,10 @@ export default function Library() {
   const myId = user?.id || "me";
   const partnerId = authPartner?.id || (myId === "me" ? "wife" : "me");
   const partnerDisplayName = authPartner?.name || (partnerId === "wife" ? "Sara" : "Mustaq");
-  const currentlyReading = books.filter((b) => b.status === "reading");
+  const currentlyReading = books.filter((b) => b.status === "reading" && b.addedBy === myId);
   const myShelf = books.filter((b) => b.addedBy === myId);
   const partnerShelf = books.filter((b) => b.addedBy === partnerId);
-  const finishedBooks = books.filter((b) => b.status === "finished");
+  const finishedBooks = books.filter((b) => b.status === "finished" && b.addedBy === myId);
   const hero = currentlyReading[0] || myShelf[0];
 
   return (
@@ -789,1149 +789,1184 @@ export default function Library() {
           --lib-muted: #8b7355;
           --lib-btn-hover: rgba(91,70,54,0.1);
         }
+        .lib-theme-mocha {
+          --lib-bg: #1c1917;
+          --lib-text: #e7e5e4;
+          --lib-header: rgba(28,25,23,0.9);
+          --lib-card: #292524;
+          --lib-border: rgba(231,229,228,0.1);
+          --lib-input: rgba(231,229,228,0.05);
+          --lib-muted: #a8a29e;
+          --lib-btn-hover: rgba(231,229,228,0.1);
+        }
+        .lib-theme-sage {
+          --lib-bg: #f2f5f1;
+          --lib-text: #2f3e31;
+          --lib-header: rgba(242,245,241,0.9);
+          --lib-card: #e5ebe4;
+          --lib-border: rgba(47,62,49,0.15);
+          --lib-input: #e5ebe4;
+          --lib-muted: #647466;
+          --lib-btn-hover: rgba(47,62,49,0.1);
+        }
+        .lib-theme-rosewater {
+          --lib-bg: #fff1f2;
+          --lib-text: #4c0519;
+          --lib-header: rgba(255,241,242,0.9);
+          --lib-card: #ffe4e6;
+          --lib-border: rgba(76,5,25,0.1);
+          --lib-input: #ffe4e6;
+          --lib-muted: #9f1239;
+          --lib-btn-hover: rgba(76,5,25,0.1);
+        }
+        .lib-theme-abyss {
+          --lib-bg: #030712;
+          --lib-text: #f3f4f6;
+          --lib-header: rgba(3,7,18,0.9);
+          --lib-card: #111827;
+          --lib-border: rgba(243,244,246,0.1);
+          --lib-input: #1f2937;
+          --lib-muted: #9ca3af;
+          --lib-btn-hover: rgba(243,244,246,0.1);
+        }
       `}</style>
       <div className={`min-h-full pb-24 lib-theme-${libTheme} bg-[var(--lib-bg)] text-[var(--lib-text)] transition-colors duration-300`}>
         {/* ── Sticky Search Header ── */}
         <div className="sticky top-0 z-20 backdrop-blur-md pt-[max(1rem,env(safe-area-inset-top))] px-4 pb-4 border-b border-[var(--lib-border)] bg-[var(--lib-header)] transition-colors duration-300">
           <div className="flex items-center gap-2 mb-3">
             <h1 className="text-3xl font-bold font-serif italic text-primary leading-none flex-1">{t.library}</h1>
-            <input 
-              type="file" 
-              accept=".pdf,application/pdf" 
-              ref={fileInputRef} 
-              onChange={handlePdfUpload} 
-              className="hidden" 
+            <input
+              type="file"
+              accept=".pdf,application/pdf"
+              ref={fileInputRef}
+              onChange={handlePdfUpload}
+              className="hidden"
             />
-            <button 
+            <button
               onClick={() => setShowSettings(true)}
               className="p-2 rounded-full active:scale-90 transition-all hover:bg-[var(--lib-btn-hover)] text-[var(--lib-text)]"
             >
               <Settings className="w-6 h-6" />
             </button>
           </div>
-        <form onSubmit={handleSearch} className="relative z-50">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--lib-muted)]" />
-          <input
-            type="text"
-            placeholder={t.searchPlaceholder}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onFocus={() => setIsSearchFocused(true)}
-            onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)}
-            className="w-full bg-[var(--lib-input)] border border-[var(--lib-border)] rounded-2xl py-3 pl-10 pr-12 text-[var(--lib-text)] placeholder-[var(--lib-muted)] focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm transition-colors duration-300"
-            dir="auto"
-          />
-          {searchQuery && (
-            <button
-              type="button"
-              onClick={() => { setSearchQuery(""); setSearchResults([]); }}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--lib-muted)] hover:text-[var(--lib-text)] text-lg leading-none"
-            >
-              ×
-            </button>
-          )}
-
-          {/* Autocomplete Dropdown */}
-          <AnimatePresence>
-            {isSearchFocused && (
-              !searchQuery ? recentSearches.length > 0 : (
-                books.some(b => 
-                  b.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                  b.author.toLowerCase().includes(searchQuery.toLowerCase())
-                )
-              )
-            ) && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="absolute top-full left-0 right-0 mt-2 bg-[var(--lib-card)] border border-[var(--lib-border)] rounded-2xl shadow-2xl overflow-hidden z-50"
+          <form onSubmit={handleSearch} className="relative z-50">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--lib-muted)]" />
+            <input
+              type="text"
+              placeholder={t.searchPlaceholder}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onFocus={() => setIsSearchFocused(true)}
+              onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)}
+              className="w-full bg-[var(--lib-input)] border border-[var(--lib-border)] rounded-2xl py-3 pl-10 pr-12 text-[var(--lib-text)] placeholder-[var(--lib-muted)] focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm transition-colors duration-300"
+              dir="auto"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => { setSearchQuery(""); setSearchResults([]); }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--lib-muted)] hover:text-[var(--lib-text)] text-lg leading-none"
               >
-                {!searchQuery ? (
-                  recentSearches.length > 0 && (
-                    <>
-                      <div className="p-3 border-b border-[var(--lib-border)] flex items-center justify-between">
-                        <h4 className="text-[10px] font-bold text-[var(--lib-muted)] uppercase tracking-wider">Recent Searches</h4>
-                        <button type="button" onMouseDown={(e) => { e.preventDefault(); setRecentSearches([]); localStorage.removeItem(`grova-library-recent-searches-${user?.id}`); }} className="text-[10px] font-bold text-[var(--lib-muted)] hover:text-red-400">Clear</button>
-                      </div>
-                      <div className="max-h-[250px] overflow-y-auto">
-                        {recentSearches.map((rs, idx) => (
-                          <div 
-                            key={idx} 
-                            className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--lib-input)] cursor-pointer transition-colors border-b border-[var(--lib-border)] last:border-0"
-                            onMouseDown={(e) => { e.preventDefault(); handleSearch(rs); }}
-                          >
-                            <Clock className="w-4 h-4 text-[var(--lib-muted)] shrink-0" />
-                            <span className="text-sm text-[var(--lib-text)] font-medium flex-1 truncate">{rs}</span>
-                            <ArrowUpRight className="w-3 h-3 text-[var(--lib-muted)] opacity-50 shrink-0" />
-                          </div>
-                        ))}
-                      </div>
-                    </>
+                ×
+              </button>
+            )}
+
+            {/* Autocomplete Dropdown */}
+            <AnimatePresence>
+              {isSearchFocused && (
+                !searchQuery ? recentSearches.length > 0 : (
+                  books.some(b =>
+                    b.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    b.author.toLowerCase().includes(searchQuery.toLowerCase())
                   )
-                ) : (
-                  (() => {
-                    const matches = books.filter(b => 
-                      b.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                      b.author.toLowerCase().includes(searchQuery.toLowerCase())
-                    ).slice(0, 5);
-
-                    return (
-                      <>
-                        <div className="p-3 border-b border-[var(--lib-border)]">
-                          <h4 className="text-[10px] font-bold text-primary uppercase tracking-wider">In Your Library</h4>
-                        </div>
-                        <div className="max-h-[300px] overflow-y-auto">
-                          {matches.map((b) => (
-                            <div 
-                              key={b.id} 
-                              className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--lib-input)] cursor-pointer transition-colors border-b border-[var(--lib-border)] last:border-0 group"
-                              onMouseDown={(e) => { e.preventDefault(); openBook(b); setIsSearchFocused(false); }}
-                            >
-                              <div className="w-8 h-12 bg-[var(--lib-bg)] rounded overflow-hidden shrink-0 border border-[var(--lib-border)]">
-                                <BookCover coverUrl={b.coverUrl} title={b.title} />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm text-[var(--lib-text)] font-bold truncate">{b.title}</p>
-                                <p className="text-[10px] text-[var(--lib-muted)] truncate">{b.author}</p>
-                              </div>
-                              <BookOpen className="w-4 h-4 text-[var(--lib-muted)] group-hover:text-primary transition-colors opacity-0 group-hover:opacity-100" />
-                            </div>
-                          ))}
-                        </div>
-                        <div 
-                          className="p-3 bg-[var(--lib-input)] text-center text-xs font-bold text-primary cursor-pointer hover:bg-primary/10 transition-colors"
-                          onMouseDown={(e) => { e.preventDefault(); handleSearch(searchQuery); setIsSearchFocused(false); }}
-                        >
-                          Search all sources for &ldquo;{searchQuery}&rdquo;
-                        </div>
-                      </>
-                    );
-                  })()
-                )}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </form>
-        {/* Source Chips — active filters on search results */}
-        {searchQuery && resultSources.length > 0 && (
-          <div className="flex gap-2 mt-2 overflow-x-auto scrollbar-hide pb-1">
-            <button
-              onClick={() => setActiveSource(null)}
-              className={`shrink-0 text-[9px] font-bold px-2.5 py-1 rounded-full border transition-all ${
-                !activeSource
-                  ? "bg-white text-black border-white"
-                  : "bg-[var(--lib-input)] text-[var(--lib-muted)] border-[var(--lib-border)]"
-              }`}
-            >
-              All ({mergedSearchResults.length})
-            </button>
-            {resultSources.map((src) => {
-              const color = SOURCE_COLORS[src] || "#607D8B";
-              const isActive = activeSource === src;
-              const count = mergedSearchResults.filter((r) => r.source === src).length;
-              return (
-                <button
-                  key={src}
-                  onClick={() => setActiveSource(isActive ? null : src)}
-                  className="shrink-0 text-[9px] font-bold px-2.5 py-1 rounded-full border transition-all"
-                  style={{
-                    backgroundColor: isActive ? color : `${color}22`,
-                    color: isActive ? "white" : color,
-                    borderColor: isActive ? color : `${color}44`,
-                  }}
-                >
-                  {src} ({count})
-                </button>
-              );
-            })}
-            {searchMeta?.cached && (
-              <span className="shrink-0 text-[9px] text-gray-600 flex items-center gap-1 px-1">
-                ⚡ cached
-              </span>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* ── Search Results ── */}
-      {searchQuery && (
-        <div className="px-4 py-4 space-y-8">
-          {/* Local Matches */}
-          {(() => {
-            const localMatches = books.filter(b => 
-              b.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-              b.author.toLowerCase().includes(searchQuery.toLowerCase())
-            );
-            if (localMatches.length === 0) return null;
-            return (
-              <div>
-                <h3 className="text-lg font-bold mb-3 flex items-center text-primary">
-                  <BookMarked className="w-5 h-5 mr-2" /> In Your Library
-                </h3>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                  {localMatches.map((result) => (
-                    <div key={result.id} className="bg-[var(--lib-card)] rounded-2xl overflow-hidden border border-[var(--lib-border)] flex flex-col group cursor-pointer transition-colors duration-300" onClick={() => openBook(result)}>
-                      <div className="aspect-[2/3] w-full bg-[var(--lib-bg)] relative overflow-hidden">
-                        <BookCover coverUrl={result.coverUrl} title={result.title} />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                          <BookOpen className="w-8 h-8 text-[var(--lib-text)] drop-shadow-md" />
-                        </div>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); deleteBook(result.id); }}
-                          className="absolute top-2 right-2 w-7 h-7 bg-black/70 rounded-full items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity flex z-20 hover:bg-red-500/80"
-                          title="Remove from Shelf"
-                        >
-                          {deletingId === result.id ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--lib-text)]" />
-                          ) : (
-                            <Trash2 className="w-3.5 h-3.5 text-[var(--lib-text)]" />
-                          )}
-                        </button>
-                      </div>
-                      <div className="p-2.5 flex flex-col gap-0.5">
-                        <p className="font-bold text-xs line-clamp-1 leading-tight">{result.title}</p>
-                        <p className="text-[11px] text-[var(--lib-muted)] line-clamp-1">{result.author}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })()}
-
-          {/* Online search results */}
-          <div>
-            {isSearching && displayedResults.length === 0 ? (
-              <div className="flex flex-col items-center py-12 gap-3 text-[var(--lib-muted)]">
-                <Loader2 className="w-7 h-7 animate-spin text-primary" />
-                <p className="text-sm font-semibold">Searching…</p>
-              </div>
-          ) : displayedResults.length > 0 ? (
-            <>
-
-            {selectedResultIds.size > 0 && (
-              <div className="sticky bottom-20 z-30 mx-auto max-w-md">
-                <button
-                  onClick={addSelectedToLibrary}
-                  disabled={batchAdding}
-                  className="w-full bg-primary text-primary-foreground font-bold py-3.5 px-6 rounded-2xl shadow-2xl flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-70"
-                >
-                  {batchAdding ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
-                  Add {selectedResultIds.size} book{selectedResultIds.size > 1 ? "s" : ""} to shelf
-                </button>
-              </div>
-            )}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              {displayedResults.map((result) => {
-                const alreadyAdded = addedIds.has(result.id) || isBookOnShelf(result.title, result.epubUrl);
-                const isAdding = addingId === result.id;
-                const isSelected = selectedResultIds.has(result.id);
-                return (
-                  <div key={result.id} className={`bg-[var(--lib-card)] rounded-2xl overflow-hidden border flex flex-col group cursor-pointer transition-colors duration-300 ${isSelected ? "border-primary ring-2 ring-primary/40" : "border-[var(--lib-border)]"}`} onClick={() => setSelectedPreviewBook(result)}>
-                    <div className="aspect-[2/3] w-full bg-[var(--lib-bg)] relative overflow-hidden">
-                      <BookCover coverUrl={result.coverUrl} title={result.title} />
-                      {!alreadyAdded && result.epubUrl && (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); toggleResultSelection(result.id); }}
-                          className={`absolute top-2 left-2 z-20 w-7 h-7 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? "bg-primary border-primary text-primary-foreground" : "bg-black/50 border-white/60 text-white"}`}
-                          title="Select for batch add"
-                        >
-                          {isSelected ? "✓" : "+"}
-                        </button>
-                      )}
-                      <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 p-3 backdrop-blur-sm">
-                        {result.isLink ? (
-                          <a
-                            href={result.epubUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="bg-white/20 text-[var(--lib-text)] text-xs font-bold py-2 px-3 rounded-full flex items-center gap-1 border border-white/30 hover:bg-white/30 transition-colors"
-                          >
-                            <ExternalLink className="w-3 h-3" /> Open HathiTrust
-                          </a>
-                        ) : alreadyAdded ? (
-                          <div className="flex flex-col gap-2 w-full px-2">
-                            <button
-                              onClick={(e) => { e.stopPropagation(); openBook(result as unknown as ApiBook); }}
-                              className="bg-white text-black font-bold text-xs py-2 w-full rounded-full flex items-center justify-center gap-1.5 active:scale-95 transition-all"
-                            >
-                              <BookOpen className="w-3 h-3" /> Read Now
-                            </button>
-                            {result.coverUrl && (
-                              <button
-                                onClick={(e) => { e.stopPropagation(); window.open(result.coverUrl as string, "_blank"); }}
-                                className="bg-white/20 text-[var(--lib-text)] font-bold text-xs py-2 w-full rounded-full flex items-center justify-center gap-1.5 active:scale-95 transition-all border border-white/30 hover:bg-white/30"
-                              >
-                                <Download className="w-3 h-3" /> Cover
-                              </button>
-                            )}
+                )
+              ) && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="absolute top-full left-0 right-0 mt-2 bg-[var(--lib-card)] border border-[var(--lib-border)] rounded-2xl shadow-2xl overflow-hidden z-50"
+                  >
+                    {!searchQuery ? (
+                      recentSearches.length > 0 && (
+                        <>
+                          <div className="p-3 border-b border-[var(--lib-border)] flex items-center justify-between">
+                            <h4 className="text-[10px] font-bold text-[var(--lib-muted)] uppercase tracking-wider">Recent Searches</h4>
+                            <button type="button" onMouseDown={(e) => { e.preventDefault(); setRecentSearches([]); localStorage.removeItem(`grova-library-recent-searches-${user?.id}`); }} className="text-[10px] font-bold text-[var(--lib-muted)] hover:text-red-400">Clear</button>
                           </div>
-                        ) : (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); addToLibrary(result); }}
-                            disabled={isAdding}
-                            className="bg-primary text-primary-foreground font-bold text-xs py-2 px-4 rounded-full flex items-center gap-1.5 disabled:opacity-70 transition-all active:scale-95 shadow-lg shadow-primary/20 hover:bg-primary/90"
-                          >
-                            {isAdding ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
-                            Add to Shelf
-                          </button>
-                        )}
-                        <p className="text-xs text-[var(--lib-text)] text-center line-clamp-2 leading-tight">{result.description}</p>
-                      </div>
-                    </div>
-                    <div className="p-2.5 flex flex-col gap-0.5">
-                      <p className="font-bold text-xs line-clamp-1 leading-tight">{result.title}</p>
-                      <p className="text-[11px] text-[var(--lib-muted)] line-clamp-1">{result.author}</p>
-                    </div>
-                  </div>
+                          <div className="max-h-[250px] overflow-y-auto">
+                            {recentSearches.map((rs, idx) => (
+                              <div
+                                key={idx}
+                                className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--lib-input)] cursor-pointer transition-colors border-b border-[var(--lib-border)] last:border-0"
+                                onMouseDown={(e) => { e.preventDefault(); handleSearch(rs); }}
+                              >
+                                <Clock className="w-4 h-4 text-[var(--lib-muted)] shrink-0" />
+                                <span className="text-sm text-[var(--lib-text)] font-medium flex-1 truncate">{rs}</span>
+                                <ArrowUpRight className="w-3 h-3 text-[var(--lib-muted)] opacity-50 shrink-0" />
+                              </div>
+                            ))}
+                          </div>
+                        </>
+                      )
+                    ) : (
+                      (() => {
+                        const matches = books.filter(b =>
+                          b.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          b.author.toLowerCase().includes(searchQuery.toLowerCase())
+                        ).slice(0, 5);
+
+                        return (
+                          <>
+                            <div className="p-3 border-b border-[var(--lib-border)]">
+                              <h4 className="text-[10px] font-bold text-primary uppercase tracking-wider">In Your Library</h4>
+                            </div>
+                            <div className="max-h-[300px] overflow-y-auto">
+                              {matches.map((b) => (
+                                <div
+                                  key={b.id}
+                                  className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--lib-input)] cursor-pointer transition-colors border-b border-[var(--lib-border)] last:border-0 group"
+                                  onMouseDown={(e) => { e.preventDefault(); openBook(b); setIsSearchFocused(false); }}
+                                >
+                                  <div className="w-8 h-12 bg-[var(--lib-bg)] rounded overflow-hidden shrink-0 border border-[var(--lib-border)]">
+                                    <BookCover coverUrl={b.coverUrl} title={b.title} />
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm text-[var(--lib-text)] font-bold truncate">{b.title}</p>
+                                    <p className="text-[10px] text-[var(--lib-muted)] truncate">{b.author}</p>
+                                  </div>
+                                  <BookOpen className="w-4 h-4 text-[var(--lib-muted)] group-hover:text-primary transition-colors opacity-0 group-hover:opacity-100" />
+                                </div>
+                              ))}
+                            </div>
+                            <div
+                              className="p-3 bg-[var(--lib-input)] text-center text-xs font-bold text-primary cursor-pointer hover:bg-primary/10 transition-colors"
+                              onMouseDown={(e) => { e.preventDefault(); handleSearch(searchQuery); setIsSearchFocused(false); }}
+                            >
+                              Search all sources for &ldquo;{searchQuery}&rdquo;
+                            </div>
+                          </>
+                        );
+                      })()
+                    )}
+                  </motion.div>
+                )}
+            </AnimatePresence>
+          </form>
+          {/* Source Chips — active filters on search results */}
+          {searchQuery && resultSources.length > 0 && (
+            <div className="flex gap-2 mt-2 overflow-x-auto scrollbar-hide pb-1">
+              <button
+                onClick={() => setActiveSource(null)}
+                className={`shrink-0 text-[9px] font-bold px-2.5 py-1 rounded-full border transition-all ${!activeSource
+                    ? "bg-white text-black border-white"
+                    : "bg-[var(--lib-input)] text-[var(--lib-muted)] border-[var(--lib-border)]"
+                  }`}
+              >
+                All ({mergedSearchResults.length})
+              </button>
+              {resultSources.map((src) => {
+                const color = SOURCE_COLORS[src] || "#607D8B";
+                const isActive = activeSource === src;
+                const count = mergedSearchResults.filter((r) => r.source === src).length;
+                return (
+                  <button
+                    key={src}
+                    onClick={() => setActiveSource(isActive ? null : src)}
+                    className="shrink-0 text-[9px] font-bold px-2.5 py-1 rounded-full border transition-all"
+                    style={{
+                      backgroundColor: isActive ? color : `${color}22`,
+                      color: isActive ? "white" : color,
+                      borderColor: isActive ? color : `${color}44`,
+                    }}
+                  >
+                    {src} ({count})
+                  </button>
                 );
               })}
-            </div>
-            </>
-          ) : searchResults.length > 0 ? (
-            <div className="text-center py-10 text-[var(--lib-muted)]">
-              <Filter className="w-8 h-8 mx-auto mb-2 opacity-30" />
-              <p className="text-sm">No {activeSource} results.</p>
-              <button onClick={() => setActiveSource(null)} className="text-xs text-primary mt-2">Show all results</button>
-            </div>
-          ) : (
-            <div className="text-center py-12 text-[var(--lib-muted)]">
-              <Book className="w-10 h-10 mx-auto mb-3 opacity-30" />
-              <p className="text-sm">No results found across all sources.</p>
-              <p className="text-xs mt-1 opacity-70">Try a different term or check your spelling.</p>
+              {searchMeta?.cached && (
+                <span className="shrink-0 text-[9px] text-gray-600 flex items-center gap-1 px-1">
+                  ⚡ cached
+                </span>
+              )}
             </div>
           )}
+        </div>
+
+        {/* ── Search Results ── */}
+        {searchQuery && (
+          <div className="px-4 py-4 space-y-8">
+            {/* Local Matches */}
+            {(() => {
+              const localMatches = books.filter(b =>
+                b.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                b.author.toLowerCase().includes(searchQuery.toLowerCase())
+              );
+              if (localMatches.length === 0) return null;
+              return (
+                <div>
+                  <h3 className="text-lg font-bold mb-3 flex items-center text-primary">
+                    <BookMarked className="w-5 h-5 mr-2" /> In Your Library
+                  </h3>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                    {localMatches.map((result) => (
+                      <div key={result.id} className="bg-[var(--lib-card)] rounded-2xl overflow-hidden border border-[var(--lib-border)] flex flex-col group cursor-pointer transition-colors duration-300" onClick={() => openBook(result)}>
+                        <div className="aspect-[2/3] w-full bg-[var(--lib-bg)] relative overflow-hidden">
+                          <BookCover coverUrl={result.coverUrl} title={result.title} />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <BookOpen className="w-8 h-8 text-[var(--lib-text)] drop-shadow-md" />
+                          </div>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); deleteBook(result.id); }}
+                            className="absolute top-2 right-2 w-7 h-7 bg-black/70 rounded-full items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity flex z-20 hover:bg-red-500/80"
+                            title="Remove from Shelf"
+                          >
+                            {deletingId === result.id ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--lib-text)]" />
+                            ) : (
+                              <Trash2 className="w-3.5 h-3.5 text-[var(--lib-text)]" />
+                            )}
+                          </button>
+                        </div>
+                        <div className="p-2.5 flex flex-col gap-0.5">
+                          <p className="font-bold text-xs line-clamp-1 leading-tight">{result.title}</p>
+                          <p className="text-[11px] text-[var(--lib-muted)] line-clamp-1">{result.author}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Online search results */}
+            <div>
+              {isSearching && displayedResults.length === 0 ? (
+                <div className="flex flex-col items-center py-12 gap-3 text-[var(--lib-muted)]">
+                  <Loader2 className="w-7 h-7 animate-spin text-primary" />
+                  <p className="text-sm font-semibold">Searching…</p>
+                </div>
+              ) : displayedResults.length > 0 ? (
+                <>
+
+                  {selectedResultIds.size > 0 && (
+                    <div className="sticky bottom-20 z-30 mx-auto max-w-md">
+                      <button
+                        onClick={addSelectedToLibrary}
+                        disabled={batchAdding}
+                        className="w-full bg-primary text-primary-foreground font-bold py-3.5 px-6 rounded-2xl shadow-2xl flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-70"
+                      >
+                        {batchAdding ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
+                        Add {selectedResultIds.size} book{selectedResultIds.size > 1 ? "s" : ""} to shelf
+                      </button>
+                    </div>
+                  )}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                    {displayedResults.map((result) => {
+                      const alreadyAdded = addedIds.has(result.id) || isBookOnShelf(result.title, result.epubUrl);
+                      const isAdding = addingId === result.id;
+                      const isSelected = selectedResultIds.has(result.id);
+                      return (
+                        <div key={result.id} className={`bg-[var(--lib-card)] rounded-2xl overflow-hidden border flex flex-col group cursor-pointer transition-colors duration-300 ${isSelected ? "border-primary ring-2 ring-primary/40" : "border-[var(--lib-border)]"}`} onClick={() => setSelectedPreviewBook(result)}>
+                          <div className="aspect-[2/3] w-full bg-[var(--lib-bg)] relative overflow-hidden">
+                            <BookCover coverUrl={result.coverUrl} title={result.title} />
+                            {!alreadyAdded && result.epubUrl && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); toggleResultSelection(result.id); }}
+                                className={`absolute top-2 left-2 z-20 w-7 h-7 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? "bg-primary border-primary text-primary-foreground" : "bg-black/50 border-white/60 text-white"}`}
+                                title="Select for batch add"
+                              >
+                                {isSelected ? "✓" : "+"}
+                              </button>
+                            )}
+                            <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 p-3 backdrop-blur-sm">
+                              {result.isLink ? (
+                                <a
+                                  href={result.epubUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="bg-white/20 text-[var(--lib-text)] text-xs font-bold py-2 px-3 rounded-full flex items-center gap-1 border border-white/30 hover:bg-white/30 transition-colors"
+                                >
+                                  <ExternalLink className="w-3 h-3" /> Open HathiTrust
+                                </a>
+                              ) : alreadyAdded ? (
+                                <div className="flex flex-col gap-2 w-full px-2">
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); openBook(result as unknown as ApiBook); }}
+                                    className="bg-white text-black font-bold text-xs py-2 w-full rounded-full flex items-center justify-center gap-1.5 active:scale-95 transition-all"
+                                  >
+                                    <BookOpen className="w-3 h-3" /> Read Now
+                                  </button>
+                                  {result.coverUrl && (
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); window.open(result.coverUrl as string, "_blank"); }}
+                                      className="bg-white/20 text-[var(--lib-text)] font-bold text-xs py-2 w-full rounded-full flex items-center justify-center gap-1.5 active:scale-95 transition-all border border-white/30 hover:bg-white/30"
+                                    >
+                                      <Download className="w-3 h-3" /> Cover
+                                    </button>
+                                  )}
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); addToLibrary(result); }}
+                                  disabled={isAdding}
+                                  className="bg-primary text-primary-foreground font-bold text-xs py-2 px-4 rounded-full flex items-center gap-1.5 disabled:opacity-70 transition-all active:scale-95 shadow-lg shadow-primary/20 hover:bg-primary/90"
+                                >
+                                  {isAdding ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
+                                  Add to Shelf
+                                </button>
+                              )}
+                              <p className="text-xs text-[var(--lib-text)] text-center line-clamp-2 leading-tight">{result.description}</p>
+                            </div>
+                          </div>
+                          <div className="p-2.5 flex flex-col gap-0.5">
+                            <p className="font-bold text-xs line-clamp-1 leading-tight">{result.title}</p>
+                            <p className="text-[11px] text-[var(--lib-muted)] line-clamp-1">{result.author}</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              ) : searchResults.length > 0 ? (
+                <div className="text-center py-10 text-[var(--lib-muted)]">
+                  <Filter className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                  <p className="text-sm">No {activeSource} results.</p>
+                  <button onClick={() => setActiveSource(null)} className="text-xs text-primary mt-2">Show all results</button>
+                </div>
+              ) : (
+                <div className="text-center py-12 text-[var(--lib-muted)]">
+                  <Book className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                  <p className="text-sm">No results found across all sources.</p>
+                  <p className="text-xs mt-1 opacity-70">Try a different term or check your spelling.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── Main Dashboard ── */}
+        {!searchQuery && libraryTab === "dashboard" && (
+          <>
+            {/* Add a Book Banner */}
+            {!isSearchFocused && (
+              <div className="px-4 mt-6">
+                <div
+                  onClick={() => { if (!isUploading) fileInputRef.current?.click(); }}
+                  className={`relative overflow-hidden rounded-3xl p-6 group active:scale-[0.98] transition-transform shadow-sm border border-[var(--lib-border)] bg-[var(--lib-card)] ${isUploading ? "opacity-70 pointer-events-none cursor-wait" : "cursor-pointer"
+                    }`}
+                >
+                  {/* Background Shapes */}
+                  <div className="absolute top-0 right-0 w-full h-full pointer-events-none overflow-hidden rounded-3xl opacity-30">
+                    {/* corner blobs */}
+                    <div className="absolute -top-12 -right-12 w-32 h-32 bg-primary rounded-full blur-xl" />
+                    <div className="absolute -bottom-16 -right-16 w-48 h-48 bg-primary rounded-full blur-xl" />
+
+                    {/* Plus marks */}
+                    <Plus className="absolute top-8 right-12 w-6 h-6 text-primary opacity-40 rotate-12" strokeWidth={4} />
+                    <Plus className="absolute bottom-12 left-1/2 w-10 h-10 text-primary opacity-40 rotate-45" strokeWidth={4} />
+                    <Plus className="absolute top-1/2 right-1/4 w-8 h-8 text-primary opacity-40 -rotate-12" strokeWidth={4} />
+
+                    {/* Big Plus Mark */}
+                    <Plus className="absolute -bottom-8 -right-8 w-40 h-40 text-primary opacity-50 group-hover:scale-110 group-hover:rotate-12 transition-transform duration-500" strokeWidth={3} />
+                  </div>
+
+                  {/* Content */}
+                  <div className="relative z-10 w-2/3">
+                    <h3 className="text-2xl font-bold text-[var(--lib-text)] mb-1 flex items-center gap-1.5">
+                      {isUploading ? <Loader2 className="w-6 h-6 text-primary animate-spin" /> : <Plus className="w-6 h-6 text-primary" strokeWidth={3} />}
+                      {isUploading ? (libLang === "ar" ? "جاري الرفع..." : "Uploading...") : (libLang === "ar" ? "أضف كتاباً" : "Add a book")}
+                    </h3>
+                    <p className="text-sm font-medium text-[var(--lib-muted)]">
+                      {isUploading
+                        ? (libLang === "ar" ? "يرجى الانتظار..." : "Please wait, uploading PDF...")
+                        : (libLang === "ar" ? "ارفع PDF من جهازك" : "Upload a PDF from your device")}
+                    </p>
+                    {uploadSuccess && !isUploading && (
+                      <p className="mt-2 text-xs text-emerald-400/90 leading-snug">
+                        {libLang === "ar" ? "تم الرفع — اضغط «أضف إلى الرف» في قائمة الانتظار." : "PDF uploaded — tap Add to shelf in Read Later."}
+                      </p>
+                    )}
+                    {uploadError && !isUploading && (
+                      <p className="mt-2 text-xs text-red-400/90 leading-snug">
+                        {libLang === "ar" ? "فشل الرفع: " : "Upload failed: "}
+                        {uploadError}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Random Catalog Discovery */}
+            <div className="px-4 mt-8">
+              <h3 className="text-lg font-bold mb-3 flex items-center justify-between text-[var(--lib-text)]">
+                <span>{t.catalog}</span>
+              </h3>
+              <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-2">
+                {(catalogBooks.length > 0 ? catalogBooks : RANDOM_CATALOG).map((book) => (
+                  <div
+                    key={book.id}
+                    onClick={() => setSelectedPreviewBook(book as SearchResult)}
+                    className="shrink-0 w-[120px] cursor-pointer group"
+                  >
+                    <div className="aspect-[2/3] w-full bg-[var(--lib-input)] rounded-xl overflow-hidden shadow-md mb-2 relative group-hover:scale-105 transition-transform">
+                      <BookCover coverUrl={book.coverUrl} title={book.title} size="sm" />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <BookOpen className="w-8 h-8 text-[var(--lib-text)] drop-shadow-md" />
+                      </div>
+                    </div>
+                    <p className="font-bold text-xs line-clamp-2 leading-tight mb-0.5">{book.title}</p>
+                    <p className="text-[10px] text-[var(--lib-muted)] line-clamp-1">{book.author}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Library Stats / Widgets Grid */}
+            <div className="px-4 mt-6">
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                <div className="bg-[var(--lib-card)] border border-[var(--lib-border)] rounded-2xl p-4 flex flex-col justify-center items-center shadow-sm">
+                  <Flame className="w-6 h-6 text-orange-500 mb-2" />
+                  <p className="text-[10px] text-[var(--lib-muted)] text-center uppercase tracking-wider font-bold mb-1">Reading Streak</p>
+                  <p className="text-xl font-serif font-bold text-[var(--lib-text)]">{stats.streakDays} <span className="text-xs font-normal">days</span></p>
+                </div>
+                <div className="bg-[var(--lib-card)] border border-[var(--lib-border)] rounded-2xl p-4 flex flex-col justify-center items-center shadow-sm">
+                  <Calendar className="w-6 h-6 text-primary mb-2" />
+                  <p className="text-[10px] text-[var(--lib-muted)] text-center uppercase tracking-wider font-bold mb-1">Today's Read</p>
+                  <p className="text-xl font-serif font-bold text-[var(--lib-text)]">{stats.dailyMinutes} <span className="text-xs font-normal">min</span></p>
+                </div>
+                <div className="bg-[var(--lib-card)] border border-[var(--lib-border)] rounded-2xl p-4 flex flex-col justify-center items-center shadow-sm">
+                  <BookOpen className="w-6 h-6 text-blue-500 mb-2" />
+                  <p className="text-[10px] text-[var(--lib-muted)] text-center uppercase tracking-wider font-bold mb-1">Pages Read</p>
+                  <p className="text-xl font-serif font-bold text-[var(--lib-text)]">{stats.totalPagesRead} <span className="text-xs font-normal">pgs</span></p>
+                </div>
+                <div className="bg-[var(--lib-card)] border border-[var(--lib-border)] rounded-2xl p-4 flex flex-col justify-center items-center shadow-sm">
+                  <Clock className="w-6 h-6 text-purple-500 mb-2" />
+                  <p className="text-[10px] text-[var(--lib-muted)] text-center uppercase tracking-wider font-bold mb-1">Avg Speed</p>
+                  <p className="text-xl font-serif font-bold text-[var(--lib-text)]">{stats.avgTimePerPage} <span className="text-xs font-normal">m/pg</span></p>
+                </div>
+              </div>
+
+              <LibraryStatsGraph
+                key={`${stats.dailyMinutes}-${stats.totalPagesRead}-${stats.weeklyData.map((d) => d.pages).join(".")}`}
+                weeklyData={stats.weeklyData}
+                monthlyData={stats.monthlyData}
+              />
+            </div>
+
+            {/* Hero – Currently Reading */}
+            <AnimatePresence mode="wait">
+              {hero && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  transition={{ duration: 0.5, ease: "easeOut" }}
+                  className="px-4 pt-6 pb-2"
+                >
+                  <div
+                    className="relative w-full rounded-3xl overflow-hidden shadow-2xl cursor-pointer active:scale-[0.98] transition-transform group"
+                    style={{ minHeight: "260px" }}
+                    onClick={() => openBook(hero)}
+                  >
+                    {/* Blurred BG with Animated Glow */}
+                    <div className="absolute inset-0 bg-black">
+                      {hero.coverUrl ? (
+                        <img
+                          src={hero.coverUrl}
+                          className="w-full h-full object-cover blur-2xl scale-125 opacity-60 group-hover:scale-150 transition-transform duration-1000"
+                          alt=""
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-gradient-to-br from-primary/40 to-black" />
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-gray-950 via-gray-900/80 to-gray-900/20 mix-blend-multiply" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
+                    </div>
+
+                    {/* Top Right Delete Button */}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); deleteBook(hero.id); }}
+                      className="absolute top-4 right-4 w-9 h-9 bg-black/40 backdrop-blur-md rounded-full items-center justify-center flex z-20 hover:bg-red-500/80 transition-colors border border-white/20 shadow-lg"
+                      title="Remove from Shelf"
+                    >
+                      {deletingId === hero.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin text-white" />
+                      ) : (
+                        <Trash2 className="w-4 h-4 text-white" />
+                      )}
+                    </button>
+
+                    {/* Content */}
+                    <div className="relative z-10 flex gap-5 items-end p-5 pt-10 h-full">
+                      <motion.div
+                        whileHover={{ scale: 1.05, rotateY: 5 }}
+                        className="w-28 aspect-[2/3] rounded-xl overflow-hidden shadow-[0_20px_40px_rgba(0,0,0,0.6)] ring-1 ring-white/20 shrink-0 relative z-20"
+                        style={{ perspective: "1000px" }}
+                      >
+                        <BookCover coverUrl={hero.coverUrl} title={hero.title} />
+                      </motion.div>
+                      <div className="flex-1 pb-1 min-w-0">
+                        <p className="text-[10px] text-primary/90 font-bold mb-1.5 uppercase tracking-widest flex items-center gap-1.5">
+                          <Sparkles className="w-3 h-3" />
+                          {hero.status === "reading" ? "Continue Reading" : "Up Next"}
+                        </p>
+                        <h2 className="text-xl sm:text-2xl font-bold font-serif leading-tight mb-1 line-clamp-2 text-white drop-shadow-lg">{hero.title}</h2>
+                        <p className="text-white/80 text-sm line-clamp-1 mb-4 drop-shadow-md">{hero.author}</p>
+
+                        {hero.totalPages > 0 && (
+                          <div className="mb-4">
+                            <div className="w-full bg-white/20 rounded-full h-1.5 mb-2 overflow-hidden shadow-inner">
+                              <motion.div
+                                initial={{ width: 0 }}
+                                animate={{ width: `${Math.min(100, (hero.currentPage / hero.totalPages) * 100)}%` }}
+                                transition={{ duration: 1, ease: "easeOut" }}
+                                className="bg-primary h-full rounded-full relative"
+                              >
+                                <div className="absolute inset-0 bg-white/30 animate-pulse" />
+                              </motion.div>
+                            </div>
+                            <p className="text-[10px] font-medium text-white/60 uppercase tracking-wide">
+                              {hero.currentPage > 0
+                                ? `${Math.round((hero.currentPage / hero.totalPages) * 100)}% Completed`
+                                : `${hero.totalPages} Pages Total`}
+                            </p>
+                          </div>
+                        )}
+
+                        <div className="flex flex-wrap gap-2 items-center mt-1">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); openBook(hero); }}
+                            className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-2 px-5 rounded-full text-sm flex items-center gap-1.5 active:scale-95 transition-all shadow-lg shadow-primary/20"
+                          >
+                            <BookOpen className="w-4 h-4" />
+                            {hero.status === "reading" && hero.currentPage > 0 ? "Resume" : "Start"}
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setActiveNotesBook(hero); }}
+                            className="bg-white/10 backdrop-blur-md text-white border border-white/20 font-bold py-2 px-4 rounded-full text-sm flex items-center gap-1.5 active:scale-95 transition-all hover:bg-white/20"
+                          >
+                            <MessageSquare className="w-4 h-4" />
+                            Notes
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <div className="px-4 py-6 space-y-4">
+              {/* Wishlist / Read Later Widget */}
+              <div className="bg-[var(--lib-card)] border border-[var(--lib-border)] rounded-2xl p-4 flex flex-col shadow-sm">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-bold text-[var(--lib-text)] flex items-center gap-2">
+                    <Bookmark className="w-4 h-4 text-primary" /> Books to read later
+                  </h3>
+                </div>
+                {pendingUploads.length > 0 && (
+                  <div className="mb-3 space-y-2">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--lib-muted)]">Your files</p>
+                    {pendingUploads.map((p) => (
+                      <div key={p.id} className="flex items-center gap-2 bg-[var(--lib-input)] rounded-xl p-2 border border-[var(--lib-border)]">
+                        <Book className="w-4 h-4 text-primary shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-bold truncate">{p.title}</p>
+                          <p className="text-[10px] text-[var(--lib-muted)] truncate">{p.fileName}</p>
+                        </div>
+                        <button
+                          onClick={() => addPendingToShelf(p, "reading")}
+                          className="shrink-0 text-[10px] font-bold bg-primary text-primary-foreground px-2.5 py-1.5 rounded-full"
+                        >
+                          Add to shelf
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {books.filter(b => b.status === "wishlist").length > 0 ? (
+                  <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2">
+                    {books.filter(b => b.status === "wishlist").map(b => (
+                      <div key={b.id} onClick={() => openBook(b)} className="w-16 shrink-0 aspect-[2/3] rounded-lg overflow-hidden border border-[var(--lib-border)] cursor-pointer hover:scale-105 transition-transform">
+                        <BookCover coverUrl={b.coverUrl} title={b.title} size="sm" />
+                      </div>
+                    ))}
+                  </div>
+                ) : pendingUploads.length === 0 ? (
+                  <div className="flex gap-2">
+                    {[1, 2, 3, 4].map(i => (
+                      <div
+                        key={i}
+                        onClick={() => { if (!isUploading) fileInputRef.current?.click(); }}
+                        className="w-12 h-12 shrink-0 rounded-full bg-[var(--lib-input)] border border-[var(--lib-border)] flex items-center justify-center text-[var(--lib-muted)] cursor-pointer hover:bg-[var(--lib-btn-hover)] transition-colors"
+                      >
+                        <Plus className="w-5 h-5" />
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+
+              {/* Collection Tabs */}
+              <div className="bg-[var(--lib-card)] border border-[var(--lib-border)] rounded-2xl p-4 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-bold text-[var(--lib-text)] flex items-center gap-2">
+                    <BookMarked className="w-4 h-4 text-primary" /> Collections
+                  </h3>
+                </div>
+                <div className="flex gap-2 mb-4 bg-[var(--lib-input)] p-1 rounded-2xl border border-[var(--lib-border)] overflow-x-auto scrollbar-hide">
+                  <button
+                    onClick={() => setActiveTab("myShelf")}
+                    className={`shrink-0 min-w-[80px] py-2 px-3 text-xs font-bold rounded-xl transition-all ${activeTab === "myShelf" ? "bg-[var(--lib-card)] text-[var(--lib-text)] shadow-sm" : "text-[var(--lib-muted)] hover:text-[var(--lib-text)]"}`}
+                  >
+                    My Shelf
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("partnerShelf")}
+                    className={`shrink-0 min-w-[80px] py-2 px-3 text-xs font-bold rounded-xl transition-all ${activeTab === "partnerShelf" ? "bg-[var(--lib-card)] text-[var(--lib-text)] shadow-sm" : "text-[var(--lib-muted)] hover:text-[var(--lib-text)]"}`}
+                  >
+                    {partnerDisplayName}
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("favorites")}
+                    className={`shrink-0 min-w-[80px] py-2 px-3 text-xs font-bold rounded-xl transition-all ${activeTab === "favorites" ? "bg-[var(--lib-card)] text-[var(--lib-text)] shadow-sm" : "text-[var(--lib-muted)] hover:text-[var(--lib-text)]"}`}
+                  >
+                    Favorites
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("finished")}
+                    className={`shrink-0 min-w-[80px] py-2 px-3 text-xs font-bold rounded-xl transition-all ${activeTab === "finished" ? "bg-[var(--lib-card)] text-[var(--lib-text)] shadow-sm" : "text-[var(--lib-muted)] hover:text-[var(--lib-text)]"}`}
+                  >
+                    Finished
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("paused")}
+                    className={`shrink-0 min-w-[80px] py-2 px-3 text-xs font-bold rounded-xl transition-all ${activeTab === "paused" ? "bg-[var(--lib-card)] text-[var(--lib-text)] shadow-sm" : "text-[var(--lib-muted)] hover:text-[var(--lib-text)]"}`}
+                  >
+                    Paused
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("gaveUp")}
+                    className={`shrink-0 min-w-[80px] py-2 px-3 text-xs font-bold rounded-xl transition-all ${activeTab === "gaveUp" ? "bg-[var(--lib-card)] text-[var(--lib-text)] shadow-sm" : "text-[var(--lib-muted)] hover:text-[var(--lib-text)]"}`}
+                  >
+                    Gave Up
+                  </button>
+                </div>
+
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={activeTab}
+                    initial={{ opacity: 0, x: 10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -10 }}
+                    transition={{ duration: 0.15 }}
+                  >
+                    {activeTab === "myShelf" && (
+                      <ShelfRow
+                        title=""
+                        books={myShelf}
+                        emptyMsg="Your shelf is empty."
+                        onOpen={openBook}
+                        onDelete={deleteBook}
+                        deletingId={deletingId}
+                        onStatusChangeMenu={(e, bookId) => {
+                          e.preventDefault();
+                          setStatusMenu({ bookId, x: e.clientX, y: e.clientY });
+                        }}
+                        updatingStatus={updatingStatus}
+                        isLoading={loading}
+                      />
+                    )}
+                    {activeTab === "partnerShelf" && (
+                      <ShelfRow
+                        title=""
+                        books={partnerShelf}
+                        emptyMsg={`${partnerDisplayName}'s shelf is empty.`}
+                        onOpen={openBook}
+                        onDelete={deleteBook}
+                        deletingId={deletingId}
+                        onStatusChangeMenu={(e, bookId) => {
+                          e.preventDefault();
+                          setStatusMenu({ bookId, x: e.clientX, y: e.clientY });
+                        }}
+                        updatingStatus={updatingStatus}
+                        isLoading={loading}
+                      />
+                    )}
+                    {activeTab === "finished" && (
+                      <ShelfRow
+                        title=""
+                        books={finishedBooks}
+                        emptyMsg="No finished books yet."
+                        onOpen={openBook}
+                        onDelete={deleteBook}
+                        deletingId={deletingId}
+                        grayscale
+                        onStatusChangeMenu={(e, bookId) => {
+                          e.preventDefault();
+                          setStatusMenu({ bookId, x: e.clientX, y: e.clientY });
+                        }}
+                        updatingStatus={updatingStatus}
+                        isLoading={loading}
+                      />
+                    )}
+                    {activeTab === "favorites" && (
+                      <ShelfRow
+                        title=""
+                        books={books.filter(b => b.isFavorite)}
+                        emptyMsg="No favorites yet."
+                        onOpen={openBook}
+                        onDelete={deleteBook}
+                        deletingId={deletingId}
+                        onStatusChangeMenu={(e, bookId) => {
+                          e.preventDefault();
+                          setStatusMenu({ bookId, x: e.clientX, y: e.clientY });
+                        }}
+                        updatingStatus={updatingStatus}
+                        isLoading={loading}
+                      />
+                    )}
+                    {activeTab === "paused" && (
+                      <ShelfRow
+                        title=""
+                        books={books.filter(b => b.status === "paused")}
+                        emptyMsg="No paused books."
+                        onOpen={openBook}
+                        onDelete={deleteBook}
+                        deletingId={deletingId}
+                        onStatusChangeMenu={(e, bookId) => {
+                          e.preventDefault();
+                          setStatusMenu({ bookId, x: e.clientX, y: e.clientY });
+                        }}
+                        updatingStatus={updatingStatus}
+                        isLoading={loading}
+                      />
+                    )}
+                    {activeTab === "gaveUp" && (
+                      <ShelfRow
+                        title=""
+                        books={books.filter(b => b.status === "gave_up")}
+                        emptyMsg="No given up books."
+                        onOpen={openBook}
+                        onDelete={deleteBook}
+                        deletingId={deletingId}
+                        grayscale
+                        onStatusChangeMenu={(e, bookId) => {
+                          e.preventDefault();
+                          setStatusMenu({ bookId, x: e.clientX, y: e.clientY });
+                        }}
+                        updatingStatus={updatingStatus}
+                        isLoading={loading}
+                      />
+                    )}
+                  </motion.div>
+                </AnimatePresence>
+              </div>
+
+              {/* Empty state fallback */}
+              {books.length === 0 && !loading && (
+                <div className="flex flex-col items-center py-8 text-center text-[var(--lib-muted)]">
+                  <BookMarked className="w-12 h-12 mb-4 opacity-30" />
+                  <p className="text-sm font-bold text-[var(--lib-text)]">Your library is empty</p>
+                  <p className="text-xs mt-1">Search hundreds of thousands of PDF books above and add them to your shelf.</p>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* ── Memorize View ── */}
+        {!searchQuery && libraryTab === "memorize" && (
+          <div className="min-h-[80vh] flex flex-col bg-blue-600/10">
+            <div className="bg-primary px-6 py-12 pb-24 text-primary-foreground rounded-b-[3rem] shadow-xl">
+              <h2 className="text-4xl font-black mb-3">Memorize</h2>
+              <p className="text-sm font-medium opacity-90 max-w-[80%] leading-relaxed">
+                After reading books, write down some notes you want to remember.
+                <br /> If you don't have a book yet, how about adding it first?
+              </p>
+            </div>
+            <div className="px-4 -mt-16 pb-12 space-y-4">
+              {allNotes.length === 0 ? (
+                <div className="bg-[var(--lib-card)] border border-[var(--lib-border)] rounded-3xl p-8 flex flex-col items-center justify-center text-center shadow-xl">
+                  <div className="w-32 h-32 bg-primary/10 rounded-full flex items-center justify-center mb-6">
+                    <Lightbulb className="w-16 h-16 text-primary opacity-50" />
+                  </div>
+                  <p className="text-[var(--lib-muted)] font-medium">There are no reading notes yet.</p>
+                </div>
+              ) : (
+                allNotes.map((note) => (
+                  <div key={note.id} className="bg-[var(--lib-card)] border border-[var(--lib-border)] rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow">
+                    <div className="flex items-start gap-3">
+                      <div className="bg-primary/10 p-2 rounded-xl shrink-0">
+                        <MessageSquare className="w-5 h-5 text-primary" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-[10px] text-[var(--lib-muted)] font-bold uppercase tracking-wider mb-1 flex items-center justify-between">
+                          <span
+                            className="line-clamp-1 flex-1 mr-2 cursor-pointer hover:text-primary transition-colors"
+                            onClick={() => setLocation(`/read/${note.bookId}?location=${encodeURIComponent(note.chapterOrPage || "")}`)}
+                          >
+                            {note.bookTitle || "Unknown Book"}
+                          </span>
+                          <span className="shrink-0">{new Date(note.timestamp).toLocaleDateString()}</span>
+                        </p>
+                        <p className="text-sm text-[var(--lib-text)] leading-relaxed">{note.text}</p>
+                        {note.chapterOrPage && (
+                          <p className="text-xs text-[var(--lib-muted)] mt-2 font-mono bg-[var(--lib-input)] inline-block px-2 py-0.5 rounded-md border border-[var(--lib-border)]">
+                            {note.chapterOrPage}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── Achievements View ── */}
+        {!searchQuery && libraryTab === "achievements" && (
+          <div className="min-h-[80vh] flex flex-col">
+            <div className="bg-[var(--lib-card)] border-b border-[var(--lib-border)] px-6 py-12 pb-24 text-[var(--lib-text)] rounded-b-[3rem] shadow-sm">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-4xl font-black">Achievement</h2>
+                <button className="p-2 bg-[var(--lib-input)] rounded-full hover:bg-[var(--lib-btn-hover)] transition-colors text-[var(--lib-text)]"><Settings className="w-5 h-5" /></button>
+              </div>
+              <p className="text-sm font-medium text-[var(--lib-muted)] max-w-[80%] leading-relaxed">
+                Books which you read are registered in achievement.
+              </p>
+            </div>
+            <div className="px-4 -mt-16 pb-12">
+              <div className="bg-[var(--lib-card)] border border-[var(--lib-border)] rounded-3xl p-6 shadow-xl min-h-[400px] relative overflow-hidden">
+                <h3 className="text-lg font-bold text-[var(--lib-text)] mb-6 flex items-center gap-2 relative z-10">
+                  <Sparkles className="w-5 h-5 text-yellow-500" /> Your Badges
+                </h3>
+
+                <div className="relative z-10">
+                  <LibraryAchievements stats={stats} books={books} />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Library Bottom Navigation ── */}
+        <div className="fixed bottom-0 left-0 right-0 bg-[var(--lib-header)] border-t border-[var(--lib-border)] backdrop-blur-xl z-40 pb-[env(safe-area-inset-bottom)] px-6">
+          <div className="flex justify-between items-center py-3 max-w-sm mx-auto">
+            <button
+              onClick={() => setLibraryTab("dashboard")}
+              className={`flex flex-col items-center gap-1 transition-all ${libraryTab === "dashboard" ? "text-primary scale-110" : "text-[var(--lib-muted)] hover:text-[var(--lib-text)]"}`}
+            >
+              <div className={`p-2 rounded-full ${libraryTab === "dashboard" ? "bg-primary text-primary-foreground" : ""}`}>
+                <BookOpen className="w-6 h-6" />
+              </div>
+            </button>
+            <button
+              onClick={() => setLibraryTab("memorize")}
+              className={`flex flex-col items-center gap-1 transition-all ${libraryTab === "memorize" ? "text-primary scale-110" : "text-[var(--lib-muted)] hover:text-[var(--lib-text)]"}`}
+            >
+              <div className={`p-2 rounded-full ${libraryTab === "memorize" ? "bg-primary text-primary-foreground" : ""}`}>
+                <Lightbulb className="w-6 h-6" />
+              </div>
+            </button>
+            <button
+              onClick={() => setLibraryTab("achievements")}
+              className={`flex flex-col items-center gap-1 transition-all ${libraryTab === "achievements" ? "text-primary scale-110" : "text-[var(--lib-muted)] hover:text-[var(--lib-text)]"}`}
+            >
+              <div className={`p-2 rounded-full ${libraryTab === "achievements" ? "bg-primary text-primary-foreground" : ""}`}>
+                <Medal className="w-6 h-6" />
+              </div>
+            </button>
+            <button
+              onClick={() => setLocation("/")}
+              className="flex flex-col items-center gap-1 text-[var(--lib-muted)] hover:text-[var(--lib-text)] transition-all"
+            >
+              <div className="p-2 rounded-full">
+                <User className="w-6 h-6" />
+              </div>
+            </button>
           </div>
         </div>
-      )}
 
-      {/* ── Main Dashboard ── */}
-      {!searchQuery && libraryTab === "dashboard" && (
-        <>
-          {/* Add a Book Banner */}
-          {!isSearchFocused && (
-            <div className="px-4 mt-6">
-              <div 
-                onClick={() => { if (!isUploading) fileInputRef.current?.click(); }}
-                className={`relative overflow-hidden rounded-3xl p-6 group active:scale-[0.98] transition-transform shadow-sm border border-[var(--lib-border)] bg-[var(--lib-card)] ${
-                  isUploading ? "opacity-70 pointer-events-none cursor-wait" : "cursor-pointer"
-                }`}
-              >
-                {/* Background Shapes */}
-                <div className="absolute top-0 right-0 w-full h-full pointer-events-none overflow-hidden rounded-3xl opacity-30">
-                  {/* corner blobs */}
-                  <div className="absolute -top-12 -right-12 w-32 h-32 bg-primary rounded-full blur-xl" />
-                  <div className="absolute -bottom-16 -right-16 w-48 h-48 bg-primary rounded-full blur-xl" />
-                  
-                  {/* Plus marks */}
-                  <Plus className="absolute top-8 right-12 w-6 h-6 text-primary opacity-40 rotate-12" strokeWidth={4} />
-                  <Plus className="absolute bottom-12 left-1/2 w-10 h-10 text-primary opacity-40 rotate-45" strokeWidth={4} />
-                  <Plus className="absolute top-1/2 right-1/4 w-8 h-8 text-primary opacity-40 -rotate-12" strokeWidth={4} />
-                  
-                  {/* Big Plus Mark */}
-                  <Plus className="absolute -bottom-8 -right-8 w-40 h-40 text-primary opacity-50 group-hover:scale-110 group-hover:rotate-12 transition-transform duration-500" strokeWidth={3} />
-                </div>
-
-                {/* Content */}
-                <div className="relative z-10 w-2/3">
-                  <h3 className="text-2xl font-bold text-[var(--lib-text)] mb-1 flex items-center gap-1.5">
-                    {isUploading ? <Loader2 className="w-6 h-6 text-primary animate-spin" /> : <Plus className="w-6 h-6 text-primary" strokeWidth={3} />} 
-                    {isUploading ? (libLang === "ar" ? "جاري الرفع..." : "Uploading...") : (libLang === "ar" ? "أضف كتاباً" : "Add a book")}
-                  </h3>
-                  <p className="text-sm font-medium text-[var(--lib-muted)]">
-                    {isUploading
-                      ? (libLang === "ar" ? "يرجى الانتظار..." : "Please wait, uploading PDF...")
-                      : (libLang === "ar" ? "ارفع PDF من جهازك" : "Upload a PDF from your device")}
-                  </p>
-                  {uploadSuccess && !isUploading && (
-                    <p className="mt-2 text-xs text-emerald-400/90 leading-snug">
-                      {libLang === "ar" ? "تم الرفع — اضغط «أضف إلى الرف» في قائمة الانتظار." : "PDF uploaded — tap Add to shelf in Read Later."}
-                    </p>
-                  )}
-                  {uploadError && !isUploading && (
-                    <p className="mt-2 text-xs text-red-400/90 leading-snug">
-                      {libLang === "ar" ? "فشل الرفع: " : "Upload failed: "}
-                      {uploadError}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Random Catalog Discovery */}
-          <div className="px-4 mt-8">
-            <h3 className="text-lg font-bold mb-3 flex items-center justify-between text-[var(--lib-text)]">
-              <span>{t.catalog}</span>
-            </h3>
-            <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-2">
-              {(catalogBooks.length > 0 ? catalogBooks : RANDOM_CATALOG).map((book) => (
-                <div
-                  key={book.id}
-                  onClick={() => setSelectedPreviewBook(book as SearchResult)}
-                  className="shrink-0 w-[120px] cursor-pointer group"
-                >
-                  <div className="aspect-[2/3] w-full bg-[var(--lib-input)] rounded-xl overflow-hidden shadow-md mb-2 relative group-hover:scale-105 transition-transform">
-                    <BookCover coverUrl={book.coverUrl} title={book.title} size="sm" />
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <BookOpen className="w-8 h-8 text-[var(--lib-text)] drop-shadow-md" />
-                    </div>
-                  </div>
-                  <p className="font-bold text-xs line-clamp-2 leading-tight mb-0.5">{book.title}</p>
-                  <p className="text-[10px] text-[var(--lib-muted)] line-clamp-1">{book.author}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Library Stats / Widgets Grid */}
-          <div className="px-4 mt-6">
-            <div className="grid grid-cols-2 gap-3 mb-3">
-              <div className="bg-[var(--lib-card)] border border-[var(--lib-border)] rounded-2xl p-4 flex flex-col justify-center items-center shadow-sm">
-                <Flame className="w-6 h-6 text-orange-500 mb-2" />
-                <p className="text-[10px] text-[var(--lib-muted)] text-center uppercase tracking-wider font-bold mb-1">Reading Streak</p>
-                <p className="text-xl font-serif font-bold text-[var(--lib-text)]">{stats.streakDays} <span className="text-xs font-normal">days</span></p>
-              </div>
-              <div className="bg-[var(--lib-card)] border border-[var(--lib-border)] rounded-2xl p-4 flex flex-col justify-center items-center shadow-sm">
-                <Calendar className="w-6 h-6 text-primary mb-2" />
-                <p className="text-[10px] text-[var(--lib-muted)] text-center uppercase tracking-wider font-bold mb-1">Today's Read</p>
-                <p className="text-xl font-serif font-bold text-[var(--lib-text)]">{stats.dailyMinutes} <span className="text-xs font-normal">min</span></p>
-              </div>
-              <div className="bg-[var(--lib-card)] border border-[var(--lib-border)] rounded-2xl p-4 flex flex-col justify-center items-center shadow-sm">
-                <BookOpen className="w-6 h-6 text-blue-500 mb-2" />
-                <p className="text-[10px] text-[var(--lib-muted)] text-center uppercase tracking-wider font-bold mb-1">Pages Read</p>
-                <p className="text-xl font-serif font-bold text-[var(--lib-text)]">{stats.totalPagesRead} <span className="text-xs font-normal">pgs</span></p>
-              </div>
-              <div className="bg-[var(--lib-card)] border border-[var(--lib-border)] rounded-2xl p-4 flex flex-col justify-center items-center shadow-sm">
-                <Clock className="w-6 h-6 text-purple-500 mb-2" />
-                <p className="text-[10px] text-[var(--lib-muted)] text-center uppercase tracking-wider font-bold mb-1">Avg Speed</p>
-                <p className="text-xl font-serif font-bold text-[var(--lib-text)]">{stats.avgTimePerPage} <span className="text-xs font-normal">m/pg</span></p>
-              </div>
-            </div>
-            
-            <LibraryStatsGraph
-              key={`${stats.dailyMinutes}-${stats.totalPagesRead}-${stats.weeklyData.map((d) => d.minutes).join(".")}`}
-              weeklyData={stats.weeklyData}
-              monthlyData={stats.monthlyData}
-            />
-          </div>
-
-          {/* Hero – Currently Reading */}
-          <AnimatePresence mode="wait">
-          {hero && (
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+        {/* ── Status Menu Modal ── */}
+        <AnimatePresence>
+          {statusMenu && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: -10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              transition={{ duration: 0.5, ease: "easeOut" }}
-              className="px-4 pt-6 pb-2"
+              exit={{ opacity: 0, scale: 0.9, y: -10 }}
+              transition={{ duration: 0.15 }}
+              className="fixed z-50 bg-[var(--lib-bg)]/90 backdrop-blur-md border border-[var(--lib-border)] rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+              style={{
+                top: Math.min(statusMenu.y, window.innerHeight - 150),
+                left: Math.min(statusMenu.x, window.innerWidth - 180),
+                width: "160px"
+              }}
+              onClick={(e) => e.stopPropagation()}
             >
-              <div
-                className="relative w-full rounded-3xl overflow-hidden shadow-2xl cursor-pointer active:scale-[0.98] transition-transform group"
-                style={{ minHeight: "260px" }}
-                onClick={() => openBook(hero)}
+              <button
+                onClick={() => changeStatus(statusMenu.bookId, { status: "reading" })}
+                className="px-4 py-3 text-left text-sm font-bold text-[var(--lib-text)] hover:bg-[var(--lib-input)] active:bg-white/20 transition-colors border-b border-[var(--lib-border)]"
               >
-                {/* Blurred BG with Animated Glow */}
-                <div className="absolute inset-0 bg-black">
-                  {hero.coverUrl ? (
-                    <img
-                      src={hero.coverUrl}
-                      className="w-full h-full object-cover blur-2xl scale-125 opacity-60 group-hover:scale-150 transition-transform duration-1000"
-                      alt=""
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-primary/40 to-black" />
-                  )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-gray-950 via-gray-900/80 to-gray-900/20 mix-blend-multiply" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
-                </div>
-                
-                {/* Top Right Delete Button */}
-                <button
-                  onClick={(e) => { e.stopPropagation(); deleteBook(hero.id); }}
-                  className="absolute top-4 right-4 w-9 h-9 bg-black/40 backdrop-blur-md rounded-full items-center justify-center flex z-20 hover:bg-red-500/80 transition-colors border border-white/20 shadow-lg"
-                  title="Remove from Shelf"
-                >
-                  {deletingId === hero.id ? (
-                    <Loader2 className="w-4 h-4 animate-spin text-white" />
-                  ) : (
-                    <Trash2 className="w-4 h-4 text-white" />
-                  )}
-                </button>
-
-                {/* Content */}
-                <div className="relative z-10 flex gap-5 items-end p-5 pt-10 h-full">
-                  <motion.div 
-                    whileHover={{ scale: 1.05, rotateY: 5 }}
-                    className="w-28 aspect-[2/3] rounded-xl overflow-hidden shadow-[0_20px_40px_rgba(0,0,0,0.6)] ring-1 ring-white/20 shrink-0 relative z-20"
-                    style={{ perspective: "1000px" }}
-                  >
-                    <BookCover coverUrl={hero.coverUrl} title={hero.title} />
-                  </motion.div>
-                  <div className="flex-1 pb-1 min-w-0">
-                    <p className="text-[10px] text-primary/90 font-bold mb-1.5 uppercase tracking-widest flex items-center gap-1.5">
-                      <Sparkles className="w-3 h-3" />
-                      {hero.status === "reading" ? "Continue Reading" : "Up Next"}
-                    </p>
-                    <h2 className="text-xl sm:text-2xl font-bold font-serif leading-tight mb-1 line-clamp-2 text-white drop-shadow-lg">{hero.title}</h2>
-                    <p className="text-white/80 text-sm line-clamp-1 mb-4 drop-shadow-md">{hero.author}</p>
-
-                    {hero.totalPages > 0 && (
-                      <div className="mb-4">
-                        <div className="w-full bg-white/20 rounded-full h-1.5 mb-2 overflow-hidden shadow-inner">
-                          <motion.div
-                            initial={{ width: 0 }}
-                            animate={{ width: `${Math.min(100, (hero.currentPage / hero.totalPages) * 100)}%` }}
-                            transition={{ duration: 1, ease: "easeOut" }}
-                            className="bg-primary h-full rounded-full relative"
-                          >
-                            <div className="absolute inset-0 bg-white/30 animate-pulse" />
-                          </motion.div>
-                        </div>
-                        <p className="text-[10px] font-medium text-white/60 uppercase tracking-wide">
-                          {hero.currentPage > 0
-                            ? `${Math.round((hero.currentPage / hero.totalPages) * 100)}% Completed`
-                            : `${hero.totalPages} Pages Total`}
-                        </p>
-                      </div>
-                    )}
-
-                    <div className="flex flex-wrap gap-2 items-center mt-1">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); openBook(hero); }}
-                        className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-2 px-5 rounded-full text-sm flex items-center gap-1.5 active:scale-95 transition-all shadow-lg shadow-primary/20"
-                      >
-                        <BookOpen className="w-4 h-4" />
-                        {hero.status === "reading" && hero.currentPage > 0 ? "Resume" : "Start"}
-                      </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setActiveNotesBook(hero); }}
-                        className="bg-white/10 backdrop-blur-md text-white border border-white/20 font-bold py-2 px-4 rounded-full text-sm flex items-center gap-1.5 active:scale-95 transition-all hover:bg-white/20"
-                      >
-                        <MessageSquare className="w-4 h-4" />
-                        Notes
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
+                Reading
+              </button>
+              <button
+                onClick={() => changeStatus(statusMenu.bookId, { status: "wishlist" })}
+                className="px-4 py-3 text-left text-sm font-bold text-[var(--lib-text)] hover:bg-[var(--lib-input)] active:bg-white/20 transition-colors border-b border-[var(--lib-border)]"
+              >
+                Read Later
+              </button>
+              <button
+                onClick={() => changeStatus(statusMenu.bookId, { status: "paused" })}
+                className="px-4 py-3 text-left text-sm font-bold text-[var(--lib-text)] hover:bg-[var(--lib-input)] active:bg-white/20 transition-colors border-b border-[var(--lib-border)]"
+              >
+                Paused
+              </button>
+              <button
+                onClick={() => changeStatus(statusMenu.bookId, { status: "gave_up" })}
+                className="px-4 py-3 text-left text-sm font-bold text-red-400 hover:bg-[var(--lib-input)] active:bg-white/20 transition-colors border-b border-[var(--lib-border)]"
+              >
+                Give Up
+              </button>
+              <button
+                onClick={() => changeStatus(statusMenu.bookId, { status: "finished" })}
+                className="px-4 py-3 text-left text-sm font-bold text-green-400 hover:bg-[var(--lib-input)] active:bg-white/20 transition-colors border-b border-[var(--lib-border)]"
+              >
+                Finished ✓
+              </button>
+              <button
+                onClick={() => {
+                  const b = books.find(b => b.id === statusMenu.bookId);
+                  if (b) {
+                    changeStatus(statusMenu.bookId, { favorite: !b.isFavorite });
+                  }
+                }}
+                className="px-4 py-3 text-left text-sm font-bold text-pink-400 hover:bg-[var(--lib-input)] active:bg-white/20 transition-colors border-b border-[var(--lib-border)]"
+              >
+                {books.find(b => b.id === statusMenu.bookId)?.isFavorite ? "Unfavorite" : "Favorite ♥"}
+              </button>
+              <button
+                onClick={() => {
+                  const b = books.find(b => b.id === statusMenu.bookId);
+                  if (b) setActiveNotesBook(b);
+                  setStatusMenu(null);
+                }}
+                className="px-4 py-3 text-left text-sm font-bold text-primary hover:bg-[var(--lib-input)] active:bg-white/20 transition-colors flex items-center gap-2"
+              >
+                <MessageSquare className="w-4 h-4" />
+                Reading Notes
+              </button>
             </motion.div>
           )}
-          </AnimatePresence>
+        </AnimatePresence>
 
-          <div className="px-4 py-6 space-y-4">
-            {/* Wishlist / Read Later Widget */}
-            <div className="bg-[var(--lib-card)] border border-[var(--lib-border)] rounded-2xl p-4 flex flex-col shadow-sm">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-bold text-[var(--lib-text)] flex items-center gap-2">
-                  <Bookmark className="w-4 h-4 text-primary" /> Books to read later
-                </h3>
-              </div>
-              {pendingUploads.length > 0 && (
-                <div className="mb-3 space-y-2">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--lib-muted)]">Your files</p>
-                  {pendingUploads.map((p) => (
-                    <div key={p.id} className="flex items-center gap-2 bg-[var(--lib-input)] rounded-xl p-2 border border-[var(--lib-border)]">
-                      <Book className="w-4 h-4 text-primary shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-bold truncate">{p.title}</p>
-                        <p className="text-[10px] text-[var(--lib-muted)] truncate">{p.fileName}</p>
-                      </div>
+        {/* ── Notes Modal ── */}
+        {activeNotesBook && (
+          <NotesModal
+            book={activeNotesBook}
+            onClose={() => setActiveNotesBook(null)}
+            myId={myId}
+            partnerName={partnerDisplayName}
+          />
+        )}
+
+        {/* ── In-App Browser Modal ── */}
+        {inAppBrowserUrl && (
+          <InAppBrowser
+            url={inAppBrowserUrl}
+            onClose={() => setInAppBrowserUrl(null)}
+          />
+        )}
+
+        {/* ── Settings Modal ── */}
+        <AnimatePresence>
+          {showSettings && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[110] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+            >
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0, y: 20 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.95, opacity: 0, y: 20 }}
+                transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                className="bg-[var(--lib-bg)] border border-[var(--lib-border)] rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden"
+              >
+                <div className="flex items-center justify-between p-5 border-b border-[var(--lib-border)]">
+                  <h2 className="text-xl font-bold font-serif text-[var(--lib-text)]">Library Settings</h2>
+                  <button onClick={() => setShowSettings(false)} className="p-1 hover:bg-[var(--lib-input)] rounded-full text-[var(--lib-text)] active:scale-90 transition-transform">
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
+
+                <div className="p-5 space-y-6">
+                  {/* Theme Settings */}
+                  <div>
+                    <p className="text-sm font-bold text-[var(--lib-muted)] mb-3 uppercase tracking-wider">Theme</p>
+                    <div className="flex gap-3">
+                      {(["dark", "light", "sepia"] as const).map(th => (
+                        <button
+                          key={th}
+                          onClick={() => setLibTheme(th)}
+                          className={`flex-1 py-2 rounded-xl font-bold text-xs uppercase border-2 transition-all ${libTheme === th ? "border-primary text-primary bg-primary/10 shadow-[0_0_15px_rgba(var(--primary),0.2)]" : "border-[var(--lib-border)] text-[var(--lib-muted)] hover:border-white/30"
+                            }`}
+                        >
+                          {th}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Language Settings */}
+                  <div>
+                    <p className="text-sm font-bold text-[var(--lib-muted)] mb-3 uppercase tracking-wider">Language</p>
+                    <div className="flex gap-3">
                       <button
-                        onClick={() => addPendingToShelf(p, "reading")}
-                        className="shrink-0 text-[10px] font-bold bg-primary text-primary-foreground px-2.5 py-1.5 rounded-full"
+                        onClick={() => setLibLang("en")}
+                        className={`flex-1 py-2 rounded-xl font-bold text-xs border-2 transition-all ${libLang === "en" ? "border-primary text-primary bg-primary/10 shadow-[0_0_15px_rgba(var(--primary),0.2)]" : "border-[var(--lib-border)] text-[var(--lib-muted)] hover:border-white/30"
+                          }`}
                       >
-                        Add to shelf
+                        English
+                      </button>
+                      <button
+                        onClick={() => setLibLang("ar")}
+                        className={`flex-1 py-2 rounded-xl font-bold text-xs border-2 transition-all ${libLang === "ar" ? "border-primary text-primary bg-primary/10 shadow-[0_0_15px_rgba(var(--primary),0.2)]" : "border-[var(--lib-border)] text-[var(--lib-muted)] hover:border-white/30"
+                          }`}
+                      >
+                        العربية
                       </button>
                     </div>
-                  ))}
-                </div>
-              )}
-              {books.filter(b => b.status === "wishlist").length > 0 ? (
-                <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2">
-                  {books.filter(b => b.status === "wishlist").map(b => (
-                    <div key={b.id} onClick={() => openBook(b)} className="w-16 shrink-0 aspect-[2/3] rounded-lg overflow-hidden border border-[var(--lib-border)] cursor-pointer hover:scale-105 transition-transform">
-                      <BookCover coverUrl={b.coverUrl} title={b.title} size="sm" />
-                    </div>
-                  ))}
-                </div>
-              ) : pendingUploads.length === 0 ? (
-                <div className="flex gap-2">
-                  {[1,2,3,4].map(i => (
-                    <div
-                      key={i}
-                      onClick={() => { if (!isUploading) fileInputRef.current?.click(); }}
-                      className="w-12 h-12 shrink-0 rounded-full bg-[var(--lib-input)] border border-[var(--lib-border)] flex items-center justify-center text-[var(--lib-muted)] cursor-pointer hover:bg-[var(--lib-btn-hover)] transition-colors"
-                    >
-                      <Plus className="w-5 h-5" />
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-            </div>
+                  </div>
 
-            {/* Collection Tabs */}
-            <div className="bg-[var(--lib-card)] border border-[var(--lib-border)] rounded-2xl p-4 shadow-sm">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-bold text-[var(--lib-text)] flex items-center gap-2">
-                  <BookMarked className="w-4 h-4 text-primary" /> Collections
-                </h3>
-              </div>
-              <div className="flex gap-2 mb-4 bg-[var(--lib-input)] p-1 rounded-2xl border border-[var(--lib-border)] overflow-x-auto scrollbar-hide">
-                <button
-                  onClick={() => setActiveTab("myShelf")}
-                  className={`shrink-0 min-w-[80px] py-2 px-3 text-xs font-bold rounded-xl transition-all ${activeTab === "myShelf" ? "bg-[var(--lib-card)] text-[var(--lib-text)] shadow-sm" : "text-[var(--lib-muted)] hover:text-[var(--lib-text)]"}`}
-                >
-                  My Shelf
-                </button>
-                <button
-                  onClick={() => setActiveTab("partnerShelf")}
-                  className={`shrink-0 min-w-[80px] py-2 px-3 text-xs font-bold rounded-xl transition-all ${activeTab === "partnerShelf" ? "bg-[var(--lib-card)] text-[var(--lib-text)] shadow-sm" : "text-[var(--lib-muted)] hover:text-[var(--lib-text)]"}`}
-                >
-                  {partnerDisplayName}
-                </button>
-                <button
-                  onClick={() => setActiveTab("favorites")}
-                  className={`shrink-0 min-w-[80px] py-2 px-3 text-xs font-bold rounded-xl transition-all ${activeTab === "favorites" ? "bg-[var(--lib-card)] text-[var(--lib-text)] shadow-sm" : "text-[var(--lib-muted)] hover:text-[var(--lib-text)]"}`}
-                >
-                  Favorites
-                </button>
-                <button
-                  onClick={() => setActiveTab("finished")}
-                  className={`shrink-0 min-w-[80px] py-2 px-3 text-xs font-bold rounded-xl transition-all ${activeTab === "finished" ? "bg-[var(--lib-card)] text-[var(--lib-text)] shadow-sm" : "text-[var(--lib-muted)] hover:text-[var(--lib-text)]"}`}
-                >
-                  Finished
-                </button>
-                <button
-                  onClick={() => setActiveTab("paused")}
-                  className={`shrink-0 min-w-[80px] py-2 px-3 text-xs font-bold rounded-xl transition-all ${activeTab === "paused" ? "bg-[var(--lib-card)] text-[var(--lib-text)] shadow-sm" : "text-[var(--lib-muted)] hover:text-[var(--lib-text)]"}`}
-                >
-                  Paused
-                </button>
-                <button
-                  onClick={() => setActiveTab("gaveUp")}
-                  className={`shrink-0 min-w-[80px] py-2 px-3 text-xs font-bold rounded-xl transition-all ${activeTab === "gaveUp" ? "bg-[var(--lib-card)] text-[var(--lib-text)] shadow-sm" : "text-[var(--lib-muted)] hover:text-[var(--lib-text)]"}`}
-                >
-                  Gave Up
-                </button>
-              </div>
-
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={activeTab}
-                  initial={{ opacity: 0, x: 10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -10 }}
-                  transition={{ duration: 0.15 }}
-                >
-                  {activeTab === "myShelf" && (
-                    <ShelfRow
-                      title=""
-                      books={myShelf}
-                      emptyMsg="Your shelf is empty."
-                      onOpen={openBook}
-                      onDelete={deleteBook}
-                      deletingId={deletingId}
-                      onStatusChangeMenu={(e, bookId) => {
-                        e.preventDefault();
-                        setStatusMenu({ bookId, x: e.clientX, y: e.clientY });
-                      }}
-                      updatingStatus={updatingStatus}
-                      isLoading={loading}
-                    />
-                  )}
-                  {activeTab === "partnerShelf" && (
-                    <ShelfRow
-                      title=""
-                      books={partnerShelf}
-                      emptyMsg={`${partnerDisplayName}'s shelf is empty.`}
-                      onOpen={openBook}
-                      onDelete={deleteBook}
-                      deletingId={deletingId}
-                      onStatusChangeMenu={(e, bookId) => {
-                        e.preventDefault();
-                        setStatusMenu({ bookId, x: e.clientX, y: e.clientY });
-                      }}
-                      updatingStatus={updatingStatus}
-                      isLoading={loading}
-                    />
-                  )}
-                  {activeTab === "finished" && (
-                    <ShelfRow
-                      title=""
-                      books={finishedBooks}
-                      emptyMsg="No finished books yet."
-                      onOpen={openBook}
-                      onDelete={deleteBook}
-                      deletingId={deletingId}
-                      grayscale
-                      onStatusChangeMenu={(e, bookId) => {
-                        e.preventDefault();
-                        setStatusMenu({ bookId, x: e.clientX, y: e.clientY });
-                      }}
-                      updatingStatus={updatingStatus}
-                      isLoading={loading}
-                    />
-                  )}
-                  {activeTab === "favorites" && (
-                    <ShelfRow
-                      title=""
-                      books={books.filter(b => b.isFavorite)}
-                      emptyMsg="No favorites yet."
-                      onOpen={openBook}
-                      onDelete={deleteBook}
-                      deletingId={deletingId}
-                      onStatusChangeMenu={(e, bookId) => {
-                        e.preventDefault();
-                        setStatusMenu({ bookId, x: e.clientX, y: e.clientY });
-                      }}
-                      updatingStatus={updatingStatus}
-                      isLoading={loading}
-                    />
-                  )}
-                  {activeTab === "paused" && (
-                    <ShelfRow
-                      title=""
-                      books={books.filter(b => b.status === "paused")}
-                      emptyMsg="No paused books."
-                      onOpen={openBook}
-                      onDelete={deleteBook}
-                      deletingId={deletingId}
-                      onStatusChangeMenu={(e, bookId) => {
-                        e.preventDefault();
-                        setStatusMenu({ bookId, x: e.clientX, y: e.clientY });
-                      }}
-                      updatingStatus={updatingStatus}
-                      isLoading={loading}
-                    />
-                  )}
-                  {activeTab === "gaveUp" && (
-                    <ShelfRow
-                      title=""
-                      books={books.filter(b => b.status === "gave_up")}
-                      emptyMsg="No given up books."
-                      onOpen={openBook}
-                      onDelete={deleteBook}
-                      deletingId={deletingId}
-                      grayscale
-                      onStatusChangeMenu={(e, bookId) => {
-                        e.preventDefault();
-                        setStatusMenu({ bookId, x: e.clientX, y: e.clientY });
-                      }}
-                      updatingStatus={updatingStatus}
-                      isLoading={loading}
-                    />
-                  )}
-                </motion.div>
-              </AnimatePresence>
-            </div>
-
-            {/* Empty state fallback */}
-            {books.length === 0 && !loading && (
-              <div className="flex flex-col items-center py-8 text-center text-[var(--lib-muted)]">
-                <BookMarked className="w-12 h-12 mb-4 opacity-30" />
-                <p className="text-sm font-bold text-[var(--lib-text)]">Your library is empty</p>
-                <p className="text-xs mt-1">Search hundreds of thousands of PDF books above and add them to your shelf.</p>
-              </div>
-            )}
-          </div>
-        </>
-      )}
-
-      {/* ── Memorize View ── */}
-      {!searchQuery && libraryTab === "memorize" && (
-        <div className="min-h-[80vh] flex flex-col bg-blue-600/10">
-          <div className="bg-primary px-6 py-12 pb-24 text-primary-foreground rounded-b-[3rem] shadow-xl">
-            <h2 className="text-4xl font-black mb-3">Memorize</h2>
-            <p className="text-sm font-medium opacity-90 max-w-[80%] leading-relaxed">
-              After reading books, write down some notes you want to remember. 
-              <br/> If you don't have a book yet, how about adding it first?
-            </p>
-          </div>
-          <div className="px-4 -mt-16 pb-12 space-y-4">
-            {allNotes.length === 0 ? (
-              <div className="bg-[var(--lib-card)] border border-[var(--lib-border)] rounded-3xl p-8 flex flex-col items-center justify-center text-center shadow-xl">
-                <div className="w-32 h-32 bg-primary/10 rounded-full flex items-center justify-center mb-6">
-                  <Lightbulb className="w-16 h-16 text-primary opacity-50" />
-                </div>
-                <p className="text-[var(--lib-muted)] font-medium">There are no reading notes yet.</p>
-              </div>
-            ) : (
-              allNotes.map((note) => (
-                <div key={note.id} className="bg-[var(--lib-card)] border border-[var(--lib-border)] rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow">
-                  <div className="flex items-start gap-3">
-                    <div className="bg-primary/10 p-2 rounded-xl shrink-0">
-                      <MessageSquare className="w-5 h-5 text-primary" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-[10px] text-[var(--lib-muted)] font-bold uppercase tracking-wider mb-1 flex items-center justify-between">
-                        <span 
-                           className="line-clamp-1 flex-1 mr-2 cursor-pointer hover:text-primary transition-colors"
-                           onClick={() => setLocation(`/read/${note.bookId}?location=${encodeURIComponent(note.chapterOrPage || "")}`)}
-                        >
-                          {note.bookTitle || "Unknown Book"}
-                        </span>
-                        <span className="shrink-0">{new Date(note.timestamp).toLocaleDateString()}</span>
-                      </p>
-                      <p className="text-sm text-[var(--lib-text)] leading-relaxed">{note.text}</p>
-                      {note.chapterOrPage && (
-                        <p className="text-xs text-[var(--lib-muted)] mt-2 font-mono bg-[var(--lib-input)] inline-block px-2 py-0.5 rounded-md border border-[var(--lib-border)]">
-                          {note.chapterOrPage}
+                  {/* Library Focus Mode */}
+                  <div className="pt-4 border-t border-[var(--lib-border)]">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <p className="text-sm font-bold text-[var(--lib-text)] mb-0.5 flex items-center">
+                          <BookOpen className="w-4 h-4 mr-1.5 text-primary" />
+                          Focus Mode
                         </p>
-                      )}
+                        <p className="text-[11px] text-[var(--lib-muted)]">Blocks all incoming calls, notifications, and menus.</p>
+                      </div>
+                      <button
+                        onClick={toggleLibraryMode}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${libraryMode ? "bg-primary shadow-[0_0_10px_rgba(var(--primary),0.5)]" : "bg-white/20"}`}
+                      >
+                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${libraryMode ? "translate-x-6" : "translate-x-1"}`} />
+                      </button>
                     </div>
                   </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      )}
 
-      {/* ── Achievements View ── */}
-      {!searchQuery && libraryTab === "achievements" && (
-        <div className="min-h-[80vh] flex flex-col">
-          <div className="bg-[var(--lib-card)] border-b border-[var(--lib-border)] px-6 py-12 pb-24 text-[var(--lib-text)] rounded-b-[3rem] shadow-sm">
-            <div className="flex items-center justify-between mb-3">
-               <h2 className="text-4xl font-black">Achievement</h2>
-               <button className="p-2 bg-[var(--lib-input)] rounded-full hover:bg-[var(--lib-btn-hover)] transition-colors text-[var(--lib-text)]"><Settings className="w-5 h-5" /></button>
-            </div>
-            <p className="text-sm font-medium text-[var(--lib-muted)] max-w-[80%] leading-relaxed">
-              Books which you read are registered in achievement.
-            </p>
-          </div>
-          <div className="px-4 -mt-16 pb-12">
-            <div className="bg-[var(--lib-card)] border border-[var(--lib-border)] rounded-3xl p-6 shadow-xl min-h-[400px] relative overflow-hidden">
-              <h3 className="text-lg font-bold text-[var(--lib-text)] mb-6 flex items-center gap-2 relative z-10">
-                <Sparkles className="w-5 h-5 text-yellow-500" /> Your Badges
-              </h3>
-              
-              <div className="relative z-10">
-                <LibraryAchievements stats={stats} books={books} />
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Library Bottom Navigation ── */}
-      <div className="fixed bottom-0 left-0 right-0 bg-[var(--lib-header)] border-t border-[var(--lib-border)] backdrop-blur-xl z-40 pb-[env(safe-area-inset-bottom)] px-6">
-        <div className="flex justify-between items-center py-3 max-w-sm mx-auto">
-          <button 
-            onClick={() => setLibraryTab("dashboard")} 
-            className={`flex flex-col items-center gap-1 transition-all ${libraryTab === "dashboard" ? "text-primary scale-110" : "text-[var(--lib-muted)] hover:text-[var(--lib-text)]"}`}
-          >
-            <div className={`p-2 rounded-full ${libraryTab === "dashboard" ? "bg-primary text-primary-foreground" : ""}`}>
-              <BookOpen className="w-6 h-6" />
-            </div>
-          </button>
-          <button 
-            onClick={() => setLibraryTab("memorize")} 
-            className={`flex flex-col items-center gap-1 transition-all ${libraryTab === "memorize" ? "text-primary scale-110" : "text-[var(--lib-muted)] hover:text-[var(--lib-text)]"}`}
-          >
-            <div className={`p-2 rounded-full ${libraryTab === "memorize" ? "bg-primary text-primary-foreground" : ""}`}>
-              <Lightbulb className="w-6 h-6" />
-            </div>
-          </button>
-          <button 
-            onClick={() => setLibraryTab("achievements")} 
-            className={`flex flex-col items-center gap-1 transition-all ${libraryTab === "achievements" ? "text-primary scale-110" : "text-[var(--lib-muted)] hover:text-[var(--lib-text)]"}`}
-          >
-            <div className={`p-2 rounded-full ${libraryTab === "achievements" ? "bg-primary text-primary-foreground" : ""}`}>
-              <Medal className="w-6 h-6" />
-            </div>
-          </button>
-          <button 
-            onClick={() => setLocation("/")} 
-            className="flex flex-col items-center gap-1 text-[var(--lib-muted)] hover:text-[var(--lib-text)] transition-all"
-          >
-            <div className="p-2 rounded-full">
-              <User className="w-6 h-6" />
-            </div>
-          </button>
-        </div>
-      </div>
-
-      {/* ── Status Menu Modal ── */}
-      <AnimatePresence>
-      {statusMenu && (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9, y: -10 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.9, y: -10 }}
-          transition={{ duration: 0.15 }}
-          className="fixed z-50 bg-[var(--lib-bg)]/90 backdrop-blur-md border border-[var(--lib-border)] rounded-2xl shadow-2xl overflow-hidden flex flex-col"
-          style={{
-            top: Math.min(statusMenu.y, window.innerHeight - 150),
-            left: Math.min(statusMenu.x, window.innerWidth - 180),
-            width: "160px"
-          }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <button
-            onClick={() => changeStatus(statusMenu.bookId, { status: "reading" })}
-            className="px-4 py-3 text-left text-sm font-bold text-[var(--lib-text)] hover:bg-[var(--lib-input)] active:bg-white/20 transition-colors border-b border-[var(--lib-border)]"
-          >
-            Reading
-          </button>
-          <button
-            onClick={() => changeStatus(statusMenu.bookId, { status: "wishlist" })}
-            className="px-4 py-3 text-left text-sm font-bold text-[var(--lib-text)] hover:bg-[var(--lib-input)] active:bg-white/20 transition-colors border-b border-[var(--lib-border)]"
-          >
-            Read Later
-          </button>
-          <button
-            onClick={() => changeStatus(statusMenu.bookId, { status: "paused" })}
-            className="px-4 py-3 text-left text-sm font-bold text-[var(--lib-text)] hover:bg-[var(--lib-input)] active:bg-white/20 transition-colors border-b border-[var(--lib-border)]"
-          >
-            Paused
-          </button>
-          <button
-            onClick={() => changeStatus(statusMenu.bookId, { status: "gave_up" })}
-            className="px-4 py-3 text-left text-sm font-bold text-red-400 hover:bg-[var(--lib-input)] active:bg-white/20 transition-colors border-b border-[var(--lib-border)]"
-          >
-            Give Up
-          </button>
-          <button
-            onClick={() => changeStatus(statusMenu.bookId, { status: "finished" })}
-            className="px-4 py-3 text-left text-sm font-bold text-green-400 hover:bg-[var(--lib-input)] active:bg-white/20 transition-colors border-b border-[var(--lib-border)]"
-          >
-            Finished ✓
-          </button>
-          <button
-            onClick={() => {
-              const b = books.find(b => b.id === statusMenu.bookId);
-              if (b) {
-                changeStatus(statusMenu.bookId, { favorite: !b.isFavorite });
-              }
-            }}
-            className="px-4 py-3 text-left text-sm font-bold text-pink-400 hover:bg-[var(--lib-input)] active:bg-white/20 transition-colors border-b border-[var(--lib-border)]"
-          >
-            {books.find(b => b.id === statusMenu.bookId)?.isFavorite ? "Unfavorite" : "Favorite ♥"}
-          </button>
-          <button
-            onClick={() => {
-              const b = books.find(b => b.id === statusMenu.bookId);
-              if (b) setActiveNotesBook(b);
-              setStatusMenu(null);
-            }}
-            className="px-4 py-3 text-left text-sm font-bold text-primary hover:bg-[var(--lib-input)] active:bg-white/20 transition-colors flex items-center gap-2"
-          >
-            <MessageSquare className="w-4 h-4" />
-            Reading Notes
-          </button>
-        </motion.div>
-      )}
-      </AnimatePresence>
-
-      {/* ── Notes Modal ── */}
-      {activeNotesBook && (
-        <NotesModal
-          book={activeNotesBook}
-          onClose={() => setActiveNotesBook(null)}
-          myId={myId}
-          partnerName={partnerDisplayName}
-        />
-      )}
-
-      {/* ── In-App Browser Modal ── */}
-      {inAppBrowserUrl && (
-        <InAppBrowser 
-          url={inAppBrowserUrl} 
-          onClose={() => setInAppBrowserUrl(null)} 
-        />
-      )}
-
-      {/* ── Settings Modal ── */}
-      <AnimatePresence>
-      {showSettings && (
-        <motion.div 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[110] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
-        >
-          <motion.div 
-            initial={{ scale: 0.95, opacity: 0, y: 20 }}
-            animate={{ scale: 1, opacity: 1, y: 0 }}
-            exit={{ scale: 0.95, opacity: 0, y: 20 }}
-            transition={{ type: "spring", stiffness: 300, damping: 25 }}
-            className="bg-[var(--lib-bg)] border border-[var(--lib-border)] rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden"
-          >
-            <div className="flex items-center justify-between p-5 border-b border-[var(--lib-border)]">
-              <h2 className="text-xl font-bold font-serif text-[var(--lib-text)]">Library Settings</h2>
-              <button onClick={() => setShowSettings(false)} className="p-1 hover:bg-[var(--lib-input)] rounded-full text-[var(--lib-text)] active:scale-90 transition-transform">
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-            
-            <div className="p-5 space-y-6">
-              {/* Theme Settings */}
-              <div>
-                <p className="text-sm font-bold text-[var(--lib-muted)] mb-3 uppercase tracking-wider">Theme</p>
-                <div className="flex gap-3">
-                  {(["dark", "light", "sepia"] as const).map(th => (
-                    <button
-                      key={th}
-                      onClick={() => setLibTheme(th)}
-                      className={`flex-1 py-2 rounded-xl font-bold text-xs uppercase border-2 transition-all ${
-                        libTheme === th ? "border-primary text-primary bg-primary/10 shadow-[0_0_15px_rgba(var(--primary),0.2)]" : "border-[var(--lib-border)] text-[var(--lib-muted)] hover:border-white/30"
-                      }`}
-                    >
-                      {th}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Language Settings */}
-              <div>
-                <p className="text-sm font-bold text-[var(--lib-muted)] mb-3 uppercase tracking-wider">Language</p>
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => setLibLang("en")}
-                    className={`flex-1 py-2 rounded-xl font-bold text-xs border-2 transition-all ${
-                      libLang === "en" ? "border-primary text-primary bg-primary/10 shadow-[0_0_15px_rgba(var(--primary),0.2)]" : "border-[var(--lib-border)] text-[var(--lib-muted)] hover:border-white/30"
-                    }`}
-                  >
-                    English
-                  </button>
-                  <button
-                    onClick={() => setLibLang("ar")}
-                    className={`flex-1 py-2 rounded-xl font-bold text-xs border-2 transition-all ${
-                      libLang === "ar" ? "border-primary text-primary bg-primary/10 shadow-[0_0_15px_rgba(var(--primary),0.2)]" : "border-[var(--lib-border)] text-[var(--lib-muted)] hover:border-white/30"
-                    }`}
-                  >
-                    العربية
-                  </button>
-                </div>
-              </div>
-
-              {/* Library Focus Mode */}
-              <div className="pt-4 border-t border-[var(--lib-border)]">
-                <div className="flex items-center justify-between gap-4">
+                  {/* Fullscreen Toggle */}
                   <div>
-                    <p className="text-sm font-bold text-[var(--lib-text)] mb-0.5 flex items-center">
-                      <BookOpen className="w-4 h-4 mr-1.5 text-primary" />
-                      Focus Mode
-                    </p>
-                    <p className="text-[11px] text-[var(--lib-muted)]">Blocks all incoming calls, notifications, and menus.</p>
+                    <p className="text-sm font-bold text-[var(--lib-muted)] mb-3 uppercase tracking-wider">Display</p>
+                    <button
+                      onClick={toggleFullscreen}
+                      className="w-full bg-[var(--lib-input)] hover:bg-[var(--lib-input)] border border-[var(--lib-border)] rounded-xl py-3 px-4 flex items-center justify-between text-sm font-bold text-[var(--lib-text)] transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <Maximize className="w-5 h-5 text-[var(--lib-muted)]" />
+                        Toggle Fullscreen
+                      </div>
+                    </button>
                   </div>
-                  <button 
-                    onClick={toggleLibraryMode}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${libraryMode ? "bg-primary shadow-[0_0_10px_rgba(var(--primary),0.5)]" : "bg-white/20"}`}
-                  >
-                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${libraryMode ? "translate-x-6" : "translate-x-1"}`} />
-                  </button>
                 </div>
-              </div>
-
-              {/* Fullscreen Toggle */}
-              <div>
-                <p className="text-sm font-bold text-[var(--lib-muted)] mb-3 uppercase tracking-wider">Display</p>
-                <button
-                  onClick={toggleFullscreen}
-                  className="w-full bg-[var(--lib-input)] hover:bg-[var(--lib-input)] border border-[var(--lib-border)] rounded-xl py-3 px-4 flex items-center justify-between text-sm font-bold text-[var(--lib-text)] transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <Maximize className="w-5 h-5 text-[var(--lib-muted)]" />
-                    Toggle Fullscreen
-                  </div>
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        </motion.div>
-      )}
-      </AnimatePresence>
-
-      {/* ── Book Preview Modal ── */}
-      <AnimatePresence>
-      {selectedPreviewBook && (
-        <motion.div 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[120] bg-black/80 backdrop-blur-md flex flex-col items-center justify-end sm:justify-center p-0 sm:p-4"
-        >
-          <div className="absolute inset-0" onClick={() => setSelectedPreviewBook(null)} />
-          <motion.div 
-            initial={{ y: "100%" }}
-            animate={{ y: 0 }}
-            exit={{ y: "100%" }}
-            transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="bg-[var(--lib-bg)] border border-[var(--lib-border)] rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-md overflow-hidden relative z-10"
-          >
-            <div className="relative aspect-[4/3] w-full bg-black overflow-hidden flex items-end justify-center pb-8">
-              {/* Blurred background */}
-              <div className="absolute inset-0 opacity-50">
-                {selectedPreviewBook.coverUrl ? (
-                   <img src={selectedPreviewBook.coverUrl} className="w-full h-full object-cover blur-2xl scale-125" alt="" />
-                ) : (
-                   <div className="w-full h-full bg-gradient-to-br from-primary/30 to-black" />
-                )}
-                <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/60 to-transparent mix-blend-multiply" />
-              </div>
-              
-              <button 
-                onClick={() => setSelectedPreviewBook(null)}
-                className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center bg-black/40 hover:bg-black/60 rounded-full text-[var(--lib-text)] backdrop-blur-md z-10 transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-
-              {/* Book Cover */}
-              <motion.div 
-                initial={{ y: 20, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ delay: 0.1 }}
-                className="relative z-10 w-32 aspect-[2/3] rounded-xl shadow-2xl shadow-black/60 overflow-hidden ring-1 ring-white/20"
-              >
-                <BookCover coverUrl={selectedPreviewBook.coverUrl} title={selectedPreviewBook.title} />
               </motion.div>
-            </div>
-            
-            <div className="p-6 text-center space-y-2">
-              <motion.h2 
-                initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}
-                className="text-2xl font-bold font-serif text-[var(--lib-text)] line-clamp-2 leading-tight"
-              >{selectedPreviewBook.title}</motion.h2>
-              <motion.p 
-                initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.25 }}
-                className="text-[var(--lib-muted)] text-sm font-medium"
-              >{selectedPreviewBook.author}</motion.p>
-              {selectedPreviewBook.description && (
-                <motion.p 
-                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}
-                  className="text-xs text-[var(--lib-muted)] line-clamp-4 mt-4 px-2 leading-relaxed"
-                >{selectedPreviewBook.description}</motion.p>
-              )}
-            </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-            <div className="p-6 pt-2 pb-8 flex gap-3">
-              {isBookOnShelf(selectedPreviewBook.title, selectedPreviewBook.epubUrl) ? (
-                <button
-                  disabled
-                  className="flex-1 bg-[var(--lib-input)] text-[var(--lib-muted)] border border-[var(--lib-border)] font-bold py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 cursor-not-allowed opacity-60"
-                >
-                  <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                  Already in Shelf
-                </button>
-              ) : (
-                <button
-                  onClick={() => { addToLibrary(selectedPreviewBook); setSelectedPreviewBook(null); }}
-                  className="flex-1 bg-primary text-primary-foreground font-bold py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 hover:bg-primary/90 active:scale-95 transition-all shadow-lg shadow-primary/20"
-                >
-                  <BookOpen className="w-5 h-5" />
-                  Add to Shelf
-                </button>
-              )}
-            </div>
-          </motion.div>
-        </motion.div>
-      )}
-      </AnimatePresence>
-    </div>
+        {/* ── Book Preview Modal ── */}
+        <AnimatePresence>
+          {selectedPreviewBook && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[120] bg-black/80 backdrop-blur-md flex flex-col items-center justify-end sm:justify-center p-0 sm:p-4"
+            >
+              <div className="absolute inset-0" onClick={() => setSelectedPreviewBook(null)} />
+              <motion.div
+                initial={{ y: "100%" }}
+                animate={{ y: 0 }}
+                exit={{ y: "100%" }}
+                transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                className="bg-[var(--lib-bg)] border border-[var(--lib-border)] rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-md overflow-hidden relative z-10"
+              >
+                <div className="relative aspect-[4/3] w-full bg-black overflow-hidden flex items-end justify-center pb-8">
+                  {/* Blurred background */}
+                  <div className="absolute inset-0 opacity-50">
+                    {selectedPreviewBook.coverUrl ? (
+                      <img src={selectedPreviewBook.coverUrl} className="w-full h-full object-cover blur-2xl scale-125" alt="" />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-primary/30 to-black" />
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/60 to-transparent mix-blend-multiply" />
+                  </div>
+
+                  <button
+                    onClick={() => setSelectedPreviewBook(null)}
+                    className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center bg-black/40 hover:bg-black/60 rounded-full text-[var(--lib-text)] backdrop-blur-md z-10 transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+
+                  {/* Book Cover */}
+                  <motion.div
+                    initial={{ y: 20, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ delay: 0.1 }}
+                    className="relative z-10 w-32 aspect-[2/3] rounded-xl shadow-2xl shadow-black/60 overflow-hidden ring-1 ring-white/20"
+                  >
+                    <BookCover coverUrl={selectedPreviewBook.coverUrl} title={selectedPreviewBook.title} />
+                  </motion.div>
+                </div>
+
+                <div className="p-6 text-center space-y-2">
+                  <motion.h2
+                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}
+                    className="text-2xl font-bold font-serif text-[var(--lib-text)] line-clamp-2 leading-tight"
+                  >{selectedPreviewBook.title}</motion.h2>
+                  <motion.p
+                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.25 }}
+                    className="text-[var(--lib-muted)] text-sm font-medium"
+                  >{selectedPreviewBook.author}</motion.p>
+                  {selectedPreviewBook.description && (
+                    <motion.p
+                      initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}
+                      className="text-xs text-[var(--lib-muted)] line-clamp-4 mt-4 px-2 leading-relaxed"
+                    >{selectedPreviewBook.description}</motion.p>
+                  )}
+                </div>
+
+                <div className="p-6 pt-2 pb-8 flex gap-3">
+                  {isBookOnShelf(selectedPreviewBook.title, selectedPreviewBook.epubUrl) ? (
+                    <button
+                      disabled
+                      className="flex-1 bg-[var(--lib-input)] text-[var(--lib-muted)] border border-[var(--lib-border)] font-bold py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 cursor-not-allowed opacity-60"
+                    >
+                      <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                      Already in Shelf
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => { addToLibrary(selectedPreviewBook); setSelectedPreviewBook(null); }}
+                      className="flex-1 bg-primary text-primary-foreground font-bold py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 hover:bg-primary/90 active:scale-95 transition-all shadow-lg shadow-primary/20"
+                    >
+                      <BookOpen className="w-5 h-5" />
+                      Add to Shelf
+                    </button>
+                  )}
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </>
   );
 }
@@ -1994,7 +2029,7 @@ function ShelfRow({
           <p className="text-xs font-medium text-[var(--lib-muted)]">{emptyMsg}</p>
         </div>
       ) : (
-        <motion.div 
+        <motion.div
           variants={container}
           initial="hidden"
           animate="show"
@@ -2134,14 +2169,14 @@ function NotesModal({
 
   return (
     <AnimatePresence>
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         className="fixed inset-0 z-[60] flex flex-col justify-end"
       >
         <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose} />
-        <motion.div 
+        <motion.div
           initial={{ y: "100%" }}
           animate={{ y: 0 }}
           exit={{ y: "100%" }}
@@ -2166,7 +2201,7 @@ function NotesModal({
                 <Loader2 className="w-6 h-6 animate-spin text-primary" />
               </div>
             ) : notes.length === 0 ? (
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 className="flex flex-col items-center justify-center h-full text-[var(--lib-muted)] opacity-60"
@@ -2179,10 +2214,10 @@ function NotesModal({
               notes.map((note) => {
                 const isMine = note.authorId === myId;
                 return (
-                  <motion.div 
+                  <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    key={note.id} 
+                    key={note.id}
                     className={`flex flex-col ${isMine ? "items-end" : "items-start"}`}
                   >
                     <span className="text-[10px] text-[var(--lib-muted)] mb-1 px-1 font-bold uppercase tracking-wider">
@@ -2226,11 +2261,11 @@ function NotesModal({
 
 // ── Statistics Graph Component ──────────────────────────────────────────────────
 
-function LibraryStatsGraph({ weeklyData, monthlyData }: { weeklyData: { date: string; minutes: number }[], monthlyData: { month: string; minutes: number }[] }) {
+function LibraryStatsGraph({ weeklyData, monthlyData }: { weeklyData: { date: string; pages: number }[], monthlyData: { month: string; pages: number }[] }) {
   const [view, setView] = useState<"week" | "year">("week");
-  
+
   const data = view === "week" ? weeklyData : monthlyData;
-  const maxMinutes = Math.max(...data.map(d => d.minutes), 1); // Avoid division by zero
+  const maxPages = Math.max(...data.map(d => d.pages), 1); // Avoid division by zero
 
   const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -2243,6 +2278,30 @@ function LibraryStatsGraph({ weeklyData, monthlyData }: { weeklyData: { date: st
     return months[parseInt(d.month) - 1];
   }
 
+  // Generate smooth curved path points
+  const generatePath = () => {
+    if (data.length === 0) return "";
+    const pts = data.map((d, i) => {
+      const x = (i / (data.length - 1)) * 100;
+      const y = 100 - (d.pages / maxPages) * 100;
+      return { x, y };
+    });
+
+    let path = `M ${pts[0].x} ${pts[0].y}`;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const current = pts[i];
+      const next = pts[i + 1];
+      const cpX1 = current.x + (next.x - current.x) / 2;
+      const cpY1 = current.y;
+      const cpX2 = current.x + (next.x - current.x) / 2;
+      const cpY2 = next.y;
+      path += ` C ${cpX1} ${cpY1}, ${cpX2} ${cpY2}, ${next.x} ${next.y}`;
+    }
+    return path;
+  };
+
+  const pathD = generatePath();
+
   return (
     <div className="bg-[var(--lib-card)] border border-[var(--lib-border)] rounded-3xl p-5 shadow-sm mt-4">
       <div className="flex items-center justify-between mb-6">
@@ -2250,13 +2309,13 @@ function LibraryStatsGraph({ weeklyData, monthlyData }: { weeklyData: { date: st
           <BarChart3 className="w-5 h-5 text-primary" /> Activity
         </h3>
         <div className="flex bg-[var(--lib-input)] rounded-lg p-1 border border-[var(--lib-border)]">
-          <button 
+          <button
             onClick={() => setView("week")}
             className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${view === "week" ? "bg-[var(--lib-card)] text-[var(--lib-text)] shadow-sm" : "text-[var(--lib-muted)]"}`}
           >
             Week
           </button>
-          <button 
+          <button
             onClick={() => setView("year")}
             className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${view === "year" ? "bg-[var(--lib-card)] text-[var(--lib-text)] shadow-sm" : "text-[var(--lib-muted)]"}`}
           >
@@ -2265,27 +2324,61 @@ function LibraryStatsGraph({ weeklyData, monthlyData }: { weeklyData: { date: st
         </div>
       </div>
 
-      <div className="h-40 flex items-end justify-between gap-1 sm:gap-2">
-        {data.map((d, i) => {
-          const heightPct = (d.minutes / maxMinutes) * 100;
-          return (
-            <div key={i} className="flex-1 flex flex-col items-center gap-2 group h-full">
-              <div className="w-full relative h-full flex flex-col justify-end">
-                {/* Tooltip */}
-                <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-black text-[var(--lib-text)] text-[10px] font-bold py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
-                  {Math.round(d.minutes)} min
+      <div className="relative h-40 mt-6 mb-6 px-2">
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 w-full h-full overflow-visible">
+          <defs>
+            <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="rgba(59,130,246,0.3)" />
+              <stop offset="100%" stopColor="rgba(59,130,246,0)" />
+            </linearGradient>
+          </defs>
+          <path
+            d={`${pathD} L 100 100 L 0 100 Z`}
+            fill="url(#areaGradient)"
+          />
+          <motion.path
+            initial={{ pathLength: 0 }}
+            animate={{ pathLength: 1 }}
+            transition={{ duration: 1.5, ease: "easeOut" }}
+            d={pathD}
+            fill="none"
+            stroke="#3b82f6"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="drop-shadow-[0_4px_6px_rgba(59,130,246,0.4)]"
+          />
+          {data.map((d, i) => {
+            const x = (i / (data.length - 1)) * 100;
+            const y = 100 - (d.pages / maxPages) * 100;
+            return (
+              <circle
+                key={i}
+                cx={x}
+                cy={y}
+                r="2.5"
+                fill="#1e40af"
+                stroke="white"
+                strokeWidth="1.5"
+                className="z-10 shadow-lg"
+              />
+            )
+          })}
+        </svg>
+
+        <div className="absolute inset-0 w-full h-full flex justify-between pointer-events-none">
+          {data.map((d, i) => (
+            <div key={i} className="flex flex-col items-center justify-end h-full relative group pointer-events-auto" style={{ width: `${100 / data.length}%` }}>
+              <div className="absolute top-0 w-full h-full opacity-0 group-hover:opacity-100 transition-opacity flex justify-center pt-2 z-20">
+                <div className="bg-black text-white text-[10px] font-bold py-1 px-2 rounded -mt-8 pointer-events-none shadow-xl whitespace-nowrap">
+                  {Math.round(d.pages)} pages
                 </div>
-                <motion.div 
-                  initial={{ height: 0 }}
-                  animate={{ height: `${Math.max(heightPct, 2)}%` }}
-                  transition={{ type: "spring", stiffness: 100, damping: 15, delay: i * 0.05 }}
-                  className="w-full bg-gradient-to-t from-blue-600 to-blue-400 rounded-t-sm opacity-90 group-hover:opacity-100 transition-opacity shadow-[0_0_10px_rgba(59,130,246,0.3)]"
-                />
               </div>
-              <span className="text-[8px] sm:text-[9px] font-bold text-[var(--lib-muted)] uppercase">{getLabel(d)}</span>
+              <div className="h-full w-px bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity" />
+              <span className="absolute -bottom-6 text-[9px] font-bold text-[var(--lib-muted)] uppercase">{getLabel(d)}</span>
             </div>
-          );
-        })}
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -2298,7 +2391,7 @@ function LibraryAchievements({ stats, books }: { stats: any, books: ApiBook[] })
   const pagesRead = stats.totalPagesRead || 0;
   const streak = stats.streakDays || 0;
   const hoursThisYear = Math.round((stats.annualMinutes || 0) / 60);
-  
+
   const badges = [
     {
       id: "first_page",
@@ -2371,7 +2464,7 @@ function LibraryAchievements({ stats, books }: { stats: any, books: ApiBook[] })
   return (
     <div className="grid grid-cols-2 gap-4">
       {badges.map((b, i) => (
-        <motion.div 
+        <motion.div
           key={b.id}
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -2389,7 +2482,7 @@ function LibraryAchievements({ stats, books }: { stats: any, books: ApiBook[] })
           <h4 className="font-bold text-[var(--lib-text)] mb-1 leading-tight">{b.title}</h4>
           <p className="text-[10px] text-[var(--lib-muted)] mb-2 leading-tight">{b.desc}</p>
           <p className="text-[10px] font-bold text-primary mb-3">{b.stat}</p>
-          
+
           <div className="w-full bg-black/20 rounded-full h-1.5 overflow-hidden">
             <motion.div
               initial={{ width: 0 }}

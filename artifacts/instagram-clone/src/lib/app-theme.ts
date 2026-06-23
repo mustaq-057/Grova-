@@ -8,7 +8,8 @@ export type AppThemeId =
   | "moonlight-saga"
   | "floura"
   | "mint"
-  | "library";
+  | "library"
+  | "vintage-polaroid";
 
 const PREMIUM_ANIMATED_THEMES: AppThemeId[] = ["moonlight-saga"];
 
@@ -111,20 +112,20 @@ export const APP_THEMES: {
       description: "Sara falls · lavender photo ♡",
       swatch: "bg-gradient-to-br from-pink-300 via-fuchsia-200 to-violet-300",
       dark: {
-        "--app-background": "270 22% 9%",
-        "--app-foreground": "0 0% 98%",
-        "--app-primary": "330 75% 78%",
-        "--app-card": "270 20% 13%",
-        "--app-secondary": "270 18% 16%",
-        "--app-border": "270 14% 22%",
+        "--app-background": "260 15% 10%", // Very dark soft purple
+        "--app-foreground": "260 20% 96%", // Soft purpleish white
+        "--app-primary": "260 60% 70%", // Elegant soft lavender
+        "--app-card": "260 15% 14%",
+        "--app-secondary": "260 12% 18%",
+        "--app-border": "260 12% 24%",
       },
       light: {
-        "--app-background": "270 35% 97%",
-        "--app-foreground": "270 25% 16%",
-        "--app-primary": "330 65% 52%",
+        "--app-background": "260 30% 98%", // Extremely soft lilac white
+        "--app-foreground": "260 40% 16%", // Dark purple-brown
+        "--app-primary": "260 55% 55%", // Muted purple
         "--app-card": "0 0% 100%",
-        "--app-secondary": "270 28% 94%",
-        "--app-border": "270 22% 88%",
+        "--app-secondary": "260 25% 94%",
+        "--app-border": "260 20% 88%",
       },
     },
     {
@@ -170,6 +171,28 @@ export const APP_THEMES: {
         "--app-card": "0 0% 100%",
         "--app-secondary": "210 25% 92%",
         "--app-border": "210 18% 85%",
+      },
+    },
+    {
+      id: "vintage-polaroid",
+      name: "Polaroid",
+      description: "A nostalgic, grainy vintage film aesthetic 📸",
+      swatch: "bg-gradient-to-br from-[#d4c9b9] via-[#c2b4a3] to-[#8c7863]",
+      dark: {
+        "--app-background": "35 25% 10%",
+        "--app-foreground": "40 30% 90%",
+        "--app-primary": "10 50% 45%",
+        "--app-card": "35 20% 13%",
+        "--app-secondary": "35 20% 16%",
+        "--app-border": "35 15% 22%",
+      },
+      light: {
+        "--app-background": "40 35% 95%",
+        "--app-foreground": "30 20% 15%",
+        "--app-primary": "10 50% 50%",
+        "--app-card": "40 35% 98%",
+        "--app-secondary": "40 25% 90%",
+        "--app-border": "40 15% 85%",
       },
     },
 
@@ -274,10 +297,10 @@ export function themeUsesPhotoBackground(themeId?: AppThemeId): boolean {
 /** Photo layer strength — kept low so nav/cards stay readable. */
 export function getThemeBackgroundOpacity(themeId?: AppThemeId): number {
   const id = themeId ?? getStoredAppTheme();
-  if (id === "sara-lavender") return 0.32;
+  if (id === "sara-lavender") return 0.95;
   if (id === "floura") return 1.0;
-  if (id === "mint") return 1.0; // Mint uses a full vivid background
-  if (id === "library") return 1.0; // Library uses a full immersive photo
+  if (id === "mint") return 1.0;
+  if (id === "library") return 1.0;
   return 0.28;
 }
 
@@ -289,8 +312,8 @@ export function themeUsesPhotoScrim(themeId?: AppThemeId): boolean {
 export function getPhotoScrimGradient(themeId: AppThemeId, dark: boolean): string {
   if (themeId === "sara-lavender") {
     return dark
-      ? "linear-gradient(180deg, rgba(28,14,32,0.68) 0%, rgba(28,14,32,0.84) 55%, rgba(28,14,32,0.92) 100%)"
-      : "linear-gradient(180deg, rgba(255,246,252,0.7) 0%, rgba(255,246,252,0.86) 55%, rgba(255,246,252,0.93) 100%)";
+      ? "linear-gradient(180deg, rgba(30,20,40,0.6) 0%, rgba(20,10,30,0.85) 100%)"
+      : "linear-gradient(180deg, rgba(250,240,250,0.5) 0%, rgba(240,230,245,0.8) 100%)";
   }
   if (themeId === "floura") {
     return dark
@@ -306,6 +329,11 @@ export function getPhotoScrimGradient(themeId: AppThemeId, dark: boolean): strin
     return dark
       ? "linear-gradient(180deg, rgba(30,20,15,0.5) 0%, rgba(20,10,5,0.85) 100%)"
       : "linear-gradient(180deg, rgba(250,240,230,0.4) 0%, rgba(240,230,215,0.7) 100%)";
+  }
+  if (themeId === "vintage-polaroid") {
+    return dark
+      ? "linear-gradient(180deg, rgba(30,25,20,0.4) 0%, rgba(15,10,5,0.85) 100%)"
+      : "linear-gradient(180deg, rgba(235,225,215,0.4) 0%, rgba(215,205,190,0.7) 100%)";
   }
   return dark
     ? "linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.88) 100%)"

@@ -1636,3 +1636,219 @@ html[data-theme-id="mint"] .home-avatar-mint-glow::before {
   0% { opacity: 0.5; transform: translate(-50%, -50%) scale(0.95); }
   100% { opacity: 1; transform: translate(-50%, -50%) scale(1.05); }
 }
+
+/* Vintage Polaroid UI Enhancements */
+html[data-theme-id="vintage-polaroid"] {
+  --app-font-sans: 'Courier New', Courier, monospace; /* Vintage typewriter font */
+}
+
+/* Light leaks and vignette */
+html[data-theme-id="vintage-polaroid"]::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  pointer-events: none;
+  background: 
+    radial-gradient(circle at 100% 0%, rgba(255, 100, 0, 0.08) 0%, transparent 40%),
+    radial-gradient(circle at 0% 100%, rgba(255, 0, 0, 0.05) 0%, transparent 50%),
+    radial-gradient(circle, transparent 50%, rgba(0, 0, 0, 0.6) 130%);
+  mix-blend-mode: overlay;
+}
+
+html.dark[data-theme-id="vintage-polaroid"]::before {
+  background: 
+    radial-gradient(circle at 100% 0%, rgba(255, 100, 0, 0.12) 0%, transparent 40%),
+    radial-gradient(circle at 0% 100%, rgba(255, 0, 50, 0.1) 0%, transparent 50%),
+    radial-gradient(circle, transparent 40%, rgba(0, 0, 0, 0.9) 110%);
+}
+
+/* Film grain noise */
+html[data-theme-id="vintage-polaroid"]::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.08'/%3E%3C/svg%3E");
+  mix-blend-mode: multiply;
+  opacity: 0.7;
+}
+
+html.dark[data-theme-id="vintage-polaroid"]::after {
+  mix-blend-mode: screen;
+  opacity: 0.35;
+}
+
+/* Sepia tone on photos and videos */
+html[data-theme-id="vintage-polaroid"] img,
+html[data-theme-id="vintage-polaroid"] video {
+  filter: sepia(0.4) contrast(1.1) brightness(0.9) saturate(0.8) hue-rotate(-10deg);
+  border-radius: 2px !important;
+}
+
+html[data-theme-id="vintage-polaroid"] .bg-card,
+html[data-theme-id="vintage-polaroid"] .glass-card,
+html[data-theme-id="vintage-polaroid"] .app-chrome {
+  border-radius: 2px !important; /* Sharp polaroid corners */
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08), inset 0 0 0 4px rgba(255,255,255,0.3) !important;
+  border: 1px solid rgba(0,0,0,0.1) !important;
+}
+
+html.dark[data-theme-id="vintage-polaroid"] .bg-card,
+html.dark[data-theme-id="vintage-polaroid"] .glass-card,
+html.dark[data-theme-id="vintage-polaroid"] .app-chrome {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4), inset 0 0 0 4px rgba(255,255,255,0.02) !important;
+  border: 1px solid rgba(255,255,255,0.05) !important;
+}
+
+html[data-theme-id="vintage-polaroid"] h1,
+html[data-theme-id="vintage-polaroid"] h2,
+html[data-theme-id="vintage-polaroid"] p,
+html[data-theme-id="vintage-polaroid"] span,
+html[data-theme-id="vintage-polaroid"] div {
+  text-shadow: 0 0 1px rgba(0,0,0,0.05); /* Ink bleed effect on typewriter font */
+}
+
+/* ========================================= */
+/* DEEP GEOMETRY THEMING FOR HOME SCREEN     */
+/* ========================================= */
+
+/* 1. Floura Theme (Organic Leaf Geometry) */
+html[data-theme-id="floura"] .theme-home-shortcut-card {
+  border-radius: 28px 8px 28px 8px !important; /* Leaf shape */
+  background: rgba(255, 255, 255, 0.45) !important;
+  backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.7) !important;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.06) !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+html.dark[data-theme-id="floura"] .theme-home-shortcut-card {
+  background: rgba(0, 0, 0, 0.45) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+}
+html[data-theme-id="floura"] .theme-home-shortcut-card:hover {
+  border-radius: 8px 28px 8px 28px !important; /* Flip leaf on hover */
+}
+html[data-theme-id="floura"] .theme-home-avatar {
+  border-radius: 40px 16px 40px 16px !important;
+  border: 4px solid rgba(255, 255, 255, 0.6) !important;
+}
+html.dark[data-theme-id="floura"] .theme-home-avatar {
+  border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+/* 2. Sara Lavender Theme (Wedding Invitation Geometry) */
+html[data-theme-id="sara-lavender"] .theme-home-shortcut-card {
+  border-radius: 2px !important;
+  border: 1px solid rgba(0,0,0,0.08) !important;
+  background: rgba(255,255,255,0.75) !important;
+  backdrop-filter: blur(16px) !important;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.04), inset 0 0 0 2px rgba(255,255,255,0.9), inset 0 0 0 3px rgba(0,0,0,0.03) !important;
+}
+html.dark[data-theme-id="sara-lavender"] .theme-home-shortcut-card {
+  background: rgba(0,0,0,0.55) !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.25), inset 0 0 0 2px rgba(0,0,0,0.6), inset 0 0 0 3px rgba(255,255,255,0.04) !important;
+}
+html[data-theme-id="sara-lavender"] .theme-home-avatar {
+  border-width: 1px !important;
+  border-color: rgba(0,0,0,0.15) !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.08), 0 0 0 4px rgba(255,255,255,0.6) !important;
+}
+html.dark[data-theme-id="sara-lavender"] .theme-home-avatar {
+  border-color: rgba(255,255,255,0.15) !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3), 0 0 0 4px rgba(0,0,0,0.4) !important;
+}
+
+/* 3. Moonlight Saga Theme (Cyber Mystical Neon Geometry) */
+html[data-theme-id="moonlight-saga"] .theme-home-shortcut-card {
+  border-radius: 6px !important;
+  background: linear-gradient(180deg, rgba(20,25,45,0.6) 0%, rgba(10,15,30,0.9) 100%) !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  border-bottom: 2px solid #38bdf8 !important; /* Glowing neon lip */
+  box-shadow: 0 8px 20px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.15) !important;
+  backdrop-filter: blur(12px) !important;
+}
+html[data-theme-id="moonlight-saga"] .theme-home-avatar {
+  border-radius: 12px !important;
+  border: 2px solid rgba(56,189,248,0.6) !important;
+  box-shadow: 0 0 25px rgba(56,189,248,0.4), inset 0 0 12px rgba(56,189,248,0.4) !important;
+}
+html[data-theme-id="moonlight-saga"] .theme-home-presence {
+  border-radius: 4px !important;
+  box-shadow: 0 0 10px #22c55e !important; /* glowing online status */
+}
+
+/* 4. Sakura Fall Theme (Soft Frosted Floating Glass Geometry) */
+html[data-theme-id="sakura-fall"] .theme-home-shortcut-card {
+  border-radius: 32px !important;
+  background: linear-gradient(135deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.15) 100%) !important;
+  backdrop-filter: blur(24px) !important;
+  border: 1px solid rgba(255,255,255,0.5) !important;
+  box-shadow: 0 12px 32px rgba(255,105,180,0.15), inset 0 1px 0 rgba(255,255,255,0.8) !important;
+}
+html.dark[data-theme-id="sakura-fall"] .theme-home-shortcut-card {
+  background: linear-gradient(135deg, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.2) 100%) !important;
+  border: 1px solid rgba(255,255,255,0.15) !important;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1) !important;
+}
+html[data-theme-id="sakura-fall"] .theme-home-avatar {
+  border: none !important;
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.8), 0 0 0 8px rgba(255,192,203,0.4) !important;
+}
+html.dark[data-theme-id="sakura-fall"] .theme-home-avatar {
+  box-shadow: 0 0 0 2px rgba(0,0,0,0.8), 0 0 0 8px rgba(255,192,203,0.2) !important;
+}
+
+/* 5. Vintage Polaroid Theme (Analog Photography Geometry) */
+html[data-theme-id="vintage-polaroid"] .theme-home-shortcut-card {
+  background-color: #faf8f5 !important;
+  border: 8px solid #faf8f5 !important;
+  border-bottom-width: 28px !important; /* Thick bottom chin of a polaroid */
+  box-shadow: 0 6px 16px rgba(0,0,0,0.12), inset 0 0 0 1px rgba(0,0,0,0.05) !important;
+  transform: rotate(calc(var(--tw-rotate) + 1deg)) !important; /* subtle messy tilt */
+}
+html.dark[data-theme-id="vintage-polaroid"] .theme-home-shortcut-card {
+  background-color: #1a1a1a !important;
+  border: 8px solid #1a1a1a !important;
+  border-bottom-width: 28px !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(255,255,255,0.05) !important;
+}
+html[data-theme-id="vintage-polaroid"] .theme-home-shortcut-icon-wrapper {
+  border-radius: 0 !important; /* sharp corners inside the polaroid */
+}
+html[data-theme-id="vintage-polaroid"] .theme-home-clock-badge {
+  border-radius: 0 !important;
+  background: transparent !important;
+  border: 1px dashed rgba(0,0,0,0.2) !important;
+  color: #d32f2f !important; /* Stamped red ink look */
+  font-family: var(--app-font-sans) !important;
+  font-weight: bold;
+}
+html.dark[data-theme-id="vintage-polaroid"] .theme-home-clock-badge {
+  border-color: rgba(255,255,255,0.2) !important;
+  color: #ff5252 !important;
+}
+
+/* 6. Mint Theme (Minimalist Pill Geometry) */
+html[data-theme-id="mint"] .theme-home-shortcut-card {
+  border-radius: 100px !important; /* Full pill shape */
+  background: rgba(255,255,255,0.6) !important;
+  backdrop-filter: blur(16px) !important;
+  border: 1px solid rgba(255,255,255,0.8) !important;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.04) !important;
+  padding-left: 1.5rem !important;
+  padding-right: 1.5rem !important;
+}
+html.dark[data-theme-id="mint"] .theme-home-shortcut-card {
+  background: rgba(0,0,0,0.4) !important;
+  border: 1px solid rgba(255,255,255,0.15) !important;
+}
+html[data-theme-id="mint"] .theme-home-avatar {
+  border: 4px solid #fff !important;
+  box-shadow: 0 12px 30px rgba(52,211,153,0.3) !important;
+}
+html.dark[data-theme-id="mint"] .theme-home-avatar {
+  border-color: #111 !important;
+}

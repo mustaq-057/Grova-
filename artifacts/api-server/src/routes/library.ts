@@ -532,7 +532,7 @@ libraryRouter.get("/library/stats", authenticate, async (req: AuthenticatedReque
     weekStart.setUTCDate(weekStart.getUTCDate() - 6);
     const weekStartStr = weekStart.toISOString().split("T")[0]!;
     const weeklyRows = await db.query(
-      `SELECT date, SUM(duration_minutes) AS total
+      `SELECT date, SUM(pages_read) AS total
        FROM library_reading_sessions
        WHERE user_id = $1 AND date >= $2
        GROUP BY date`,
@@ -549,12 +549,12 @@ libraryRouter.get("/library/stats", authenticate, async (req: AuthenticatedReque
       const d = new Date(todayDate + "T00:00:00.000Z");
       d.setUTCDate(d.getUTCDate() - i);
       const dateStr = d.toISOString().split("T")[0]!;
-      weeklyData.push({ date: dateStr, minutes: weeklyMap.get(dateStr) || 0 });
+      weeklyData.push({ date: dateStr, pages: weeklyMap.get(dateStr) || 0 });
     }
 
     // Monthly totals in one query (current year)
     const monthlyRows = await db.query(
-      `SELECT SUBSTRING(CAST(date AS TEXT), 6, 2) AS month, SUM(duration_minutes) AS total
+      `SELECT SUBSTRING(CAST(date AS TEXT), 6, 2) AS month, SUM(pages_read) AS total
        FROM library_reading_sessions
        WHERE user_id = $1 AND CAST(date AS TEXT) LIKE $2
        GROUP BY SUBSTRING(CAST(date AS TEXT), 6, 2)`,
@@ -567,7 +567,7 @@ libraryRouter.get("/library/stats", authenticate, async (req: AuthenticatedReque
     const monthlyData = [];
     for (let i = 1; i <= 12; i++) {
       const monthStr = i.toString().padStart(2, "0");
-      monthlyData.push({ month: monthStr, minutes: monthlyMap.get(monthStr) || 0 });
+      monthlyData.push({ month: monthStr, pages: monthlyMap.get(monthStr) || 0 });
     }
 
     const finishedResult = await db.query(

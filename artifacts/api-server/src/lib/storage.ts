@@ -37,7 +37,7 @@ export function isCloudinaryConfigured(): boolean {
 }
 
 function cloudinaryResourceType(contentType: string): "image" | "video" | "raw" {
-  if (contentType.startsWith("video/")) return "video";
+  if (contentType.startsWith("video/") || contentType.startsWith("audio/")) return "video";
   if (contentType.startsWith("image/")) return "image";
   return "raw";
 }
