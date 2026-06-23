@@ -8,7 +8,10 @@ const router = Router();
 router.post("/stories", authenticate, rateLimiters.messages, async (req, res) => {
   try {
     const userId = (req as any).user.id;
-    const { media_url, kind = "story", text_overlay } = req.body;
+    // Accept both camelCase (from frontend) and snake_case
+    const media_url = req.body.mediaUrl ?? req.body.media_url;
+    const kind = req.body.kind ?? "story";
+    const text_overlay = req.body.text_overlay ?? req.body.textOverlay ?? null;
 
     if (!media_url) {
       res.status(400).json({ error: "media_url is required" });
@@ -21,7 +24,7 @@ router.post("/stories", authenticate, rateLimiters.messages, async (req, res) =>
 
     await db.execute(
       "INSERT INTO stories (id, author_id, media_url, kind, created_at, expires_at, text_overlay) VALUES ($1, $2, $3, $4, $5, $6, $7)",
-      [id, userId, media_url, kind, created_at, expires_at, text_overlay || null]
+      [id, userId, media_url, kind, created_at, expires_at, text_overlay]
     );
 
     const result = await db.query(
@@ -80,7 +83,9 @@ router.delete("/stories/:id", authenticate, async (req, res) => {
       [id, userId]
     );
 
-    if (result.changes === 0) {
+    // Support both PostgreSQL (rowCount) and SQLite (changes)
+    const affected = (result as any).rowCount ?? (result as any).changes ?? 0;
+    if (affected === 0) {
       res.status(404).json({ error: "Story not found or unauthorized" });
       return;
     }

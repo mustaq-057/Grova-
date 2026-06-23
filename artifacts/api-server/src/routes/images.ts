@@ -22,15 +22,22 @@ const router = Router();
 function allowedMediaHostname(hostname: string): boolean {
   const host = hostname.toLowerCase();
   if (host === "res.cloudinary.com" || host.endsWith(".cloudinary.com")) return true;
-  if (host.includes("backblazeb2.com")) return true;
+  if (host.includes("backblazeb2.com")) return true; // covers both s3.* and f00X.*
   try {
     const b2 = process.env.B2_ENDPOINT ? new URL(process.env.B2_ENDPOINT).hostname : "";
     if (b2 && (host === b2 || host.endsWith(b2))) return true;
   } catch {
     /* ignore */
   }
+  if (process.env.B2_PUBLIC_URL) {
+    try {
+      const pubHost = new URL(process.env.B2_PUBLIC_URL).hostname;
+      if (pubHost && (host === pubHost || host.endsWith("." + pubHost))) return true;
+    } catch { /* ignore */ }
+  }
   return false;
 }
+
 
 /** Stream chat files inline so mobile Chrome opens PDFs/docs instead of a Cloudinary page. */
 router.get("/media/inline", rateLimiters.read, authenticateBearerOrQuery, async (req, res) => {
@@ -250,8 +257,22 @@ router.get("/media/b2-sign-story", authenticate, async (req, res) => {
     });
 
     const uploadUrl = await getSignedUrl(s3 as any, command as any, { expiresIn: 3600 });
-    // The final URL where the file will be accessible (if public) or identifiable (for proxy)
-    const fileUrl = `${endpoint}/${bucket}/${key}`;
+
+    // Build the public-facing download URL.
+    // Priority: B2_PUBLIC_URL env var (custom domain / CDN) > standard B2 download URL
+    // B2 S3 endpoint is like https://s3.us-east-005.backblazeb2.com
+    // Public download URL is like https://f005.backblazeb2.com/file/<bucket>/<key>
+    let fileUrl: string;
+    if (process.env.B2_PUBLIC_URL) {
+      fileUrl = `${process.env.B2_PUBLIC_URL.replace(/\/$/, "")}/${key}`;
+    } else {
+      // Derive f00X cluster from endpoint (e.g. s3.us-east-005 -> f005)
+      const endpointHost = new URL(endpoint!).hostname; // s3.us-east-005.backblazeb2.com
+      const clusterMatch = endpointHost.match(/us-east-(\d+)/);
+      const clusterNum = clusterMatch ? clusterMatch[1].padStart(3, "0") : "005";
+      fileUrl = `https://f${clusterNum}.backblazeb2.com/file/${bucket}/${key}`;
+    }
+
 
     res.json({ uploadUrl, fileUrl, key });
   } catch (err) {
