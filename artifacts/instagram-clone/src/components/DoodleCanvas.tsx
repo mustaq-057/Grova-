@@ -229,7 +229,14 @@ export default function DoodleCanvas({ onClose, onSend, onError, onDrawStart, is
       const canvas = canvasRef.current;
       const ctx = canvas?.getContext("2d");
       const rect = canvas?.getBoundingClientRect();
-      if (!ctx || !rect || !data.strokes || data.strokes.length === 0) return;
+      if (!ctx || !rect) return;
+
+      if (data.clear) {
+        ctx.clearRect(0, 0, rect.width, rect.height);
+        return;
+      }
+
+      if (!data.strokes || data.strokes.length === 0) return;
 
       ctx.save();
       ctx.globalCompositeOperation = "source-over";
@@ -254,7 +261,6 @@ export default function DoodleCanvas({ onClose, onSend, onError, onDrawStart, is
       }
 
       ctx.restore();
-      saveHistory();
     };
 
     window.addEventListener("doodle_sync_event", handleSync);
