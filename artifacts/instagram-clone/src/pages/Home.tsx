@@ -1,7 +1,7 @@
 import { useEffect, useState, memo } from "react";
 import { Link } from "wouter";
-import { MessageCircle, BookOpen, Heart, ImagePlus, Shield, Clock, Plus } from "lucide-react";
-import { motion } from "framer-motion";
+import { MessageCircle, BookOpen, Heart, ImagePlus, Shield, Clock, Plus, X, Camera, Eye } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/lib/auth";
 import { api, type ApiUser, type ApiStory } from "@/lib/api";
 import { isEncryptionReady } from "@/lib/crypto";
@@ -30,6 +30,7 @@ export default memo(function Home() {
   const [stories, setStories] = useState<ApiStory[]>([]);
   const [showCamera, setShowCamera] = useState(false);
   const [viewingStories, setViewingStories] = useState<ApiStory[] | null>(null);
+  const [showMyStoryOptions, setShowMyStoryOptions] = useState(false);
 
   const partnerId = user?.id === "me" ? "wife" : "me";
 
@@ -191,7 +192,7 @@ export default memo(function Home() {
                 type="button"
                 className={`relative z-10 p-0.5 rounded-full cursor-pointer transition-transform active:scale-95 ${myStories.length > 0 ? "bg-gradient-to-tr from-yellow-400 to-primary" : ""}`}
                 onClick={() => {
-                  if (myStories.length > 0) setViewingStories(myStories);
+                  if (myStories.length > 0) setShowMyStoryOptions(true);
                   else setShowCamera(true);
                 }}
               >
@@ -342,6 +343,85 @@ export default memo(function Home() {
       {viewingStories && (
         <StoryViewer stories={viewingStories} onClose={() => setViewingStories(null)} />
       )}
+
+      {/* "View or Add Story" bottom sheet */}
+      <AnimatePresence>
+        {showMyStoryOptions && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[400] bg-black/50 backdrop-blur-sm"
+              onClick={() => setShowMyStoryOptions(false)}
+            />
+            {/* Sheet */}
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 26, stiffness: 280 }}
+              className="fixed bottom-0 left-0 right-0 z-[401] bg-background rounded-t-2xl shadow-2xl overflow-hidden"
+              style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
+            >
+              {/* Handle bar */}
+              <div className="w-10 h-1 bg-muted-foreground/20 rounded-full mx-auto mt-3 mb-2" />
+
+              {/* Header */}
+              <div className="flex items-center justify-between px-4 pb-3 border-b border-border/50">
+                <div>
+                  <p className="font-semibold text-sm">Your Stories</p>
+                  <p className="text-xs text-muted-foreground">
+                    {myStories.length} active · each expires in 24 h
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowMyStoryOptions(false)}
+                  className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-secondary transition-colors"
+                >
+                  <X className="w-4 h-4 text-muted-foreground" />
+                </button>
+              </div>
+
+              {/* Options */}
+              <button
+                onClick={() => {
+                  setShowMyStoryOptions(false);
+                  setViewingStories(myStories);
+                }}
+                className="w-full flex items-center gap-4 px-5 py-4 hover:bg-secondary/50 transition-colors"
+              >
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                  <Eye className="w-5 h-5 text-primary" />
+                </div>
+                <div className="text-left">
+                  <p className="font-semibold text-sm">View my story</p>
+                  <p className="text-xs text-muted-foreground">See all {myStories.length} slide{myStories.length !== 1 ? "s" : ""}</p>
+                </div>
+              </button>
+
+              <div className="border-t border-border/30 mx-4" />
+
+              <button
+                onClick={() => {
+                  setShowMyStoryOptions(false);
+                  setShowCamera(true);
+                }}
+                className="w-full flex items-center gap-4 px-5 py-4 hover:bg-secondary/50 transition-colors"
+              >
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                  <Camera className="w-5 h-5 text-primary" />
+                </div>
+                <div className="text-left">
+                  <p className="font-semibold text-sm">Add to story</p>
+                  <p className="text-xs text-muted-foreground">Adds a new slide · expires in 24 h</p>
+                </div>
+              </button>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 });

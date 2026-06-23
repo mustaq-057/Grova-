@@ -1293,8 +1293,10 @@ export default function Messages() {
 
   useEffect(() => {
     if (chatAnimationsEnabled) return;
-    if (messages.length === 0) return; // Wait until initial messages are rendered
-    const t = window.setTimeout(() => setChatAnimationsEnabled(true), 100);
+    if (messages.length === 0) return;
+    // Wait until initial paint + scroll settle before enabling animations
+    // (prevents visible flash when messages first render)
+    const t = window.setTimeout(() => setChatAnimationsEnabled(true), 600);
     return () => window.clearTimeout(t);
   }, [chatAnimationsEnabled, messages.length]);
 
@@ -3221,7 +3223,7 @@ export default function Messages() {
           )}
           data-testid="messages-list"
           ref={messagesContainerRef}
-          style={{ scrollBehavior: 'auto' }}
+          style={{ scrollBehavior: "auto", contain: "strict" }}
           onClick={(e) => {
             const t = e.target as HTMLElement;
             if (t.closest("button, a, input, textarea, video, audio, img, [role='button']")) return;
