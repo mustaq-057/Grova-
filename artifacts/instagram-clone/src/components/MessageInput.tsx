@@ -59,7 +59,7 @@ const SchedulePicker = ({ onClose, onSchedule }: { onClose: () => void, onSchedu
     onSchedule(date);
   };
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[200] bg-black/50 backdrop-blur-sm flex flex-col justify-end">
       <div className="absolute inset-0" onClick={onClose} />
       <motion.div 
@@ -137,7 +137,8 @@ const SchedulePicker = ({ onClose, onSchedule }: { onClose: () => void, onSchedu
           </div>
         )}
       </motion.div>
-    </div>
+    </div>,
+    document.body
   );
 };
 
