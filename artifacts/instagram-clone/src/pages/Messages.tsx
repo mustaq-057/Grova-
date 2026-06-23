@@ -3390,48 +3390,6 @@ export default function Messages() {
             </div>
           ))}
 
-          {/* Scheduled Messages */}
-          {scheduledMessages.length > 0 && (
-            <div className="mt-4 border-t border-primary/20 pt-4 relative">
-              <p className="text-center text-[11px] text-muted-foreground/70 mb-4 font-medium">Scheduled Messages</p>
-              {scheduledMessages.map(msg => {
-                const dummyMsg: ApiMessage = {
-                  id: msg.id,
-                  senderId: msg.senderId,
-                  text: msg.text,
-                  type: msg.type as any,
-                  variant: msg.variant as any,
-                  timestamp: msg.createdAt,
-                  companionSticker: msg.companionSticker,
-                  imageUrl: msg.imageData || msg.gifUrl,
-                  audioData: msg.audioData,
-                  liked: false,
-                  mediaOpenCount: 0,
-                };
-                return (
-                  <MessageItem
-                    key={msg.id}
-                    msg={dummyMsg}
-                    isMe={true}
-                    myId={user!.id}
-                    partnerAvatar={pAvatar}
-                    partnerName={pName}
-                    isScheduled={true}
-                    scheduledAt={msg.scheduledAt}
-                    onDelete={async (id) => {
-                      try {
-                        await api.deleteScheduledMessage(id);
-                        setScheduledMessages(prev => prev.filter(m => m.id !== id));
-                      } catch {
-                        // error handled silently or with alert
-                      }
-                    }}
-                    onLike={() => {}}
-                  />
-                )
-              })}
-            </div>
-          )}
 
           <div ref={bottomRef} className="h-8 shrink-0 scroll-anchor-bottom" aria-hidden />
           </div>
