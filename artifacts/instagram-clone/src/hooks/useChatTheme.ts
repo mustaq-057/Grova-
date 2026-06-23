@@ -38,7 +38,7 @@ export function useChatTheme() {
       bubbleColor: "#354A21",
       bubbleBorder: "#354A21",
       textColor: "#EBE2CD",
-      partnerTextColor: "#354A21"
+      partnerTextColor: "#EBE2CD"
     };
   }
 
@@ -49,7 +49,7 @@ export function useChatTheme() {
       bubbleColor: "#3b2a22", // Espresso Brown
       bubbleBorder: "#3b2a22",
       textColor: "#f8f1e7", // Cream
-      partnerTextColor: "#2c1e16" // Dark Mahogany text on partner's cream bubble
+      partnerTextColor: "#f8f1e7"
     };
   }
 
@@ -60,7 +60,7 @@ export function useChatTheme() {
       bubbleColor: "#9c3b3b", // Faded polaroid red
       bubbleBorder: "#9c3b3b",
       textColor: "#f4f1ea", // Paper white
-      partnerTextColor: "#2d2420" // Ink black on their paper bubble
+      partnerTextColor: "#f4f1ea"
     };
   }
 
@@ -71,7 +71,7 @@ export function useChatTheme() {
       bubbleColor: "#9b72aa", // Soft lavender
       bubbleBorder: "#8e659b",
       textColor: "#f8f4fa", // Whiteish-pink text
-      partnerTextColor: "#4a3b52" // Deep purple for partner's bubble
+      partnerTextColor: "#f8f4fa"
     };
   }
 

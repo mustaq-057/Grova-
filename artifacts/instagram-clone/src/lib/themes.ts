@@ -25,21 +25,10 @@ export function darkenHex(hex: string, amount = 0.28): string {
 }
 
 export function getPartnerBubbleColors(theme: Pick<ChatTheme, "bubbleColor" | "bubbleBorder"> & { id?: string }) {
-  if (theme.id === "floura-override") {
-    return {
-      fill: "#5C7C49",
-      border: "#5C7C49",
-    };
-  }
-  if (theme.id === "mint") {
-    return {
-      fill: "#EBE2CD",
-      border: "#EBE2CD",
-    };
-  }
+  // User explicitly requested both sides of the chat to use the exact same bright theme colors
   return {
-    fill: darkenHex(theme.bubbleColor, 0.32),
-    border: darkenHex(theme.bubbleBorder, 0.15),
+    fill: theme.bubbleColor,
+    border: theme.bubbleBorder,
   };
 }
 
