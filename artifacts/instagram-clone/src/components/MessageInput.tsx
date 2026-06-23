@@ -1,6 +1,6 @@
 import { memo, useRef, useState, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
 import { createPortal } from "react-dom";
-import { Smile, Mic, Send, Sticker, Paperclip, X, MessageCircle, MapPin, PenTool, Zap, Plus, Image as ImageIcon, PlusCircle, Sparkles, FileText, Palette, File as FileIcon, AlertCircle, Camera, MessageSquarePlus, Type } from "lucide-react";
+import { Smile, Mic, Send, Sticker, Paperclip, X, MessageCircle, MapPin, PenTool, Zap, Plus, Image as ImageIcon, PlusCircle, Sparkles, FileText, Palette, File as FileIcon, AlertCircle, Camera, MessageSquarePlus, Type, Clock } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import EmojiPicker from "@/components/EmojiPicker";
 import StickerPicker from "@/components/StickerPicker";
@@ -18,6 +18,7 @@ const CustomQuickChatIcon = () => <MessageSquarePlus className="w-[26px] h-[26px
 const CustomDoodleIcon = () => <PenTool className="w-[26px] h-[26px] text-white" strokeWidth={1.6} />;
 const CustomPaletteIcon = () => <Palette className="w-[26px] h-[26px] text-white" strokeWidth={1.6} />;
 const CustomFileIcon = () => <FileIcon className="w-[26px] h-[26px] text-white" strokeWidth={1.6} />;
+const CustomClockIcon = () => <Clock className="w-[26px] h-[26px] text-white" strokeWidth={1.6} />;
 
 interface MessageInputProps {
   draftKey?: string;
@@ -45,7 +46,88 @@ interface MessageInputProps {
   replyPreview?: React.ReactNode;
 }
 
-type OpenPicker = "emoji" | "sticker" | "greeting" | "stickerz" | null;
+type OpenPicker = "emoji" | "sticker" | "greeting" | "stickerz" | "schedule" | null;
+
+const SchedulePicker = ({ onClose, onSchedule }: { onClose: () => void, onSchedule: (date: Date) => void }) => {
+  const [mode, setMode] = useState<"chips" | "custom">("chips");
+  const [dateStr, setDateStr] = useState("");
+  const [timeStr, setTimeStr] = useState("");
+
+  const handleCustom = () => {
+    if (!dateStr || !timeStr) return;
+    const date = new Date(`${dateStr}T${timeStr}`);
+    onSchedule(date);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[200] bg-black/50 backdrop-blur-sm flex flex-col justify-end">
+      <div className="absolute inset-0" onClick={onClose} />
+      <motion.div 
+        initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
+        className="relative bg-[#1c1c1c] rounded-t-[28px] p-6 text-white pb-[env(safe-area-inset-bottom,20px)]"
+      >
+        <div className="w-12 h-1.5 bg-white/20 rounded-full mx-auto mb-6" />
+        <h3 className="text-xl font-bold mb-4">Schedule Message</h3>
+        
+        {mode === "chips" ? (
+          <div className="flex flex-col gap-3">
+            <button 
+              onClick={() => onSchedule(new Date(Date.now() + 60 * 60 * 1000))}
+              className="w-full bg-white/10 hover:bg-white/20 p-4 rounded-2xl text-left font-medium transition-colors"
+            >
+              In 1 Hour
+            </button>
+            <button 
+              onClick={() => {
+                const d = new Date();
+                d.setDate(d.getDate() + 1);
+                d.setHours(9, 0, 0, 0);
+                onSchedule(d);
+              }}
+              className="w-full bg-white/10 hover:bg-white/20 p-4 rounded-2xl text-left font-medium transition-colors"
+            >
+              Tomorrow Morning (9:00 AM)
+            </button>
+            <button 
+              onClick={() => setMode("custom")}
+              className="w-full bg-white/10 hover:bg-white/20 p-4 rounded-2xl text-left font-medium transition-colors"
+            >
+              Custom Date & Time
+            </button>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-4">
+            <div>
+              <label className="block text-sm text-white/50 mb-1 ml-1">Date</label>
+              <input 
+                type="date" 
+                value={dateStr}
+                onChange={(e) => setDateStr(e.target.value)}
+                className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white appearance-none outline-none focus:border-primary focus:bg-white/10 transition-colors"
+              />
+            </div>
+            <div>
+              <label className="block text-sm text-white/50 mb-1 ml-1">Time</label>
+              <input 
+                type="time" 
+                value={timeStr}
+                onChange={(e) => setTimeStr(e.target.value)}
+                className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white appearance-none outline-none focus:border-primary focus:bg-white/10 transition-colors"
+              />
+            </div>
+            <button 
+              onClick={handleCustom}
+              disabled={!dateStr || !timeStr}
+              className="w-full bg-primary text-primary-foreground p-4 rounded-2xl font-bold mt-2 disabled:opacity-50 transition-opacity"
+            >
+              Confirm Time
+            </button>
+          </div>
+        )}
+      </motion.div>
+    </div>
+  );
+};
 
 export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputProps>(function MessageInput({
   onSendMessage,
@@ -79,6 +161,7 @@ export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputPro
     }
     return "";
   });
+  const [scheduledTime, setScheduledTime] = useState<Date | null>(null);
   const [fontStyle, setFontStyle] = useState<"default" | "edo" | "italian" | "allura">("default");
   const [openPicker, setOpenPicker] = useState<OpenPicker>(null);
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
@@ -120,8 +203,29 @@ export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputPro
       try { sessionStorage.removeItem(draftKey); } catch {}
     }
     if (inputRef.current) inputRef.current.style.height = 'auto';
+
+    if (scheduledTime) {
+      // It's a scheduled message
+      import("@/lib/api").then(({ api }) => {
+        api.scheduleMessage({
+          senderId: "me", // this will be overridden by the server using authenticated token
+          type: "text",
+          text: text,
+          scheduledAt: scheduledTime.toISOString(),
+          variant: fontStyle === "default" ? undefined : fontStyle,
+        }).then(() => {
+          toast.success(`Message scheduled for ${scheduledTime.toLocaleTimeString()}`);
+          setScheduledTime(null);
+        }).catch(err => {
+          toast.error("Failed to schedule message");
+          setInput(text); // restore
+        });
+      });
+      return;
+    }
+
     onSendMessage(text, fontStyle);
-  }, [input, disabled, recording, onSendMessage, fontStyle, draftKey]);
+  }, [input, disabled, recording, onSendMessage, fontStyle, draftKey, scheduledTime]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -268,6 +372,11 @@ export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputPro
   const toggleQuickReplies = useCallback(() => {
     setShowAttachmentMenu(false);
     setOpenPicker((p) => (p === "greeting" ? null : "greeting"));
+  }, []);
+
+  const toggleSchedulePicker = useCallback(() => {
+    setShowAttachmentMenu(false);
+    setOpenPicker((p) => (p === "schedule" ? null : "schedule"));
   }, []);
 
   const handleShareLocation = useCallback(() => {
@@ -456,6 +565,18 @@ export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputPro
 
             <button
               type="button"
+              onClick={toggleSchedulePicker}
+              className="flex items-center gap-[20px] px-[24px] py-[15px] text-[17px] font-normal hover:bg-white/5 transition-colors w-full text-left text-white"
+              disabled={disabled}
+            >
+              <div className="w-[28px] h-[28px] flex items-center justify-center shrink-0">
+                <CustomClockIcon />
+              </div>
+              <span>Schedule</span>
+            </button>
+
+            <button
+              type="button"
               onClick={toggleFontStyle}
               className="flex items-center gap-[20px] px-[24px] py-[15px] text-[17px] font-normal hover:bg-white/5 transition-colors w-full text-left text-white"
               disabled={disabled}
@@ -505,7 +626,19 @@ export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputPro
         <GreetingPicker onSelect={handleGreetingSelect} onClose={() => setOpenPicker(null)} />
       )}
 
-      <div className="message-input-pill flex items-center gap-[8px] sm:gap-[10px] bg-[#1a1a1a] rounded-[40px] py-[7px] sm:py-[9px] pr-[8px] sm:pr-[14px] pl-[5px] sm:pl-[9px] mx-[4px] md:mx-auto md:w-full md:max-w-[800px]">
+      {scheduledTime && (
+        <div className="absolute -top-[30px] left-[5%] w-[90%] bg-primary/20 backdrop-blur-md border border-primary/30 text-white text-[13px] px-4 py-1.5 rounded-t-2xl flex items-center justify-between z-10 font-medium">
+          <div className="flex items-center gap-2">
+            <Clock className="w-3.5 h-3.5 text-primary" />
+            Scheduling for {scheduledTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </div>
+          <button onClick={() => setScheduledTime(null)} className="text-white/50 hover:text-white p-1">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
+      <div className={`message-input-pill flex items-center gap-[8px] sm:gap-[10px] bg-[#1a1a1a] rounded-[40px] py-[7px] sm:py-[9px] pr-[8px] sm:pr-[14px] pl-[5px] sm:pl-[9px] mx-[4px] md:mx-auto md:w-full md:max-w-[800px] ${scheduledTime ? 'rounded-tl-none rounded-tr-none border border-primary/30 border-t-0' : ''}`}>
         {/* eslint-disable-next-line */}
         <button
           type="button"
@@ -597,7 +730,17 @@ export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputPro
           onClose={() => setOpenPicker(null)}
         />
       )}
-
+      
+      {openPicker === "schedule" && (
+        <SchedulePicker 
+          onSchedule={(date) => {
+            setScheduledTime(date);
+            setOpenPicker(null);
+            setTimeout(() => inputRef.current?.focus(), 100);
+          }} 
+          onClose={() => setOpenPicker(null)} 
+        />
+      )}
 
     </div>
   );

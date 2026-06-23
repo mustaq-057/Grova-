@@ -29,6 +29,7 @@ import hiddenMessagesRouter from "./hidden-messages";
 import exportRouter from "./export";
 import coupleSyncRouter from "./couple-sync";
 import libraryRouter from "./library";
+import doodleRouter from "./doodle";
 
 const router: IRouter = Router();
 
@@ -67,5 +68,6 @@ router.use(hiddenMessagesRouter);
 router.use(exportRouter);
 router.use(coupleSyncRouter);
 router.use(libraryRouter);
+router.use("/doodle", doodleRouter);
 
 export default router;

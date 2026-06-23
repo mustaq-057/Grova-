@@ -8,3 +8,17 @@ export type CouplePrefs = {
   noteWife?: string;
   quickEmojis?: string[];
 };
+
+export interface ScheduledMessage {
+  id: string;
+  senderId: string;
+  text?: string;
+  type: "text" | "image" | "doodle" | "audio" | "sticker" | "gif" | "file" | "location" | "video" | "heart";
+  audioData?: string;
+  gifUrl?: string;
+  imageData?: string;
+  variant?: string;
+  companionSticker?: string;
+  scheduledAt: string;
+  createdAt: string;
+}

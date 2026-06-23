@@ -2,6 +2,7 @@ import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, sta
 import { Info, Heart, Mic, X, Trash2, Ban, Phone, Video, WifiOff, Wifi, Search, AlertCircle, Palette, MessageCircle, Shield } from "lucide-react";
 import { motion } from "framer-motion";
 import { api, type ApiMessage } from "@/lib/api";
+import type { ScheduledMessage } from "@/lib/types";
 import { useAuth } from "@/lib/auth";
 import { useCall } from "@/lib/call-context";
 import { MessageItem } from "@/components/MessageItem";
@@ -228,6 +229,8 @@ export default function Messages() {
   const [sharingLocation, setSharingLocation] = useState(false);
   const [imageToCrop, setImageToCrop] = useState<string | null>(null);
   const [doodleOpen, setDoodleOpen] = useState(false);
+  const [doodleLiveMode, setDoodleLiveMode] = useState(false);
+  const [scheduledMessages, setScheduledMessages] = useState<ScheduledMessage[]>([]);
   const [pendingImageType, setPendingImageType] = useState("image/jpeg");
   const [mediaViewMode, setMediaViewMode] = useState<"keep" | "once" | "twice">("keep");
   const [mediaViewer, setMediaViewer] = useState<{
@@ -413,7 +416,10 @@ export default function Messages() {
   );
 
   const openDoodlePanel = useCallback(() => setDoodleOpen(true), []);
-  const closeDoodlePanel = useCallback(() => setDoodleOpen(false), []);
+  const closeDoodlePanel = useCallback(() => {
+    setDoodleOpen(false);
+    setDoodleLiveMode(false);
+  }, []);
 
   const handleDoodleSend = useCallback((data: DoodleData) => {
     if (!user) {
@@ -566,6 +572,7 @@ export default function Messages() {
     const uid = user?.id;
     if (uid) {
       void hydrateHiddenMessages(uid).then(() => setHiddenTick((t) => t + 1));
+      void api.getScheduledMessages(uid).then(setScheduledMessages).catch(console.error);
     }
 
     const requestPromise = api.getMessages({ limit: 80 })
@@ -1171,6 +1178,11 @@ export default function Messages() {
       es.addEventListener("dua-added", handleDuaAdded);
       es.addEventListener("dua-deleted", handleDuaDeleted);
       es.addEventListener("prefs-updated", handlePrefsUpdated);
+      es.addEventListener("doodle_sync", (e: Event) => {
+        const msgEvent = e as MessageEvent;
+        const data = JSON.parse(msgEvent.data);
+        window.dispatchEvent(new CustomEvent("doodle_sync_event", { detail: data }));
+      });
 
       // SSE error handler with exponential backoff reconnection
       es.onerror = () => {
@@ -1926,6 +1938,12 @@ export default function Messages() {
   );
 
   const openMediaMessage = useCallback(async (msg: ApiMessage, stack?: ApiMessage[]) => {
+    if ((msg.variant as string) === "doodle_invite") {
+      setDoodleLiveMode(true);
+      setDoodleOpen(true);
+      return;
+    }
+
     const viewMode = msg.mediaViewMode ?? parseMediaViewMode(msg.companionSticker);
     const timed = viewMode === "once" || viewMode === "twice";
     const allowDownload = !timed;
@@ -3372,6 +3390,49 @@ export default function Messages() {
             </div>
           ))}
 
+          {/* Scheduled Messages */}
+          {scheduledMessages.length > 0 && (
+            <div className="mt-4 border-t border-primary/20 pt-4 relative">
+              <p className="text-center text-[11px] text-muted-foreground/70 mb-4 font-medium">Scheduled Messages</p>
+              {scheduledMessages.map(msg => {
+                const dummyMsg: ApiMessage = {
+                  id: msg.id,
+                  senderId: msg.senderId,
+                  text: msg.text,
+                  type: msg.type as any,
+                  variant: msg.variant as any,
+                  timestamp: msg.createdAt,
+                  companionSticker: msg.companionSticker,
+                  imageUrl: msg.imageData || msg.gifUrl,
+                  audioData: msg.audioData,
+                  liked: false,
+                  mediaOpenCount: 0,
+                };
+                return (
+                  <MessageItem
+                    key={msg.id}
+                    msg={dummyMsg}
+                    isMe={true}
+                    myId={user!.id}
+                    partnerAvatar={pAvatar}
+                    partnerName={pName}
+                    isScheduled={true}
+                    scheduledAt={msg.scheduledAt}
+                    onDelete={async (id) => {
+                      try {
+                        await api.deleteScheduledMessage(id);
+                        setScheduledMessages(prev => prev.filter(m => m.id !== id));
+                      } catch {
+                        // error handled silently or with alert
+                      }
+                    }}
+                    onLike={() => {}}
+                  />
+                )
+              })}
+            </div>
+          )}
+
           <div ref={bottomRef} className="h-8 shrink-0 scroll-anchor-bottom" aria-hidden />
           </div>
         </div>
@@ -3403,6 +3464,16 @@ export default function Messages() {
             <DoodleCanvas
               onClose={closeDoodlePanel}
               onSend={handleDoodleSend}
+              isLiveMode={doodleLiveMode}
+              partnerId={partnerId}
+              onGoLive={() => {
+                setDoodleLiveMode(true);
+                void sendMsgRef.current({
+                  type: "text",
+                  text: "I started a live drawing! 🎨",
+                  variant: "doodle_invite" as any
+                });
+              }}
               onError={(msg) => toast.error(msg, { duration: 4000 })}
               onDrawStart={() => {
                 if (user && partnerId) {

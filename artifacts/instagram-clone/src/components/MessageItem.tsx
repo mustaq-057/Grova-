@@ -23,7 +23,7 @@ import { resolveChatImageUrl, resolveChatVideoUrl, resolveChatAudioUrl, resolveM
 import { useEffect } from "react";
 import { useChatTheme } from "@/hooks/useChatTheme";
 import { useCall } from "@/lib/call-context";
-import { Phone, PhoneOff, PhoneForwarded, PhoneMissed, Video } from "lucide-react";
+import { Phone, PhoneOff, PhoneForwarded, PhoneMissed, Video, Lock, Clock, Palette } from "lucide-react";
 
 function isEmojiOnlyText(text?: string): boolean {
   if (!text) return false;
@@ -63,6 +63,8 @@ export interface MessageItemProps {
   onJumpToMessage?: (messageId: string) => void;
   animateEntrance?: boolean;
   openingMedia?: boolean;
+  isScheduled?: boolean;
+  scheduledAt?: string;
 }
 
 export const MessageItem = memo(function MessageItem({
@@ -89,6 +91,8 @@ export const MessageItem = memo(function MessageItem({
   onJumpToMessage,
   animateEntrance = true,
   openingMedia = false,
+  isScheduled = false,
+  scheduledAt,
 }: MessageItemProps) {
   const sameSender = prevMsg?.senderId === msg.senderId;
   const [showReactions, setShowReactions] = useState(false);
@@ -462,6 +466,22 @@ export const MessageItem = memo(function MessageItem({
             )}
           </div>
         </div>
+      ) : (msg.variant as string) === "doodle_invite" ? (
+        <div className="flex flex-col gap-2 p-1">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full bg-red-500/20 flex items-center justify-center shrink-0">
+              <Palette className="w-4 h-4 text-red-500" />
+            </div>
+            <p className="font-semibold text-[15px]">{msg.text}</p>
+          </div>
+          <button 
+            onClick={() => onOpenMedia?.(msg)}
+            className="w-full mt-1 bg-red-500 text-white rounded-xl py-2 font-bold hover:bg-red-600 transition-colors shadow-lg shadow-red-500/20"
+          >
+            🎨 Join Live Canvas
+          </button>
+        </div>
+
       ) : displayText && (msg.type === "text" || msg.type === "heart" || msg.type === "sticker") ? (
         <div className={cn(msg.companionSticker && !msg.companionSticker.startsWith("__vm:") && msg.companionSticker !== "🤲" && "flex items-start gap-1.5")}>
           {msg.companionSticker && !msg.companionSticker.startsWith("__vm:") && msg.companionSticker !== "🤲" && (

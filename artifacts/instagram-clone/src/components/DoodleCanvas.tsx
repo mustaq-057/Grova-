@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { X, Undo2, Send, Pipette } from "lucide-react";
+import { X, Undo2, Send, Pipette, Radio } from "lucide-react";
+import { api } from "@/lib/api";
 
 export interface DoodleData {
   imageData: string;
@@ -14,6 +15,9 @@ interface DoodleCanvasProps {
   onSend: (data: DoodleData) => void;
   onError?: (message: string) => void;
   onDrawStart?: () => void;
+  isLiveMode?: boolean;
+  partnerId?: string;
+  onGoLive?: () => void;
 }
 
 const BACKGROUND_WHITE = "#FFFFFF";
@@ -97,7 +101,7 @@ function isBackgroundPixel(r: number, g: number, b: number, a: number, bg: strin
   return Math.abs(r - br) < 8 && Math.abs(g - bg2) < 8 && Math.abs(b - bb) < 8;
 }
 
-export default function DoodleCanvas({ onClose, onSend, onError, onDrawStart }: DoodleCanvasProps) {
+export default function DoodleCanvas({ onClose, onSend, onError, onDrawStart, isLiveMode, partnerId, onGoLive }: DoodleCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const colorScrollRef = useRef<HTMLDivElement>(null);
@@ -114,6 +118,10 @@ export default function DoodleCanvas({ onClose, onSend, onError, onDrawStart }: 
   const lastPtRef = useRef<Point | null>(null);
   const historyRef = useRef<string[]>([]);
   const exportGenRef = useRef(0);
+  
+  // Live sync refs
+  const pendingStrokesRef = useRef<{x: number, y: number}[]>([]);
+  const lastSentTimeRef = useRef(0);
 
   const fillCanvas = useCallback((bg: string, snap?: string | null) => {
     const canvas = canvasRef.current;
@@ -200,6 +208,59 @@ export default function DoodleCanvas({ onClose, onSend, onError, onDrawStart }: 
     ctx.lineJoin = "round";
   }, [color, brushSize]);
 
+  useEffect(() => {
+    if (!isLiveMode || !partnerId) return;
+
+    const intervalId = setInterval(() => {
+      if (pendingStrokesRef.current.length > 0) {
+        void api.syncDoodleStrokes(partnerId, pendingStrokesRef.current, color, brushSize);
+        pendingStrokesRef.current = [];
+      }
+    }, 100);
+
+    return () => clearInterval(intervalId);
+  }, [isLiveMode, partnerId, color, brushSize]);
+
+  useEffect(() => {
+    if (!isLiveMode) return;
+
+    const handleSync = (e: Event) => {
+      const data = (e as CustomEvent).detail;
+      const canvas = canvasRef.current;
+      const ctx = canvas?.getContext("2d");
+      const rect = canvas?.getBoundingClientRect();
+      if (!ctx || !rect || !data.strokes || data.strokes.length === 0) return;
+
+      ctx.save();
+      ctx.globalCompositeOperation = "source-over";
+      ctx.strokeStyle = data.color;
+      ctx.fillStyle = data.color;
+      ctx.lineWidth = data.brushSize;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+
+      ctx.beginPath();
+      const first = data.strokes[0];
+      ctx.moveTo(first.x * rect.width, first.y * rect.height);
+      for (let i = 1; i < data.strokes.length; i++) {
+        ctx.lineTo(data.strokes[i].x * rect.width, data.strokes[i].y * rect.height);
+      }
+      ctx.stroke();
+
+      if (data.strokes.length === 1) {
+        ctx.beginPath();
+        ctx.arc(first.x * rect.width, first.y * rect.height, data.brushSize / 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.restore();
+      saveHistory();
+    };
+
+    window.addEventListener("doodle_sync_event", handleSync);
+    return () => window.removeEventListener("doodle_sync_event", handleSync);
+  }, [isLiveMode, saveHistory]);
+
   const getPoint = (e: React.PointerEvent): Point => {
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return { x: 0, y: 0 };
@@ -251,14 +312,22 @@ export default function DoodleCanvas({ onClose, onSend, onError, onDrawStart }: 
     e.preventDefault();
     const pt = getPoint(e);
     const ctx = canvasRef.current?.getContext("2d");
-    if (!ctx) return;
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!ctx || !rect) return;
     applyBrush(ctx);
     ctx.beginPath();
     ctx.moveTo(lastPtRef.current.x, lastPtRef.current.y);
     ctx.lineTo(pt.x, pt.y);
     ctx.stroke();
     lastPtRef.current = pt;
-  }, [applyBrush]);
+
+    if (isLiveMode && partnerId) {
+      pendingStrokesRef.current.push({
+        x: pt.x / rect.width,
+        y: pt.y / rect.height,
+      });
+    }
+  }, [applyBrush, isLiveMode, partnerId]);
 
   const onPointerUp = useCallback(() => {
     if (!isDrawingRef.current) return;
@@ -266,7 +335,12 @@ export default function DoodleCanvas({ onClose, onSend, onError, onDrawStart }: 
     lastPtRef.current = null;
     saveHistory();
     setHasStrokes(true);
-  }, [saveHistory]);
+    
+    if (isLiveMode && partnerId && pendingStrokesRef.current.length > 0) {
+      void api.syncDoodleStrokes(partnerId, pendingStrokesRef.current, color, brushSize);
+      pendingStrokesRef.current = [];
+    }
+  }, [saveHistory, isLiveMode, partnerId, color, brushSize]);
 
   const cropToContent = (
     sourceCanvas: HTMLCanvasElement,
@@ -560,6 +634,17 @@ export default function DoodleCanvas({ onClose, onSend, onError, onDrawStart }: 
           >
             {allSwatches.map((c) => swatchClass(c, isBgSelected(c)))}
           </div>
+
+          {!isLiveMode && onGoLive && (
+            <button
+              onClick={onGoLive}
+              className="px-3 h-[34px] flex items-center justify-center bg-red-500/20 text-red-500 rounded-full shrink-0 active:scale-95 transition-transform font-bold text-sm gap-1.5"
+              aria-label="Go Live"
+            >
+              <Radio className="w-4 h-4 animate-pulse" />
+              Go Live
+            </button>
+          )}
 
           <button
             onClick={handleSend}

@@ -1,5 +1,5 @@
 import { getAuthHeaders, saveSession, clearSession, getRefreshToken, setDeviceId, getOrCreateClientId } from "./session";
-import type { CouplePrefs } from "./types";
+import type { CouplePrefs, ScheduledMessage } from "./types";
 
 const BASE = "/api";
 const FETCH_TIMEOUT_MS = 45_000;
@@ -328,14 +328,7 @@ export type ApiStory = {
   expiresAt: string;
 };
 
-export type ScheduledMessage = {
-  id: string;
-  senderId: string;
-  text?: string;
-  type: string;
-  scheduledAt: string;
-  createdAt: string;
-};
+
 
 export type PresenceResponse = {
   lastSeen: Record<string, number>;
@@ -714,4 +707,10 @@ export const api = {
     }),
 
   getCallSignals: () => apiFetch<{ event: string; data: any }[]>("/call/signals"),
+
+  syncDoodleStrokes: (partnerId: string, strokes: { x: number; y: number }[], color: string, brushSize: number, clear?: boolean) =>
+    apiFetch<{ success: boolean }>("/doodle/sync", {
+      method: "POST",
+      body: JSON.stringify({ partnerId, strokes, color, brushSize, clear }),
+    }),
 };
