@@ -24,12 +24,16 @@ export async function iaResolvePdfUrl(identifier: string): Promise<string | null
       signal: AbortSignal.timeout(8000),
     });
     if (!res.ok) return null;
-    const data = (await res.json()) as { files?: { name?: string; format?: string }[] };
+    const data = (await res.json()) as { metadata?: { access_restricted_item?: boolean | string }; files?: { name?: string; format?: string }[] };
+    if (data.metadata?.access_restricted_item && data.metadata.access_restricted_item !== "false") return null;
+
     const pdf = (data.files || []).find(
       (f) =>
-        f.name?.toLowerCase().endsWith(".pdf") ||
+        (f.name?.toLowerCase().endsWith(".pdf") ||
         f.format === "Text PDF" ||
-        f.format === "PDF",
+        f.format === "PDF") &&
+        !f.name?.toLowerCase().includes("_encrypted") &&
+        !f.name?.toLowerCase().includes("_sample")
     );
     if (pdf?.name) return iaPdfUrl(identifier, pdf.name);
     return null;
@@ -114,7 +118,7 @@ export async function searchInternetArchive(
 
 /** Open Library — resolve verified Internet Archive PDF */
 export async function searchOpenLibrary(query: string, limit = 8): Promise<CatalogHit[]> {
-  const url = `https://openlibrary.org/search.json?q=${encodeURIComponent(query)}&has_fulltext=true&limit=${limit}`;
+  const url = `https://openlibrary.org/search.json?q=${encodeURIComponent(query)}&has_fulltext=true&public_scan_b=true&limit=${limit}`;
   const res = await fetch(url, {
     headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" },
     signal: AbortSignal.timeout(12000),

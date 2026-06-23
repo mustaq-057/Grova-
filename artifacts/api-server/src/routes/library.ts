@@ -616,6 +616,36 @@ libraryRouter.get("/library/notes", authenticate, async (req: AuthenticatedReque
   }
 });
 
+// ─── RESOLVE DIRECT FILE URL (bypass Vercel 4.5MB proxy limit) ───────────────
+libraryRouter.get("/library/:id/file-url", authenticate, async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT epub_url AS "epubUrl" FROM library_books WHERE id = $1`,
+      [req.params.id]
+    );
+    const epubUrl = result.rows[0]?.epubUrl as string | undefined;
+    if (!epubUrl?.trim()) return res.status(404).json({ error: "No file URL" });
+
+    // Always proxy cloud storage through API to handle private buckets/CORS
+    if (/cloudinary\.com|backblazeb2\.com/i.test(epubUrl)) {
+      return res.json({ proxy: true, url: epubUrl });
+    }
+
+    if (epubUrl.includes("archive.org/download/")) {
+      const upstream = await fetch(epubUrl, { redirect: "manual" });
+      if (upstream.status >= 300 && upstream.status < 400) {
+        const loc = upstream.headers.get("location");
+        if (loc) return res.json({ proxy: false, url: loc });
+      }
+    }
+
+    return res.json({ proxy: false, url: epubUrl });
+  } catch (err) {
+    console.error("Library file-url error:", err);
+    return res.status(500).json({ error: "Failed to resolve file URL" });
+  }
+});
+
 // ─── STREAM BOOK FILE (proxy — fixes CORS + PDF loading) ───────────────────
 libraryRouter.get("/library/:id/file", authenticate, async (req, res) => {
   try {

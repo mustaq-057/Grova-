@@ -91,7 +91,31 @@ async function fetchPdfBlob(
     }
   }
 
-  // Always load through our API — direct browser fetch hits CORS on archive.org, Gutenberg, Cloudinary, etc.
+  // FIRST: Get the direct URL to avoid proxying 50MB PDFs through Vercel
+  try {
+    const info = await apiFetch<{ proxy: boolean; url: string }>(`/library/${bookId}/file-url`);
+    
+    if (!info.proxy && info.url) {
+      // Fetch directly from the source without credentials (bypasses CORS restrictions on wildcards)
+      const res = await fetch(info.url, { mode: "cors" });
+      if (res.ok) {
+        const buf = await res.arrayBuffer();
+        if (isPdfBuffer(buf)) {
+           return {
+             blob: new Blob([buf], { type: "application/pdf" }),
+             contentType: res.headers.get("content-type") || "application/pdf"
+           };
+        }
+        errors.push("Direct fetch returned a file that is not a valid PDF.");
+      } else {
+        errors.push(`Direct fetch failed: HTTP ${res.status}`);
+      }
+    }
+  } catch (e) {
+    errors.push(e instanceof Error ? e.message : "Failed to fetch file URL");
+  }
+
+  // Fallback: Always load through our API — direct browser fetch hits CORS on archive.org redirects, Gutenberg, Cloudinary, etc.
   try {
     const proxied = await apiFetchBlob(`/library/${bookId}/file`);
     const buf = await proxied.blob.arrayBuffer();

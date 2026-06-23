@@ -272,13 +272,12 @@ export default function CallScreen({
   // Orphaned call prevention: Send end signal if the tab is closed
   useEffect(() => {
     const handleBeforeUnload = () => {
-      // Beacon is more reliable for unload, but fetch might work if small
-      // We use onSendSignal which might use fetch, hopefully it fires in time.
-      onSendSignal({ type: "end", senderId: myId });
+      const blob = new Blob([JSON.stringify({ type: "end", senderId: myId })], { type: "application/json" });
+      navigator.sendBeacon("/api/call/signal", blob);
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [onSendSignal, myId]);
+  }, [myId]);
 
   // WebRTC Setup
   useEffect(() => {
@@ -694,6 +693,7 @@ export default function CallScreen({
               <ControlButton icon={videoOff ? <VideoOff /> : <Video />} onClick={toggleVideo} active={videoOff} label="Video" />
               <ControlButton icon={muted ? <MicOff /> : <Mic />} onClick={toggleMute} active={muted} label="Mute" />
               <ControlButton icon={<SwitchCamera />} onClick={flipCamera} label="Flip" />
+              <ControlButton icon={<MonitorUp />} onClick={toggleScreenShare} active={isScreenSharing} label="Share" />
               <ControlButton icon={<PictureInPicture />} onClick={togglePiP} label="PiP" />
               <ControlButton icon={<Gauge />} onClick={toggleLowDataMode} active={lowDataMode} label={lowDataMode ? "Data Saver" : "HD"} />
               <button
