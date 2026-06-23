@@ -223,7 +223,7 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
         className="fixed inset-0 z-[300] bg-black flex flex-col"
       >
         <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-center z-10 bg-gradient-to-b from-black/50 to-transparent pt-[max(1rem,env(safe-area-inset-top))]">
-          <button onClick={onClose} className="p-2 text-white hover:bg-white/10 rounded-full transition-colors active:scale-95">
+          <button onClick={() => onClose()} className="p-2 text-white hover:bg-white/10 rounded-full transition-colors active:scale-95">
             <X className="w-8 h-8" />
           </button>
           
