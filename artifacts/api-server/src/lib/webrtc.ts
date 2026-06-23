@@ -57,9 +57,15 @@ export function getTurnServers(): RTCIceServer[] {
   const turnSecret = process.env.TURN_CREDENTIAL; // Using the credential env var as the secret
 
   if (turnUrls.length === 0 || !turnUsername || !turnSecret) {
-    console.warn('TURN server not configured. WebRTC may not work in restrictive network environments.');
-    console.warn('Set TURN_SERVERS, TURN_USERNAME, and TURN_CREDENTIAL environment variables.');
-    return [];
+    console.warn('TURN server not configured via env vars. Falling back to public openrelay.metered.ca TURN servers.');
+    return [
+      {
+        urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443', 'turn:openrelay.metered.ca:443?transport=tcp'],
+        username: 'openrelayproject',
+        credential: 'openrelayproject',
+        credentialType: 'password'
+      }
+    ];
   }
 
   // Generate dynamic time-limited credentials

@@ -264,6 +264,17 @@ export default function CallScreen({
     onEnd();
   }, [myId, onEnd, onSendSignal, cleanupMedia]);
 
+  // Orphaned call prevention: Send end signal if the tab is closed
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      // Beacon is more reliable for unload, but fetch might work if small
+      // We use onSendSignal which might use fetch, hopefully it fires in time.
+      onSendSignal({ type: "end", senderId: myId });
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [onSendSignal, myId]);
+
   // WebRTC Setup
   useEffect(() => {
     let isMounted = true;
