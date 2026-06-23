@@ -53,17 +53,6 @@ export function useChatTheme() {
     };
   }
 
-  if (appTheme === "vintage-polaroid") {
-    theme = {
-      ...theme,
-      id: "vintage-polaroid",
-      bubbleColor: "#9c3b3b", // Faded polaroid red
-      bubbleBorder: "#9c3b3b",
-      textColor: "#f4f1ea", // Paper white
-      partnerTextColor: "#f4f1ea"
-    };
-  }
-
   if (appTheme === "sara-lavender") {
     theme = {
       ...theme,

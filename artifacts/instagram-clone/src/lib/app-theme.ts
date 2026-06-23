@@ -8,8 +8,7 @@ export type AppThemeId =
   | "moonlight-saga"
   | "floura"
   | "mint"
-  | "library"
-  | "vintage-polaroid";
+  | "library";
 
 const PREMIUM_ANIMATED_THEMES: AppThemeId[] = ["moonlight-saga"];
 
@@ -173,29 +172,6 @@ export const APP_THEMES: {
         "--app-border": "210 18% 85%",
       },
     },
-    {
-      id: "vintage-polaroid",
-      name: "Polaroid",
-      description: "A nostalgic, grainy vintage film aesthetic 📸",
-      swatch: "bg-gradient-to-br from-[#d4c9b9] via-[#c2b4a3] to-[#8c7863]",
-      dark: {
-        "--app-background": "35 25% 10%",
-        "--app-foreground": "40 30% 90%",
-        "--app-primary": "10 50% 45%",
-        "--app-card": "35 20% 13%",
-        "--app-secondary": "35 20% 16%",
-        "--app-border": "35 15% 22%",
-      },
-      light: {
-        "--app-background": "40 35% 95%",
-        "--app-foreground": "30 20% 15%",
-        "--app-primary": "10 50% 50%",
-        "--app-card": "40 35% 98%",
-        "--app-secondary": "40 25% 90%",
-        "--app-border": "40 15% 85%",
-      },
-    },
-
   ];
 
 let currentAppTheme: AppThemeId = "sara-lavender";
