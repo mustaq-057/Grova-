@@ -178,12 +178,13 @@ export function CallProvider({ children }: { children: ReactNode }) {
 
   // Auto-hangup for unanswered outgoing calls (60 seconds)
   useEffect(() => {
-    if (callState?.status === "outgoing") {
-      const timer = setTimeout(() => {
-        endCall();
-      }, 60000);
-      return () => clearTimeout(timer);
-    }
+    if (callState?.status !== "outgoing") return;
+    
+    const timer = setTimeout(() => {
+      endCall();
+    }, 60000);
+    
+    return () => clearTimeout(timer);
   }, [callState?.status, endCall]);
 
   // Fetch pending call signals on mount/login (one-shot)
