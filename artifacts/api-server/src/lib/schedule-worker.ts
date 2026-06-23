@@ -53,27 +53,34 @@ async function deliverScheduledRow(row: Record<string, unknown>): Promise<void> 
   });
 }
 
-export function startScheduleWorker(): void {
-  const tick = async () => {
-    try {
-      const now = new Date().toISOString();
-      const result = await db.execute(
-        "SELECT * FROM scheduled_messages WHERE sent = 0 AND scheduled_at <= $1 ORDER BY scheduled_at ASC LIMIT 20",
-        [now],
-      );
-      for (const row of result.rows as Record<string, unknown>[]) {
-        try {
-          await deliverScheduledRow(row);
-        } catch (err) {
-          logger.error({ err, id: row.id }, "Failed to deliver scheduled message");
-        }
-      }
-    } catch (err) {
-      logger.error({ err }, "Schedule worker tick failed");
-    }
-  };
+let lastTickTime = 0;
 
-  void tick();
-  setInterval(tick, 30_000);
+export async function runScheduleTick(): Promise<void> {
+  const nowMs = Date.now();
+  // Throttle to run at most once every 10 seconds
+  if (nowMs - lastTickTime < 10_000) return;
+  lastTickTime = nowMs;
+
+  try {
+    const nowStr = new Date(nowMs).toISOString();
+    const result = await db.execute(
+      "SELECT * FROM scheduled_messages WHERE sent = 0 AND scheduled_at <= $1 ORDER BY scheduled_at ASC LIMIT 20",
+      [nowStr],
+    );
+    for (const row of result.rows as Record<string, unknown>[]) {
+      try {
+        await deliverScheduledRow(row);
+      } catch (err) {
+        logger.error({ err, id: row.id }, "Failed to deliver scheduled message");
+      }
+    }
+  } catch (err) {
+    logger.error({ err }, "Schedule worker tick failed");
+  }
+}
+
+export function startScheduleWorker(): void {
+  void runScheduleTick();
+  setInterval(runScheduleTick, 30_000);
   logger.info("Schedule message worker started");
 }

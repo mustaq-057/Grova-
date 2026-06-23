@@ -3,6 +3,7 @@ import { broadcast } from "../lib/sse";
 import { authenticate } from "../lib/auth-middleware";
 import { rateLimiters } from "../lib/security";
 import db from "../lib/db";
+import { runScheduleTick } from "../lib/schedule-worker";
 
 const lastSeen: Record<string, number> = {};
 const inLibraryState: Record<string, boolean> = {};
@@ -84,6 +85,9 @@ router.get("/presence", rateLimiters.read, authenticate, async (req, res) => {
     }
 
     res.json({ lastSeen: lastSeenMap, typing, inLibrary: inLibraryState });
+
+    // Trigger scheduled messages tick on Vercel
+    void runScheduleTick().catch(() => {});
   } catch (err) {
     console.error("Failed to fetch presence:", err);
     res.status(500).json({ error: "Failed to fetch presence" });
