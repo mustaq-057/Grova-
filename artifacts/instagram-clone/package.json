@@ -73,6 +73,7 @@
     "zod": "catalog:"
   },
   "dependencies": {
+    "@use-gesture/react": "^10.3.1",
     "epubjs": "^0.3.93",
     "react-easy-crop": "^6.0.2",
     "react-pdf": "^10.4.1",
