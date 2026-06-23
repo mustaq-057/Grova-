@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { X, Image as ImageIcon, RefreshCcw, Zap, ZapOff, Film } from "lucide-react";
-import { createPortal } from "react-dom";
+import { X, Image as ImageIcon, RefreshCcw, Zap, ZapOff } from "lucide-react";
+import ReactDOM from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import vintageCameraImg from "../vintage-camera.png";
 import { StoryEditor } from "./StoryEditor";
@@ -293,7 +293,7 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
     return <StoryEditor file={storyFile} onClose={() => setStoryFile(null)} onComplete={() => onClose(true)} />;
   }
 
-  return createPortal(
+  return ReactDOM.createPortal(
     <AnimatePresence>
       <motion.div
         initial={{ opacity: 0, y: 50 }}

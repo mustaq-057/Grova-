@@ -208,6 +208,12 @@ export default memo(function Home() {
                 ) : (
                   <div className="absolute bottom-0 right-0 w-5 h-5 sm:w-6 sm:h-6 bg-green-500 rounded-full border-[3px] border-background z-20 shadow-sm" aria-label="You are online" />
                 )}
+                {/* Story count badge */}
+                {myStories.length > 1 && (
+                  <div className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-primary text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 z-30 shadow border-2 border-background">
+                    {myStories.length}
+                  </div>
+                )}
               </button>
 
               {/* Animated heart in the middle — tap to go to chat */}
@@ -252,6 +258,12 @@ export default memo(function Home() {
                   className={`absolute bottom-0 right-0 w-5 h-5 sm:w-6 sm:h-6 rounded-full border-[3px] border-background z-20 shadow-sm ${partnerOnline ? "bg-green-500" : "bg-gray-400"}`}
                   aria-label={partnerOnline ? "Partner is online" : "Partner is offline"}
                 />
+                {/* Story count badge */}
+                {partnerStories.length > 1 && (
+                  <div className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-primary text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 z-30 shadow border-2 border-background">
+                    {partnerStories.length}
+                  </div>
+                )}
               </button>
             </motion.div>
         )}
