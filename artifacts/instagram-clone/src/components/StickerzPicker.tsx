@@ -157,22 +157,24 @@ export function StickerzPicker({ onSelect, onClose }: StickerzPickerProps) {
           </button>
         </div>
 
-        <div className="px-4 py-3 shrink-0">
-          <div className="relative">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Search stickerz..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-[#2a2a2a] text-white rounded-full py-2 pl-9 pr-4 text-sm focus:outline-none focus:ring-1 focus:ring-primary/50"
-            />
+        {step === "list" && (
+          <div className="px-4 py-3 shrink-0">
+            <div className="relative">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="Search stickerz..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-[#2a2a2a] text-white rounded-full py-2 pl-9 pr-4 text-sm focus:outline-none focus:ring-1 focus:ring-primary/50"
+              />
+            </div>
           </div>
-        </div>
+        )}
 
         {step === "crop" ? (
-          <div className="flex-1 flex flex-col p-4 space-y-4">
-            <div className="relative flex-1 rounded-2xl overflow-hidden bg-black border border-white/10">
+          <div className="flex-1 flex flex-col min-h-0 p-4 space-y-4 pb-8">
+            <div className="relative flex-1 min-h-0 rounded-2xl overflow-hidden bg-black border border-white/10">
               <Cropper
                 image={uploadPreview}
                 crop={crop}
