@@ -163,39 +163,7 @@ export default memo(function Home() {
         )}
       </motion.div>
 
-      {/* Stories Bar */}
-      <div className="flex gap-4 px-4 py-4 overflow-x-auto hide-scrollbar">
-        {/* Add Story Button / My Stories */}
-        <div className="flex flex-col items-center gap-1">
-          <div className="relative">
-            <div 
-              className={`p-0.5 rounded-full ${myStories.length > 0 ? "bg-gradient-to-tr from-yellow-400 to-primary" : ""}`}
-              onClick={() => myStories.length > 0 ? setViewingStories(myStories) : setShowCamera(true)}
-            >
-              <AvatarImage src={user?.avatar} userId={user?.id ?? "me"} alt="Your story" className="w-16 h-16 rounded-full border-2 border-background object-cover bg-neutral-800" />
-            </div>
-            {myStories.length === 0 && (
-              <button 
-                onClick={() => setShowCamera(true)}
-                className="absolute bottom-0 right-0 w-6 h-6 bg-blue-500 rounded-full border-2 border-background flex items-center justify-center"
-              >
-                <Plus className="w-4 h-4 text-white" strokeWidth={3} />
-              </button>
-            )}
-          </div>
-          <span className="text-[10px] text-muted-foreground font-medium">Your Story</span>
-        </div>
 
-        {/* Partner Stories */}
-        {partner && partnerStories.length > 0 && (
-          <div className="flex flex-col items-center gap-1 cursor-pointer" onClick={() => setViewingStories(partnerStories)}>
-            <div className="p-0.5 rounded-full bg-gradient-to-tr from-yellow-400 to-primary">
-              <AvatarImage src={partner.avatar} userId={partner.id} alt="Partner story" className="w-16 h-16 rounded-full border-2 border-background object-cover bg-neutral-800" />
-            </div>
-            <span className="text-[10px] text-muted-foreground font-medium">{partner.name}</span>
-          </div>
-        )}
-      </div>
 
       <motion.div 
         initial={{ opacity: 0 }}
@@ -219,14 +187,28 @@ export default memo(function Home() {
               transition={{ delay: 0.2, duration: 0.3 }}
               className={`relative flex items-center justify-center gap-5 sm:gap-7 mt-8 mb-6 w-full max-w-[340px] mx-auto cursor-pointer active:scale-[0.98] transition-transform ${appTheme === 'library' ? 'library-locket-container' : ''} ${appTheme === 'mint' ? 'home-avatar-mint-glow' : ''}`}
             >
-              <div className="relative z-10">
+              <div 
+                className={`relative z-10 p-0.5 rounded-full cursor-pointer transition-transform active:scale-95 ${myStories.length > 0 ? "bg-gradient-to-tr from-yellow-400 to-primary" : ""}`}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (myStories.length > 0) setViewingStories(myStories);
+                  else setShowCamera(true);
+                }}
+              >
                 <AvatarImage
                   src={user?.avatar}
                   userId={user?.id ?? "me"}
                   alt=""
-                  className={`w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-[3px] border-primary/40 shadow-[0_0_20px_rgba(var(--primary),0.25)] bg-background ${appTheme === 'library' ? 'library-locket' : ''}`}
+                  className={`w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-[3px] shadow-[0_0_20px_rgba(var(--primary),0.25)] bg-background ${myStories.length > 0 ? "border-background" : "border-primary/40"} ${appTheme === 'library' ? 'library-locket' : ''}`}
                 />
-                <div className="absolute bottom-0 right-0 w-5 h-5 sm:w-6 sm:h-6 bg-green-500 rounded-full border-[3px] border-background z-20 shadow-sm" aria-label="You are online" />
+                {myStories.length === 0 ? (
+                  <div className="absolute bottom-0 right-0 w-6 h-6 sm:w-7 sm:h-7 bg-blue-500 rounded-full border-[3px] border-background flex items-center justify-center z-20">
+                    <Plus className="w-3 h-3 sm:w-4 sm:h-4 text-white" strokeWidth={3} />
+                  </div>
+                ) : (
+                  <div className="absolute bottom-0 right-0 w-5 h-5 sm:w-6 sm:h-6 bg-green-500 rounded-full border-[3px] border-background z-20 shadow-sm" aria-label="You are online" />
+                )}
               </div>
 
               <motion.div
@@ -249,12 +231,21 @@ export default memo(function Home() {
                 />
               </motion.div>
 
-              <div className="relative z-10">
+              <div 
+                className={`relative z-10 p-0.5 rounded-full ${partnerStories.length > 0 ? "cursor-pointer transition-transform active:scale-95 bg-gradient-to-tr from-yellow-400 to-primary" : ""}`}
+                onClick={(e) => {
+                  if (partnerStories.length > 0) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setViewingStories(partnerStories);
+                  }
+                }}
+              >
                 <AvatarImage
                   src={partner.avatar}
                   userId={partner.id}
                   alt=""
-                  className={`w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-[3px] border-primary/40 shadow-[0_0_20px_rgba(var(--primary),0.25)] bg-background ${appTheme === 'library' ? 'library-locket' : ''}`}
+                  className={`w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-[3px] shadow-[0_0_20px_rgba(var(--primary),0.25)] bg-background ${partnerStories.length > 0 ? "border-background" : "border-primary/40"} ${appTheme === 'library' ? 'library-locket' : ''}`}
                 />
                 <div
                   className={`absolute bottom-0 right-0 w-5 h-5 sm:w-6 sm:h-6 rounded-full border-[3px] border-background z-20 shadow-sm ${partnerOnline ? "bg-green-500" : "bg-gray-400"}`}

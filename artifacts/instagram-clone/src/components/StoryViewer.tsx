@@ -109,7 +109,7 @@ export function StoryViewer({ stories, initialIndex = 0, onClose }: StoryViewerP
         >
           {currentStory.mediaUrl && (
             <img 
-              src={currentStory.mediaUrl} 
+              src={`/api/media/inline?url=${encodeURIComponent(currentStory.mediaUrl)}&type=image/jpeg`} 
               className="w-full h-full object-cover" 
               draggable={false}
               alt="Story"
