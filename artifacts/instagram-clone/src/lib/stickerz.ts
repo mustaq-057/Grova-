@@ -92,6 +92,15 @@ export function addCustomSticker(url: string, caption: string): CustomSticker {
   return newSticker;
 }
 
+export function removeCustomSticker(id: string) {
+  const custom = getCustomStickers();
+  const filtered = custom.filter(s => s.id !== id);
+  if (filtered.length !== custom.length) {
+    localStorage.setItem(CUSTOM_STICKERZ_STORAGE_KEY, JSON.stringify(filtered));
+    window.dispatchEvent(new Event("custom_stickerz_updated"));
+  }
+}
+
 let preloaded = false;
 
 export function preloadStickerz() {

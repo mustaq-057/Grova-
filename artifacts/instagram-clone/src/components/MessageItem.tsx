@@ -522,11 +522,12 @@ export const MessageItem = memo(function MessageItem({
     const timeString = new Date(msg.timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 
     const isMissedRed = isMissed;
-    const bgColor = isMissedRed ? "bg-red-500/10 hover:bg-red-500/20 active:bg-red-500/30" : "bg-[#262626] hover:bg-[#2e2e2e] active:bg-[#333]";
-    const borderColor = isMissedRed ? "border-red-500/20" : "border-white/5";
-    const iconContainerColor = isMissedRed ? "bg-red-500/20" : "bg-white/20";
-    const textColor = isMissedRed ? "text-red-500" : "text-white";
-    const timeColor = isMissedRed ? "text-red-500/70" : "text-white/60";
+    const bgColor = isMissedRed ? "bg-red-500/10 hover:bg-red-500/20 active:bg-red-500/30" : "bg-card hover:bg-card/80 active:bg-card/60 shadow-sm";
+    const borderColor = isMissedRed ? "border-red-500/20" : "border-border";
+    const iconContainerColor = isMissedRed ? "bg-red-500/20" : "bg-primary/15";
+    const textColor = isMissedRed ? "text-red-600 dark:text-red-400" : "text-card-foreground";
+    const timeColor = isMissedRed ? "text-red-600/70 dark:text-red-400/70" : "text-muted-foreground";
+    const iconColor = isMissedRed ? "text-red-600 dark:text-red-400" : "text-primary";
 
     return (
       <div 
@@ -540,15 +541,15 @@ export const MessageItem = memo(function MessageItem({
           {/* Circular Icon Container */}
           <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 ${iconContainerColor}`}>
             {isVideoLog ? (
-              <Video className={`w-6 h-6 ${textColor}`} fill="currentColor" />
+              <Video className={`w-6 h-6 ${iconColor}`} fill="currentColor" />
             ) : isMissed ? (
-              <PhoneMissed className={`w-6 h-6 ${textColor}`} />
+              <PhoneMissed className={`w-6 h-6 ${iconColor}`} />
             ) : isEnded ? (
-              <PhoneOff className={`w-6 h-6 ${textColor}`} />
+              <PhoneOff className={`w-6 h-6 ${iconColor}`} />
             ) : isOutgoing ? (
-              <PhoneForwarded className={`w-6 h-6 ${textColor}`} />
+              <PhoneForwarded className={`w-6 h-6 ${iconColor}`} />
             ) : (
-              <Phone className={`w-6 h-6 ${textColor}`} fill="currentColor" />
+              <Phone className={`w-6 h-6 ${iconColor}`} fill="currentColor" />
             )}
           </div>
           
