@@ -45,7 +45,7 @@ export interface Message {
   liked: boolean;
   deleted?: boolean;
   deletedAt?: string;
-  variant?: "cute" | "default";
+  variant?: "cute" | "default" | "doodle_invite";
   companionSticker?: string;
   reaction?: string;
   replyToId?: string;
@@ -73,7 +73,7 @@ function validateMessageType(type: string): type is Message["type"] {
 }
 
 function validateVariant(variant: unknown): variant is Message["variant"] {
-  return typeof variant === "string" && (variant === "cute" || variant === "default");
+  return typeof variant === "string" && (variant === "cute" || variant === "default" || variant === "doodle_invite");
 }
 
 function parseMediaViewMode(companionSticker?: string): "keep" | "once" | "twice" {

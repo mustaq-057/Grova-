@@ -217,7 +217,7 @@ export type ApiMessage = {
   likedBy?: string;
   deleted?: boolean;
   deletedAt?: string;
-  variant?: "cute" | "default";
+  variant?: "cute" | "default" | "doodle_invite";
   companionSticker?: string;
   encrypted?: boolean;
   read?: boolean;

@@ -72,6 +72,18 @@ const SchedulePicker = ({ onClose, onSchedule }: { onClose: () => void, onSchedu
         {mode === "chips" ? (
           <div className="flex flex-col gap-3">
             <button 
+              onClick={() => onSchedule(new Date(Date.now() + 10 * 60 * 1000))}
+              className="w-full bg-white/10 hover:bg-white/20 p-4 rounded-2xl text-left font-medium transition-colors"
+            >
+              In 10 Minutes
+            </button>
+            <button 
+              onClick={() => onSchedule(new Date(Date.now() + 30 * 60 * 1000))}
+              className="w-full bg-white/10 hover:bg-white/20 p-4 rounded-2xl text-left font-medium transition-colors"
+            >
+              In 30 Minutes
+            </button>
+            <button 
               onClick={() => onSchedule(new Date(Date.now() + 60 * 60 * 1000))}
               className="w-full bg-white/10 hover:bg-white/20 p-4 rounded-2xl text-left font-medium transition-colors"
             >
