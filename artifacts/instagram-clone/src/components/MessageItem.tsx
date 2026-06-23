@@ -102,6 +102,21 @@ export const MessageItem = memo(function MessageItem({
   const [showReactionEmojiPicker, setShowReactionEmojiPicker] = useState(false);
   const [imageLoadFailed, setImageLoadFailed] = useState(false);
   const [imageRetry, setImageRetry] = useState(0);
+  const [doodleExpired, setDoodleExpired] = useState(false);
+
+  useEffect(() => {
+    if ((msg.variant as string) === "doodle_invite") {
+      const checkExpiry = () => {
+        const elapsed = Date.now() - new Date(msg.timestamp).getTime();
+        setDoodleExpired(elapsed > 30000);
+      };
+      checkExpiry();
+      const interval = setInterval(checkExpiry, 1000);
+      return () => clearInterval(interval);
+    }
+    return undefined;
+  }, [msg.timestamp, msg.variant]);
+
   const remoteImageSrc = useMemo(
     () => resolveChatImageUrl(msg.imageUrl || msg.imageData),
     [msg.imageUrl, msg.imageData],
@@ -475,10 +490,17 @@ export const MessageItem = memo(function MessageItem({
             <p className="font-semibold text-[15px]">{msg.text}</p>
           </div>
           <button 
-            onClick={() => onOpenMedia?.(msg)}
-            className="w-full mt-1 bg-red-500 text-white rounded-xl py-2 font-bold hover:bg-red-600 transition-colors shadow-lg shadow-red-500/20"
+            onClick={() => {
+              if (!doodleExpired) onOpenMedia?.(msg);
+            }}
+            disabled={doodleExpired}
+            className={`w-full mt-1 rounded-xl py-2 font-bold transition-all shadow-lg ${
+              doodleExpired 
+                ? "bg-secondary text-muted-foreground cursor-not-allowed shadow-none" 
+                : "bg-red-500 text-white hover:bg-red-600 shadow-red-500/20"
+            }`}
           >
-            🎨 Join Live Canvas
+            {doodleExpired ? "⏱️ Invitation Expired" : "🎨 Join Live Canvas"}
           </button>
         </div>
 
