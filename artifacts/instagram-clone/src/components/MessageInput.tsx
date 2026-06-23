@@ -70,22 +70,22 @@ const SchedulePicker = ({ onClose, onSchedule }: { onClose: () => void, onSchedu
         <h3 className="text-xl font-bold mb-4">Schedule Message</h3>
         
         {mode === "chips" ? (
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-3 max-h-[50vh] overflow-y-auto pr-1 pb-2">
             <button 
               onClick={() => onSchedule(new Date(Date.now() + 10 * 60 * 1000))}
-              className="w-full bg-white/10 hover:bg-white/20 p-4 rounded-2xl text-left font-medium transition-colors"
+              className="w-full bg-white/10 hover:bg-white/20 p-4 rounded-2xl text-left font-medium transition-colors shrink-0"
             >
               In 10 Minutes
             </button>
             <button 
               onClick={() => onSchedule(new Date(Date.now() + 30 * 60 * 1000))}
-              className="w-full bg-white/10 hover:bg-white/20 p-4 rounded-2xl text-left font-medium transition-colors"
+              className="w-full bg-white/10 hover:bg-white/20 p-4 rounded-2xl text-left font-medium transition-colors shrink-0"
             >
               In 30 Minutes
             </button>
             <button 
               onClick={() => onSchedule(new Date(Date.now() + 60 * 60 * 1000))}
-              className="w-full bg-white/10 hover:bg-white/20 p-4 rounded-2xl text-left font-medium transition-colors"
+              className="w-full bg-white/10 hover:bg-white/20 p-4 rounded-2xl text-left font-medium transition-colors shrink-0"
             >
               In 1 Hour
             </button>
@@ -96,19 +96,19 @@ const SchedulePicker = ({ onClose, onSchedule }: { onClose: () => void, onSchedu
                 d.setHours(9, 0, 0, 0);
                 onSchedule(d);
               }}
-              className="w-full bg-white/10 hover:bg-white/20 p-4 rounded-2xl text-left font-medium transition-colors"
+              className="w-full bg-white/10 hover:bg-white/20 p-4 rounded-2xl text-left font-medium transition-colors shrink-0"
             >
               Tomorrow Morning (9:00 AM)
             </button>
             <button 
               onClick={() => setMode("custom")}
-              className="w-full bg-white/10 hover:bg-white/20 p-4 rounded-2xl text-left font-medium transition-colors"
+              className="w-full bg-white/10 hover:bg-white/20 p-4 rounded-2xl text-left font-medium transition-colors shrink-0"
             >
               Custom Date & Time
             </button>
           </div>
         ) : (
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-4 max-h-[50vh] overflow-y-auto pr-1 pb-2">
             <div>
               <label className="block text-sm text-white/50 mb-1 ml-1">Date</label>
               <input 
