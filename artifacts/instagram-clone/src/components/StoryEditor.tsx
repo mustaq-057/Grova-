@@ -336,23 +336,23 @@ export function StoryEditor({ file, onClose, onComplete }: StoryEditorProps) {
       {/* Top Controls */}
       {!isTyping && (
         <div className="absolute top-safe left-0 right-0 p-4 flex justify-between items-center z-20 pointer-events-none">
-          <button onClick={onClose} className="p-2 text-white hover:bg-white/10 rounded-full pointer-events-auto">
-            <X className="w-7 h-7 drop-shadow-md" />
-          </button>
-          
-          <div className="flex gap-4 pointer-events-auto">
-            {/* Gallery Sticker Button - Only for images */}
+          <div className="flex items-center gap-2 pointer-events-auto">
+            {/* Close */}
+            <button onClick={onClose} className="p-2 text-white hover:bg-white/10 rounded-full">
+              <X className="w-7 h-7 drop-shadow-md" />
+            </button>
+            {/* Add image from gallery — only for images, shown next to close */}
             {!isVideo && (
               <button onClick={() => fileInputRef.current?.click()} className="p-2 text-white hover:bg-white/10 rounded-full flex items-center justify-center">
-                <ImagePlus className="w-7 h-7 drop-shadow-md" />
+                <ImagePlus className="w-6 h-6 drop-shadow-md" />
               </button>
             )}
-            
-            {/* Text Button */}
-            <button onClick={() => setIsTyping(true)} className="p-2 text-white hover:bg-white/10 rounded-full flex items-center justify-center">
-              <span className="font-serif font-bold text-[26px] drop-shadow-md leading-none">Aa</span>
-            </button>
           </div>
+
+          {/* Text / Aa — right side */}
+          <button onClick={() => setIsTyping(true)} className="p-2 text-white hover:bg-white/10 rounded-full flex items-center justify-center pointer-events-auto">
+            <span className="font-serif font-bold text-[26px] drop-shadow-md leading-none">Aa</span>
+          </button>
         </div>
       )}
 

@@ -180,18 +180,17 @@ export default memo(function Home() {
             <div className="w-16 h-16 rounded-full bg-secondary/50 animate-pulse" />
           </div>
         ) : partner && (
-          <Link href="/chat">
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.2, duration: 0.3 }}
-              className={`relative flex items-center justify-center gap-5 sm:gap-7 mt-8 mb-6 w-full max-w-[340px] mx-auto cursor-pointer active:scale-[0.98] transition-transform ${appTheme === 'library' ? 'library-locket-container' : ''} ${appTheme === 'mint' ? 'home-avatar-mint-glow' : ''}`}
+              className={`relative flex items-center justify-center gap-5 sm:gap-7 mt-8 mb-3 w-full max-w-[340px] mx-auto ${appTheme === 'library' ? 'library-locket-container' : ''} ${appTheme === 'mint' ? 'home-avatar-mint-glow' : ''}`}
             >
-              <div 
+              {/* My avatar — tap to view/add story */}
+              <button
+                type="button"
                 className={`relative z-10 p-0.5 rounded-full cursor-pointer transition-transform active:scale-95 ${myStories.length > 0 ? "bg-gradient-to-tr from-yellow-400 to-primary" : ""}`}
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
+                onClick={() => {
                   if (myStories.length > 0) setViewingStories(myStories);
                   else setShowCamera(true);
                 }}
@@ -209,37 +208,39 @@ export default memo(function Home() {
                 ) : (
                   <div className="absolute bottom-0 right-0 w-5 h-5 sm:w-6 sm:h-6 bg-green-500 rounded-full border-[3px] border-background z-20 shadow-sm" aria-label="You are online" />
                 )}
-              </div>
+              </button>
 
-              <motion.div
-                animate={{ scale: [1, 1.18, 1] }}
-                transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
-                className="relative z-[7] flex items-center justify-center"
-                aria-hidden
-              >
-                <div className="absolute w-20 h-20 sm:w-24 sm:h-24 bg-primary/25 rounded-full blur-[28px] animate-pulse" />
-                <div className="absolute w-14 h-14 sm:w-16 sm:h-16 bg-primary/40 rounded-full blur-[16px]" />
-                <div
-                  className="absolute w-10 h-10 sm:w-12 sm:h-12 bg-primary/60 rounded-full blur-[8px]"
-                  style={{ boxShadow: "0 0 32px rgba(var(--primary), 0.9), 0 0 64px rgba(var(--primary), 0.5)" }}
-                />
-                <Heart
-                  className="relative w-8 h-8 sm:w-10 sm:h-10 text-primary fill-primary"
-                  style={{
-                    filter: "drop-shadow(0 0 8px rgba(var(--primary), 1)) drop-shadow(0 0 20px rgba(var(--primary), 0.85)) drop-shadow(0 0 40px rgba(var(--primary), 0.5))",
-                  }}
-                />
-              </motion.div>
+              {/* Animated heart in the middle — tap to go to chat */}
+              <Link href="/chat">
+                <motion.div
+                  animate={{ scale: [1, 1.18, 1] }}
+                  transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
+                  className="relative z-[7] flex items-center justify-center cursor-pointer"
+                  aria-label="Open chat"
+                >
+                  <div className="absolute w-20 h-20 sm:w-24 sm:h-24 bg-primary/25 rounded-full blur-[28px] animate-pulse" />
+                  <div className="absolute w-14 h-14 sm:w-16 sm:h-16 bg-primary/40 rounded-full blur-[16px]" />
+                  <div
+                    className="absolute w-10 h-10 sm:w-12 sm:h-12 bg-primary/60 rounded-full blur-[8px]"
+                    style={{ boxShadow: "0 0 32px rgba(var(--primary), 0.9), 0 0 64px rgba(var(--primary), 0.5)" }}
+                  />
+                  <Heart
+                    className="relative w-8 h-8 sm:w-10 sm:h-10 text-primary fill-primary"
+                    style={{
+                      filter: "drop-shadow(0 0 8px rgba(var(--primary), 1)) drop-shadow(0 0 20px rgba(var(--primary), 0.85)) drop-shadow(0 0 40px rgba(var(--primary), 0.5))",
+                    }}
+                  />
+                </motion.div>
+              </Link>
 
-              <div 
-                className={`relative z-10 p-0.5 rounded-full ${partnerStories.length > 0 ? "cursor-pointer transition-transform active:scale-95 bg-gradient-to-tr from-yellow-400 to-primary" : ""}`}
-                onClick={(e) => {
-                  if (partnerStories.length > 0) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setViewingStories(partnerStories);
-                  }
+              {/* Partner avatar — tap to view story if they have one, else do nothing */}
+              <button
+                type="button"
+                className={`relative z-10 p-0.5 rounded-full transition-transform ${partnerStories.length > 0 ? "cursor-pointer active:scale-95 bg-gradient-to-tr from-yellow-400 to-primary" : "cursor-default"}`}
+                onClick={() => {
+                  if (partnerStories.length > 0) setViewingStories(partnerStories);
                 }}
+                disabled={partnerStories.length === 0}
               >
                 <AvatarImage
                   src={partner.avatar}
@@ -251,18 +252,17 @@ export default memo(function Home() {
                   className={`absolute bottom-0 right-0 w-5 h-5 sm:w-6 sm:h-6 rounded-full border-[3px] border-background z-20 shadow-sm ${partnerOnline ? "bg-green-500" : "bg-gray-400"}`}
                   aria-label={partnerOnline ? "Partner is online" : "Partner is offline"}
                 />
-              </div>
+              </button>
             </motion.div>
-          </Link>
         )}
         {partner && (
-          <p className={`text-base sm:text-lg font-medium mt-2 drop-shadow-sm flex items-center justify-center gap-1.5 text-foreground/90 ${appTheme === 'library' ? 'library-home-text' : ''}`}>
+          <p className={`text-base sm:text-lg font-medium mt-1 drop-shadow-sm flex items-center justify-center gap-1.5 text-foreground/90 ${appTheme === 'library' ? 'library-home-text' : ''}`}>
             You & {partner.name}
             <Heart className={`w-4 h-4 text-primary ${appTheme === 'library' ? 'hidden' : ''}`} strokeWidth={2.5} />
           </p>
         )}
         {partner && (
-          <p className="text-xs text-muted-foreground/70 mt-1 mb-4">Tap to open chat</p>
+          <p className="text-xs text-muted-foreground/60 mt-1 mb-3">Tap the ♥ to open chat · tap avatar to view story</p>
         )}
         {!partner && !loadingPartner && (
           <p className={`text-base sm:text-lg font-medium mt-4 drop-shadow-sm text-foreground/90 ${appTheme === 'library' ? 'library-home-text' : ''}`}>
