@@ -96,8 +96,21 @@ export function CallProvider({ children }: { children: ReactNode }) {
     }
   }, [sendCallLogMsg]);
 
-  const startCall = useCallback((type: CallType) => {
+  const startCall = useCallback(async (type: CallType) => {
     if (!user) return;
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: type === "video",
+      });
+      stream.getTracks().forEach(t => t.stop());
+    } catch (err) {
+      console.error("Call permissions denied:", err);
+      alert("Please allow Camera and Microphone permissions in your browser settings to make a call.");
+      return;
+    }
+
     activeCallTypeRef.current = type;
     callRoleRef.current = "outgoing";
     callLoggedStartRef.current = false;
@@ -137,10 +150,6 @@ export function CallProvider({ children }: { children: ReactNode }) {
     const isLibraryMode = window.localStorage.getItem("libraryMode") === "true";
 
     if (type === "call-offer") {
-      if (isLibraryMode) {
-         api.sendCallSignal({ type: "reject", senderId: user.id }).catch(() => {});
-         return;
-      }
       const d = data as { from: string; callType: CallType; sdp?: RTCSessionDescriptionInit };
       if (d.from !== partnerId || !d.sdp) return;
       setIncomingCall({ type: d.callType, offer: d.sdp });

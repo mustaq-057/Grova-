@@ -330,7 +330,10 @@ export default function CallScreen({
         }
       } catch (err) {
         console.error("WebRTC setup failed:", err);
-        handleEnd();
+        if (isMounted) {
+          alert("Failed to access camera or microphone. The call could not be established.");
+          handleEnd();
+        }
       }
     };
 

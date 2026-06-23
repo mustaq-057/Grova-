@@ -108,9 +108,10 @@ router.get("/call/signals", rateLimiters.read, authenticate, async (req, res) =>
   try {
     const authenticatedUserId = (req as AuthenticatedRequest).user.id;
     
-    // Atomically fetch and delete pending signals that have not expired
+    // Fetch pending signals that have not expired without deleting them immediately,
+    // so multi-tab clients all ring simultaneously.
     const result = await db.execute(
-      "DELETE FROM call_signals WHERE receiver_id = $1 AND expires_at > $2 RETURNING *",
+      "SELECT * FROM call_signals WHERE receiver_id = $1 AND expires_at > $2",
       [authenticatedUserId, Date.now()]
     );
     
