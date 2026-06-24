@@ -3,6 +3,7 @@ import { X, Image as ImageIcon, RefreshCcw, Zap, ZapOff } from "lucide-react";
 import ReactDOM from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import vintageCameraImg from "../vintage-camera.png";
+import disposableCameraImg from "../disposable.png";
 import { StoryEditor } from "./StoryEditor";
 
 interface CameraOverlayProps {
@@ -19,7 +20,7 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
   const [flashOn, setFlashOn] = useState(false);
   const [aspectRatio, setAspectRatio] = useState<"Full" | "16:9" | "4:3" | "1:1">("Full");
   const [error, setError] = useState<string | null>(null);
-  const [vintageMode, setVintageMode] = useState(false);
+  const [cameraMode, setCameraMode] = useState<"normal" | "vintage" | "disposable">("normal");
   const [storyFiles, setStoryFiles] = useState<File[]>([]);
   
   const [zoom, setZoom] = useState(1);
@@ -118,13 +119,15 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
       ctx.scale(-1, 1);
     }
     
-    if (vintageMode) {
+    if (cameraMode === "vintage") {
       ctx.filter = "sepia(0.4) contrast(1.1) saturate(1.2) brightness(1.05) hue-rotate(-5deg)";
+    } else if (cameraMode === "disposable") {
+      ctx.filter = "contrast(1.2) saturate(1.2) brightness(1.15) sepia(0.2) hue-rotate(-10deg)";
     }
     
     ctx.drawImage(video, sx, sy, cropW, cropH, 0, 0, cw, ch);
     
-    if (vintageMode) {
+    if (cameraMode === "vintage") {
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.filter = "none";
       
@@ -145,6 +148,40 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
 
       ctx.fillStyle = "#ff9900";
       ctx.font = "bold 32px 'Courier New', Courier, monospace";
+      ctx.textAlign = "right";
+      ctx.textBaseline = "bottom";
+      ctx.shadowColor = "rgba(255, 153, 0, 0.5)";
+      ctx.shadowBlur = 10;
+      
+      const now = new Date();
+      const yy = String(now.getFullYear()).slice(-2);
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+      ctx.fillText(`'${yy} ${mm} ${dd}`, cw - 30, ch - 30);
+    } else if (cameraMode === "disposable") {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.filter = "none";
+
+      const gradient = ctx.createRadialGradient(cw/2, ch/2, cw * 0.2, cw/2, ch/2, Math.max(cw, ch) * 1.0);
+      gradient.addColorStop(0, "rgba(255,255,255,0.1)");
+      gradient.addColorStop(0.5, "rgba(0,0,0,0)");
+      gradient.addColorStop(1, "rgba(0,0,0,0.7)");
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, cw, ch);
+
+      // Heavy Grain
+      const imgData = ctx.getImageData(0, 0, cw, ch);
+      const data = imgData.data;
+      for (let i = 0; i < data.length; i += 4) {
+        const noise = (Math.random() - 0.5) * 50;
+        data[i] = Math.min(255, Math.max(0, data[i] + noise));
+        data[i+1] = Math.min(255, Math.max(0, data[i+1] + noise));
+        data[i+2] = Math.min(255, Math.max(0, data[i+2] + noise));
+      }
+      ctx.putImageData(imgData, 0, 0);
+      
+      ctx.fillStyle = "#ff9900";
+      ctx.font = "bold 36px 'Courier New', Courier, monospace";
       ctx.textAlign = "right";
       ctx.textBaseline = "bottom";
       ctx.shadowColor = "rgba(255, 153, 0, 0.5)";
@@ -270,16 +307,33 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
                 className={`absolute inset-0 w-full h-full object-cover origin-center ${facingMode === "user" ? "scale-x-[-1]" : ""}`}
                 style={{
                   transform: `scale(${zoom}) ${facingMode === "user" ? "scaleX(-1)" : ""}`,
-                  filter: vintageMode ? "sepia(0.4) contrast(1.1) saturate(1.2) brightness(1.05) hue-rotate(-5deg)" : "none",
+                  filter: cameraMode === "vintage" ? "sepia(0.4) contrast(1.1) saturate(1.2) brightness(1.05) hue-rotate(-5deg)" :
+                          cameraMode === "disposable" ? "contrast(1.2) saturate(1.2) brightness(1.15) sepia(0.2) hue-rotate(-10deg)" : "none",
                   transition: pinchStartRef.current ? "none" : "transform 0.1s ease-out"
                 }}
               />
-              {vintageMode && (
+              
+              {/* Overlay graphics */}
+              {cameraMode === "vintage" && (
                 <>
                   <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(circle, rgba(0,0,0,0) 40%, rgba(0,0,0,0.3) 100%)" }} />
                   <div className="absolute bottom-6 right-6 font-mono text-2xl font-bold text-[#ff9900] tracking-widest pointer-events-none" style={{ textShadow: "0 0 10px rgba(255,153,0,0.5)" }}>
                     '{String(new Date().getFullYear()).slice(-2)} {String(new Date().getMonth() + 1).padStart(2, '0')} {String(new Date().getDate()).padStart(2, '0')}
                   </div>
+                </>
+              )}
+              {cameraMode === "disposable" && (
+                <>
+                  {/* Heavy flash vignette */}
+                  <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(circle, rgba(255,255,255,0.05) 20%, rgba(0,0,0,0) 50%, rgba(0,0,0,0.6) 100%)" }} />
+                  {/* CSS noise overlay for live preview grain */}
+                  <div className="absolute inset-0 pointer-events-none mix-blend-overlay opacity-50" style={{ backgroundImage: "url('data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.85%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E')" }} />
+                  {/* Date stamp */}
+                  <div className="absolute bottom-6 right-6 font-mono text-2xl font-bold text-[#ff9900] tracking-widest pointer-events-none" style={{ textShadow: "0 0 10px rgba(255,153,0,0.5)" }}>
+                    '{String(new Date().getFullYear()).slice(-2)} {String(new Date().getMonth() + 1).padStart(2, '0')} {String(new Date().getDate()).padStart(2, '0')}
+                  </div>
+                  {/* Disposable Viewfinder Frame Mask */}
+                  <div className="absolute inset-0 pointer-events-none border-[12vw] border-black/90 shadow-[inset_0_0_20px_rgba(0,0,0,0.8)] rounded-[20vw] z-20 mix-blend-multiply" />
                 </>
               )}
             </div>
@@ -295,27 +349,41 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
           </button>
           
           <div className="relative flex items-center justify-center">
-            {/* Vintage Mode Toggle */}
+            {/* Camera Mode Cycle Button */}
             <button
-              onClick={() => setVintageMode(v => !v)}
-              className="absolute -right-16 w-11 h-11 rounded-full flex flex-col items-center justify-center transition-all bg-black/40 border border-white/20 hover:bg-white/10 overflow-hidden"
-              title="Toggle Vintage Camera"
+              onClick={() => {
+                setCameraMode(prev => {
+                  if (prev === "normal") return "vintage";
+                  if (prev === "vintage") return "disposable";
+                  return "normal";
+                });
+              }}
+              className="absolute -right-16 w-11 h-11 rounded-full flex flex-col items-center justify-center transition-all bg-black/40 border border-white/20 hover:bg-white/10 overflow-hidden shadow-lg z-30"
+              title="Cycle Camera Mode"
             >
-              {vintageMode ? (
+              {cameraMode === "normal" ? (
                 <div className="w-5 h-5 rounded-full border-2 border-white" />
-              ) : (
+              ) : cameraMode === "vintage" ? (
                 <img src={vintageCameraImg} alt="Vintage" loading="eager" fetchPriority="high" className="w-full h-full object-cover bg-neutral-800" />
+              ) : (
+                <img src={disposableCameraImg} alt="Disposable" loading="eager" fetchPriority="high" className="w-full h-full object-cover bg-neutral-800" />
               )}
             </button>
 
             {/* Capture button */}
-            <div className="relative flex items-center justify-center">
+            <div className="relative flex items-center justify-center z-20">
               <button 
                 onClick={handleCapture}
-                className={`w-20 h-20 rounded-full border-4 flex items-center justify-center transition-all active:scale-90 ${vintageMode ? "border-[#ff9900]/80 shadow-[0_0_20px_rgba(255,153,0,0.4)] p-0.5" : "border-white"}`}
+                className={`w-20 h-20 rounded-full border-4 flex items-center justify-center transition-all active:scale-90 ${
+                  cameraMode === "vintage" ? "border-[#ff9900]/80 shadow-[0_0_20px_rgba(255,153,0,0.4)] p-0.5" : 
+                  cameraMode === "disposable" ? "border-green-500/80 shadow-[0_0_20px_rgba(34,197,94,0.4)] p-0.5" : 
+                  "border-white"
+                }`}
               >
-                {vintageMode ? (
+                {cameraMode === "vintage" ? (
                   <img src={vintageCameraImg} alt="Vintage Camera" loading="eager" fetchPriority="high" className="w-full h-full rounded-full object-cover bg-neutral-800" />
+                ) : cameraMode === "disposable" ? (
+                  <img src={disposableCameraImg} alt="Disposable Camera" loading="eager" fetchPriority="high" className="w-full h-full rounded-full object-cover bg-neutral-800" />
                 ) : (
                   <div className="w-16 h-16 rounded-full transition-all bg-white" />
                 )}
