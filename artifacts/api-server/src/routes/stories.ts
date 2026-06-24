@@ -2,105 +2,15 @@ import { Router } from "express";
 import db from "../lib/db";
 import { authenticate } from "../lib/auth-middleware";
 import { rateLimiters } from "../lib/security";
+import { deleteImage } from "../lib/storage";
 
 const router = Router();
 
-async function deleteB2File(url: string) {
-  try {
-    const { S3Client, DeleteObjectCommand } = await import("@aws-sdk/client-s3");
-    const region = process.env.AWS_REGION || "us-east-005";
-    const endpoint = process.env.B2_ENDPOINT;
-    const bucket = process.env.B2_BUCKET_NAME;
-    const accessKeyId = process.env.B2_KEY_ID;
-    const secretAccessKey = process.env.B2_APPLICATION_KEY;
-
-    if (!endpoint || !bucket || !accessKeyId || !secretAccessKey) return;
-
-    // extract key from url
-    // eg: https://f005.backblazeb2.com/file/bucket-name/stories/123.mp4 -> stories/123.mp4
-    let key = "";
-    try {
-      const parsedUrl = new URL(url);
-      if (parsedUrl.pathname.includes(`/file/${bucket}/`)) {
-        key = parsedUrl.pathname.split(`/file/${bucket}/`)[1];
-      } else if (parsedUrl.hostname === new URL(endpoint).hostname) {
-         // https://s3.us-east-005.backblazeb2.com/bucket-name/stories/123.mp4
-         key = parsedUrl.pathname.split(`/${bucket}/`)[1];
-      } else if (process.env.B2_PUBLIC_URL && url.startsWith(process.env.B2_PUBLIC_URL)) {
-         key = url.slice(process.env.B2_PUBLIC_URL.length).replace(/^\//, "");
-      }
-    } catch { }
-
-    if (!key) return;
-
-    const s3 = new S3Client({
-      region,
-      endpoint,
-      forcePathStyle: true,
-      credentials: { accessKeyId, secretAccessKey },
-    });
-
-    await s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
-  } catch (err) {
-    console.error("Failed to delete B2 file:", err);
-  }
-}
-
-async function signB2GetUrl(url: string): Promise<string> {
-  try {
-    const { S3Client, GetObjectCommand } = await import("@aws-sdk/client-s3");
-    const { getSignedUrl } = await import("@aws-sdk/s3-request-presigner");
-    const region = process.env.AWS_REGION || "us-east-005";
-    const endpoint = process.env.B2_ENDPOINT;
-    const bucket = process.env.B2_BUCKET_NAME;
-    const accessKeyId = process.env.B2_KEY_ID;
-    const secretAccessKey = process.env.B2_APPLICATION_KEY;
-
-    if (!endpoint || !bucket || !accessKeyId || !secretAccessKey) return url;
-
-    // Extract the object key from any known B2 URL format:
-    //   1. f00X.backblazeb2.com/file/<bucket>/<key>  (native B2 download URL)
-    //   2. s3.<region>.backblazeb2.com/<bucket>/<key> (S3-compatible path-style)
-    //   3. <B2_PUBLIC_URL>/<key>                       (custom domain / CDN)
-    let key = "";
-    try {
-      const parsedUrl = new URL(url);
-      const pathname = parsedUrl.pathname.split("?")[0]; // strip any query params already in the stored URL
-
-      if (pathname.includes(`/file/${bucket}/`)) {
-        // Native B2 download URL: https://f005.backblazeb2.com/file/<bucket>/<key>
-        key = pathname.split(`/file/${bucket}/`)[1];
-      } else if (parsedUrl.hostname === new URL(endpoint).hostname) {
-        // S3 path-style: https://s3.<region>.backblazeb2.com/<bucket>/<key>
-        key = pathname.split(`/${bucket}/`)[1];
-      } else if (process.env.B2_PUBLIC_URL && url.startsWith(process.env.B2_PUBLIC_URL)) {
-        // Custom CDN / public URL prefix
-        key = url.slice(process.env.B2_PUBLIC_URL.length).replace(/^\//, "").split("?")[0];
-      } else if (parsedUrl.hostname.endsWith(".backblazeb2.com") && pathname.includes(`/${bucket}/`)) {
-        // Catch-all for any other backblazeb2.com hostname variant
-        key = pathname.split(`/${bucket}/`)[1];
-      }
-    } catch { }
-
-    if (!key) {
-      console.warn("signB2GetUrl: could not extract key from URL:", url);
-      return url;
-    }
-
-    const s3 = new S3Client({
-      region,
-      endpoint,
-      forcePathStyle: true,
-      credentials: { accessKeyId, secretAccessKey },
-    });
-
-    const command = new GetObjectCommand({ Bucket: bucket, Key: key });
-    // 1-hour expiry — stories last 24h but we re-sign on every GET /stories call
-    return await getSignedUrl(s3 as any, command as any, { expiresIn: 3600 });
-  } catch (err) {
-    console.error("Failed to sign B2 GET url:", err);
-    return url;
-  }
+function extractCloudinaryKey(url: string): string | null {
+  if (!url) return null;
+  const match = url.match(/\/grova\/([^/?]+)/);
+  if (match) return match[1];
+  return null;
 }
 
 router.post("/stories", authenticate, rateLimiters.messages, async (req, res) => {
@@ -117,7 +27,7 @@ router.post("/stories", authenticate, rateLimiters.messages, async (req, res) =>
     }
 
     if (media_url.startsWith("data:")) {
-      res.status(400).json({ error: "To protect database storage, stories must be uploaded to B2 instead of storing raw base64 data." });
+      res.status(400).json({ error: "To protect database storage, stories must be uploaded to Cloudinary instead of storing raw base64 data." });
       return;
     }
 
@@ -143,11 +53,7 @@ router.post("/stories", authenticate, rateLimiters.messages, async (req, res) =>
       WHERE id = $1`, 
       [id]
     );
-    const row = result.rows[0];
-    if (row && row.mediaUrl) {
-      row.mediaUrl = await signB2GetUrl(row.mediaUrl);
-    }
-    res.json(row);
+    res.json(result.rows[0]);
   } catch (error) {
     console.error("Create story error:", error);
     res.status(500).json({ error: "Failed to create story" });
@@ -169,9 +75,12 @@ router.get("/stories", authenticate, rateLimiters.read, async (req, res) => {
         const ids = expiredResult.rows.map((r: any) => `'${r.id}'`).join(',');
         await db.execute(`DELETE FROM stories WHERE id IN (${ids})`);
         
-        // Delete from B2 in background
+        // Delete from Cloudinary in background
         expiredResult.rows.forEach((r: any) => {
-          if (r.media_url) deleteB2File(r.media_url);
+          if (r.media_url) {
+            const key = extractCloudinaryKey(r.media_url);
+            if (key) deleteImage(key);
+          }
         });
       }
     } catch (err) {
@@ -194,17 +103,7 @@ router.get("/stories", authenticate, rateLimiters.read, async (req, res) => {
       [now]
     );
     
-    // Sign URLs since the bucket is private
-    const storiesWithSignedUrls = await Promise.all(
-      result.rows.map(async (row: any) => {
-        if (row.mediaUrl) {
-          row.mediaUrl = await signB2GetUrl(row.mediaUrl);
-        }
-        return row;
-      })
-    );
-    
-    res.json(storiesWithSignedUrls);
+    res.json(result.rows);
   } catch (error) {
     console.error("Get stories error:", error);
     res.status(500).json({ error: "Failed to fetch stories" });
@@ -234,9 +133,10 @@ router.delete("/stories/:id", authenticate, async (req, res) => {
       return;
     }
 
-    // Delete from B2
+    // Delete from Cloudinary
     if (storyRes.rows[0]?.media_url) {
-      deleteB2File(storyRes.rows[0].media_url);
+      const key = extractCloudinaryKey(storyRes.rows[0].media_url);
+      if (key) deleteImage(key);
     }
 
     res.json({ success: true });

@@ -4,6 +4,7 @@ import { motion, AnimatePresence, useMotionValue, useTransform } from "framer-mo
 import { useGesture } from "@use-gesture/react";
 import ReactDOM from "react-dom";
 import { api } from "../lib/api";
+import { uploadMediaFile } from "../lib/media-upload";
 
 interface StoryEditorProps {
   file: File;
@@ -331,7 +332,7 @@ export function StoryEditor({ file, onClose, onComplete }: StoryEditorProps) {
         }
       }
 
-      const { url } = await api.uploadStoryToB2(finalBlob, isVideo ? "video" : "image");
+      const url = await uploadMediaFile(finalBlob, isVideo ? "video/mp4" : "image/jpeg");
       await api.addStory({ mediaUrl: url, text_overlay: textOverlayObj ? JSON.stringify(textOverlayObj) : undefined });
       onComplete();
     } catch (err) {
