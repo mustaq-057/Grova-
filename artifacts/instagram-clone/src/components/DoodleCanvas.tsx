@@ -597,6 +597,13 @@ export default function DoodleCanvas({ onClose, onSend, onError, onDrawStart, is
                 eyedropperActive ? "cursor-cell" : "cursor-crosshair"
               }`}
             />
+            {/* LIVE badge — only visible in live mode */}
+            {isLiveMode && (
+              <div className="absolute top-3 left-3 flex items-center gap-1.5 bg-red-600/90 text-white text-xs font-bold px-2.5 py-1 rounded-full shadow-lg backdrop-blur-sm pointer-events-none">
+                <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+                LIVE
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -675,10 +682,10 @@ export default function DoodleCanvas({ onClose, onSend, onError, onDrawStart, is
           {isLiveMode && onStopLive && (
             <button
               onClick={onStopLive}
-              className="px-3 h-[34px] flex items-center justify-center bg-white/20 text-white rounded-full shrink-0 active:scale-95 transition-transform font-bold text-sm gap-1.5"
+              className="px-3 h-[34px] flex items-center justify-center bg-red-600 text-white rounded-full shrink-0 active:scale-95 transition-transform font-bold text-sm gap-1.5 shadow-lg shadow-red-600/40"
               aria-label="Stop Live"
             >
-              <Radio className="w-4 h-4" />
+              <Radio className="w-4 h-4 animate-pulse" />
               Stop Live
             </button>
           )}

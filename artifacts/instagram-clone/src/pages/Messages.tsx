@@ -878,10 +878,42 @@ export default function Messages() {
             stickToBottomRef.current = true;
             requestStickToBottom();
           }
+
+          // Live doodle invite — show actionable toast to the partner
+          if ((raw.variant as string) === "doodle_invite" && raw.senderId !== user?.id) {
+            toast(
+              (t) => (
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span>🎨 {partnerName} wants to draw with you live!</span>
+                  <button
+                    onClick={() => {
+                      toast.dismiss(t.id);
+                      setDoodleLiveMode(true);
+                      setDoodleOpen(true);
+                    }}
+                    style={{
+                      background: "#E1306C",
+                      color: "white",
+                      border: "none",
+                      borderRadius: 8,
+                      padding: "4px 12px",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      flexShrink: 0,
+                    }}
+                  >
+                    Join 🎨
+                  </button>
+                </div>
+              ),
+              { duration: 20000 }
+            );
+          }
         } catch (err) {
           console.error("Failed to handle new message:", err);
         }
       };
+
 
       const handleMessageLiked = async (e: MessageEvent) => {
         if (!mounted) return;

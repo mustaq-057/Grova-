@@ -20,7 +20,7 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
   const [aspectRatio, setAspectRatio] = useState<"Full" | "16:9" | "4:3" | "1:1">("Full");
   const [error, setError] = useState<string | null>(null);
   const [vintageMode, setVintageMode] = useState(false);
-  const [storyFile, setStoryFile] = useState<File | null>(null);
+  const [storyFiles, setStoryFiles] = useState<File[]>([]);
   
   const [zoom, setZoom] = useState(1);
   const pinchStartRef = useRef<{ dist: number, zoom: number } | null>(null);
@@ -161,7 +161,7 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
       if (!blob) return;
       const file = new File([blob], `capture-${Date.now()}.jpg`, { type: "image/jpeg" });
       if (mode === "story") {
-        setStoryFile(file);
+        setStoryFiles([file]);
       } else if (onCapture) {
         onCapture(file);
       }
@@ -169,17 +169,18 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.type.startsWith("video/")) {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    const selected = files.slice(0, 3);
+    if (selected.some(f => f.type.startsWith("video/"))) {
       setError("Stories support photos only.");
       if (fileInputRef.current) fileInputRef.current.value = "";
       return;
     }
     if (mode === "story") {
-      setStoryFile(file);
+      setStoryFiles(selected);
     } else if (onCapture) {
-      onCapture(file);
+      onCapture(selected[0]);
     }
   };
 
@@ -216,8 +217,8 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
     setZoom(newZoom);
   };
 
-  if (storyFile) {
-    return <StoryEditor file={storyFile} onClose={() => setStoryFile(null)} onComplete={(uploaded, story) => onClose(uploaded, story)} />;
+  if (storyFiles.length > 0) {
+    return <StoryEditor files={storyFiles} onClose={() => setStoryFiles([])} onComplete={(uploaded, story) => onClose(uploaded, story)} />;
   }
 
   return ReactDOM.createPortal(
@@ -334,6 +335,7 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
           ref={fileInputRef}
           type="file"
           accept="image/*"
+          multiple
           className="hidden"
           onChange={handleFileChange}
         />

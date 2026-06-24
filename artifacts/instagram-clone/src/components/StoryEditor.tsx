@@ -7,7 +7,7 @@ import { api } from "../lib/api";
 import { uploadMediaFile } from "../lib/media-upload";
 
 interface StoryEditorProps {
-  file: File;
+  files: File[];
   onClose: () => void;
   onComplete: (uploaded?: boolean, story?: any) => void;
 }
@@ -184,7 +184,10 @@ function DraggableText({
 }
 
 // ── Main Editor ───────────────────────────────────────────────────────────────
-export function StoryEditor({ file, onClose, onComplete }: StoryEditorProps) {
+export function StoryEditor({ files, onClose, onComplete }: StoryEditorProps) {
+  const [fileIndex, setFileIndex] = useState(0);
+  const currentFile = files[fileIndex];
+
   const [imageUrl, setImageUrl] = useState("");
   const [text, setText] = useState("");
   const [fontFamily, setFontFamily] = useState(FONTS[0].value);
@@ -203,10 +206,15 @@ export function StoryEditor({ file, onClose, onComplete }: StoryEditorProps) {
   const binRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const url = URL.createObjectURL(file);
+    if (!currentFile) return;
+    const url = URL.createObjectURL(currentFile);
     setImageUrl(url);
+    setText("");
+    setStickers([]);
+    setMainTransform({ x: 0, y: 0, scale: 1, rotate: 0, flipped: false });
+    setTextTransform({ x: 0, y: 0, scale: 1, rotate: 0 });
     return () => URL.revokeObjectURL(url);
-  }, [file]);
+  }, [currentFile]);
 
   // Check if drag position is over the delete bin
   const isOverBin = useCallback((pos: { x: number; y: number }) => {
@@ -248,7 +256,7 @@ export function StoryEditor({ file, onClose, onComplete }: StoryEditorProps) {
   const bakeAndUpload = async () => {
     setUploading(true);
     try {
-      let finalBlob: Blob | File = file;
+      let finalBlob: Blob | File = currentFile;
 
       const dpr = 2;
       const canvas = document.createElement("canvas");
@@ -320,7 +328,13 @@ export function StoryEditor({ file, onClose, onComplete }: StoryEditorProps) {
       const mime = (finalBlob instanceof File && finalBlob.type) ? finalBlob.type : "image/jpeg";
       const url = await uploadMediaFile(finalBlob, mime);
       const story = await api.addStory({ mediaUrl: url, kind: "story" });
-      onComplete(true, story);
+      
+      if (fileIndex < files.length - 1) {
+        setFileIndex(prev => prev + 1);
+        setUploading(false);
+      } else {
+        onComplete(true, story);
+      }
     } catch (err) {
       console.error("Failed to upload story", err);
       alert("Failed to upload story. Please try again.");
@@ -409,12 +423,43 @@ export function StoryEditor({ file, onClose, onComplete }: StoryEditorProps) {
             </button>
           </div>
 
+          {/* Progress dots — only shown when multiple files selected */}
+          {files.length > 1 && (
+            <div className="absolute left-1/2 -translate-x-1/2 top-5 flex items-center gap-1.5 pointer-events-none">
+              {files.map((_, i) => (
+                <div
+                  key={i}
+                  className={`rounded-full transition-all duration-300 ${
+                    i < fileIndex
+                      ? "w-2 h-2 bg-white/50"
+                      : i === fileIndex
+                      ? "w-2.5 h-2.5 bg-white shadow-[0_0_6px_rgba(255,255,255,0.8)]"
+                      : "w-2 h-2 bg-white/30"
+                  }`}
+                />
+              ))}
+            </div>
+          )}
+
           <button
             onClick={bakeAndUpload}
             disabled={uploading}
-            className="w-13 h-13 w-14 h-14 bg-white text-black rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-lg disabled:opacity-50 pointer-events-auto"
+            className={`h-12 ${
+              fileIndex < files.length - 1
+                ? "px-4 rounded-full flex items-center gap-1.5 text-sm font-bold bg-white text-black"
+                : "w-14 rounded-full flex items-center justify-center bg-white text-black"
+            } hover:scale-105 active:scale-95 transition-all shadow-lg disabled:opacity-50 pointer-events-auto`}
           >
-            {uploading ? <Loader2 className="w-6 h-6 animate-spin" /> : <Check className="w-7 h-7" />}
+            {uploading ? (
+              <Loader2 className="w-6 h-6 animate-spin" />
+            ) : fileIndex < files.length - 1 ? (
+              <>
+                <Check className="w-5 h-5" />
+                <span>Next</span>
+              </>
+            ) : (
+              <Check className="w-7 h-7" />
+            )}
           </button>
         </div>
       )}
