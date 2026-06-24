@@ -93,6 +93,64 @@ function TransformableImage({
   );
 }
 
+function DraggableText({
+  text, fontFamily, color, isTyping,
+  onTransformChange, onDragOver, onDragEnd
+}: {
+  text: string; fontFamily: string; color: string; isTyping: boolean;
+  onTransformChange: (x: number, y: number, scale: number) => void;
+  onDragOver?: (pos: { x: number; y: number }) => void;
+  onDragEnd?: (pos: { x: number; y: number }) => void;
+}) {
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+  const scale = useMotionValue(1);
+
+  const bind = useGesture(
+    {
+      onDrag: ({ offset: [ox, oy], xy: [px, py] }) => {
+        if (isTyping) return;
+        x.set(ox);
+        y.set(oy);
+        onTransformChange(ox, oy, scale.get());
+        onDragOver?.({ x: px, y: py });
+      },
+      onDragEnd: ({ xy: [px, py] }) => {
+        onDragEnd?.({ x: px, y: py });
+      },
+      onPinch: ({ offset: [s] }) => {
+        if (isTyping) return;
+        scale.set(s);
+        onTransformChange(x.get(), y.get(), s);
+      },
+    },
+    {
+      drag: { from: () => [x.get(), y.get()] },
+      pinch: {
+        from: () => [scale.get(), 0],
+        scaleBounds: { min: 0.5, max: 4 },
+        eventOptions: { passive: false },
+      },
+    }
+  );
+
+  return (
+    <motion.div
+      {...(bind() as any)}
+      style={{
+        x, y, scale, touchAction: "none",
+        fontFamily, color,
+        fontSize: "clamp(24px, 8vw, 36px)",
+        fontWeight: "bold",
+        textShadow: "0px 2px 10px rgba(0,0,0,0.5)",
+      }}
+      className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-30 pointer-events-auto text-center whitespace-pre-wrap select-none"
+    >
+      {text}
+    </motion.div>
+  );
+}
+
 // ── Main Editor ───────────────────────────────────────────────────────────────
 export function StoryEditor({ file, onClose, onComplete }: StoryEditorProps) {
   const [imageUrl, setImageUrl] = useState("");
@@ -101,7 +159,7 @@ export function StoryEditor({ file, onClose, onComplete }: StoryEditorProps) {
   const [textColor, setTextColor] = useState(COLORS[0]);
   const [isTyping, setIsTyping] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [textPosition, setTextPosition] = useState({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
+  const [textTransform, setTextTransform] = useState({ x: 0, y: 0, scale: 1 });
   const [mainTransform, setMainTransform] = useState({ x: 0, y: 0, scale: 1 });
   const [stickers, setStickers] = useState<Sticker[]>([]);
 
@@ -112,8 +170,6 @@ export function StoryEditor({ file, onClose, onComplete }: StoryEditorProps) {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const binRef = useRef<HTMLDivElement>(null);
-
-  const textDragRef = useRef({ isDragging: false, startX: 0, startY: 0, initialX: 0, initialY: 0 });
   const isVideo = file.type.startsWith("video");
 
   useEffect(() => {
@@ -142,22 +198,6 @@ export function StoryEditor({ file, onClose, onComplete }: StoryEditorProps) {
       setPendingDeleteId(id); // show confirm sheet
     }
   }, [isOverBin]);
-
-  // Text drag
-  const handleTextPointerDown = (e: React.PointerEvent) => {
-    if (isTyping) return;
-    textDragRef.current = { isDragging: true, startX: e.clientX, startY: e.clientY, initialX: textPosition.x, initialY: textPosition.y };
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
-  };
-  const handleTextPointerMove = (e: React.PointerEvent) => {
-    if (!textDragRef.current.isDragging) return;
-    setTextPosition({ x: textDragRef.current.initialX + e.clientX - textDragRef.current.startX, y: textDragRef.current.initialY + e.clientY - textDragRef.current.startY });
-  };
-  const handleTextPointerUp = (e: React.PointerEvent) => {
-    textDragRef.current.isDragging = false;
-    (e.target as HTMLElement).releasePointerCapture(e.pointerId);
-  };
-
   const handleAddSticker = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f || !f.type.startsWith("image/")) return;
@@ -228,13 +268,17 @@ export function StoryEditor({ file, onClose, onComplete }: StoryEditorProps) {
         }
 
         if (text.trim()) {
-          ctx.font = `bold 40px ${fontFamily}`;
+          ctx.save();
+          ctx.translate(W / 2 + textTransform.x, H / 2 + textTransform.y);
+          ctx.scale(textTransform.scale, textTransform.scale);
+          ctx.font = `bold 36px ${fontFamily}`;
           ctx.fillStyle = textColor;
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
           ctx.shadowColor = "rgba(0,0,0,0.5)";
           ctx.shadowBlur = 10;
-          ctx.fillText(text, textPosition.x, textPosition.y);
+          ctx.fillText(text, 0, 0);
+          ctx.restore();
         }
 
         const blob = await new Promise<Blob | null>(res => canvas.toBlob(res, "image/jpeg", 0.85));
@@ -242,7 +286,14 @@ export function StoryEditor({ file, onClose, onComplete }: StoryEditorProps) {
         finalBlob = blob;
       } else {
         if (text.trim()) {
-          textOverlayObj = { text, fontFamily, textColor, x: textPosition.x / window.innerWidth, y: textPosition.y / window.innerHeight };
+          textOverlayObj = { 
+            text, 
+            fontFamily, 
+            textColor, 
+            x: (window.innerWidth / 2 + textTransform.x) / window.innerWidth, 
+            y: (window.innerHeight / 2 + textTransform.y) / window.innerHeight,
+            scale: textTransform.scale
+          };
         }
       }
 
@@ -342,26 +393,16 @@ export function StoryEditor({ file, onClose, onComplete }: StoryEditorProps) {
 
       {/* Draggable text */}
       {!isTyping && text && (
-        <div
-          className="absolute z-30 cursor-move text-center whitespace-pre-wrap select-none"
-          style={{
-            left: textPosition.x,
-            top: textPosition.y,
-            transform: "translate(-50%, -50%)",
-            fontFamily,
-            color: textColor,
-            fontSize: "40px",
-            fontWeight: "bold",
-            textShadow: "0px 2px 10px rgba(0,0,0,0.5)",
-            touchAction: "none",
+        <DraggableText
+          text={text}
+          fontFamily={fontFamily}
+          color={textColor}
+          isTyping={isTyping}
+          onTransformChange={(x, y, s) => setTextTransform({ x, y, scale: s })}
+          onDragEnd={(pos) => {
+            if (isOverBin(pos)) setText("");
           }}
-          onPointerDown={handleTextPointerDown}
-          onPointerMove={handleTextPointerMove}
-          onPointerUp={handleTextPointerUp}
-          onPointerCancel={handleTextPointerUp}
-        >
-          {text}
-        </div>
+        />
       )}
 
       {/* Delete bin — appears at bottom center while dragging a sticker */}
@@ -401,7 +442,7 @@ export function StoryEditor({ file, onClose, onComplete }: StoryEditorProps) {
                 value={text}
                 onChange={e => setText(e.target.value)}
                 className="w-full bg-transparent text-center resize-none outline-none overflow-hidden"
-                style={{ fontFamily, color: textColor, fontSize: "40px", fontWeight: "bold", textShadow: "0px 2px 10px rgba(0,0,0,0.5)" }}
+                style={{ fontFamily, color: textColor, fontSize: "clamp(24px, 8vw, 36px)", fontWeight: "bold", textShadow: "0px 2px 10px rgba(0,0,0,0.5)" }}
                 placeholder="Type something..."
                 rows={4}
               />
