@@ -434,7 +434,13 @@ export function StoryEditor({ file, onClose, onComplete }: StoryEditorProps) {
           color={textColor}
           isTyping={isTyping}
           onTransformChange={(x, y, s, r) => setTextTransform({ x, y, scale: s, rotate: r })}
+          onDragOver={pos => {
+            setDraggingStickerPos(pos);
+            setHoveredBin(isOverBin(pos));
+          }}
           onDragEnd={(pos) => {
+            setDraggingStickerPos(null);
+            setHoveredBin(false);
             if (isOverBin(pos)) setText("");
           }}
         />
