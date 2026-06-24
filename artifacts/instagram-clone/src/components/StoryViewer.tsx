@@ -47,6 +47,8 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
   const hasPinchedRef = useRef(false);
   const replyInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
+  const lastTouchTimeRef = useRef(0);
 
   useEffect(() => { setLocalStories(stories); }, [stories]);
 
@@ -56,6 +58,13 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
     setMediaStatus("loading");
     setShowHeart(false);
   }, [currentIndex]);
+
+  // Instantly handle cached images
+  useEffect(() => {
+    if (imgRef.current && imgRef.current.complete) {
+      setMediaStatus("loaded");
+    }
+  }, [currentIndex, localStories, currentIndex]);
 
   // Video sync pause/play
   useEffect(() => {
@@ -332,18 +341,24 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
         <div
           {...bindPinch()}
           className="absolute inset-0 flex items-center justify-center overflow-hidden touch-none"
-          onMouseDown={() => { 
+                  onMouseDown={() => { 
+            if (Date.now() - lastTouchTimeRef.current < 1000) return;
             touchStartTimeRef.current = Date.now();
             if (!showDeleteConfirm && !isReplying) setIsTouchingToPause(true); 
           }}
           onMouseUp={e => { 
+            if (Date.now() - lastTouchTimeRef.current < 1000) return;
             setIsTouchingToPause(false); 
             if (Date.now() - touchStartTimeRef.current < 300) {
               handleTap(e); 
             }
           }}
-          onMouseLeave={() => setIsTouchingToPause(false)}
+          onMouseLeave={() => {
+            if (Date.now() - lastTouchTimeRef.current < 1000) return;
+            setIsTouchingToPause(false);
+          }}
           onTouchStart={e => { 
+            lastTouchTimeRef.current = Date.now();
             touchStartTimeRef.current = Date.now();
             if (!showDeleteConfirm && !isReplying && e.touches.length === 1) {
               setIsTouchingToPause(true); 
@@ -352,11 +367,13 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
             }
           }}
           onTouchMove={e => {
+            lastTouchTimeRef.current = Date.now();
             if (e.touches.length > 1) {
               setIsTouchingToPause(false);
             }
           }}
           onTouchEnd={e => { 
+            lastTouchTimeRef.current = Date.now();
             if (e.touches.length === 0) {
               setIsTouchingToPause(false); 
               const duration = Date.now() - touchStartTimeRef.current;
@@ -404,7 +421,7 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
             {mediaUrl && (
               isVideo ? (
                 <video
-                  key={mediaUrl}
+                  key={currentStory.id}
                   ref={videoRef}
                   src={mediaUrl}
                   className={`relative w-full h-full object-contain pointer-events-auto transition-opacity duration-300 ${mediaStatus === "loaded" ? "opacity-100" : "opacity-0"}`}
@@ -423,7 +440,8 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
                 />
               ) : (
                 <img
-                  key={mediaUrl}
+                  key={currentStory.id}
+                  ref={imgRef}
                   src={mediaUrl}
                   className={`relative max-w-full max-h-full object-contain drop-shadow-2xl pointer-events-auto transition-opacity duration-300 ${mediaStatus === "loaded" ? "opacity-100" : "opacity-0"}`}
                   draggable={false}

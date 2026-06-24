@@ -1,4 +1,5 @@
 import { useState, memo, useCallback, useMemo, useRef, useLayoutEffect } from "react";
+import { useLocation } from "wouter";
 import { createPortal } from "react-dom";
 import { Smile, MoreHorizontal, Trash2, Download } from "lucide-react";
 import { motion } from "framer-motion";
@@ -218,7 +219,8 @@ export const MessageItem = memo(function MessageItem({
   const quotedText = msg.replyToText ?? legacyReply?.quoted;
   const displayText = legacyReply?.body ?? msg.text;
   const isStoryReply = quotedText === "Story";
-  const hasReply = Boolean(quotedText) && !isStoryReply;
+  const hasReply = Boolean(quotedText);
+  const [, setLocation] = useLocation();
 
   const replyThumbSrc = useMemo(() => {
     const rawUrl = replySource
@@ -658,16 +660,24 @@ export const MessageItem = memo(function MessageItem({
         {hasReply && (
           <div className={`w-full max-w-full mb-1.5 ${isMe ? "items-end" : "items-start"} flex flex-col`}>
             <p className="text-[11px] sm:text-xs text-muted-foreground/90 mb-1 px-0.5">
-              {isMe ? "You" : partnerName} replied to {replyTargetLabel}
+              {isStoryReply ? (
+                isMe ? (
+                  msg.replyToSenderId === myId ? "You replied to your story" : `You replied to ${partnerName}'s story`
+                ) : (
+                  msg.replyToSenderId === myId ? `${partnerName} replied to your story` : `${partnerName} replied to their story`
+                )
+              ) : (
+                `${isMe ? "You" : partnerName} replied to ${replyTargetLabel}`
+              )}
             </p>
             <button
               type="button"
               onClick={() => {
                 if (msg.replyToText === "Story") {
-                  window.location.href = `/?storyId=${msg.replyToId}`;
+                  setLocation(`/?storyId=${msg.replyToId}`);
                 } else if (msg.replyToId?.startsWith("__note__")) {
                   const noteUserId = msg.replyToId.replace("__note__", "");
-                  window.location.href = `/?noteUserId=${noteUserId}`;
+                  setLocation(`/?noteUserId=${noteUserId}`);
                 } else if (msg.replyToId && onJumpToMessage) {
                   onJumpToMessage(msg.replyToId);
                 }

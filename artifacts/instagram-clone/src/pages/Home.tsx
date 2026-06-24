@@ -146,10 +146,18 @@ export default memo(function Home() {
   useEffect(() => {
     const storyId = searchParams.get("storyId");
     if (storyId && stories.length > 0) {
-      const idx = stories.findIndex(s => s.id === storyId);
-      if (idx !== -1) {
-        setInitialStoryIndex(idx);
-        setViewingStories(stories);
+      const targetStory = stories.find(s => s.id === storyId);
+      if (targetStory) {
+        const isMine = targetStory.authorId === user?.id;
+        const targetList = isMine 
+          ? stories.filter(s => s.authorId === user?.id) 
+          : (partner ? stories.filter(s => s.authorId === partner.id) : [targetStory]);
+        
+        const idx = targetList.findIndex(s => s.id === storyId);
+        if (idx !== -1) {
+          setInitialStoryIndex(idx);
+          setViewingStories(targetList);
+        }
       }
       window.history.replaceState({}, "", "/");
     }
