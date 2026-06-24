@@ -202,7 +202,7 @@ router.get("/couple/activity", rateLimiters.read, authenticate, async (req, res)
 
 router.post("/couple/activity", rateLimiters.messages, authenticate, async (req, res) => {
   const userId = (req as { user?: { id: string } }).user!.id;
-  const { type, text } = req.body as {
+  const { type, text, targetPath } = req.body as {
     type:
       | "like"
       | "comment"
@@ -218,6 +218,7 @@ router.post("/couple/activity", rateLimiters.messages, authenticate, async (req,
       | "greeting";
     fromName?: string;
     text: string;
+    targetPath?: string;
   };
   if (!type || !text) {
     res.status(400).json({ error: "type and text required" });
@@ -225,7 +226,7 @@ router.post("/couple/activity", rateLimiters.messages, authenticate, async (req,
   }
   try {
     const fromName = await profileDisplayName(userId);
-    await postCoupleActivity(type, userId, fromName, text);
+    await postCoupleActivity(type, userId, fromName, text, targetPath);
     res.json({ success: true });
   } catch (err) {
     logger.error({ err }, "Failed to add activity");

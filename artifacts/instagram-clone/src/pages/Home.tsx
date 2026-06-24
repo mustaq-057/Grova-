@@ -34,6 +34,7 @@ export default memo(function Home() {
   const [showMyOptions, setShowMyOptions] = useState(false);
   const [showPartnerOptions, setShowPartnerOptions] = useState(false);
   const [initialStoryIndex, setInitialStoryIndex] = useState(0);
+  const [loadingStories, setLoadingStories] = useState(true);
 
   const [notes, setNotes] = useState<ApiAvatarNote[]>([]);
   const [selectedNoteUser, setSelectedNoteUser] = useState<ApiUser | null>(null);
@@ -137,9 +138,11 @@ export default memo(function Home() {
     Promise.all([api.getStories(), api.getAvatarNotes()]).then(([storyData, noteData]) => {
       setStories(storyData);
       setNotes(noteData);
-
-      // Auto-open logic moved to searchParams effect
-    }).catch(console.error);
+      setLoadingStories(false);
+    }).catch(err => {
+      console.error(err);
+      setLoadingStories(false);
+    });
   }, []);
 
   // Listen to searchParams changes for stories and notes
@@ -247,13 +250,13 @@ export default memo(function Home() {
                   alt=""
                   className={`w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-[3px] shadow-[0_0_20px_rgba(var(--primary),0.25)] bg-background ${myStories.length > 0 ? "border-background" : "border-primary/40"} ${appTheme === 'library' ? 'library-locket' : ''}`}
                 />
-                {myStories.length === 0 ? (
+                {!loadingStories && myStories.length === 0 ? (
                   <div className="absolute bottom-0 right-0 w-6 h-6 sm:w-7 sm:h-7 bg-blue-500 rounded-full border-[3px] border-background flex items-center justify-center z-20">
                     <Plus className="w-3 h-3 sm:w-4 sm:h-4 text-white" strokeWidth={3} />
                   </div>
-                ) : (
+                ) : myStories.length > 0 ? (
                   <div className="absolute bottom-0 right-0 w-5 h-5 sm:w-6 sm:h-6 bg-green-500 rounded-full border-[3px] border-background z-20 shadow-sm" aria-label="You are online" />
-                )}
+                ) : null}
                 {/* Story count badge */}
                 {myStories.length > 1 && (
                   <div className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-primary text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 z-30 shadow border-2 border-background">

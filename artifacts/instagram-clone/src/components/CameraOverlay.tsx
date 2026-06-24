@@ -171,7 +171,7 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
-    const selected = files.slice(0, 3);
+    const selected = files; // no batch limit — upload all selected
     if (selected.some(f => f.type.startsWith("video/"))) {
       setError("Stories support photos only.");
       if (fileInputRef.current) fileInputRef.current.value = "";

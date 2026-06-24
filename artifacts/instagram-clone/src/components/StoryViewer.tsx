@@ -216,18 +216,7 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
       return;
     }
 
-    // Double-tap detection for like (only in middle area)
-    const now = Date.now();
-    const distance = Math.sqrt(
-      Math.pow(clientX - lastTapPosRef.current.x, 2) +
-      Math.pow(clientY - lastTapPosRef.current.y, 2)
-    );
-
-    if (now - lastTapTimeRef.current < 320 && distance < 50) {
-      lastTapTimeRef.current = 0;
-      triggerLike(localStories[currentIndex]?.id ?? "");
-      return;
-    }
+    // Removed double-tap detection for like to avoid accidental triggers when tapping left/right
     lastTapTimeRef.current = now;
     lastTapPosRef.current = { x: clientX, y: clientY };
 
