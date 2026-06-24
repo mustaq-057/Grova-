@@ -85,13 +85,6 @@ function applyStyleToCanvas(
       data[i + 2] = Math.min(255, Math.max(0, data[i + 2] + noise));
     }
     ctx.putImageData(imgData, 0, 0);
-    ctx.fillStyle = "#ff9900";
-    ctx.font = "bold 36px 'Courier New', Courier, monospace";
-    ctx.textAlign = "right";
-    ctx.textBaseline = "bottom";
-    ctx.shadowColor = "rgba(255,153,0,0.5)";
-    ctx.shadowBlur = 10;
-    ctx.fillText(dateStr, cw - 30, ch - 30);
   }
 }
 
@@ -499,10 +492,7 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
                   <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(circle, rgba(255,255,255,0.05) 20%, rgba(0,0,0,0) 50%, rgba(0,0,0,0.6) 100%)" }} />
                   {/* Grain */}
                   <div className="absolute inset-0 pointer-events-none mix-blend-overlay opacity-50" style={{ backgroundImage: "url('data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.85%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E')" }} />
-                  {/* Date stamp */}
-                  <div className="absolute bottom-6 right-6 font-mono text-2xl font-bold text-[#ff9900] tracking-widest pointer-events-none" style={{ textShadow: "0 0 10px rgba(255,153,0,0.5)" }}>
-                    '{String(new Date().getFullYear()).slice(-2)} {String(new Date().getMonth() + 1).padStart(2, "0")} {String(new Date().getDate()).padStart(2, "0")}
-                  </div>
+
                   {/* ✅ Black camera body frame — flash dot is INSIDE it */}
                   <div className="absolute inset-0 pointer-events-none border-[12vw] border-black/90 shadow-[inset_0_0_20px_rgba(0,0,0,0.8)] rounded-[20vw] z-20 mix-blend-multiply" />
                   {/* Flash dot — sits inside the black frame top-right corner */}
