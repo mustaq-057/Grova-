@@ -57,6 +57,16 @@ export default memo(function Settings() {
   const [codeSuccess, setCodeSuccess] = useState(false);
   const [savingCode, setSavingCode] = useState(false);
 
+  const [autoConnect, setAutoConnect] = useState(() => localStorage.getItem("grova_autoconnect") === "true");
+
+  const toggleAutoConnect = () => {
+    setAutoConnect((v) => {
+      const next = !v;
+      localStorage.setItem("grova_autoconnect", next ? "true" : "false");
+      return next;
+    });
+  };
+
   const [isFullscreen, setIsFullscreen] = useState(!!document.fullscreenElement);
 
   
@@ -326,7 +336,12 @@ export default memo(function Settings() {
             <div className="flex-1"><p className="text-sm font-medium">Change code</p><p className="text-xs text-muted-foreground">Change your profile code</p></div>
             <ChevronRight className="w-4 h-4 text-muted-foreground" />
           </motion.div>
-          <div className="flex items-center gap-4 px-4 py-3.5">
+          <div className="flex items-center gap-4 px-4 py-3.5 border-t border-border/50">
+            <div className="w-10 h-10 bg-secondary/50 rounded-xl flex items-center justify-center"><Lock className="w-5 h-5 text-muted-foreground" strokeWidth={1.5} /></div>
+            <div className="flex-1"><p className="text-sm font-medium">Auto-connect</p><p className="text-xs text-muted-foreground">Skip code when tapping profile</p></div>
+            <Toggle on={autoConnect} toggle={toggleAutoConnect} />
+          </div>
+          <div className="flex items-center gap-4 px-4 py-3.5 border-t border-border/50">
             <div className="w-10 h-10 bg-secondary/50 rounded-xl flex items-center justify-center"><Smartphone className="w-5 h-5 text-muted-foreground" strokeWidth={1.5} /></div>
             <div className="flex-1"><p className="text-sm font-medium">Connected devices</p><p className="text-xs text-muted-foreground">This device is authorized</p></div>
           </div>

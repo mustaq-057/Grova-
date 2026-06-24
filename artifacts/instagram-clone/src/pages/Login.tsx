@@ -146,21 +146,13 @@ export default memo(function Login() {
     }
   };
 
-  const handlePick = (id: "me" | "wife") => {
-    setSelectedId(id);
-    setStep("code");
-    setError("");
-    setCode("");
-  };
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedId || !code) return;
+  const performLogin = async (id: "me" | "wife", loginCode: string) => {
     setLoading(true);
     setError("");
     try {
-      const { user, encryptionKey } = await api.login(selectedId, code);
+      const { user, encryptionKey } = await api.login(id, loginCode);
       await initEncryption(encryptionKey.trim());
+      localStorage.setItem(`grova_code_${id}`, loginCode); // Save code for auto-connect
       setUser(user as ApiUser);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "";
@@ -184,9 +176,30 @@ export default memo(function Login() {
       } else {
         setError("Login failed. Please try again.");
       }
+      setStep("code");
     } finally {
       setLoading(false);
     }
+  };
+
+  const handlePick = (id: "me" | "wife") => {
+    setSelectedId(id);
+    if (localStorage.getItem("grova_autoconnect") === "true") {
+      const savedCode = localStorage.getItem(`grova_code_${id}`);
+      if (savedCode) {
+        performLogin(id, savedCode);
+        return;
+      }
+    }
+    setStep("code");
+    setError("");
+    setCode("");
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedId || !code) return;
+    await performLogin(selectedId, code);
   };
 
   return (
