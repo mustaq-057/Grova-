@@ -41,6 +41,8 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
   const [showHeart, setShowHeart] = useState(false);
   const lastTapTimeRef = useRef(0);
+  const touchStartTimeRef = useRef(0);
+  const hasPinchedRef = useRef(false);
   const replyInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -193,9 +195,11 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
 
   const scale = useMotionValue(1);
 
-  const bindPinch = usePinch(({ offset: [s], last }) => {
-    if (last) {
+  const bindPinch = usePinch(({ offset: [s], active }) => {
+    if (active) hasPinchedRef.current = true;
+    if (!active) {
       scale.set(1);
+      setTimeout(() => { hasPinchedRef.current = false; }, 100);
     } else {
       scale.set(s);
     }
@@ -272,12 +276,23 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
         <div
           {...bindPinch()}
           className="absolute inset-0 flex items-center justify-center overflow-hidden touch-none"
-          onMouseDown={() => { if (!showDeleteConfirm && !isReplying) setIsTouchingToPause(true); }}
-          onMouseUp={e => { setIsTouchingToPause(false); handleTap(e); }}
+          onMouseDown={() => { 
+            touchStartTimeRef.current = Date.now();
+            if (!showDeleteConfirm && !isReplying) setIsTouchingToPause(true); 
+          }}
+          onMouseUp={e => { 
+            setIsTouchingToPause(false); 
+            if (Date.now() - touchStartTimeRef.current < 300) {
+              handleTap(e); 
+            }
+          }}
           onMouseLeave={() => setIsTouchingToPause(false)}
           onTouchStart={e => { 
+            touchStartTimeRef.current = Date.now();
             if (!showDeleteConfirm && !isReplying && e.touches.length === 1) {
               setIsTouchingToPause(true); 
+            } else if (e.touches.length > 1) {
+              setIsTouchingToPause(false);
             }
           }}
           onTouchMove={e => {
@@ -288,7 +303,10 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
           onTouchEnd={e => { 
             if (e.touches.length === 0) {
               setIsTouchingToPause(false); 
-              handleTap(e); 
+              const duration = Date.now() - touchStartTimeRef.current;
+              if (!hasPinchedRef.current && duration < 300) {
+                handleTap(e); 
+              }
             }
           }}
           onContextMenu={e => e.preventDefault()}
@@ -306,55 +324,58 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
             />
           )}
 
-          {/* Media */}
-          {mediaUrl && (
-            isVideo ? (
-              <motion.video
-                key={mediaUrl}
-                ref={videoRef}
-                src={mediaUrl}
-                className="relative w-full h-full object-contain z-10"
-                style={{ scale }}
-                autoPlay
-                loop
-                playsInline
-                muted
-                draggable={false}
-              />
-            ) : (
-              <motion.img
-                key={mediaUrl}
-                src={mediaUrl}
-                className="relative max-w-full max-h-full object-contain z-10 drop-shadow-2xl"
-                style={{ scale }}
-                draggable={false}
-                alt="Story"
-                onError={e => {
-                  // B2 public URL failed (bucket not public?) → fall through to blank
-                  (e.target as HTMLImageElement).style.opacity = "0";
-                }}
-              />
-            )
-          )}
+          {/* Scalable Container for Media + Text */}
+          <motion.div 
+            style={{ scale }} 
+            className="absolute inset-0 flex items-center justify-center pointer-events-none z-10"
+          >
+            {/* Media */}
+            {mediaUrl && (
+              isVideo ? (
+                <video
+                  key={mediaUrl}
+                  ref={videoRef}
+                  src={mediaUrl}
+                  className="relative w-full h-full object-contain pointer-events-auto"
+                  autoPlay
+                  loop
+                  playsInline
+                  muted
+                  draggable={false}
+                />
+              ) : (
+                <img
+                  key={mediaUrl}
+                  src={mediaUrl}
+                  className="relative max-w-full max-h-full object-contain drop-shadow-2xl pointer-events-auto"
+                  draggable={false}
+                  alt="Story"
+                  onError={e => {
+                    (e.target as HTMLImageElement).style.opacity = "0";
+                  }}
+                />
+              )
+            )}
 
-          {/* Text overlay (for video stories) */}
-          {textOverlayData && (
-            <div
-              className="absolute z-20 text-center whitespace-pre-wrap select-none pointer-events-none"
-              style={{
-                left: `${textOverlayData.x * 100}%`,
-                top: `${textOverlayData.y * 100}%`,
-                transform: "translate(-50%, -50%)",
-                fontFamily: textOverlayData.fontFamily,
-                color: textOverlayData.textColor,
-                fontSize: "clamp(24px, 8vw, 40px)",
-                fontWeight: "bold",
-                textShadow: "0px 2px 12px rgba(0,0,0,0.7)"
-              }}
-            >
-              {textOverlayData.text}
-            </div>
-          )}
+            {/* Text overlay (for video stories) */}
+            {textOverlayData && (
+              <div
+                className="absolute text-center whitespace-pre-wrap select-none pointer-events-none"
+                style={{
+                  left: `${textOverlayData.x * 100}%`,
+                  top: `${textOverlayData.y * 100}%`,
+                  transform: "translate(-50%, -50%)",
+                  fontFamily: textOverlayData.fontFamily,
+                  color: textOverlayData.textColor,
+                  fontSize: "clamp(24px, 8vw, 40px)",
+                  fontWeight: "bold",
+                  textShadow: "0px 2px 12px rgba(0,0,0,0.7)"
+                }}
+              >
+                {textOverlayData.text}
+              </div>
+            )}
+          </motion.div>
 
           {/* Top/bottom gradient */}
           <div className="absolute inset-0 bg-gradient-to-b from-black/55 via-transparent to-black/40 pointer-events-none z-10" />
