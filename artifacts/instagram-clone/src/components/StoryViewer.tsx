@@ -213,7 +213,9 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
   });
 
   const mediaUrl = currentStory.mediaUrl ?? "";
-  const isVideo = mediaUrl.includes(".mp4") || mediaUrl.includes(".webm") || currentStory.kind === "reel" || mediaUrl.includes("video");
+  // Strip query params for extension check (signed URLs have ?X-Amz-... appended)
+  const mediaUrlClean = mediaUrl.split("?")[0];
+  const isVideo = mediaUrlClean.endsWith(".mp4") || mediaUrlClean.endsWith(".webm") || currentStory.kind === "reel" || mediaUrlClean.includes("/video");
   const isLiked = likedIds.has(currentStory.id);
 
   return ReactDOM.createPortal(
@@ -315,8 +317,8 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
           }}
           onContextMenu={e => e.preventDefault()}
         >
-          {/* Blurred background (images only) */}
-          {mediaUrl && !isVideo && (
+          {/* Blurred background (images only) — only show once loaded */}
+          {mediaUrl && !isVideo && mediaStatus === "loaded" && (
             <div
               className="absolute inset-0 scale-110"
               style={{
@@ -360,9 +362,14 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
                   loop
                   playsInline
                   muted
+                  crossOrigin="anonymous"
                   draggable={false}
                   onCanPlay={() => setMediaStatus("loaded")}
-                  onError={() => setMediaStatus("error")}
+                  onLoadedData={() => setMediaStatus("loaded")}
+                  onError={(e) => {
+                    console.error("Story video error:", (e.target as HTMLVideoElement).error);
+                    setMediaStatus("error");
+                  }}
                 />
               ) : (
                 <img

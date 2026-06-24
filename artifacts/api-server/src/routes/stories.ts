@@ -58,20 +58,34 @@ async function signB2GetUrl(url: string): Promise<string> {
 
     if (!endpoint || !bucket || !accessKeyId || !secretAccessKey) return url;
 
-    // extract key from url
+    // Extract the object key from any known B2 URL format:
+    //   1. f00X.backblazeb2.com/file/<bucket>/<key>  (native B2 download URL)
+    //   2. s3.<region>.backblazeb2.com/<bucket>/<key> (S3-compatible path-style)
+    //   3. <B2_PUBLIC_URL>/<key>                       (custom domain / CDN)
     let key = "";
     try {
       const parsedUrl = new URL(url);
-      if (parsedUrl.pathname.includes(`/file/${bucket}/`)) {
-        key = parsedUrl.pathname.split(`/file/${bucket}/`)[1];
+      const pathname = parsedUrl.pathname.split("?")[0]; // strip any query params already in the stored URL
+
+      if (pathname.includes(`/file/${bucket}/`)) {
+        // Native B2 download URL: https://f005.backblazeb2.com/file/<bucket>/<key>
+        key = pathname.split(`/file/${bucket}/`)[1];
       } else if (parsedUrl.hostname === new URL(endpoint).hostname) {
-         key = parsedUrl.pathname.split(`/${bucket}/`)[1];
+        // S3 path-style: https://s3.<region>.backblazeb2.com/<bucket>/<key>
+        key = pathname.split(`/${bucket}/`)[1];
       } else if (process.env.B2_PUBLIC_URL && url.startsWith(process.env.B2_PUBLIC_URL)) {
-         key = url.slice(process.env.B2_PUBLIC_URL.length).replace(/^\//, "");
+        // Custom CDN / public URL prefix
+        key = url.slice(process.env.B2_PUBLIC_URL.length).replace(/^\//, "").split("?")[0];
+      } else if (parsedUrl.hostname.endsWith(".backblazeb2.com") && pathname.includes(`/${bucket}/`)) {
+        // Catch-all for any other backblazeb2.com hostname variant
+        key = pathname.split(`/${bucket}/`)[1];
       }
     } catch { }
 
-    if (!key) return url;
+    if (!key) {
+      console.warn("signB2GetUrl: could not extract key from URL:", url);
+      return url;
+    }
 
     const s3 = new S3Client({
       region,
@@ -81,8 +95,8 @@ async function signB2GetUrl(url: string): Promise<string> {
     });
 
     const command = new GetObjectCommand({ Bucket: bucket, Key: key });
-    // 24 hours expiry
-    return await getSignedUrl(s3 as any, command as any, { expiresIn: 86400 });
+    // 1-hour expiry — stories last 24h but we re-sign on every GET /stories call
+    return await getSignedUrl(s3 as any, command as any, { expiresIn: 3600 });
   } catch (err) {
     console.error("Failed to sign B2 GET url:", err);
     return url;
