@@ -127,14 +127,28 @@ export default memo(function Home() {
     }
     
     // Fetch stories
-    api.getStories().then(setStories).catch(console.error);
+    api.getStories().then(data => {
+      setStories(data);
+      // Auto-open specific story if URL has storyId
+      const params = new URLSearchParams(window.location.search);
+      const storyId = params.get("storyId");
+      if (storyId) {
+        const idx = data.findIndex(s => s.id === storyId);
+        if (idx !== -1) {
+          setInitialStoryIndex(idx);
+          setViewingStories(data);
+        }
+        // Clean up URL
+        window.history.replaceState({}, "", "/");
+      }
+    }).catch(console.error);
   }, []);
 
-  const handleStoryComplete = (uploaded?: boolean) => {
+  const handleStoryComplete = (uploaded?: boolean, story?: any) => {
     setShowCamera(false);
     api.getStories().then(setStories).catch(console.error);
     if (uploaded) {
-      api.postActivity({ type: "story", fromName: user?.name ?? "You", text: "Added a new story" }).catch(console.error);
+      api.postActivity({ type: "story", fromName: user?.name ?? "You", text: "Added a new story", targetPath: story ? `/?storyId=${story.id}` : undefined }).catch(console.error);
     }
   };
 

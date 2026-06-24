@@ -611,7 +611,7 @@ export const api = {
 
   getActivityFeed: () => apiFetch<{ notifications: AppNotification[] }>("/couple/activity"),
 
-  postActivity: (data: { type: AppNotification["type"]; fromName: string; text: string }) =>
+  postActivity: (data: { type: AppNotification["type"]; fromName: string; text: string; targetPath?: string }) =>
     apiFetch<{ success: boolean }>("/couple/activity", { method: "POST", body: JSON.stringify(data) }),
 
   markActivityReadAll: () =>

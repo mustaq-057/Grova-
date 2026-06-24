@@ -139,6 +139,9 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
         text: `💬 ${replyText}`,
         type: "text",
         senderId: user?.id ?? "me",
+        replyToImageUrl: currentStory.mediaUrl,
+        replyToText: "Story",
+        replyToId: currentStory.id,
       } as any);
       setReplyText("");
       setIsReplying(false);
@@ -157,6 +160,17 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
     setLikedIds(prev => new Set([...prev, id]));
     setShowHeart(true);
     setTimeout(() => setShowHeart(false), 1100);
+    const story = localStories.find(s => s.id === id);
+    if (story) {
+      api.sendMessage({
+        text: "❤️",
+        type: "text",
+        senderId: user?.id ?? "me",
+        replyToImageUrl: story.mediaUrl,
+        replyToText: "Story",
+        replyToId: id,
+      } as any).catch(console.error);
+    }
   };
 
   const handleTap = (e: React.MouseEvent | React.TouchEvent) => {
@@ -271,12 +285,14 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
             >
               {isManuallyPaused ? <Play className="w-5 h-5" /> : <Pause className="w-5 h-5" />}
             </button>
-            <button
-              onClick={() => { setShowDeleteConfirm(true); setIsManuallyPaused(true); }}
-              className="w-9 h-9 flex items-center justify-center text-white hover:bg-white/10 rounded-full"
-            >
-              <Trash2 className="w-5 h-5" />
-            </button>
+            {currentStory.authorId === user?.id && (
+              <button
+                onClick={() => { setShowDeleteConfirm(true); setIsManuallyPaused(true); }}
+                className="w-9 h-9 flex items-center justify-center text-white hover:bg-white/10 rounded-full"
+              >
+                <Trash2 className="w-5 h-5" />
+              </button>
+            )}
             <button onClick={onClose} className="w-9 h-9 flex items-center justify-center text-white hover:bg-white/10 rounded-full">
               <X className="w-5 h-5" />
             </button>

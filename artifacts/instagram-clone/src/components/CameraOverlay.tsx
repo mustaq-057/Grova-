@@ -6,7 +6,7 @@ import vintageCameraImg from "../vintage-camera.png";
 import { StoryEditor } from "./StoryEditor";
 
 interface CameraOverlayProps {
-  onClose: (uploaded?: boolean) => void;
+  onClose: (uploaded?: boolean, story?: any) => void;
   onCapture?: (file: File) => void;
   mode?: "chat" | "story";
 }
@@ -40,7 +40,7 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
     }
     try {
       const newStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: mode, width: { ideal: 1920 }, height: { ideal: 1080 } },
+        video: { facingMode: mode, width: { ideal: 1280 }, height: { ideal: 720 } },
         audio: false,
       });
       streamRef.current = newStream;
@@ -92,8 +92,8 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
     if (!streamRef.current) return;
     
     try {
-      const options = { mimeType: "video/webm;codecs=vp8,opus" };
-      const recorder = new MediaRecorder(streamRef.current, MediaRecorder.isTypeSupported(options.mimeType) ? options : undefined);
+      const options = { mimeType: "video/webm;codecs=vp8,opus", videoBitsPerSecond: 2500000 };
+      const recorder = new MediaRecorder(streamRef.current, MediaRecorder.isTypeSupported(options.mimeType) ? options : { videoBitsPerSecond: 2500000 });
       mediaRecorderRef.current = recorder;
       chunksRef.current = [];
 
@@ -290,7 +290,7 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
   };
 
   if (storyFile) {
-    return <StoryEditor file={storyFile} onClose={() => setStoryFile(null)} onComplete={() => onClose(true)} />;
+    return <StoryEditor file={storyFile} onClose={() => setStoryFile(null)} onComplete={(uploaded, story) => onClose(uploaded, story)} />;
   }
 
   return ReactDOM.createPortal(

@@ -9,7 +9,7 @@ import { uploadMediaFile } from "../lib/media-upload";
 interface StoryEditorProps {
   file: File;
   onClose: () => void;
-  onComplete: () => void;
+  onComplete: (uploaded?: boolean, story?: any) => void;
 }
 
 const FONTS = [
@@ -335,8 +335,8 @@ export function StoryEditor({ file, onClose, onComplete }: StoryEditorProps) {
       // Use the blob's actual content type (video/webm from camera, image/jpeg from canvas)
       const mime = finalBlob instanceof File ? finalBlob.type : isVideo ? "video/mp4" : "image/jpeg";
       const url = await uploadMediaFile(finalBlob, mime || (isVideo ? "video/mp4" : "image/jpeg"));
-      await api.addStory({ mediaUrl: url, kind: isVideo ? "reel" : "story", text_overlay: textOverlayObj ? JSON.stringify(textOverlayObj) : undefined });
-      onComplete();
+      const story = await api.addStory({ mediaUrl: url, kind: isVideo ? "reel" : "story", text_overlay: textOverlayObj ? JSON.stringify(textOverlayObj) : undefined });
+      onComplete(true, story);
     } catch (err) {
       console.error("Failed to upload story", err);
       alert("Failed to upload story. Please try again.");
