@@ -36,6 +36,7 @@ async function deleteB2File(url: string) {
     const s3 = new S3Client({
       region,
       endpoint,
+      forcePathStyle: true,
       credentials: { accessKeyId, secretAccessKey },
     });
 
@@ -75,6 +76,7 @@ async function signB2GetUrl(url: string): Promise<string> {
     const s3 = new S3Client({
       region,
       endpoint,
+      forcePathStyle: true,
       credentials: { accessKeyId, secretAccessKey },
     });
 
@@ -97,6 +99,11 @@ router.post("/stories", authenticate, rateLimiters.messages, async (req, res) =>
 
     if (!media_url) {
       res.status(400).json({ error: "media_url is required" });
+      return;
+    }
+
+    if (media_url.startsWith("data:")) {
+      res.status(400).json({ error: "To protect database storage, stories must be uploaded to B2 instead of storing raw base64 data." });
       return;
     }
 
