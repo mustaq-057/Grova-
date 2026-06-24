@@ -881,13 +881,14 @@ export default function Messages() {
 
           // Live doodle invite — show actionable toast to the partner
           if ((raw.variant as string) === "doodle_invite" && raw.senderId !== user?.id) {
-            toast(
-              (t) => (
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <span>🎨 {partnerName} wants to draw with you live!</span>
+            const toastId = `doodle-invite-${raw.id}`;
+            toast.custom(
+              (_id) => (
+                <div style={{ display: "flex", alignItems: "center", gap: 10, background: "#1c1c1e", color: "white", padding: "12px 16px", borderRadius: 12, boxShadow: "0 4px 24px rgba(0,0,0,0.4)", minWidth: 260 }}>
+                  <span style={{ flex: 1, fontSize: 14 }}>🎨 {partnerName} wants to draw with you live!</span>
                   <button
                     onClick={() => {
-                      toast.dismiss(t.id);
+                      toast.dismiss(toastId);
                       setDoodleLiveMode(true);
                       setDoodleOpen(true);
                     }}
@@ -896,19 +897,21 @@ export default function Messages() {
                       color: "white",
                       border: "none",
                       borderRadius: 8,
-                      padding: "4px 12px",
+                      padding: "6px 14px",
                       fontWeight: 700,
                       cursor: "pointer",
                       flexShrink: 0,
+                      fontSize: 13,
                     }}
                   >
                     Join 🎨
                   </button>
                 </div>
               ),
-              { duration: 20000 }
+              { id: toastId, duration: 20000 }
             );
           }
+
         } catch (err) {
           console.error("Failed to handle new message:", err);
         }
