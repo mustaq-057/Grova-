@@ -189,7 +189,7 @@ export default function Library() {
   // Settings State
   const [showSettings, setShowSettings] = useState(false);
   const [libLang, setLibLang] = useState<"en" | "ar">(() => (localStorage.getItem("grova-library-language") as "en" | "ar") || "en");
-  const [libTheme, setLibTheme] = useState<"dark" | "light" | "sepia" | "mocha" | "sage" | "rosewater" | "abyss">(() => (localStorage.getItem("grova-library-theme") as any) || "dark");
+  const [libTheme, setLibTheme] = useState<"dark" | "light" | "sepia" | "mocha" | "sage" | "rosewater" | "abyss">("dark");
   const [libraryMode, setLibraryMode] = useState(() => localStorage.getItem("libraryMode") === "true");
 
   const toggleLibraryMode = () => {
@@ -230,8 +230,21 @@ export default function Library() {
   }, [libLang]);
 
   useEffect(() => {
-    localStorage.setItem("grova-library-theme", libTheme);
-  }, [libTheme]);
+    if (!user?.id) return;
+    // Migrate old shared key to per-user key on first load
+    const sharedVal = localStorage.getItem("grova-library-theme");
+    const perUserVal = localStorage.getItem(`grova-library-theme-${user.id}`);
+    if (!perUserVal && sharedVal) {
+      localStorage.setItem(`grova-library-theme-${user.id}`, sharedVal);
+    }
+    const saved = localStorage.getItem(`grova-library-theme-${user.id}`) as any;
+    if (saved) setLibTheme(saved);
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    localStorage.setItem(`grova-library-theme-${user.id}`, libTheme);
+  }, [libTheme, user?.id]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -2368,25 +2381,36 @@ function LibraryStatsGraph({ weeklyData, monthlyData }: { weeklyData: { date: st
         </svg>
 
         <div className="absolute inset-0 w-full h-full flex justify-between pointer-events-none">
-          {data.map((d, i) => (
-            <div 
-              key={i} 
-              className="flex flex-col items-center justify-end h-full relative group pointer-events-auto" 
-              style={{ width: `${100 / data.length}%` }}
-              onMouseEnter={() => setActiveIndex(i)}
-              onMouseLeave={() => setActiveIndex(null)}
-              onTouchStart={() => setActiveIndex(i)}
-              onTouchEnd={() => setActiveIndex(null)}
-            >
-              <div className={`absolute top-0 w-full h-full transition-opacity flex justify-center pt-2 z-20 ${activeIndex === i ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
-                <div className="bg-black text-white text-[10px] font-bold py-1 px-2 rounded -mt-8 pointer-events-none shadow-xl whitespace-nowrap">
-                  {Math.round(d.pages)} pages
-                </div>
+          {data.map((d, i) => {
+            const yPercent = 100 - (d.pages / maxPages) * 100;
+            return (
+              <div 
+                key={i} 
+                className="flex flex-col items-center justify-end h-full relative group pointer-events-auto" 
+                style={{ width: `${100 / data.length}%` }}
+                onMouseEnter={() => setActiveIndex(i)}
+                onMouseLeave={() => setActiveIndex(null)}
+                onTouchStart={(e) => { e.preventDefault(); setActiveIndex(i); }}
+                onTouchEnd={() => setActiveIndex(null)}
+              >
+                {/* Compact floating badge pinned to the data point's Y position */}
+                {activeIndex === i && (
+                  <div
+                    className="absolute z-30 pointer-events-none"
+                    style={{ top: `${yPercent}%`, transform: "translate(-50%, calc(-100% - 8px))", left: "50%" }}
+                  >
+                    <div className="bg-[#1e3a5f] border border-blue-400/40 text-blue-100 text-[11px] font-bold px-2.5 py-1 rounded-lg shadow-lg whitespace-nowrap">
+                      {Math.round(d.pages)} pg
+                    </div>
+                    {/* Arrow tip */}
+                    <div className="w-0 h-0 mx-auto" style={{ borderLeft: "5px solid transparent", borderRight: "5px solid transparent", borderTop: "5px solid #1e3a5f" }} />
+                  </div>
+                )}
+                <div className={`h-full w-px bg-primary/20 transition-opacity ${activeIndex === i ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`} />
+                <span className="absolute -bottom-6 text-[9px] font-bold text-[var(--lib-muted)] uppercase">{getLabel(d)}</span>
               </div>
-              <div className={`h-full w-px bg-primary/20 transition-opacity ${activeIndex === i ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`} />
-              <span className="absolute -bottom-6 text-[9px] font-bold text-[var(--lib-muted)] uppercase">{getLabel(d)}</span>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>
