@@ -165,11 +165,12 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
     setTimeout(() => setShowHeart(false), 1100);
     const story = localStories.find(s => s.id === id);
     if (story) {
-      api.sendMessage({
-        text: "❤️",
-        type: "text",
-        senderId: user?.id ?? "me",
-      } as any).catch(console.error);
+      api.postActivity({
+        type: "like",
+        fromName: user?.name ?? "Someone",
+        text: `liked your story number ${currentIndex + 1}`,
+        targetPath: `/?storyId=${id}`
+      }).catch(console.error);
     }
   };
 
@@ -183,7 +184,30 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
       ? (e as React.TouchEvent).changedTouches[0]?.clientY
       : (e as React.MouseEvent).clientY;
 
-    // Double-tap detection for like
+    if (clientX == null) return;
+
+    const isLeftTap = clientX < window.innerWidth * 0.3;
+    const isRightTap = clientX > window.innerWidth * 0.7;
+
+    // If it's a left or right tap for turning stories, handle it immediately and skip double-tap detection
+    if (isLeftTap || isRightTap) {
+      if ((e.target as HTMLElement).closest(".story-controls")) return;
+      if (showDeleteConfirm) { 
+        setShowDeleteConfirm(false); 
+        setIsManuallyPaused(false); 
+        setIsTouchingToPause(false); 
+        return; 
+      }
+      if (isLeftTap) {
+        if (currentIndex > 0) setCurrentIndex(c => c - 1);
+      } else {
+        if (currentIndex < localStories.length - 1) setCurrentIndex(c => c + 1);
+        else onClose();
+      }
+      return;
+    }
+
+    // Double-tap detection for like (only in middle area)
     const now = Date.now();
     const distance = Math.sqrt(
       Math.pow(clientX - lastTapPosRef.current.x, 2) +
@@ -206,14 +230,9 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
       return; 
     }
 
-    if (clientX == null) return;
-
-    if (clientX < window.innerWidth * 0.3) {
-      if (currentIndex > 0) setCurrentIndex(c => c - 1);
-    } else {
-      if (currentIndex < localStories.length - 1) setCurrentIndex(c => c + 1);
-      else onClose();
-    }
+    // Fallback: middle area tap default behavior (typically pauses on hold, but if click registers)
+    if (currentIndex < localStories.length - 1) setCurrentIndex(c => c + 1);
+    else onClose();
   };
 
   // These hooks MUST be called unconditionally (Rules of Hooks) — before any conditional return
