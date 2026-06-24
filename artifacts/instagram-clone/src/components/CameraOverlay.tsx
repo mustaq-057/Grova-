@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { X, Image as ImageIcon, RefreshCcw, Zap, ZapOff } from "lucide-react";
+import { X, Image as ImageIcon, RefreshCcw, Zap, ZapOff, Check } from "lucide-react";
 import ReactDOM from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import vintageCameraImg from "../vintage-camera.png";
@@ -26,7 +26,7 @@ const MODE_LABELS: Record<CameraMode, string> = {
 const STYLE_FILTERS: Record<CameraStyle, string> = {
   normal: "none",
   vintage: "sepia(0.4) contrast(1.1) saturate(1.2) brightness(1.05) hue-rotate(-5deg)",
-  disposable: "contrast(1.2) saturate(1.2) brightness(1.15) sepia(0.2) hue-rotate(-10deg)",
+  disposable: "contrast(1.4) saturate(1.3) brightness(1.1) sepia(0.3) hue-rotate(-15deg) blur(0.5px)",
 };
 
 function applyStyleToCanvas(
@@ -73,9 +73,21 @@ function applyStyleToCanvas(
     const gradient = ctx.createRadialGradient(cw / 2, ch / 2, cw * 0.2, cw / 2, ch / 2, Math.max(cw, ch) * 1.0);
     gradient.addColorStop(0, "rgba(255,255,255,0.1)");
     gradient.addColorStop(0.5, "rgba(0,0,0,0)");
-    gradient.addColorStop(1, "rgba(0,0,0,0.7)");
+    gradient.addColorStop(1, "rgba(0,0,0,0.8)");
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, cw, ch);
+    
+    // Light leak
+    const leakGrad = ctx.createLinearGradient(0, 0, cw, 0);
+    leakGrad.addColorStop(0, "rgba(255,50,0,0.3)");
+    leakGrad.addColorStop(0.2, "rgba(0,0,0,0)");
+    leakGrad.addColorStop(0.8, "rgba(0,0,0,0)");
+    leakGrad.addColorStop(1, "rgba(255,100,0,0.2)");
+    ctx.globalCompositeOperation = "screen";
+    ctx.fillStyle = leakGrad;
+    ctx.fillRect(0, 0, cw, ch);
+    ctx.globalCompositeOperation = "source-over";
+
     const imgData = ctx.getImageData(0, 0, cw, ch);
     const data = imgData.data;
     for (let i = 0; i < data.length; i += 4) {
@@ -99,12 +111,8 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
   const [aspectRatio, setAspectRatio] = useState<"Full" | "16:9" | "4:3" | "1:1">("Full");
   const [error, setError] = useState<string | null>(null);
 
-  // Main camera mode (pill selector)
   const [cameraMode, setCameraMode] = useState<CameraMode>("normal");
-  // Toast overlay when switching modes
   const [modeOverlay, setModeOverlay] = useState<string | null>(null);
-
-  // Disposable flash dot
   const [flashDotActive, setFlashDotActive] = useState(false);
 
   // Photo booth state
@@ -112,10 +120,13 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
   const [photoBoothFiles, setPhotoBoothFiles] = useState<(File | null)[]>([null, null, null, null]);
   const [activeQuadrant, setActiveQuadrant] = useState(0);
   const [boothComplete, setBoothComplete] = useState(false);
+  const [boothReviewing, setBoothReviewing] = useState(false);
+  const [boothTransforms, setBoothTransforms] = useState(Array(4).fill({ zoom: 1, x: 0, y: 0 }));
 
   const [storyFiles, setStoryFiles] = useState<File[]>([]);
   const [zoom, setZoom] = useState(1);
   const pinchStartRef = useRef<{ dist: number; zoom: number } | null>(null);
+  const panStartRef = useRef<{ x: number; y: number } | null>(null);
 
   const startCamera = useCallback(async (fm: "user" | "environment") => {
     if (streamRef.current) {
@@ -154,29 +165,33 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
     }
   }, [flashOn]);
 
-  // Switch mode with toast overlay
   const switchMode = (newMode: CameraMode) => {
     setCameraMode(newMode);
-    // Clear existing timer & show new label
     if (overlayTimerRef.current) clearTimeout(overlayTimerRef.current);
     setModeOverlay(MODE_LABELS[newMode]);
-    overlayTimerRef.current = setTimeout(() => setModeOverlay(null), 3000);
-    // Reset photo booth when leaving
+    overlayTimerRef.current = setTimeout(() => setModeOverlay(null), 1000);
+    
     if (newMode !== "photoBooth") {
       setPhotoBoothFiles([null, null, null, null]);
+      setBoothTransforms(Array(4).fill({ zoom: 1, x: 0, y: 0 }));
       setActiveQuadrant(0);
       setBoothComplete(false);
+      setBoothReviewing(false);
+    }
+    if (newMode === "disposable") {
+      setAspectRatio("Full");
     }
   };
 
   const toggleCamera = () => setFacingMode((prev) => (prev === "user" ? "environment" : "user"));
   const toggleFlash = () => setFlashOn((f) => !f);
-  const toggleRatio = () =>
+  const toggleRatio = () => {
+    if (cameraMode === "disposable") return;
     setAspectRatio((prev) =>
       prev === "Full" ? "16:9" : prev === "16:9" ? "4:3" : prev === "4:3" ? "1:1" : "Full"
     );
+  };
 
-  // ── Capture helpers ──────────────────────────────────────────────────────────
   const buildCroppedCanvas = (style: CameraStyle): HTMLCanvasElement | null => {
     if (!videoRef.current || !streamRef.current) return null;
     const video = videoRef.current;
@@ -185,7 +200,7 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
     const videoRatio = vw / vh;
 
     let targetRatio = 9 / 16;
-    if (aspectRatio === "Full") targetRatio = vw / vh;
+    if (aspectRatio === "Full" || style === "disposable") targetRatio = vw / vh;
     if (aspectRatio === "4:3") targetRatio = 3 / 4;
     if (aspectRatio === "1:1") targetRatio = 1;
     if (vw > vh && targetRatio < 1) targetRatio = 1 / targetRatio;
@@ -211,7 +226,6 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
   const handleCapture = () => {
     const style = cameraMode === "photoBooth" ? photoBoothStyle : (cameraMode as CameraStyle);
 
-    // Flash animation for disposable
     if (style === "disposable") {
       setFlashDotActive(true);
       setTimeout(() => setFlashDotActive(false), 150);
@@ -229,11 +243,7 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
           const updated = [...photoBoothFiles];
           updated[activeQuadrant] = file;
           setPhotoBoothFiles(updated);
-          if (activeQuadrant === 3) {
-            setBoothComplete(true);
-          } else {
-            setActiveQuadrant((q) => q + 1);
-          }
+          setBoothReviewing(true);
         } else if (mode === "story") {
           setStoryFiles([file]);
         } else if (onCapture) {
@@ -245,7 +255,26 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
     );
   };
 
-  // Photo booth: combine 4 images into a collage and upload
+  const confirmBoothShot = () => {
+    if (activeQuadrant === 3) {
+      setBoothReviewing(false);
+      setBoothComplete(true);
+    } else {
+      setBoothReviewing(false);
+      setActiveQuadrant((q) => q + 1);
+    }
+  };
+
+  const retakeBoothShot = () => {
+    const updated = [...photoBoothFiles];
+    updated[activeQuadrant] = null;
+    setPhotoBoothFiles(updated);
+    setBoothReviewing(false);
+    const newTransforms = [...boothTransforms];
+    newTransforms[activeQuadrant] = { zoom: 1, x: 0, y: 0 };
+    setBoothTransforms(newTransforms);
+  };
+
   const handleBoothUpload = async () => {
     const files = photoBoothFiles.filter(Boolean) as File[];
     if (files.length < 4) return;
@@ -273,10 +302,37 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
 
     const hw = W / 2, hh = H / 2;
     const gap = 4;
-    ctx.drawImage(imgs[0], 0,          0,          hw - gap / 2, hh - gap / 2);
-    ctx.drawImage(imgs[1], hw + gap/2, 0,          hw - gap / 2, hh - gap / 2);
-    ctx.drawImage(imgs[2], 0,          hh + gap/2, hw - gap / 2, hh - gap / 2);
-    ctx.drawImage(imgs[3], hw + gap/2, hh + gap/2, hw - gap / 2, hh - gap / 2);
+    
+    const drawQuadrant = (img: HTMLImageElement, dx: number, dy: number, dw: number, dh: number, transform: {zoom:number, x:number, y:number}) => {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(dx, dy, dw, dh);
+      ctx.clip();
+
+      ctx.translate(dx + dw / 2, dy + dh / 2);
+      
+      const screenQuadW = window.innerWidth / 2;
+      const scaleRatio = dw / screenQuadW;
+
+      ctx.translate(transform.x * scaleRatio, transform.y * scaleRatio);
+      ctx.scale(transform.zoom, transform.zoom);
+
+      const imgRatio = img.naturalWidth / img.naturalHeight;
+      const boxRatio = dw / dh;
+      let drawW = dw, drawH = dh;
+      if (imgRatio > boxRatio) {
+        drawW = dh * imgRatio;
+      } else {
+        drawH = dw / imgRatio;
+      }
+      ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
+      ctx.restore();
+    };
+
+    drawQuadrant(imgs[0], 0,          0,          hw - gap / 2, hh - gap / 2, boothTransforms[0]);
+    drawQuadrant(imgs[1], hw + gap/2, 0,          hw - gap / 2, hh - gap / 2, boothTransforms[1]);
+    drawQuadrant(imgs[2], 0,          hh + gap/2, hw - gap / 2, hh - gap / 2, boothTransforms[2]);
+    drawQuadrant(imgs[3], hw + gap/2, hh + gap/2, hw - gap / 2, hh - gap / 2, boothTransforms[3]);
 
     canvas.toBlob(
       (blob) => {
@@ -307,20 +363,63 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
     if (e.touches.length === 2) {
       const t1 = e.touches[0], t2 = e.touches[1];
       const dist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
-      pinchStartRef.current = { dist, zoom };
+      if (cameraMode === "photoBooth" && boothReviewing) {
+        pinchStartRef.current = { dist, zoom: boothTransforms[activeQuadrant].zoom };
+      } else {
+        pinchStartRef.current = { dist, zoom };
+      }
+    } else if (e.touches.length === 1 && cameraMode === "photoBooth" && boothReviewing) {
+      panStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
     }
   };
+
   const handleTouchMove = (e: React.TouchEvent) => {
     if (e.touches.length === 2 && pinchStartRef.current) {
       const t1 = e.touches[0], t2 = e.touches[1];
       const dist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
       const delta = dist / pinchStartRef.current.dist;
-      setZoom(Math.max(1, Math.min(pinchStartRef.current.zoom * delta, 5)));
+      if (cameraMode === "photoBooth" && boothReviewing) {
+        const newZ = Math.max(1, Math.min(pinchStartRef.current.zoom * delta, 5));
+        setBoothTransforms(prev => {
+          const next = [...prev];
+          next[activeQuadrant] = { ...next[activeQuadrant], zoom: newZ };
+          return next;
+        });
+      } else {
+        setZoom(Math.max(1, Math.min(pinchStartRef.current.zoom * delta, 5)));
+      }
+    } else if (e.touches.length === 1 && panStartRef.current && cameraMode === "photoBooth" && boothReviewing) {
+      const dx = e.touches[0].clientX - panStartRef.current.x;
+      const dy = e.touches[0].clientY - panStartRef.current.y;
+      panStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      setBoothTransforms(prev => {
+        const next = [...prev];
+        next[activeQuadrant] = { 
+          ...next[activeQuadrant], 
+          x: next[activeQuadrant].x + dx,
+          y: next[activeQuadrant].y + dy 
+        };
+        return next;
+      });
     }
   };
-  const handleTouchEnd = () => { pinchStartRef.current = null; };
+
+  const handleTouchEnd = () => { 
+    pinchStartRef.current = null; 
+    panStartRef.current = null;
+  };
+  
   const handleWheel = (e: React.WheelEvent) => {
-    setZoom((z) => Math.max(1, Math.min(z - e.deltaY * 0.005, 5)));
+    if (cameraMode === "photoBooth" && boothReviewing) {
+      setBoothTransforms(prev => {
+        const next = [...prev];
+        const newZ = Math.max(1, Math.min(next[activeQuadrant].zoom - e.deltaY * 0.005, 5));
+        next[activeQuadrant] = { ...next[activeQuadrant], zoom: newZ };
+        return next;
+      });
+    } else {
+      setZoom((z) => Math.max(1, Math.min(z - e.deltaY * 0.005, 5)));
+    }
   };
 
   if (storyFiles.length > 0) {
@@ -340,7 +439,6 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
     isVintage ? STYLE_FILTERS.vintage :
     isDisposable ? STYLE_FILTERS.disposable : "none";
 
-  // Pill mode buttons
   const MODES: { key: CameraMode; label: string; img?: string }[] = [
     { key: "normal", label: "Default" },
     { key: "vintage", label: "Vintage", img: vintageCameraImg },
@@ -356,7 +454,6 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
         exit={{ opacity: 0, y: 50 }}
         className="fixed inset-0 z-[300] bg-black flex flex-col"
       >
-        {/* ── Top bar ───────────────────────────────────────── */}
         <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-center z-10 bg-gradient-to-b from-black/50 to-transparent pt-[max(1rem,env(safe-area-inset-top))]">
           <button onClick={() => onClose()} className="p-2 text-white hover:bg-white/10 rounded-full transition-colors active:scale-95">
             <X className="w-8 h-8" />
@@ -364,12 +461,15 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
           <button onClick={toggleFlash} className="p-2 text-white hover:bg-white/10 rounded-full transition-colors active:scale-95">
             {flashOn ? <Zap className="w-7 h-7" /> : <ZapOff className="w-7 h-7" />}
           </button>
-          <button onClick={toggleRatio} className="h-8 px-3 flex items-center justify-center text-sm font-bold text-white bg-black/40 backdrop-blur-md rounded-full border border-white/20 transition-colors active:scale-95">
-            {aspectRatio}
-          </button>
+          {!isDisposable ? (
+            <button onClick={toggleRatio} className="h-8 px-3 flex items-center justify-center text-sm font-bold text-white bg-black/40 backdrop-blur-md rounded-full border border-white/20 transition-colors active:scale-95">
+              {aspectRatio}
+            </button>
+          ) : (
+            <div className="h-8 px-3" />
+          )}
         </div>
 
-        {/* ── Mode switch toast overlay ──────────────────────── */}
         <AnimatePresence>
           {modeOverlay && (
             <motion.div
@@ -380,35 +480,47 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
               transition={{ duration: 0.18 }}
               className="absolute inset-0 flex items-center justify-center z-50 pointer-events-none"
             >
-              <div className="px-8 py-4 bg-black/70 rounded-2xl backdrop-blur-md border border-white/10">
+              <div className="px-8 py-4 bg-black/70 rounded-2xl backdrop-blur-md border border-white/10 shadow-xl">
                 <p className="text-white text-2xl font-bold tracking-widest uppercase">{modeOverlay}</p>
               </div>
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* ── Viewfinder ────────────────────────────────────── */}
         <div className="flex-1 relative overflow-hidden flex items-center justify-center bg-black w-full">
           {error ? (
             <p className="text-white/50 text-center px-4">{error}</p>
           ) : cameraMode === "photoBooth" ? (
-            /* ── 2×2 Photo Booth Grid ── */
-            <div className="relative w-full h-full grid grid-cols-2 grid-rows-2 gap-0.5 bg-black">
+            <div 
+              className="relative w-full h-full grid grid-cols-2 grid-rows-2 gap-0.5 bg-black"
+              onTouchStart={boothReviewing ? handleTouchStart : undefined}
+              onTouchMove={boothReviewing ? handleTouchMove : undefined}
+              onTouchEnd={boothReviewing ? handleTouchEnd : undefined}
+              onWheel={boothReviewing ? handleWheel : undefined}
+            >
               {[0, 1, 2, 3].map((idx) => {
                 const isActive = idx === activeQuadrant && !boothComplete;
                 const captured = photoBoothFiles[idx];
+                const transform = boothTransforms[idx];
                 return (
                   <div
                     key={idx}
-                    onClick={() => { if (isActive) handleCapture(); }}
-                    className={`relative overflow-hidden bg-black/80 ${isActive ? "ring-2 ring-white/70 cursor-pointer" : ""}`}
+                    onClick={() => { if (isActive && !boothReviewing) handleCapture(); }}
+                    className={`relative overflow-hidden bg-black/80 ${isActive && !boothReviewing ? "ring-2 ring-white/70 cursor-pointer" : ""}`}
                   >
                     {captured ? (
-                      <img src={URL.createObjectURL(captured)} className="w-full h-full object-cover" alt={`shot ${idx + 1}`} />
+                      <img 
+                        src={URL.createObjectURL(captured)} 
+                        className="w-full h-full object-cover origin-center" 
+                        style={{
+                          transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.zoom})`
+                        }}
+                        alt={`shot ${idx + 1}`} 
+                      />
                     ) : isActive ? (
                       <video
                         ref={(node) => {
-                          if (idx === activeQuadrant) {
+                          if (idx === activeQuadrant && !boothReviewing) {
                             videoRef.current = node;
                             if (node && streamRef.current && node.srcObject !== streamRef.current) {
                               node.srcObject = streamRef.current;
@@ -422,17 +534,19 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-white/20 text-4xl font-bold">{idx + 1}</div>
                     )}
-                    {isActive && !boothComplete && (
+                    {isActive && !boothComplete && !boothReviewing && (
                       <div className="absolute inset-0 border-2 border-white/50 pointer-events-none animate-pulse" />
+                    )}
+                    {isActive && boothReviewing && (
+                      <div className="absolute inset-0 pointer-events-none shadow-[inset_0_0_20px_rgba(0,0,0,0.5)] border-2 border-white/30" />
                     )}
                   </div>
                 );
               })}
-              {/* Shared video (hidden) for quadrants not active */}
               <video
                 ref={(node) => {
                   if (cameraMode === "photoBooth" && !boothComplete) {
-                    if (!photoBoothFiles[activeQuadrant]) {
+                    if (!photoBoothFiles[activeQuadrant] || boothReviewing) {
                       videoRef.current = node;
                       if (node && streamRef.current && node.srcObject !== streamRef.current) {
                         node.srcObject = streamRef.current;
@@ -445,7 +559,6 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
               />
             </div>
           ) : (
-            /* ── Normal / Vintage / Disposable viewfinder ── */
             <div
               className={`relative w-full flex items-center justify-center overflow-hidden transition-all duration-300 ${aspectRatio === "Full" ? "h-full" : "max-h-full"}`}
               style={{
@@ -475,7 +588,6 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
                 }}
               />
 
-              {/* Vintage overlays */}
               {isVintage && (
                 <>
                   <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(circle, rgba(0,0,0,0) 40%, rgba(0,0,0,0.3) 100%)" }} />
@@ -485,21 +597,13 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
                 </>
               )}
 
-              {/* Disposable overlays — flash dot lives INSIDE the black frame */}
               {isDisposable && (
                 <>
-                  {/* Heavy flash vignette */}
-                  <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(circle, rgba(255,255,255,0.05) 20%, rgba(0,0,0,0) 50%, rgba(0,0,0,0.6) 100%)" }} />
-                  {/* Grain */}
-                  <div className="absolute inset-0 pointer-events-none mix-blend-overlay opacity-50" style={{ backgroundImage: "url('data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.85%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E')" }} />
-
-                  {/* ✅ Black camera body frame — flash dot is INSIDE it */}
+                  <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(circle, rgba(255,255,255,0.1) 10%, rgba(0,0,0,0) 40%, rgba(0,0,0,0.8) 100%)" }} />
+                  <div className="absolute inset-0 pointer-events-none mix-blend-screen opacity-60" style={{ background: "linear-gradient(90deg, rgba(255,50,0,0.3) 0%, rgba(0,0,0,0) 20%, rgba(0,0,0,0) 80%, rgba(255,100,0,0.2) 100%)" }} />
+                  <div className="absolute inset-0 pointer-events-none mix-blend-overlay opacity-60" style={{ backgroundImage: "url('data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.9%22 numOctaves=%224%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E')" }} />
                   <div className="absolute inset-0 pointer-events-none border-[12vw] border-black/90 shadow-[inset_0_0_20px_rgba(0,0,0,0.8)] rounded-[20vw] z-20 mix-blend-multiply" />
-                  {/* Flash dot — sits inside the black frame top-right corner */}
-                  <div
-                    className="absolute z-30 pointer-events-none"
-                    style={{ top: "calc(12vw - 18px)", right: "calc(12vw - 18px)" }}
-                  >
+                  <div className="absolute z-30 pointer-events-none" style={{ top: "calc(12vw - 18px)", right: "calc(12vw - 18px)" }}>
                     <div
                       className="w-5 h-5 rounded-full border-2 border-orange-400/60"
                       style={{
@@ -519,10 +623,7 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
           )}
         </div>
 
-        {/* ── Bottom bar ────────────────────────────────────── */}
         <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/80 to-transparent pb-[max(1.5rem,env(safe-area-inset-bottom))]">
-
-          {/* ── Pill-style mode selector ── */}
           <div className="flex items-center justify-center mb-3 px-4">
             <div className="flex gap-1 p-1 bg-black/50 rounded-full backdrop-blur-md border border-white/10 overflow-x-auto max-w-full scrollbar-hide">
               {MODES.map(({ key, label, img }) => (
@@ -535,21 +636,14 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
                       : "text-white/70 hover:text-white hover:bg-white/10"
                   }`}
                 >
-                  {img && (
-                    <img
-                      src={img}
-                      alt={label}
-                      className="w-4 h-4 rounded-full object-cover"
-                    />
-                  )}
+                  {img && <img src={img} alt={label} className="w-4 h-4 rounded-full object-cover" />}
                   {label}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* ── Photo booth: per-shot style selector ── */}
-          {cameraMode === "photoBooth" && !boothComplete && (
+          {cameraMode === "photoBooth" && !boothComplete && !boothReviewing && (
             <div className="flex items-center justify-center mb-2 gap-2">
               {(["normal", "vintage", "disposable"] as CameraStyle[]).map((s) => (
                 <button
@@ -567,18 +661,35 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
             </div>
           )}
 
-          <div className="p-4 flex justify-between items-center">
-            {/* Gallery button */}
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="w-12 h-12 rounded-xl border border-white/20 bg-black/40 backdrop-blur-sm flex items-center justify-center text-white hover:bg-white/10 active:scale-95 transition-all overflow-hidden"
-            >
-              <ImageIcon className="w-6 h-6" />
-            </button>
+          {cameraMode === "photoBooth" && boothReviewing && (
+             <div className="flex items-center justify-center mb-2 px-4">
+               <span className="text-white/80 text-sm font-medium bg-black/40 px-3 py-1 rounded-full backdrop-blur-sm border border-white/10">
+                 Pinch to zoom / drag to pan
+               </span>
+             </div>
+          )}
 
-            {/* Centre: capture or upload collage */}
+          <div className="p-4 flex justify-between items-center">
+            {!(cameraMode === "photoBooth" && boothReviewing) ? (
+               <button
+                 onClick={() => fileInputRef.current?.click()}
+                 className="w-12 h-12 rounded-xl border border-white/20 bg-black/40 backdrop-blur-sm flex items-center justify-center text-white hover:bg-white/10 active:scale-95 transition-all overflow-hidden"
+               >
+                 <ImageIcon className="w-6 h-6" />
+               </button>
+            ) : <div className="w-12 h-12" />}
+
             <div className="relative flex items-center justify-center">
-              {cameraMode === "photoBooth" && boothComplete ? (
+              {cameraMode === "photoBooth" && boothReviewing ? (
+                <div className="flex gap-4 items-center">
+                  <button onClick={retakeBoothShot} className="w-14 h-14 rounded-full bg-red-500/80 text-white backdrop-blur-md border border-white/20 flex items-center justify-center active:scale-95 transition-all shadow-lg">
+                    <X className="w-7 h-7" />
+                  </button>
+                  <button onClick={confirmBoothShot} className="w-16 h-16 rounded-full bg-white text-black flex items-center justify-center active:scale-95 transition-all shadow-xl">
+                    <Check className="w-8 h-8" />
+                  </button>
+                </div>
+              ) : cameraMode === "photoBooth" && boothComplete ? (
                 <button
                   onClick={handleBoothUpload}
                   className="px-6 h-14 rounded-full bg-white text-black font-bold text-base active:scale-95 transition-all shadow-lg"
@@ -611,13 +722,14 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
               )}
             </div>
 
-            {/* Flip camera */}
-            <button
-              onClick={toggleCamera}
-              className="w-12 h-12 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white hover:bg-white/10 active:scale-95 transition-all"
-            >
-              <RefreshCcw className="w-6 h-6" />
-            </button>
+            {!(cameraMode === "photoBooth" && boothReviewing) ? (
+              <button
+                onClick={toggleCamera}
+                className="w-12 h-12 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white hover:bg-white/10 active:scale-95 transition-all"
+              >
+                <RefreshCcw className="w-6 h-6" />
+              </button>
+            ) : <div className="w-12 h-12" />}
           </div>
         </div>
 
