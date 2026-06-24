@@ -274,9 +274,7 @@ export default memo(function Home() {
             <Heart className={`w-4 h-4 text-primary ${appTheme === 'library' ? 'hidden' : ''}`} strokeWidth={2.5} />
           </p>
         )}
-        {partner && (
-          <p className="text-xs text-muted-foreground/60 mt-1 mb-3">Tap the ♥ to open chat · tap avatar to view story</p>
-        )}
+
         {!partner && !loadingPartner && (
           <p className={`text-base sm:text-lg font-medium mt-4 drop-shadow-sm text-foreground/90 ${appTheme === 'library' ? 'library-home-text' : ''}`}>
             Your private space
