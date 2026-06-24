@@ -136,7 +136,7 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
     setSendingReply(true);
     try {
       await api.sendMessage({
-        text: `💬 ${replyText}`,
+        text: replyText,
         type: "text",
         senderId: user?.id ?? "me",
         replyToImageUrl: currentStory.mediaUrl,

@@ -429,6 +429,23 @@ export default memo(function Home() {
                   <p className="font-semibold text-base">Add to story</p>
                 </div>
               </button>
+
+              <div className="border-t border-border/30 mx-4" />
+
+              <button
+                disabled
+                className="w-full flex items-center gap-4 px-5 py-4 transition-colors opacity-50 cursor-not-allowed"
+              >
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                  <MessageCircle className="w-5 h-5 text-primary" />
+                </div>
+                <div className="text-left flex-1">
+                  <p className="font-semibold text-base">Add a note</p>
+                </div>
+                <div className="bg-primary/20 text-primary text-[10px] uppercase font-bold px-2 py-0.5 rounded-full">
+                  Coming Soon
+                </div>
+              </button>
             </motion.div>
           </>
         )}

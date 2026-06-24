@@ -661,9 +661,15 @@ export const MessageItem = memo(function MessageItem({
             </p>
             <button
               type="button"
-              onClick={() => msg.replyToId && onJumpToMessage?.(msg.replyToId)}
+              onClick={() => {
+                if (msg.replyToText === "Story") {
+                  window.location.href = `/?storyId=${msg.replyToId}`;
+                } else if (msg.replyToId && onJumpToMessage) {
+                  onJumpToMessage(msg.replyToId);
+                }
+              }}
               className={`w-full max-w-full rounded-2xl bg-[#262626] border border-white/10 px-3 py-2.5 text-left transition-colors hover:bg-[#2e2e2e] active:bg-[#333] ${msg.replyToId ? "cursor-pointer" : "cursor-default"}`}
-              disabled={!msg.replyToId || !onJumpToMessage}
+              disabled={!msg.replyToId && msg.replyToText !== "Story"}
             >
               <div className="flex gap-2.5 items-center min-w-0">
                 {showReplyPhoto && replyThumbSrc ? (

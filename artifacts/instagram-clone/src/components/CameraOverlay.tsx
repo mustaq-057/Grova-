@@ -398,7 +398,7 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
               <button 
                 onPointerDown={handlePointerDown}
                 onPointerUp={handlePointerUp}
-                onPointerLeave={handlePointerUp}
+                onPointerCancel={handlePointerUp}
                 className={`w-20 h-20 rounded-full border-4 flex items-center justify-center transition-all ${vintageMode ? "border-[#ff9900]/80 shadow-[0_0_20px_rgba(255,153,0,0.4)] p-0.5" : "border-white"} ${isRecording ? "scale-110" : "active:scale-90"}`}
               >
                 {vintageMode ? (

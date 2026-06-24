@@ -185,7 +185,8 @@ export async function uploadMediaBinary(
         formData.append("timestamp", String(timestamp));
         formData.append("signature", signature);
 
-        res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`, {
+        const resourceType = mime.startsWith("video/") ? "video" : "image";
+        res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`, {
           method: "POST",
           body: formData,
           signal: controller.signal,
