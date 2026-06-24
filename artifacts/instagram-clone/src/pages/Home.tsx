@@ -341,7 +341,11 @@ export default memo(function Home() {
       )}
 
       {viewingStories && (
-        <StoryViewer stories={viewingStories} onClose={() => setViewingStories(null)} />
+        <StoryViewer 
+          stories={viewingStories} 
+          onClose={() => setViewingStories(null)} 
+          onStoriesChanged={handleStoryComplete}
+        />
       )}
 
       {/* "View or Add Story" bottom sheet */}

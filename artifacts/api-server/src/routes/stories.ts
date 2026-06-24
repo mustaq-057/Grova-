@@ -5,6 +5,46 @@ import { rateLimiters } from "../lib/security";
 
 const router = Router();
 
+async function deleteB2File(url: string) {
+  try {
+    const { S3Client, DeleteObjectCommand } = await import("@aws-sdk/client-s3");
+    const region = process.env.AWS_REGION || "us-east-005";
+    const endpoint = process.env.B2_ENDPOINT;
+    const bucket = process.env.B2_BUCKET_NAME;
+    const accessKeyId = process.env.B2_KEY_ID;
+    const secretAccessKey = process.env.B2_APPLICATION_KEY;
+
+    if (!endpoint || !bucket || !accessKeyId || !secretAccessKey) return;
+
+    // extract key from url
+    // eg: https://f005.backblazeb2.com/file/bucket-name/stories/123.mp4 -> stories/123.mp4
+    let key = "";
+    try {
+      const parsedUrl = new URL(url);
+      if (parsedUrl.pathname.includes(`/file/${bucket}/`)) {
+        key = parsedUrl.pathname.split(`/file/${bucket}/`)[1];
+      } else if (parsedUrl.hostname === new URL(endpoint).hostname) {
+         // https://s3.us-east-005.backblazeb2.com/bucket-name/stories/123.mp4
+         key = parsedUrl.pathname.split(`/${bucket}/`)[1];
+      } else if (process.env.B2_PUBLIC_URL && url.startsWith(process.env.B2_PUBLIC_URL)) {
+         key = url.slice(process.env.B2_PUBLIC_URL.length).replace(/^\//, "");
+      }
+    } catch { }
+
+    if (!key) return;
+
+    const s3 = new S3Client({
+      region,
+      endpoint,
+      credentials: { accessKeyId, secretAccessKey },
+    });
+
+    await s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
+  } catch (err) {
+    console.error("Failed to delete B2 file:", err);
+  }
+}
+
 router.post("/stories", authenticate, rateLimiters.messages, async (req, res) => {
   try {
     const userId = (req as any).user.id;
@@ -51,6 +91,27 @@ router.get("/stories", authenticate, rateLimiters.read, async (req, res) => {
   try {
     const now = Date.now();
     
+    // 1. Find and delete expired stories
+    try {
+      const expiredResult = await db.query(
+        `SELECT id, media_url FROM stories WHERE CAST(expires_at AS BIGINT) <= $1`,
+        [now]
+      );
+      if (expiredResult.rows.length > 0) {
+        // Delete from DB
+        const ids = expiredResult.rows.map((r: any) => `'${r.id}'`).join(',');
+        await db.execute(`DELETE FROM stories WHERE id IN (${ids})`);
+        
+        // Delete from B2 in background
+        expiredResult.rows.forEach((r: any) => {
+          if (r.media_url) deleteB2File(r.media_url);
+        });
+      }
+    } catch (err) {
+      console.error("Failed to clean up expired stories:", err);
+    }
+
+    // 2. Fetch active stories
     const result = await db.query(
       `SELECT 
         id, 
@@ -78,6 +139,12 @@ router.delete("/stories/:id", authenticate, async (req, res) => {
     const userId = (req as any).user.id;
     const { id } = req.params;
 
+    // Get story before deleting so we can delete from B2
+    const storyRes = await db.query(
+      "SELECT media_url FROM stories WHERE id = $1 AND author_id = $2", 
+      [id, userId]
+    );
+
     const result = await db.execute(
       "DELETE FROM stories WHERE id = $1 AND author_id = $2",
       [id, userId]
@@ -88,6 +155,11 @@ router.delete("/stories/:id", authenticate, async (req, res) => {
     if (affected === 0) {
       res.status(404).json({ error: "Story not found or unauthorized" });
       return;
+    }
+
+    // Delete from B2
+    if (storyRes.rows[0]?.media_url) {
+      deleteB2File(storyRes.rows[0].media_url);
     }
 
     res.json({ success: true });

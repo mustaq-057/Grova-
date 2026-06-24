@@ -1,20 +1,38 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { X, Pause, Play, Trash2, Heart, Send } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import ReactDOM from "react-dom";
 import { api } from "../lib/api";
 import type { ApiStory } from "../lib/api";
+
+/**
+ * Convert B2 S3-compatible endpoint URL → public download URL.
+ * e.g.  https://s3.us-east-005.backblazeb2.com/bucket/key
+ *  →    https://f005.backblazeb2.com/file/bucket/key
+ * Leaves Cloudinary / already-correct f00X URLs untouched.
+ */
+function normalizeMediaUrl(raw: string): string {
+  if (!raw) return raw;
+  const m = raw.match(/https:\/\/s3\.([a-z]+-[a-z]+-\d+)\.backblazeb2\.com\/([^/]+)\/(.+)/);
+  if (m) {
+    const cluster = m[1].match(/(\d+)$/)?.[1]?.padStart(3, "0") ?? "005";
+    return `https://f${cluster}.backblazeb2.com/file/${m[2]}/${m[3]}`;
+  }
+  return raw;
+}
 import { useAuth } from "@/lib/auth";
 
 interface StoryViewerProps {
   stories: ApiStory[];
   initialIndex?: number;
   onClose: () => void;
+  /** Called when a story is deleted so parent can refresh its story list */
+  onStoriesChanged?: () => void;
 }
 
 const STORY_DURATION = 5000;
 
-export function StoryViewer({ stories, initialIndex = 0, onClose }: StoryViewerProps) {
+export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChanged }: StoryViewerProps) {
   const { user } = useAuth();
 
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
@@ -92,18 +110,18 @@ export function StoryViewer({ stories, initialIndex = 0, onClose }: StoryViewerP
     if (!id) return;
     setDeleting(true);
     try {
+      await api.deleteStory(id);
       const updated = localStories.filter(s => s.id !== id);
+      onStoriesChanged?.(); // tell Home to refresh story list → clears ring
       if (updated.length === 0) { onClose(); return; }
       setLocalStories(updated);
       setCurrentIndex(c => Math.min(c, updated.length - 1));
       setProgress(0);
       setShowDeleteConfirm(false);
       setIsPaused(false);
-      await api.deleteStory(id);
     } catch (e) {
       console.error("Failed to delete story", e);
       setErrorMsg("Failed to delete — try again.");
-      setLocalStories(stories);
     } finally {
       setDeleting(false);
     }
@@ -173,7 +191,7 @@ export function StoryViewer({ stories, initialIndex = 0, onClose }: StoryViewerP
     try { textOverlayData = JSON.parse(currentStory.textOverlay); } catch { }
   }
 
-  const mediaUrl = currentStory.mediaUrl ?? "";
+  const mediaUrl = normalizeMediaUrl(currentStory.mediaUrl ?? "");
   const isVideo = mediaUrl.includes(".mp4") || mediaUrl.includes(".webm") || currentStory.kind === "reel";
   const isLiked = likedIds.has(currentStory.id);
 
@@ -281,6 +299,10 @@ export function StoryViewer({ stories, initialIndex = 0, onClose }: StoryViewerP
                 className="relative max-w-full max-h-full object-contain z-10 drop-shadow-2xl"
                 draggable={false}
                 alt="Story"
+                onError={e => {
+                  // B2 public URL failed (bucket not public?) → fall through to blank
+                  (e.target as HTMLImageElement).style.opacity = "0";
+                }}
               />
             )
           )}
