@@ -193,7 +193,6 @@ export function StoryEditor({ file, onClose, onComplete }: StoryEditorProps) {
   // Drag-to-delete state
   const [draggingStickerPos, setDraggingStickerPos] = useState<{ x: number; y: number } | null>(null);
   const [hoveredBin, setHoveredBin] = useState(false);
-  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null); // for confirm sheet
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const binRef = useRef<HTMLDivElement>(null);
@@ -222,7 +221,7 @@ export function StoryEditor({ file, onClose, onComplete }: StoryEditorProps) {
     setDraggingStickerPos(null);
     setHoveredBin(false);
     if (isOverBin(pos)) {
-      setPendingDeleteId(id); // show confirm sheet
+      setStickers(prev => prev.filter(s => s.id !== id));
     }
   }, [isOverBin]);
   const handleAddSticker = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -367,6 +366,15 @@ export function StoryEditor({ file, onClose, onComplete }: StoryEditorProps) {
             flipped={mainTransform.flipped}
             onFlipToggle={() => setMainTransform(prev => ({ ...prev, flipped: !prev.flipped }))}
             onTransformChange={(x, y, s, r) => setMainTransform(prev => ({ ...prev, x, y, scale: s, rotate: r }))}
+            onDragOver={pos => {
+              setDraggingStickerPos(pos);
+              setHoveredBin(isOverBin(pos));
+            }}
+            onDragEnd={pos => {
+              setDraggingStickerPos(null);
+              setHoveredBin(false);
+              if (isOverBin(pos)) onClose(); // discard story if main image dropped in bin
+            }}
           />
         ) : null}
 
@@ -522,43 +530,7 @@ export function StoryEditor({ file, onClose, onComplete }: StoryEditorProps) {
         )}
       </AnimatePresence>
 
-      {/* Delete sticker confirm sheet */}
-      <AnimatePresence>
-        {pendingDeleteId && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-black/60 z-50"
-              onClick={() => setPendingDeleteId(null)}
-            />
-            <motion.div
-              initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
-              transition={{ type: "spring", damping: 26, stiffness: 260 }}
-              className="absolute bottom-0 left-0 right-0 z-[51] bg-[#1c1c1e] rounded-t-2xl overflow-hidden"
-              style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
-            >
-              <div className="w-10 h-1 bg-white/20 rounded-full mx-auto mt-3 mb-4" />
-              <p className="text-center text-white/60 text-sm mb-4 px-6">Remove this image from your story?</p>
-              <div className="border-t border-white/10">
-                <button
-                  onClick={() => { setStickers(prev => prev.filter(s => s.id !== pendingDeleteId)); setPendingDeleteId(null); }}
-                  className="w-full py-4 text-red-500 font-semibold text-base flex items-center justify-center gap-2 hover:bg-white/5 transition-colors"
-                >
-                  <Trash2 className="w-5 h-5" /> Delete Image
-                </button>
-              </div>
-              <div className="border-t border-white/10">
-                <button
-                  onClick={() => setPendingDeleteId(null)}
-                  className="w-full py-4 text-white font-medium text-base hover:bg-white/5 transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+      {/* Removed confirm sheet */}
     </motion.div>,
     document.body
   );

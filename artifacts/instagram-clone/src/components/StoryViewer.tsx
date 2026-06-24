@@ -30,6 +30,7 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
   const [deleting, setDeleting] = useState(false);
   const [localStories, setLocalStories] = useState(stories);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [mediaStatus, setMediaStatus] = useState<"loading" | "loaded" | "error">("loading");
 
   // Reply
   const [replyText, setReplyText] = useState("");
@@ -48,8 +49,11 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
 
   useEffect(() => { setLocalStories(stories); }, [stories]);
 
-  // Reset progress on story change
-  useEffect(() => { setProgress(0); }, [currentIndex]);
+  // Reset progress and mediaStatus on story change
+  useEffect(() => { 
+    setProgress(0); 
+    setMediaStatus("loading");
+  }, [currentIndex]);
 
   // Video sync pause/play
   useEffect(() => {
@@ -329,6 +333,21 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
             style={{ scale }} 
             className="absolute inset-0 flex items-center justify-center pointer-events-none z-10"
           >
+            {/* Loading Spinner */}
+            {mediaStatus === "loading" && mediaUrl && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-10 h-10 border-4 border-white border-t-transparent rounded-full animate-spin opacity-70" />
+              </div>
+            )}
+
+            {/* Error Message */}
+            {mediaStatus === "error" && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-white/70">
+                <p className="text-lg font-medium mb-2">Failed to load story</p>
+                <p className="text-sm">The media might be unavailable or deleted.</p>
+              </div>
+            )}
+
             {/* Media */}
             {mediaUrl && (
               isVideo ? (
@@ -336,23 +355,24 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
                   key={mediaUrl}
                   ref={videoRef}
                   src={mediaUrl}
-                  className="relative w-full h-full object-contain pointer-events-auto"
+                  className={`relative w-full h-full object-contain pointer-events-auto transition-opacity duration-300 ${mediaStatus === "loaded" ? "opacity-100" : "opacity-0"}`}
                   autoPlay
                   loop
                   playsInline
                   muted
                   draggable={false}
+                  onCanPlay={() => setMediaStatus("loaded")}
+                  onError={() => setMediaStatus("error")}
                 />
               ) : (
                 <img
                   key={mediaUrl}
                   src={mediaUrl}
-                  className="relative max-w-full max-h-full object-contain drop-shadow-2xl pointer-events-auto"
+                  className={`relative max-w-full max-h-full object-contain drop-shadow-2xl pointer-events-auto transition-opacity duration-300 ${mediaStatus === "loaded" ? "opacity-100" : "opacity-0"}`}
                   draggable={false}
                   alt="Story"
-                  onError={e => {
-                    (e.target as HTMLImageElement).style.opacity = "0";
-                  }}
+                  onLoad={() => setMediaStatus("loaded")}
+                  onError={() => setMediaStatus("error")}
                 />
               )
             )}

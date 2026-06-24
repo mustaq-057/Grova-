@@ -241,6 +241,7 @@ router.get("/media/b2-sign-story", authenticate, async (req, res) => {
     const s3 = new S3Client({
       region,
       endpoint,
+      forcePathStyle: true,
       credentials: { accessKeyId, secretAccessKey },
     });
 
