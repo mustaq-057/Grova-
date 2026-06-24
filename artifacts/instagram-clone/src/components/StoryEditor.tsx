@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { X, Check, Loader2, ImagePlus, Type, Trash2 } from "lucide-react";
-import { motion, AnimatePresence, useMotionValue } from "framer-motion";
+import { motion, AnimatePresence, useMotionValue, useTransform } from "framer-motion";
 import { useGesture } from "@use-gesture/react";
 import ReactDOM from "react-dom";
 import { api } from "../lib/api";
@@ -26,9 +26,11 @@ interface Sticker {
   x: number;
   y: number;
   scale: number;
+  rotate: number;
+  flipped: boolean;
 }
 
-// ── Transformable image (pan + pinch) ─────────────────────────────────────────
+// ── Transformable image (pan + pinch + rotate + tap to flip) ──────────────────
 function TransformableImage({
   src,
   onTransformChange,
@@ -36,42 +38,58 @@ function TransformableImage({
   isTyping,
   onDragOver,           // called with { x, y } every frame so parent tracks position
   onDragEnd,            // called when pointer released
+  flipped,
+  onFlipToggle,
 }: {
   src: string;
-  onTransformChange: (x: number, y: number, s: number) => void;
+  onTransformChange: (x: number, y: number, s: number, r: number) => void;
   isMain?: boolean;
   isTyping?: boolean;
   onDragOver?: (pos: { x: number; y: number }) => void;
   onDragEnd?: (pos: { x: number; y: number }) => void;
+  flipped: boolean;
+  onFlipToggle: () => void;
 }) {
   const x = useMotionValue(0);
   const y = useMotionValue(0);
   const scale = useMotionValue(1);
+  const rotate = useMotionValue(0);
 
-  useEffect(() => { onTransformChange(0, 0, 1); }, []);
+  useEffect(() => { onTransformChange(0, 0, 1, 0); }, []);
+
+  const scaleX = useTransform(scale, (s) => (flipped ? -s : s));
 
   const bind = useGesture(
     {
-      onDrag: ({ offset: [ox, oy], xy: [px, py] }) => {
+      onDrag: ({ offset: [ox, oy], xy: [px, py], tap }) => {
         if (isTyping) return;
+        if (tap) {
+          onFlipToggle();
+          return;
+        }
         x.set(ox);
         y.set(oy);
-        onTransformChange(ox, oy, scale.get());
+        onTransformChange(ox, oy, scale.get(), rotate.get());
         onDragOver?.({ x: px, y: py });
       },
-      onDragEnd: ({ xy: [px, py] }) => {
+      onDragEnd: ({ xy: [px, py], tap }) => {
+        if (tap) return;
         onDragEnd?.({ x: px, y: py });
       },
-      onPinch: ({ offset: [s] }) => {
+      onPinch: ({ offset: [s, a] }) => {
         if (isTyping) return;
         scale.set(s);
-        onTransformChange(x.get(), y.get(), s);
+        rotate.set(a);
+        onTransformChange(x.get(), y.get(), s, a);
       },
     },
     {
-      drag: { from: () => [x.get(), y.get()] },
+      drag: { 
+        from: () => [x.get(), y.get()],
+        filterTaps: true,
+      },
       pinch: {
-        from: () => [scale.get(), 0],
+        from: () => [scale.get(), rotate.get()],
         scaleBounds: { min: 0.1, max: 10 },
         eventOptions: { passive: false },
       },
@@ -82,7 +100,14 @@ function TransformableImage({
     <motion.img
       {...(bind() as any)}
       src={src}
-      style={{ x, y, scale, touchAction: "none" }}
+      style={{ 
+        x, 
+        y, 
+        scaleX,
+        scaleY: scale,
+        rotate,
+        touchAction: "none" 
+      }}
       className={
         isMain
           ? "w-full h-full object-contain absolute inset-0 pointer-events-auto z-0"
@@ -98,13 +123,14 @@ function DraggableText({
   onTransformChange, onDragOver, onDragEnd
 }: {
   text: string; fontFamily: string; color: string; isTyping: boolean;
-  onTransformChange: (x: number, y: number, scale: number) => void;
+  onTransformChange: (x: number, y: number, scale: number, rotate: number) => void;
   onDragOver?: (pos: { x: number; y: number }) => void;
   onDragEnd?: (pos: { x: number; y: number }) => void;
 }) {
   const x = useMotionValue(0);
   const y = useMotionValue(0);
   const scale = useMotionValue(1);
+  const rotate = useMotionValue(0);
 
   const bind = useGesture(
     {
@@ -112,22 +138,23 @@ function DraggableText({
         if (isTyping) return;
         x.set(ox);
         y.set(oy);
-        onTransformChange(ox, oy, scale.get());
+        onTransformChange(ox, oy, scale.get(), rotate.get());
         onDragOver?.({ x: px, y: py });
       },
       onDragEnd: ({ xy: [px, py] }) => {
         onDragEnd?.({ x: px, y: py });
       },
-      onPinch: ({ offset: [s] }) => {
+      onPinch: ({ offset: [s, a] }) => {
         if (isTyping) return;
         scale.set(s);
-        onTransformChange(x.get(), y.get(), s);
+        rotate.set(a);
+        onTransformChange(x.get(), y.get(), s, a);
       },
     },
     {
       drag: { from: () => [x.get(), y.get()] },
       pinch: {
-        from: () => [scale.get(), 0],
+        from: () => [scale.get(), rotate.get()],
         scaleBounds: { min: 0.5, max: 4 },
         eventOptions: { passive: false },
       },
@@ -138,7 +165,7 @@ function DraggableText({
     <motion.div
       {...(bind() as any)}
       style={{
-        x, y, scale, touchAction: "none",
+        x, y, scale, rotate, touchAction: "none",
         fontFamily, color,
         fontSize: "clamp(24px, 8vw, 36px)",
         fontWeight: "bold",
@@ -159,8 +186,8 @@ export function StoryEditor({ file, onClose, onComplete }: StoryEditorProps) {
   const [textColor, setTextColor] = useState(COLORS[0]);
   const [isTyping, setIsTyping] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [textTransform, setTextTransform] = useState({ x: 0, y: 0, scale: 1 });
-  const [mainTransform, setMainTransform] = useState({ x: 0, y: 0, scale: 1 });
+  const [textTransform, setTextTransform] = useState({ x: 0, y: 0, scale: 1, rotate: 0 });
+  const [mainTransform, setMainTransform] = useState({ x: 0, y: 0, scale: 1, rotate: 0, flipped: false });
   const [stickers, setStickers] = useState<Sticker[]>([]);
 
   // Drag-to-delete state
@@ -202,7 +229,7 @@ export function StoryEditor({ file, onClose, onComplete }: StoryEditorProps) {
     const f = e.target.files?.[0];
     if (!f || !f.type.startsWith("image/")) return;
     const url = URL.createObjectURL(f);
-    setStickers(prev => [...prev, { id: Math.random().toString(36).substr(2, 9), url, x: 0, y: 0, scale: 1 }]);
+    setStickers(prev => [...prev, { id: Math.random().toString(36).substr(2, 9), url, x: 0, y: 0, scale: 1, rotate: 0, flipped: false }]);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -244,7 +271,8 @@ export function StoryEditor({ file, onClose, onComplete }: StoryEditorProps) {
 
         ctx.save();
         ctx.translate(W / 2 + mainTransform.x, H / 2 + mainTransform.y);
-        ctx.scale(mainTransform.scale, mainTransform.scale);
+        ctx.rotate((mainTransform.rotate * Math.PI) / 180);
+        ctx.scale(mainTransform.flipped ? -mainTransform.scale : mainTransform.scale, mainTransform.scale);
         const imgRatio = Math.min(W / mainImg.width, H / mainImg.height);
         ctx.drawImage(mainImg, -(mainImg.width * imgRatio) / 2, -(mainImg.height * imgRatio) / 2, mainImg.width * imgRatio, mainImg.height * imgRatio);
         ctx.restore();
@@ -253,7 +281,8 @@ export function StoryEditor({ file, onClose, onComplete }: StoryEditorProps) {
           const sImg = await loadImage(sticker.url);
           ctx.save();
           ctx.translate(W / 2 + sticker.x, H / 2 + sticker.y);
-          ctx.scale(sticker.scale, sticker.scale);
+          ctx.rotate((sticker.rotate * Math.PI) / 180);
+          ctx.scale(sticker.flipped ? -sticker.scale : sticker.scale, sticker.scale);
           const sRatio = Math.min((W * 0.5) / sImg.width, (H * 0.5) / sImg.height);
           const sdw = sImg.width * sRatio;
           const sdh = sImg.height * sRatio;
@@ -270,6 +299,7 @@ export function StoryEditor({ file, onClose, onComplete }: StoryEditorProps) {
         if (text.trim()) {
           ctx.save();
           ctx.translate(W / 2 + textTransform.x, H / 2 + textTransform.y);
+          ctx.rotate((textTransform.rotate * Math.PI) / 180);
           ctx.scale(textTransform.scale, textTransform.scale);
           ctx.font = `bold 36px ${fontFamily}`;
           ctx.fillStyle = textColor;
@@ -292,7 +322,8 @@ export function StoryEditor({ file, onClose, onComplete }: StoryEditorProps) {
             textColor, 
             x: (window.innerWidth / 2 + textTransform.x) / window.innerWidth, 
             y: (window.innerHeight / 2 + textTransform.y) / window.innerHeight,
-            scale: textTransform.scale
+            scale: textTransform.scale,
+            rotate: textTransform.rotate
           };
         }
       }
@@ -333,7 +364,9 @@ export function StoryEditor({ file, onClose, onComplete }: StoryEditorProps) {
             src={imageUrl}
             isMain
             isTyping={isTyping}
-            onTransformChange={(x, y, s) => setMainTransform({ x, y, scale: s })}
+            flipped={mainTransform.flipped}
+            onFlipToggle={() => setMainTransform(prev => ({ ...prev, flipped: !prev.flipped }))}
+            onTransformChange={(x, y, s, r) => setMainTransform(prev => ({ ...prev, x, y, scale: s, rotate: r }))}
           />
         ) : null}
 
@@ -342,7 +375,9 @@ export function StoryEditor({ file, onClose, onComplete }: StoryEditorProps) {
             key={sticker.id}
             src={sticker.url}
             isTyping={isTyping}
-            onTransformChange={(x, y, s) => setStickers(prev => prev.map(st => st.id === sticker.id ? { ...st, x, y, scale: s } : st))}
+            flipped={sticker.flipped}
+            onFlipToggle={() => setStickers(prev => prev.map(st => st.id === sticker.id ? { ...st, flipped: !st.flipped } : st))}
+            onTransformChange={(x, y, s, r) => setStickers(prev => prev.map(st => st.id === sticker.id ? { ...st, x, y, scale: s, rotate: r } : st))}
             onDragOver={pos => handleStickerDragOver(sticker.id, pos)}
             onDragEnd={pos => handleStickerDragEnd(sticker.id, pos)}
           />
@@ -398,7 +433,7 @@ export function StoryEditor({ file, onClose, onComplete }: StoryEditorProps) {
           fontFamily={fontFamily}
           color={textColor}
           isTyping={isTyping}
-          onTransformChange={(x, y, s) => setTextTransform({ x, y, scale: s })}
+          onTransformChange={(x, y, s, r) => setTextTransform({ x, y, scale: s, rotate: r })}
           onDragEnd={(pos) => {
             if (isOverBin(pos)) setText("");
           }}

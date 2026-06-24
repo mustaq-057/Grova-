@@ -188,7 +188,7 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
   const currentStory = localStories[currentIndex];
   if (!currentStory) return null;
 
-  let textOverlayData: { text: string; fontFamily: string; textColor: string; x: number; y: number } | null = null;
+  let textOverlayData: { text: string; fontFamily: string; textColor: string; x: number; y: number; rotate?: number } | null = null;
   if (currentStory.textOverlay) {
     try { textOverlayData = JSON.parse(currentStory.textOverlay); } catch { }
   }
@@ -364,7 +364,7 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
                 style={{
                   left: `${textOverlayData.x * 100}%`,
                   top: `${textOverlayData.y * 100}%`,
-                  transform: "translate(-50%, -50%)",
+                  transform: `translate(-50%, -50%) rotate(${textOverlayData.rotate || 0}deg)`,
                   fontFamily: textOverlayData.fontFamily,
                   color: textOverlayData.textColor,
                   fontSize: "clamp(24px, 8vw, 40px)",
