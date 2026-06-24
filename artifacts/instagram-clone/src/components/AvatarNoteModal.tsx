@@ -7,7 +7,7 @@ import { useAuth } from "@/lib/auth";
 import { AvatarImage } from "./AvatarImage";
 
 interface AvatarNoteModalProps {
-  mode: "create" | "view";
+  mode: "view";
   user: ApiUser;
   note?: ApiAvatarNote;
   onClose: () => void;
@@ -18,10 +18,10 @@ interface AvatarNoteModalProps {
 
 export function AvatarNoteModal({ mode, user, note, onClose, onNoteAdded, onNoteDeleted, onReplySent }: AvatarNoteModalProps) {
   const { user: currentUser } = useAuth();
-  const [text, setText] = useState(mode === "view" ? note?.text || "" : "");
+  const [text, setText] = useState(note?.text || "");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [replyText, setReplyText] = useState("");
-  const [editing, setEditing] = useState(mode === "create");
+  const [editing, setEditing] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const isMine = user.id === currentUser?.id;
@@ -133,43 +133,8 @@ export function AvatarNoteModal({ mode, user, note, onClose, onNoteAdded, onNote
               </div>
             </div>
 
-            {editing ? (
-              <div className="w-full">
-                <div className="relative">
-                  <textarea
-                    ref={inputRef}
-                    value={text}
-                    onChange={e => setText(e.target.value.slice(0, maxLength))}
-                    placeholder="What's on your mind?"
-                    className="w-full bg-white/5 border border-white/15 rounded-2xl p-4 text-center text-lg text-white placeholder:text-white/35 resize-none outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all min-h-[88px]"
-                    rows={3}
-                  />
-                </div>
-                <div className="flex justify-between items-center mt-4 px-1">
-                  <span className={`text-xs font-medium tabular-nums ${text.length === maxLength ? "text-red-400" : "text-white/40"}`}>
-                    {text.length}/{maxLength}
-                  </span>
-                  <span className="text-[11px] text-white/30">Visible for 24 hours</span>
-                </div>
-                <div className="flex gap-2 mt-4">
-                  {isMine && note && (
-                    <button
-                      onClick={() => { setEditing(false); setText(note.text); }}
-                      className="flex-1 py-3 rounded-full font-semibold text-sm text-white/80 bg-white/10 hover:bg-white/15 transition-colors"
-                    >
-                      Cancel
-                    </button>
-                  )}
-                  <button
-                    onClick={handleShare}
-                    disabled={!text.trim() || isSubmitting}
-                    className="flex-1 py-3 rounded-full font-semibold text-sm bg-white text-black disabled:opacity-40 hover:bg-white/90 transition-colors"
-                  >
-                    {isSubmitting ? "Sharing…" : "Share note"}
-                  </button>
-                </div>
-              </div>
-            ) : (
+            {/* View Mode Only */}
+            {note ? (
               <div className="w-full flex flex-col items-center">
                 <div className="relative w-full max-w-[92%] mb-6">
                   <div className="absolute -inset-1 bg-primary/20 blur-xl rounded-3xl" />
@@ -205,7 +170,7 @@ export function AvatarNoteModal({ mode, user, note, onClose, onNoteAdded, onNote
                       type="text"
                       value={replyText}
                       onChange={e => setReplyText(e.target.value)}
-                      placeholder={`Reply to ${user.name}…`}
+                      placeholder={`Reply to ${user.name}\u2026`}
                       className="flex-1 bg-white/10 border border-white/15 rounded-full px-4 py-3 text-sm text-white placeholder:text-white/40 outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/20 transition-all"
                       onKeyDown={e => e.key === "Enter" && handleReply()}
                     />
@@ -219,6 +184,47 @@ export function AvatarNoteModal({ mode, user, note, onClose, onNoteAdded, onNote
                     </button>
                   </div>
                 )}
+              </div>
+            ) : (
+              <div className="w-full text-center">
+                <p className="text-white/60 text-sm">No note yet</p>
+              </div>
+            )}
+
+            {/* Edit Mode */}
+            {editing && isMine && note && (
+              <div className="w-full">
+                <div className="relative">
+                  <textarea
+                    ref={inputRef}
+                    value={text}
+                    onChange={e => setText(e.target.value.slice(0, maxLength))}
+                    placeholder="What's on your mind?"
+                    className="w-full bg-white/5 border border-white/15 rounded-2xl p-4 text-center text-lg text-white placeholder:text-white/35 resize-none outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all min-h-[88px]"
+                    rows={3}
+                  />
+                </div>
+                <div className="flex justify-between items-center mt-4 px-1">
+                  <span className={`text-xs font-medium tabular-nums ${text.length === maxLength ? "text-red-400" : "text-white/40"}`}>
+                    {text.length}/{maxLength}
+                  </span>
+                  <span className="text-[11px] text-white/30">Visible for 24 hours</span>
+                </div>
+                <div className="flex gap-2 mt-4">
+                  <button
+                    onClick={() => { setEditing(false); setText(note.text); }}
+                    className="flex-1 py-3 rounded-full font-semibold text-sm text-white/80 bg-white/10 hover:bg-white/15 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleShare}
+                    disabled={!text.trim() || isSubmitting}
+                    className="flex-1 py-3 rounded-full font-semibold text-sm bg-white text-black disabled:opacity-40 hover:bg-white/90 transition-colors"
+                  >
+                    {isSubmitting ? "Sharing\u2026" : "Save note"}
+                  </button>
+                </div>
               </div>
             )}
           </div>

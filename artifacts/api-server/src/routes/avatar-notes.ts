@@ -60,7 +60,7 @@ router.post("/notes", authenticate, rateLimiters.messages, async (req, res) => {
     );
 
     const displayName = await profileDisplayName(userId);
-    await postCoupleActivity("note", userId, displayName, "shared a note", "/").catch(() => {});
+    await postCoupleActivity("note", userId, displayName, `shared a note: "${text}"`, "/").catch(() => {});
 
     const result = await db.query(
       `SELECT

@@ -36,7 +36,7 @@ export default memo(function Home() {
 
   const [notes, setNotes] = useState<ApiAvatarNote[]>([]);
   const [selectedNoteUser, setSelectedNoteUser] = useState<ApiUser | null>(null);
-  const [noteMode, setNoteMode] = useState<"create" | "view">("view");
+  const [noteMode] = useState<"view">("view");
 
   const partnerId = user?.id === "me" ? "wife" : "me";
 
@@ -213,26 +213,22 @@ export default memo(function Home() {
               className={`relative flex items-center justify-center gap-5 sm:gap-7 mt-8 mb-3 w-full max-w-[340px] mx-auto ${appTheme === 'library' ? 'library-locket-container' : ''} ${appTheme === 'mint' ? 'home-avatar-mint-glow' : ''}`}
             >
               <div className="relative">
-                {/* Note Bubble */}
-                <button
-                  type="button"
-                  className="absolute -top-14 left-1/2 -translate-x-1/2 z-40 transition-transform active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-2xl"
-                  onClick={() => { if (user) { setSelectedNoteUser(user); setNoteMode(myNote ? "view" : "create"); } }}
-                  aria-label={myNote ? "View your note" : "Add a note"}
-                >
-                  {myNote ? (
+                {/* Note Bubble - View Only */}
+                {myNote && (
+                  <button
+                    type="button"
+                    className="absolute -top-14 left-1/2 -translate-x-1/2 z-40 transition-transform active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-2xl"
+                    onClick={() => { if (user) { setSelectedNoteUser(user); } }}
+                    aria-label="View your note"
+                  >
                     <div className="relative group">
                       <div className="absolute inset-0 bg-primary/25 blur-md rounded-2xl scale-110 opacity-70" />
                       <div className="relative bg-gradient-to-br from-white via-white to-primary/10 text-foreground px-3.5 py-2 rounded-2xl rounded-bl-[4px] text-[13px] shadow-lg shadow-black/10 max-w-[130px] font-semibold leading-snug line-clamp-2">
                         {myNote.text}
                       </div>
                     </div>
-                  ) : (
-                    <div className="flex items-center gap-1.5 bg-gradient-to-br from-primary/25 to-primary/5 backdrop-blur-md px-3 py-1.5 rounded-2xl rounded-bl-[4px] border border-primary/25 text-xs font-semibold text-primary shadow-md shadow-primary/10 hover:from-primary/35 transition-colors">
-                      <StickyNote className="w-3.5 h-3.5" /> Note
-                    </div>
-                  )}
-                </button>
+                  </button>
+                )}
 
                 {/* My avatar — tap to view/add story */}
                 <button
@@ -294,7 +290,7 @@ export default memo(function Home() {
                   <button
                     type="button"
                     className="absolute -top-14 left-1/2 -translate-x-1/2 z-40 transition-transform active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-2xl"
-                    onClick={() => { setSelectedNoteUser(partner); setNoteMode("view"); }}
+                    onClick={() => { setSelectedNoteUser(partner); }}
                     aria-label={`View ${partner.name}'s note`}
                   >
                     <div className="relative">
@@ -488,26 +484,7 @@ export default memo(function Home() {
                 </div>
               </button>
 
-              <div className="border-t border-border/30 mx-4" />
 
-              <button
-                onClick={() => {
-                  setShowMyStoryOptions(false);
-                  if (user) {
-                    setSelectedNoteUser(user);
-                    setNoteMode(myNote ? "view" : "create");
-                  }
-                }}
-                className="w-full flex items-center gap-4 px-5 py-4 hover:bg-secondary/50 transition-colors"
-              >
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                  <StickyNote className="w-5 h-5 text-primary" />
-                </div>
-                <div className="text-left flex-1">
-                  <p className="font-semibold text-base">{myNote ? "View my note" : "Add a note"}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Share a short thought · 24h</p>
-                </div>
-              </button>
             </motion.div>
           </>
         )}
