@@ -2263,6 +2263,7 @@ function NotesModal({
 
 function LibraryStatsGraph({ weeklyData, monthlyData }: { weeklyData: { date: string; pages: number }[], monthlyData: { month: string; pages: number }[] }) {
   const [view, setView] = useState<"week" | "year">("week");
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
   const data = view === "week" ? weeklyData : monthlyData;
   const maxPages = Math.max(...data.map(d => d.pages), 1); // Avoid division by zero
@@ -2368,13 +2369,21 @@ function LibraryStatsGraph({ weeklyData, monthlyData }: { weeklyData: { date: st
 
         <div className="absolute inset-0 w-full h-full flex justify-between pointer-events-none">
           {data.map((d, i) => (
-            <div key={i} className="flex flex-col items-center justify-end h-full relative group pointer-events-auto" style={{ width: `${100 / data.length}%` }}>
-              <div className="absolute top-0 w-full h-full opacity-0 group-hover:opacity-100 transition-opacity flex justify-center pt-2 z-20">
+            <div 
+              key={i} 
+              className="flex flex-col items-center justify-end h-full relative group pointer-events-auto" 
+              style={{ width: `${100 / data.length}%` }}
+              onMouseEnter={() => setActiveIndex(i)}
+              onMouseLeave={() => setActiveIndex(null)}
+              onTouchStart={() => setActiveIndex(i)}
+              onTouchEnd={() => setActiveIndex(null)}
+            >
+              <div className={`absolute top-0 w-full h-full transition-opacity flex justify-center pt-2 z-20 ${activeIndex === i ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
                 <div className="bg-black text-white text-[10px] font-bold py-1 px-2 rounded -mt-8 pointer-events-none shadow-xl whitespace-nowrap">
                   {Math.round(d.pages)} pages
                 </div>
               </div>
-              <div className="h-full w-px bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className={`h-full w-px bg-primary/20 transition-opacity ${activeIndex === i ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`} />
               <span className="absolute -bottom-6 text-[9px] font-bold text-[var(--lib-muted)] uppercase">{getLabel(d)}</span>
             </div>
           ))}

@@ -110,11 +110,11 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
   const [activeQuadrant, setActiveQuadrant] = useState(0);
   const [boothComplete, setBoothComplete] = useState(false);
   const [boothReviewing, setBoothReviewing] = useState(false);
-  const [boothTransforms, setBoothTransforms] = useState(Array(4).fill({ zoom: 1, x: 0, y: 0 }));
+  const [boothTransforms, setBoothTransforms] = useState(Array(4).fill({ zoom: 1, x: 0, y: 0, rotate: 0 }));
 
   const [storyFiles, setStoryFiles] = useState<File[]>([]);
   const [zoom, setZoom] = useState(1);
-  const pinchStartRef = useRef<{ dist: number; zoom: number } | null>(null);
+  const pinchStartRef = useRef<{ dist: number; zoom: number; angle: number; rotate: number } | null>(null);
   const panStartRef = useRef<{ x: number; y: number } | null>(null);
 
   const startCamera = useCallback(async (fm: "user" | "environment") => {
@@ -162,7 +162,7 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
     
     if (newMode !== "photoBooth") {
       setPhotoBoothFiles([null, null, null, null]);
-      setBoothTransforms(Array(4).fill({ zoom: 1, x: 0, y: 0 }));
+      setBoothTransforms(Array(4).fill({ zoom: 1, x: 0, y: 0, rotate: 0 }));
       setActiveQuadrant(0);
       setBoothComplete(false);
       setBoothReviewing(false);
@@ -260,7 +260,7 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
     setPhotoBoothFiles(updated);
     setBoothReviewing(false);
     const newTransforms = [...boothTransforms];
-    newTransforms[activeQuadrant] = { zoom: 1, x: 0, y: 0 };
+    newTransforms[activeQuadrant] = { zoom: 1, x: 0, y: 0, rotate: 0 };
     setBoothTransforms(newTransforms);
   };
 
@@ -292,7 +292,7 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
     const hw = W / 2, hh = H / 2;
     const gap = 4;
     
-    const drawQuadrant = (img: HTMLImageElement, dx: number, dy: number, dw: number, dh: number, transform: {zoom:number, x:number, y:number}) => {
+    const drawQuadrant = (img: HTMLImageElement, dx: number, dy: number, dw: number, dh: number, transform: {zoom:number, x:number, y:number, rotate?:number}) => {
       ctx.save();
       ctx.beginPath();
       ctx.rect(dx, dy, dw, dh);
@@ -305,6 +305,9 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
 
       ctx.translate(transform.x * scaleRatio, transform.y * scaleRatio);
       ctx.scale(transform.zoom, transform.zoom);
+      if (transform.rotate) {
+        ctx.rotate((transform.rotate * Math.PI) / 180);
+      }
 
       const imgRatio = img.naturalWidth / img.naturalHeight;
       const boxRatio = dw / dh;
@@ -352,10 +355,16 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
     if (e.touches.length === 2) {
       const t1 = e.touches[0], t2 = e.touches[1];
       const dist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+      const angle = Math.atan2(t2.clientY - t1.clientY, t2.clientX - t1.clientX);
       if (cameraMode === "photoBooth" && boothReviewing) {
-        pinchStartRef.current = { dist, zoom: boothTransforms[activeQuadrant].zoom };
+        pinchStartRef.current = { 
+          dist, 
+          zoom: boothTransforms[activeQuadrant].zoom,
+          angle,
+          rotate: boothTransforms[activeQuadrant].rotate || 0
+        };
       } else {
-        pinchStartRef.current = { dist, zoom };
+        pinchStartRef.current = { dist, zoom, angle, rotate: 0 };
       }
     } else if (e.touches.length === 1 && cameraMode === "photoBooth" && boothReviewing) {
       panStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
@@ -366,12 +375,17 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
     if (e.touches.length === 2 && pinchStartRef.current) {
       const t1 = e.touches[0], t2 = e.touches[1];
       const dist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+      const angle = Math.atan2(t2.clientY - t1.clientY, t2.clientX - t1.clientX);
+      
       const delta = dist / pinchStartRef.current.dist;
+      const angleDelta = angle - pinchStartRef.current.angle;
+      const newRotate = pinchStartRef.current.rotate + angleDelta * (180 / Math.PI);
+
       if (cameraMode === "photoBooth" && boothReviewing) {
         const newZ = Math.max(1, Math.min(pinchStartRef.current.zoom * delta, 5));
         setBoothTransforms(prev => {
           const next = [...prev];
-          next[activeQuadrant] = { ...next[activeQuadrant], zoom: newZ };
+          next[activeQuadrant] = { ...next[activeQuadrant], zoom: newZ, rotate: newRotate };
           return next;
         });
       } else {
@@ -508,7 +522,7 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
                         src={URL.createObjectURL(captured)} 
                         className="w-full h-full object-cover origin-center" 
                         style={{
-                          transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.zoom})`
+                          transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.zoom}) rotate(${transform.rotate || 0}deg)`
                         }}
                         alt={`shot ${idx + 1}`} 
                       />
