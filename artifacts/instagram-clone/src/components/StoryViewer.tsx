@@ -42,6 +42,7 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
   const [showHeart, setShowHeart] = useState(false);
   const lastTapTimeRef = useRef(0);
+  const lastTapPosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const touchStartTimeRef = useRef(0);
   const hasPinchedRef = useRef(false);
   const replyInputRef = useRef<HTMLInputElement>(null);
@@ -53,6 +54,7 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
   useEffect(() => { 
     setProgress(0); 
     setMediaStatus("loading");
+    setShowHeart(false);
   }, [currentIndex]);
 
   // Video sync pause/play
@@ -174,14 +176,27 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
   const handleTap = (e: React.MouseEvent | React.TouchEvent) => {
     if (isReplying) return;
 
+    const clientX = "touches" in e
+      ? (e as React.TouchEvent).changedTouches[0]?.clientX
+      : (e as React.MouseEvent).clientX;
+    const clientY = "touches" in e
+      ? (e as React.TouchEvent).changedTouches[0]?.clientY
+      : (e as React.MouseEvent).clientY;
+
     // Double-tap detection for like
     const now = Date.now();
-    if (now - lastTapTimeRef.current < 320) {
+    const distance = Math.sqrt(
+      Math.pow(clientX - lastTapPosRef.current.x, 2) +
+      Math.pow(clientY - lastTapPosRef.current.y, 2)
+    );
+
+    if (now - lastTapTimeRef.current < 320 && distance < 50) {
       lastTapTimeRef.current = 0;
       triggerLike(localStories[currentIndex]?.id ?? "");
       return;
     }
     lastTapTimeRef.current = now;
+    lastTapPosRef.current = { x: clientX, y: clientY };
 
     if ((e.target as HTMLElement).closest(".story-controls")) return;
     if (showDeleteConfirm) { 
@@ -191,9 +206,6 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
       return; 
     }
 
-    const clientX = "touches" in e
-      ? (e as React.TouchEvent).changedTouches[0]?.clientX
-      : (e as React.MouseEvent).clientX;
     if (clientX == null) return;
 
     if (clientX < window.innerWidth * 0.3) {
