@@ -26,7 +26,7 @@ const MODE_LABELS: Record<CameraMode, string> = {
 const STYLE_FILTERS: Record<CameraStyle, string> = {
   normal: "none",
   vintage: "sepia(0.4) contrast(1.1) saturate(1.2) brightness(1.05) hue-rotate(-5deg)",
-  disposable: "contrast(1.4) saturate(1.3) brightness(1.1) sepia(0.3) hue-rotate(-15deg) blur(0.5px)",
+  disposable: "contrast(1.2) saturate(1.2) brightness(1.15) sepia(0.2) hue-rotate(-10deg)",
 };
 
 function applyStyleToCanvas(
@@ -73,20 +73,9 @@ function applyStyleToCanvas(
     const gradient = ctx.createRadialGradient(cw / 2, ch / 2, cw * 0.2, cw / 2, ch / 2, Math.max(cw, ch) * 1.0);
     gradient.addColorStop(0, "rgba(255,255,255,0.1)");
     gradient.addColorStop(0.5, "rgba(0,0,0,0)");
-    gradient.addColorStop(1, "rgba(0,0,0,0.8)");
+    gradient.addColorStop(1, "rgba(0,0,0,0.7)");
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, cw, ch);
-    
-    // Light leak
-    const leakGrad = ctx.createLinearGradient(0, 0, cw, 0);
-    leakGrad.addColorStop(0, "rgba(255,50,0,0.3)");
-    leakGrad.addColorStop(0.2, "rgba(0,0,0,0)");
-    leakGrad.addColorStop(0.8, "rgba(0,0,0,0)");
-    leakGrad.addColorStop(1, "rgba(255,100,0,0.2)");
-    ctx.globalCompositeOperation = "screen";
-    ctx.fillStyle = leakGrad;
-    ctx.fillRect(0, 0, cw, ch);
-    ctx.globalCompositeOperation = "source-over";
 
     const imgData = ctx.getImageData(0, 0, cw, ch);
     const data = imgData.data;
@@ -599,9 +588,8 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
 
               {isDisposable && (
                 <>
-                  <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(circle, rgba(255,255,255,0.1) 10%, rgba(0,0,0,0) 40%, rgba(0,0,0,0.8) 100%)" }} />
-                  <div className="absolute inset-0 pointer-events-none mix-blend-screen opacity-60" style={{ background: "linear-gradient(90deg, rgba(255,50,0,0.3) 0%, rgba(0,0,0,0) 20%, rgba(0,0,0,0) 80%, rgba(255,100,0,0.2) 100%)" }} />
-                  <div className="absolute inset-0 pointer-events-none mix-blend-overlay opacity-60" style={{ backgroundImage: "url('data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.9%22 numOctaves=%224%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E')" }} />
+                  <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(circle, rgba(255,255,255,0.05) 20%, rgba(0,0,0,0) 50%, rgba(0,0,0,0.6) 100%)" }} />
+                  <div className="absolute inset-0 pointer-events-none mix-blend-overlay opacity-50" style={{ backgroundImage: "url('data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.85%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E')" }} />
                   <div className="absolute inset-0 pointer-events-none border-[12vw] border-black/90 shadow-[inset_0_0_20px_rgba(0,0,0,0.8)] rounded-[20vw] z-20 mix-blend-multiply" />
                   <div className="absolute z-30 pointer-events-none" style={{ top: "calc(12vw - 18px)", right: "calc(12vw - 18px)" }}>
                     <div
