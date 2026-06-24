@@ -367,7 +367,7 @@ export default memo(function Home() {
               exit={{ y: "100%" }}
               transition={{ type: "spring", damping: 26, stiffness: 280 }}
               className="fixed bottom-0 left-0 right-0 z-[401] bg-background rounded-t-2xl shadow-2xl overflow-hidden"
-              style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
+              style={{ paddingBottom: "max(3rem, env(safe-area-inset-bottom))" }}
             >
               {/* Handle bar */}
               <div className="w-10 h-1 bg-muted-foreground/20 rounded-full mx-auto mt-3 mb-2" />

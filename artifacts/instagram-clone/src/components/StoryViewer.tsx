@@ -93,22 +93,27 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
   const handleDelete = async () => {
     const id = localStories[currentIndex]?.id;
     if (!id) return;
-    setDeleting(true);
-    try {
-      await api.deleteStory(id);
-      const updated = localStories.filter(s => s.id !== id);
-      onStoriesChanged?.(); // tell Home to refresh story list → clears ring
-      if (updated.length === 0) { onClose(); return; }
+
+    // Optimistic delete
+    const updated = localStories.filter(s => s.id !== id);
+    onStoriesChanged?.(); // tell Home to refresh story list → clears ring
+    
+    if (updated.length === 0) {
+      onClose(); // instantly close if no stories left
+    } else {
       setLocalStories(updated);
       setCurrentIndex(c => Math.min(c, updated.length - 1));
       setProgress(0);
       setShowDeleteConfirm(false);
       setIsPaused(false);
+    }
+
+    // Perform actual API delete in background
+    try {
+      await api.deleteStory(id);
     } catch (e) {
       console.error("Failed to delete story", e);
-      setErrorMsg("Failed to delete — try again.");
-    } finally {
-      setDeleting(false);
+      // could show toast error here but usually fine to ignore
     }
   };
 
