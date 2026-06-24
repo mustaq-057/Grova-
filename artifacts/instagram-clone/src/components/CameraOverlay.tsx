@@ -377,19 +377,32 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
       const dist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
       const angle = Math.atan2(t2.clientY - t1.clientY, t2.clientX - t1.clientX);
       
-      const delta = dist / pinchStartRef.current.dist;
-      const angleDelta = angle - pinchStartRef.current.angle;
+      const zoomDelta = dist / pinchStartRef.current.dist;
+
+      // Normalize angleDelta to stay in (-π, π) to prevent the jump at ±180°
+      let angleDelta = angle - pinchStartRef.current.angle;
+      if (angleDelta > Math.PI) angleDelta -= 2 * Math.PI;
+      if (angleDelta < -Math.PI) angleDelta += 2 * Math.PI;
+
       const newRotate = pinchStartRef.current.rotate + angleDelta * (180 / Math.PI);
 
+      // Update the reference angle each frame so deltas are always tiny increments
+      pinchStartRef.current.angle = angle;
+      pinchStartRef.current.rotate = newRotate;
+      pinchStartRef.current.dist = dist;
+
       if (cameraMode === "photoBooth" && boothReviewing) {
-        const newZ = Math.max(1, Math.min(pinchStartRef.current.zoom * delta, 5));
+        const newZ = Math.max(1, Math.min(pinchStartRef.current.zoom * zoomDelta, 5));
+        pinchStartRef.current.zoom = newZ;
         setBoothTransforms(prev => {
           const next = [...prev];
           next[activeQuadrant] = { ...next[activeQuadrant], zoom: newZ, rotate: newRotate };
           return next;
         });
       } else {
-        setZoom(Math.max(1, Math.min(pinchStartRef.current.zoom * delta, 5)));
+        const newZ = Math.max(1, Math.min(pinchStartRef.current.zoom * zoomDelta, 5));
+        pinchStartRef.current.zoom = newZ;
+        setZoom(newZ);
       }
     } else if (e.touches.length === 1 && panStartRef.current && cameraMode === "photoBooth" && boothReviewing) {
       const dx = e.touches[0].clientX - panStartRef.current.x;
