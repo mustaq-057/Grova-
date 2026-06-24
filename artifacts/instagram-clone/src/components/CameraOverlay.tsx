@@ -439,11 +439,11 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
     isVintage ? STYLE_FILTERS.vintage :
     isDisposable ? STYLE_FILTERS.disposable : "none";
 
-  const MODES: { key: CameraMode; label: string; img?: string }[] = [
+  const MODES: { key: CameraMode; label: string }[] = [
+    { key: "vintage", label: "Vintage" },
+    { key: "disposable", label: "Disposable" },
     { key: "normal", label: "Default" },
-    { key: "vintage", label: "Vintage", img: vintageCameraImg },
-    { key: "disposable", label: "Disposable", img: disposableCameraImg },
-    { key: "photoBooth", label: "4 Shot", img: photoBoothImg },
+    { key: "photoBooth", label: "4 Shot" },
   ];
 
   return ReactDOM.createPortal(
@@ -624,22 +624,23 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
         </div>
 
         <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/80 to-transparent pb-[max(1.5rem,env(safe-area-inset-bottom))]">
-          <div className="flex items-center justify-center mb-3 px-4">
-            <div className="flex gap-1 p-1 bg-black/50 rounded-full backdrop-blur-md border border-white/10 overflow-x-auto max-w-full scrollbar-hide">
-              {MODES.map(({ key, label, img }) => (
-                <button
-                  key={key}
-                  onClick={() => switchMode(key)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all active:scale-95 ${
-                    cameraMode === key
-                      ? "bg-white text-black shadow-sm"
-                      : "text-white/70 hover:text-white hover:bg-white/10"
-                  }`}
-                >
-                  {img && <img src={img} alt={label} className="w-4 h-4 rounded-full object-cover" />}
-                  {label}
-                </button>
-              ))}
+          <div className="flex items-center justify-center mb-6 px-4 w-full">
+            <div className="flex gap-8 overflow-x-auto w-full scrollbar-hide snap-x snap-mandatory px-[30vw]">
+              {MODES.map(({ key, label }) => {
+                const isActive = cameraMode === key;
+                return (
+                  <button
+                    key={key}
+                    onClick={() => switchMode(key)}
+                    className={`flex flex-col items-center justify-center gap-1.5 py-1 text-sm font-semibold whitespace-nowrap transition-all snap-center ${
+                      isActive ? "text-white drop-shadow-md" : "text-white/60"
+                    }`}
+                  >
+                    <span>{label}</span>
+                    <div className={`h-[3px] w-5 rounded-full transition-colors ${isActive ? "bg-yellow-500" : "bg-transparent"}`} />
+                  </button>
+                );
+              })}
             </div>
           </div>
 
