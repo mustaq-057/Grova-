@@ -94,9 +94,10 @@ router.get("/stories", authenticate, rateLimiters.read, async (req, res) => {
         [now]
       );
       if (expiredResult.rows.length > 0) {
-        // Delete from DB
-        const ids = expiredResult.rows.map((r: any) => `'${r.id}'`).join(',');
-        await db.execute(`DELETE FROM stories WHERE id IN (${ids})`);
+        // Delete from DB using parameterized placeholders to avoid injection
+        const placeholders = expiredResult.rows.map((_: any, i: number) => `$${i + 1}`).join(",");
+        const ids = expiredResult.rows.map((r: any) => r.id);
+        await db.execute(`DELETE FROM stories WHERE id IN (${placeholders})`, ids);
         
         // Delete from Cloudinary in background (fire-and-forget)
         expiredResult.rows.forEach((r: any) => {
@@ -145,23 +146,21 @@ router.delete("/stories/:id", authenticate, async (req, res) => {
     const userId = (req as any).user.id;
     const { id } = req.params;
 
-    // Get story before deleting so we can delete from B2
+    // Fetch media_url BEFORE deleting, and confirm the story exists + belongs to user
     const storyRes = await db.query(
-      "SELECT media_url FROM stories WHERE id = $1 AND author_id = $2", 
+      "SELECT media_url FROM stories WHERE id = $1 AND author_id = $2",
       [id, userId]
     );
 
-    const result = await db.execute(
-      "DELETE FROM stories WHERE id = $1 AND author_id = $2",
-      [id, userId]
-    );
-
-    // Support both PostgreSQL (rowCount) and SQLite (changes)
-    const affected = (result as any).rowCount ?? (result as any).changes ?? 0;
-    if (affected === 0) {
+    if (!storyRes.rows[0]) {
       res.status(404).json({ error: "Story not found or unauthorized" });
       return;
     }
+
+    await db.execute(
+      "DELETE FROM stories WHERE id = $1 AND author_id = $2",
+      [id, userId]
+    );
 
     // Delete from Cloudinary (fire-and-forget so response is instant)
     if (storyRes.rows[0]?.media_url) {

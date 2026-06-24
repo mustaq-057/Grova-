@@ -65,9 +65,9 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
     }
   }, [isPaused, isReplying, showDeleteConfirm]);
 
-  // Progress timer
+  // Progress timer — only ticks once media is loaded so stories don't skip while buffering
   useEffect(() => {
-    if (isPaused || showDeleteConfirm || deleting || isReplying) return;
+    if (isPaused || showDeleteConfirm || deleting || isReplying || mediaStatus !== "loaded") return;
     const interval = setInterval(() => {
       setProgress(p => {
         if (p >= 100) {
@@ -83,7 +83,7 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
       });
     }, 50);
     return () => clearInterval(interval);
-  }, [currentIndex, isPaused, showDeleteConfirm, deleting, isReplying, localStories.length, onClose]);
+  }, [currentIndex, isPaused, showDeleteConfirm, deleting, isReplying, mediaStatus, localStories.length, onClose]);
 
   // Auto-dismiss error
   useEffect(() => {
@@ -192,15 +192,7 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
     }
   };
 
-  if (localStories.length === 0) return null;
-  const currentStory = localStories[currentIndex];
-  if (!currentStory) return null;
-
-  let textOverlayData: { text: string; fontFamily: string; textColor: string; x: number; y: number; rotate?: number } | null = null;
-  if (currentStory.textOverlay) {
-    try { textOverlayData = JSON.parse(currentStory.textOverlay); } catch { }
-  }
-
+  // These hooks MUST be called unconditionally (Rules of Hooks) — before any conditional return
   const scale = useMotionValue(1);
 
   const bindPinch = usePinch(({ offset: [s], active }) => {
@@ -216,10 +208,19 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
     rubberband: true
   });
 
+  if (localStories.length === 0) return null;
+  const currentStory = localStories[currentIndex];
+  if (!currentStory) return null;
+
+  let textOverlayData: { text: string; fontFamily: string; textColor: string; x: number; y: number; rotate?: number } | null = null;
+  if (currentStory.textOverlay) {
+    try { textOverlayData = JSON.parse(currentStory.textOverlay); } catch { }
+  }
+
   const mediaUrl = currentStory.mediaUrl ?? "";
   // Strip query params for extension check (signed URLs have ?X-Amz-... appended)
   const mediaUrlClean = mediaUrl.split("?")[0];
-  const isVideo = mediaUrlClean.endsWith(".mp4") || mediaUrlClean.endsWith(".webm") || currentStory.kind === "reel" || mediaUrlClean.includes("/video");
+  const isVideo = mediaUrlClean.endsWith(".mp4") || mediaUrlClean.endsWith(".webm") || currentStory.kind === "reel" || mediaUrlClean.includes("/video/upload");
   const isLiked = likedIds.has(currentStory.id);
 
   return ReactDOM.createPortal(

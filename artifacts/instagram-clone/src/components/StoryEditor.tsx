@@ -332,8 +332,10 @@ export function StoryEditor({ file, onClose, onComplete }: StoryEditorProps) {
         }
       }
 
-      const url = await uploadMediaFile(finalBlob, isVideo ? "video/mp4" : "image/jpeg");
-      await api.addStory({ mediaUrl: url, text_overlay: textOverlayObj ? JSON.stringify(textOverlayObj) : undefined });
+      // Use the blob's actual content type (video/webm from camera, image/jpeg from canvas)
+      const mime = finalBlob instanceof File ? finalBlob.type : isVideo ? "video/mp4" : "image/jpeg";
+      const url = await uploadMediaFile(finalBlob, mime || (isVideo ? "video/mp4" : "image/jpeg"));
+      await api.addStory({ mediaUrl: url, kind: isVideo ? "reel" : "story", text_overlay: textOverlayObj ? JSON.stringify(textOverlayObj) : undefined });
       onComplete();
     } catch (err) {
       console.error("Failed to upload story", err);
