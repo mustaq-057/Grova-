@@ -253,15 +253,7 @@ export function AvatarNoteModal({
                   </div>
                 </div>
                 <p className="text-[11px] text-white/35 mb-5">{timeLeft(note!.expiresAt)}</p>
-                <div className="flex flex-wrap items-center justify-center gap-2 w-full">
-                  <button
-                    onClick={() => { setEditText(note!.text); setEditing(true); }}
-                    disabled={isSubmitting}
-                    className="flex items-center gap-2 text-white bg-white/10 hover:bg-white/15 px-5 py-2.5 rounded-full transition-colors text-sm font-medium"
-                  >
-                    <Pencil className="w-4 h-4" />
-                    Edit
-                  </button>
+              <div className="flex flex-wrap items-center justify-center gap-2 w-full">
                   <button
                     onClick={handleDelete}
                     disabled={isSubmitting}
@@ -269,43 +261,6 @@ export function AvatarNoteModal({
                   >
                     <Trash2 className="w-4 h-4" />
                     Delete
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* ── EDIT OWN NOTE ── */}
-            {showEditor && (
-              <div className="w-full">
-                <div className="relative">
-                  <textarea
-                    ref={inputRef}
-                    value={editText}
-                    onChange={e => setEditText(e.target.value.slice(0, maxLength))}
-                    placeholder="What's on your mind?"
-                    className="w-full bg-white/5 border border-white/15 rounded-2xl p-4 text-center text-lg text-white placeholder:text-white/35 resize-none outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all min-h-[88px]"
-                    rows={3}
-                  />
-                </div>
-                <div className="flex justify-between items-center mt-2 px-1 mb-4">
-                  <span className={`text-xs font-medium tabular-nums ${editText.length === maxLength ? "text-red-400" : "text-white/40"}`}>
-                    {editText.length}/{maxLength}
-                  </span>
-                  <span className="text-[11px] text-white/30">Visible for 24 hours</span>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setEditing(false)}
-                    className="flex-1 py-3 rounded-full font-semibold text-sm text-white/80 bg-white/10 hover:bg-white/15 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleSave}
-                    disabled={!editText.trim() || isSubmitting}
-                    className="flex-1 py-3 rounded-full font-semibold text-sm bg-white text-black disabled:opacity-40 hover:bg-white/90 transition-colors"
-                  >
-                    {isSubmitting ? "Saving…" : "Save note"}
                   </button>
                 </div>
               </div>
