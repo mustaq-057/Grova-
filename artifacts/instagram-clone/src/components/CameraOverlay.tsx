@@ -4,7 +4,11 @@ import ReactDOM from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import vintageCameraImg from "../vintage-camera.png";
 import disposableCameraImg from "../disposable.png";
+import photoBoothImg from "../fantasticfour.png";
 import { StoryEditor } from "./StoryEditor";
+
+type CameraStyle = "normal" | "vintage" | "disposable";
+type CameraMode = "normal" | "vintage" | "disposable" | "photoBooth";
 
 interface CameraOverlayProps {
   onClose: (uploaded?: boolean, story?: any) => void;
@@ -12,34 +16,126 @@ interface CameraOverlayProps {
   mode?: "chat" | "story";
 }
 
+const MODE_LABELS: Record<CameraMode, string> = {
+  normal: "Default",
+  vintage: "Vintage",
+  disposable: "Disposable",
+  photoBooth: "Photo Booth",
+};
+
+const STYLE_FILTERS: Record<CameraStyle, string> = {
+  normal: "none",
+  vintage: "sepia(0.4) contrast(1.1) saturate(1.2) brightness(1.05) hue-rotate(-5deg)",
+  disposable: "contrast(1.2) saturate(1.2) brightness(1.15) sepia(0.2) hue-rotate(-10deg)",
+};
+
+function applyStyleToCanvas(
+  ctx: CanvasRenderingContext2D,
+  video: HTMLVideoElement,
+  sx: number, sy: number, cropW: number, cropH: number,
+  cw: number, ch: number,
+  style: CameraStyle,
+  facingMode: "user" | "environment"
+) {
+  if (facingMode === "user") {
+    ctx.translate(cw, 0);
+    ctx.scale(-1, 1);
+  }
+  ctx.filter = STYLE_FILTERS[style];
+  ctx.drawImage(video, sx, sy, cropW, cropH, 0, 0, cw, ch);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.filter = "none";
+
+  const now = new Date();
+  const yy = String(now.getFullYear()).slice(-2);
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const dd = String(now.getDate()).padStart(2, "0");
+  const dateStr = `'${yy} ${mm} ${dd}`;
+
+  if (style === "vintage") {
+    const gradient = ctx.createRadialGradient(cw / 2, ch / 2, cw * 0.4, cw / 2, ch / 2, Math.max(cw, ch) * 0.8);
+    gradient.addColorStop(0, "rgba(0,0,0,0)");
+    gradient.addColorStop(1, "rgba(0,0,0,0.3)");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, cw, ch);
+    ctx.fillStyle = "rgba(255,255,255,0.05)";
+    for (let i = 0; i < 1500; i++) ctx.fillRect(Math.random() * cw, Math.random() * ch, 2, 2);
+    ctx.fillStyle = "rgba(0,0,0,0.08)";
+    for (let i = 0; i < 1500; i++) ctx.fillRect(Math.random() * cw, Math.random() * ch, 3, 3);
+    ctx.fillStyle = "#ff9900";
+    ctx.font = "bold 32px 'Courier New', Courier, monospace";
+    ctx.textAlign = "right";
+    ctx.textBaseline = "bottom";
+    ctx.shadowColor = "rgba(255,153,0,0.5)";
+    ctx.shadowBlur = 10;
+    ctx.fillText(dateStr, cw - 30, ch - 30);
+  } else if (style === "disposable") {
+    const gradient = ctx.createRadialGradient(cw / 2, ch / 2, cw * 0.2, cw / 2, ch / 2, Math.max(cw, ch) * 1.0);
+    gradient.addColorStop(0, "rgba(255,255,255,0.1)");
+    gradient.addColorStop(0.5, "rgba(0,0,0,0)");
+    gradient.addColorStop(1, "rgba(0,0,0,0.7)");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, cw, ch);
+    const imgData = ctx.getImageData(0, 0, cw, ch);
+    const data = imgData.data;
+    for (let i = 0; i < data.length; i += 4) {
+      const noise = (Math.random() - 0.5) * 50;
+      data[i] = Math.min(255, Math.max(0, data[i] + noise));
+      data[i + 1] = Math.min(255, Math.max(0, data[i + 1] + noise));
+      data[i + 2] = Math.min(255, Math.max(0, data[i + 2] + noise));
+    }
+    ctx.putImageData(imgData, 0, 0);
+    ctx.fillStyle = "#ff9900";
+    ctx.font = "bold 36px 'Courier New', Courier, monospace";
+    ctx.textAlign = "right";
+    ctx.textBaseline = "bottom";
+    ctx.shadowColor = "rgba(255,153,0,0.5)";
+    ctx.shadowBlur = 10;
+    ctx.fillText(dateStr, cw - 30, ch - 30);
+  }
+}
+
 export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverlayProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const overlayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const [facingMode, setFacingMode] = useState<"user" | "environment">("environment");
   const [flashOn, setFlashOn] = useState(false);
   const [aspectRatio, setAspectRatio] = useState<"Full" | "16:9" | "4:3" | "1:1">("Full");
   const [error, setError] = useState<string | null>(null);
-  const [cameraMode, setCameraMode] = useState<"normal" | "vintage" | "disposable">("normal");
+
+  // Main camera mode (pill selector)
+  const [cameraMode, setCameraMode] = useState<CameraMode>("normal");
+  // Toast overlay when switching modes
+  const [modeOverlay, setModeOverlay] = useState<string | null>(null);
+
+  // Disposable flash dot
+  const [flashDotActive, setFlashDotActive] = useState(false);
+
+  // Photo booth state
+  const [photoBoothStyle, setPhotoBoothStyle] = useState<CameraStyle>("normal");
+  const [photoBoothFiles, setPhotoBoothFiles] = useState<(File | null)[]>([null, null, null, null]);
+  const [activeQuadrant, setActiveQuadrant] = useState(0);
+  const [boothComplete, setBoothComplete] = useState(false);
+
   const [storyFiles, setStoryFiles] = useState<File[]>([]);
-  
   const [zoom, setZoom] = useState(1);
-  const pinchStartRef = useRef<{ dist: number, zoom: number } | null>(null);
-  
-  const startCamera = useCallback(async (mode: "user" | "environment") => {
+  const pinchStartRef = useRef<{ dist: number; zoom: number } | null>(null);
+
+  const startCamera = useCallback(async (fm: "user" | "environment") => {
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
     }
     try {
       const newStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: mode, width: { ideal: 1280 }, height: { ideal: 720 } },
+        video: { facingMode: fm, width: { ideal: 1280 }, height: { ideal: 720 } },
         audio: false,
       });
       streamRef.current = newStream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = newStream;
-      }
+      if (videoRef.current) videoRef.current.srcObject = newStream;
       setError(null);
     } catch (err) {
       console.error("Camera access failed", err);
@@ -50,213 +146,214 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
   useEffect(() => {
     void startCamera(facingMode);
     return () => {
-      if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
+      if (streamRef.current) streamRef.current.getTracks().forEach((t) => t.stop());
     };
   }, [facingMode, startCamera]);
-
-  const toggleCamera = () => {
-    setFacingMode(prev => prev === "user" ? "environment" : "user");
-  };
-
-  const toggleFlash = () => {
-    setFlashOn(!flashOn);
-  };
 
   useEffect(() => {
     if (!streamRef.current) return;
     const track = streamRef.current.getVideoTracks()[0];
     if (track) {
       try {
-        // @ts-ignore - torch constraint is not in standard TS types yet
-        track.applyConstraints({ advanced: [{ torch: flashOn }] }).catch(() => {
-          console.warn("Flashlight not supported by this device/camera.");
-        });
-      } catch (err) {
-        console.error("Failed to apply flashlight constraint", err);
-      }
+        // @ts-ignore
+        track.applyConstraints({ advanced: [{ torch: flashOn }] }).catch(() => {});
+      } catch {}
     }
   }, [flashOn]);
 
-  const toggleRatio = () => {
-    setAspectRatio(prev => prev === "Full" ? "16:9" : prev === "16:9" ? "4:3" : prev === "4:3" ? "1:1" : "Full");
+  // Switch mode with toast overlay
+  const switchMode = (newMode: CameraMode) => {
+    setCameraMode(newMode);
+    // Clear existing timer & show new label
+    if (overlayTimerRef.current) clearTimeout(overlayTimerRef.current);
+    setModeOverlay(MODE_LABELS[newMode]);
+    overlayTimerRef.current = setTimeout(() => setModeOverlay(null), 3000);
+    // Reset photo booth when leaving
+    if (newMode !== "photoBooth") {
+      setPhotoBoothFiles([null, null, null, null]);
+      setActiveQuadrant(0);
+      setBoothComplete(false);
+    }
   };
 
-  const handleCapture = () => {
-    if (!videoRef.current || !streamRef.current) return;
+  const toggleCamera = () => setFacingMode((prev) => (prev === "user" ? "environment" : "user"));
+  const toggleFlash = () => setFlashOn((f) => !f);
+  const toggleRatio = () =>
+    setAspectRatio((prev) =>
+      prev === "Full" ? "16:9" : prev === "16:9" ? "4:3" : prev === "4:3" ? "1:1" : "Full"
+    );
+
+  // ── Capture helpers ──────────────────────────────────────────────────────────
+  const buildCroppedCanvas = (style: CameraStyle): HTMLCanvasElement | null => {
+    if (!videoRef.current || !streamRef.current) return null;
     const video = videoRef.current;
     const vw = video.videoWidth;
     const vh = video.videoHeight;
     const videoRatio = vw / vh;
-    
+
     let targetRatio = 9 / 16;
     if (aspectRatio === "Full") targetRatio = vw / vh;
     if (aspectRatio === "4:3") targetRatio = 3 / 4;
     if (aspectRatio === "1:1") targetRatio = 1;
-    if (vw > vh && targetRatio < 1) targetRatio = 1 / targetRatio; // Landscape fallback
+    if (vw > vh && targetRatio < 1) targetRatio = 1 / targetRatio;
 
-    let cw = vw;
-    let ch = vh;
-    if (videoRatio > targetRatio) {
-      cw = vh * targetRatio;
-    } else {
-      ch = vw / targetRatio;
-    }
+    let cw = vw, ch = vh;
+    if (videoRatio > targetRatio) cw = vh * targetRatio;
+    else ch = vw / targetRatio;
 
     const cropW = cw / zoom;
     const cropH = ch / zoom;
+    const sx = (vw - cropW) / 2;
+    const sy = (vh - cropH) / 2;
 
     const canvas = document.createElement("canvas");
     canvas.width = cw;
     canvas.height = ch;
     const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    
-    const sx = (vw - cropW) / 2;
-    const sy = (vh - cropH) / 2;
+    if (!ctx) return null;
+    applyStyleToCanvas(ctx, video, sx, sy, cropW, cropH, cw, ch, style, facingMode);
+    return canvas;
+  };
 
-    if (facingMode === "user") {
-      ctx.translate(cw, 0);
-      ctx.scale(-1, 1);
+  const handleCapture = () => {
+    const style = cameraMode === "photoBooth" ? photoBoothStyle : (cameraMode as CameraStyle);
+
+    // Flash animation for disposable
+    if (style === "disposable") {
+      setFlashDotActive(true);
+      setTimeout(() => setFlashDotActive(false), 150);
     }
-    
-    if (cameraMode === "vintage") {
-      ctx.filter = "sepia(0.4) contrast(1.1) saturate(1.2) brightness(1.05) hue-rotate(-5deg)";
-    } else if (cameraMode === "disposable") {
-      ctx.filter = "contrast(1.2) saturate(1.2) brightness(1.15) sepia(0.2) hue-rotate(-10deg)";
-    }
-    
-    ctx.drawImage(video, sx, sy, cropW, cropH, 0, 0, cw, ch);
-    
-    if (cameraMode === "vintage") {
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.filter = "none";
-      
-      const gradient = ctx.createRadialGradient(cw/2, ch/2, cw * 0.4, cw/2, ch/2, Math.max(cw, ch) * 0.8);
-      gradient.addColorStop(0, "rgba(0,0,0,0)");
-      gradient.addColorStop(1, "rgba(0,0,0,0.3)");
-      ctx.fillStyle = gradient;
-      ctx.fillRect(0, 0, cw, ch);
 
-      ctx.fillStyle = "rgba(255, 255, 255, 0.05)";
-      for (let i = 0; i < 1500; i++) {
-        ctx.fillRect(Math.random() * cw, Math.random() * ch, 2, 2);
-      }
-      ctx.fillStyle = "rgba(0, 0, 0, 0.08)";
-      for (let i = 0; i < 1500; i++) {
-        ctx.fillRect(Math.random() * cw, Math.random() * ch, 3, 3);
-      }
+    const canvas = buildCroppedCanvas(style);
+    if (!canvas) return;
 
-      ctx.fillStyle = "#ff9900";
-      ctx.font = "bold 32px 'Courier New', Courier, monospace";
-      ctx.textAlign = "right";
-      ctx.textBaseline = "bottom";
-      ctx.shadowColor = "rgba(255, 153, 0, 0.5)";
-      ctx.shadowBlur = 10;
-      
-      const now = new Date();
-      const yy = String(now.getFullYear()).slice(-2);
-      const mm = String(now.getMonth() + 1).padStart(2, '0');
-      const dd = String(now.getDate()).padStart(2, '0');
-      ctx.fillText(`'${yy} ${mm} ${dd}`, cw - 30, ch - 30);
-    } else if (cameraMode === "disposable") {
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.filter = "none";
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) return;
+        const file = new File([blob], `capture-${Date.now()}.jpg`, { type: "image/jpeg" });
 
-      const gradient = ctx.createRadialGradient(cw/2, ch/2, cw * 0.2, cw/2, ch/2, Math.max(cw, ch) * 1.0);
-      gradient.addColorStop(0, "rgba(255,255,255,0.1)");
-      gradient.addColorStop(0.5, "rgba(0,0,0,0)");
-      gradient.addColorStop(1, "rgba(0,0,0,0.7)");
-      ctx.fillStyle = gradient;
-      ctx.fillRect(0, 0, cw, ch);
+        if (cameraMode === "photoBooth") {
+          const updated = [...photoBoothFiles];
+          updated[activeQuadrant] = file;
+          setPhotoBoothFiles(updated);
+          if (activeQuadrant === 3) {
+            setBoothComplete(true);
+          } else {
+            setActiveQuadrant((q) => q + 1);
+          }
+        } else if (mode === "story") {
+          setStoryFiles([file]);
+        } else if (onCapture) {
+          onCapture(file);
+        }
+      },
+      "image/jpeg",
+      0.85
+    );
+  };
 
-      // Heavy Grain
-      const imgData = ctx.getImageData(0, 0, cw, ch);
-      const data = imgData.data;
-      for (let i = 0; i < data.length; i += 4) {
-        const noise = (Math.random() - 0.5) * 50;
-        data[i] = Math.min(255, Math.max(0, data[i] + noise));
-        data[i+1] = Math.min(255, Math.max(0, data[i+1] + noise));
-        data[i+2] = Math.min(255, Math.max(0, data[i+2] + noise));
-      }
-      ctx.putImageData(imgData, 0, 0);
-      
-      ctx.fillStyle = "#ff9900";
-      ctx.font = "bold 36px 'Courier New', Courier, monospace";
-      ctx.textAlign = "right";
-      ctx.textBaseline = "bottom";
-      ctx.shadowColor = "rgba(255, 153, 0, 0.5)";
-      ctx.shadowBlur = 10;
-      
-      const now = new Date();
-      const yy = String(now.getFullYear()).slice(-2);
-      const mm = String(now.getMonth() + 1).padStart(2, '0');
-      const dd = String(now.getDate()).padStart(2, '0');
-      ctx.fillText(`'${yy} ${mm} ${dd}`, cw - 30, ch - 30);
-    }
-    
-    canvas.toBlob((blob) => {
-      if (!blob) return;
-      const file = new File([blob], `capture-${Date.now()}.jpg`, { type: "image/jpeg" });
-      if (mode === "story") {
-        setStoryFiles([file]);
-      } else if (onCapture) {
-        onCapture(file);
-      }
-    }, "image/jpeg", 0.7);
+  // Photo booth: combine 4 images into a collage and upload
+  const handleBoothUpload = async () => {
+    const files = photoBoothFiles.filter(Boolean) as File[];
+    if (files.length < 4) return;
+
+    const imgs = await Promise.all(
+      files.map(
+        (f) =>
+          new Promise<HTMLImageElement>((res) => {
+            const img = new Image();
+            img.onload = () => res(img);
+            img.src = URL.createObjectURL(f);
+          })
+      )
+    );
+
+    const W = imgs[0].naturalWidth * 2;
+    const H = imgs[0].naturalHeight * 2;
+    const canvas = document.createElement("canvas");
+    canvas.width = W;
+    canvas.height = H;
+    const ctx = canvas.getContext("2d")!;
+
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, W, H);
+
+    const hw = W / 2, hh = H / 2;
+    const gap = 4;
+    ctx.drawImage(imgs[0], 0,          0,          hw - gap / 2, hh - gap / 2);
+    ctx.drawImage(imgs[1], hw + gap/2, 0,          hw - gap / 2, hh - gap / 2);
+    ctx.drawImage(imgs[2], 0,          hh + gap/2, hw - gap / 2, hh - gap / 2);
+    ctx.drawImage(imgs[3], hw + gap/2, hh + gap/2, hw - gap / 2, hh - gap / 2);
+
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) return;
+        const file = new File([blob], `photobooth-${Date.now()}.jpg`, { type: "image/jpeg" });
+        if (mode === "story") setStoryFiles([file]);
+        else if (onCapture) onCapture(file);
+      },
+      "image/jpeg",
+      0.9
+    );
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
-    const selected = files.sort((a, b) => a.lastModified - b.lastModified); // Sort chronologically
-    if (selected.some(f => f.type.startsWith("video/"))) {
+    const selected = files.sort((a, b) => a.lastModified - b.lastModified);
+    if (selected.some((f) => f.type.startsWith("video/"))) {
       setError("Stories support photos only.");
       if (fileInputRef.current) fileInputRef.current.value = "";
       return;
     }
-    if (mode === "story") {
-      setStoryFiles(selected);
-    } else if (onCapture) {
-      onCapture(selected[0]);
-    }
+    if (mode === "story") setStoryFiles(selected);
+    else if (onCapture) onCapture(selected[0]);
   };
 
   const handleTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length === 2) {
-      const t1 = e.touches[0];
-      const t2 = e.touches[1];
+      const t1 = e.touches[0], t2 = e.touches[1];
       const dist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
       pinchStartRef.current = { dist, zoom };
     }
   };
-
   const handleTouchMove = (e: React.TouchEvent) => {
     if (e.touches.length === 2 && pinchStartRef.current) {
-      const t1 = e.touches[0];
-      const t2 = e.touches[1];
+      const t1 = e.touches[0], t2 = e.touches[1];
       const dist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
-      const { dist: startDist, zoom: startZoom } = pinchStartRef.current;
-      
-      const delta = dist / startDist;
-      let newZoom = startZoom * delta;
-      newZoom = Math.max(1, Math.min(newZoom, 5));
-      setZoom(newZoom);
+      const delta = dist / pinchStartRef.current.dist;
+      setZoom(Math.max(1, Math.min(pinchStartRef.current.zoom * delta, 5)));
     }
   };
-
-  const handleTouchEnd = () => {
-    pinchStartRef.current = null;
-  };
-
+  const handleTouchEnd = () => { pinchStartRef.current = null; };
   const handleWheel = (e: React.WheelEvent) => {
-    let newZoom = zoom - e.deltaY * 0.005;
-    newZoom = Math.max(1, Math.min(newZoom, 5));
-    setZoom(newZoom);
+    setZoom((z) => Math.max(1, Math.min(z - e.deltaY * 0.005, 5)));
   };
 
   if (storyFiles.length > 0) {
-    return <StoryEditor files={storyFiles} onClose={() => setStoryFiles([])} onComplete={(uploaded, story) => onClose(uploaded, story)} />;
+    return (
+      <StoryEditor
+        files={storyFiles}
+        onClose={() => setStoryFiles([])}
+        onComplete={(uploaded, story) => onClose(uploaded, story)}
+      />
+    );
   }
+
+  const isDisposable = cameraMode === "disposable" || (cameraMode === "photoBooth" && photoBoothStyle === "disposable");
+  const isVintage = cameraMode === "vintage" || (cameraMode === "photoBooth" && photoBoothStyle === "vintage");
+
+  const liveFilter =
+    isVintage ? STYLE_FILTERS.vintage :
+    isDisposable ? STYLE_FILTERS.disposable : "none";
+
+  // Pill mode buttons
+  const MODES: { key: CameraMode; label: string; img?: string }[] = [
+    { key: "normal", label: "Default" },
+    { key: "vintage", label: "Vintage", img: vintageCameraImg },
+    { key: "disposable", label: "Disposable", img: disposableCameraImg },
+    { key: "photoBooth", label: "4 Shot", img: photoBoothImg },
+  ];
 
   return ReactDOM.createPortal(
     <AnimatePresence>
@@ -266,33 +363,108 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
         exit={{ opacity: 0, y: 50 }}
         className="fixed inset-0 z-[300] bg-black flex flex-col"
       >
+        {/* ── Top bar ───────────────────────────────────────── */}
         <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-center z-10 bg-gradient-to-b from-black/50 to-transparent pt-[max(1rem,env(safe-area-inset-top))]">
           <button onClick={() => onClose()} className="p-2 text-white hover:bg-white/10 rounded-full transition-colors active:scale-95">
             <X className="w-8 h-8" />
           </button>
-          
           <button onClick={toggleFlash} className="p-2 text-white hover:bg-white/10 rounded-full transition-colors active:scale-95">
             {flashOn ? <Zap className="w-7 h-7" /> : <ZapOff className="w-7 h-7" />}
           </button>
-          
           <button onClick={toggleRatio} className="h-8 px-3 flex items-center justify-center text-sm font-bold text-white bg-black/40 backdrop-blur-md rounded-full border border-white/20 transition-colors active:scale-95">
             {aspectRatio}
           </button>
         </div>
 
+        {/* ── Mode switch toast overlay ──────────────────────── */}
+        <AnimatePresence>
+          {modeOverlay && (
+            <motion.div
+              key={modeOverlay}
+              initial={{ opacity: 0, scale: 0.85 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.85 }}
+              transition={{ duration: 0.18 }}
+              className="absolute inset-0 flex items-center justify-center z-50 pointer-events-none"
+            >
+              <div className="px-8 py-4 bg-black/70 rounded-2xl backdrop-blur-md border border-white/10">
+                <p className="text-white text-2xl font-bold tracking-widest uppercase">{modeOverlay}</p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ── Viewfinder ────────────────────────────────────── */}
         <div className="flex-1 relative overflow-hidden flex items-center justify-center bg-black w-full">
           {error ? (
             <p className="text-white/50 text-center px-4">{error}</p>
+          ) : cameraMode === "photoBooth" ? (
+            /* ── 2×2 Photo Booth Grid ── */
+            <div className="relative w-full h-full grid grid-cols-2 grid-rows-2 gap-0.5 bg-black">
+              {[0, 1, 2, 3].map((idx) => {
+                const isActive = idx === activeQuadrant && !boothComplete;
+                const captured = photoBoothFiles[idx];
+                return (
+                  <div
+                    key={idx}
+                    onClick={() => { if (isActive) handleCapture(); }}
+                    className={`relative overflow-hidden bg-black/80 ${isActive ? "ring-2 ring-white/70 cursor-pointer" : ""}`}
+                  >
+                    {captured ? (
+                      <img src={URL.createObjectURL(captured)} className="w-full h-full object-cover" alt={`shot ${idx + 1}`} />
+                    ) : isActive ? (
+                      <video
+                        ref={(node) => {
+                          if (idx === activeQuadrant) {
+                            videoRef.current = node;
+                            if (node && streamRef.current && node.srcObject !== streamRef.current) {
+                              node.srcObject = streamRef.current;
+                            }
+                          }
+                        }}
+                        autoPlay playsInline muted
+                        className={`w-full h-full object-cover ${facingMode === "user" ? "scale-x-[-1]" : ""}`}
+                        style={{ filter: liveFilter }}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-white/20 text-4xl font-bold">{idx + 1}</div>
+                    )}
+                    {isActive && !boothComplete && (
+                      <div className="absolute inset-0 border-2 border-white/50 pointer-events-none animate-pulse" />
+                    )}
+                  </div>
+                );
+              })}
+              {/* Shared video (hidden) for quadrants not active */}
+              <video
+                ref={(node) => {
+                  if (cameraMode === "photoBooth" && !boothComplete) {
+                    if (!photoBoothFiles[activeQuadrant]) {
+                      videoRef.current = node;
+                      if (node && streamRef.current && node.srcObject !== streamRef.current) {
+                        node.srcObject = streamRef.current;
+                      }
+                    }
+                  }
+                }}
+                autoPlay playsInline muted
+                className="hidden"
+              />
+            </div>
           ) : (
-            <div 
-               className={`relative w-full flex items-center justify-center overflow-hidden transition-all duration-300 ${aspectRatio === "Full" ? "h-full" : "max-h-full"}`}
-               style={{ 
-                 aspectRatio: aspectRatio === "Full" ? "auto" : aspectRatio === "16:9" ? "9/16" : aspectRatio === "4:3" ? "3/4" : "1/1",
-               }}
-               onTouchStart={handleTouchStart}
-               onTouchMove={handleTouchMove}
-               onTouchEnd={handleTouchEnd}
-               onWheel={handleWheel}
+            /* ── Normal / Vintage / Disposable viewfinder ── */
+            <div
+              className={`relative w-full flex items-center justify-center overflow-hidden transition-all duration-300 ${aspectRatio === "Full" ? "h-full" : "max-h-full"}`}
+              style={{
+                aspectRatio:
+                  aspectRatio === "Full" ? "auto" :
+                  aspectRatio === "16:9" ? "9/16" :
+                  aspectRatio === "4:3" ? "3/4" : "1/1",
+              }}
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+              onWheel={handleWheel}
             >
               <video
                 ref={(node) => {
@@ -301,102 +473,162 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
                     node.srcObject = streamRef.current;
                   }
                 }}
-                autoPlay
-                playsInline
-                muted
+                autoPlay playsInline muted
                 className={`absolute inset-0 w-full h-full object-cover origin-center ${facingMode === "user" ? "scale-x-[-1]" : ""}`}
                 style={{
                   transform: `scale(${zoom}) ${facingMode === "user" ? "scaleX(-1)" : ""}`,
-                  filter: cameraMode === "vintage" ? "sepia(0.4) contrast(1.1) saturate(1.2) brightness(1.05) hue-rotate(-5deg)" :
-                          cameraMode === "disposable" ? "contrast(1.2) saturate(1.2) brightness(1.15) sepia(0.2) hue-rotate(-10deg)" : "none",
-                  transition: pinchStartRef.current ? "none" : "transform 0.1s ease-out"
+                  filter: liveFilter,
+                  transition: pinchStartRef.current ? "none" : "transform 0.1s ease-out",
                 }}
               />
-              
-              {/* Overlay graphics */}
-              {cameraMode === "vintage" && (
+
+              {/* Vintage overlays */}
+              {isVintage && (
                 <>
                   <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(circle, rgba(0,0,0,0) 40%, rgba(0,0,0,0.3) 100%)" }} />
                   <div className="absolute bottom-6 right-6 font-mono text-2xl font-bold text-[#ff9900] tracking-widest pointer-events-none" style={{ textShadow: "0 0 10px rgba(255,153,0,0.5)" }}>
-                    '{String(new Date().getFullYear()).slice(-2)} {String(new Date().getMonth() + 1).padStart(2, '0')} {String(new Date().getDate()).padStart(2, '0')}
+                    '{String(new Date().getFullYear()).slice(-2)} {String(new Date().getMonth() + 1).padStart(2, "0")} {String(new Date().getDate()).padStart(2, "0")}
                   </div>
                 </>
               )}
-              {cameraMode === "disposable" && (
+
+              {/* Disposable overlays — flash dot lives INSIDE the black frame */}
+              {isDisposable && (
                 <>
                   {/* Heavy flash vignette */}
                   <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(circle, rgba(255,255,255,0.05) 20%, rgba(0,0,0,0) 50%, rgba(0,0,0,0.6) 100%)" }} />
-                  {/* CSS noise overlay for live preview grain */}
+                  {/* Grain */}
                   <div className="absolute inset-0 pointer-events-none mix-blend-overlay opacity-50" style={{ backgroundImage: "url('data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.85%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E')" }} />
                   {/* Date stamp */}
                   <div className="absolute bottom-6 right-6 font-mono text-2xl font-bold text-[#ff9900] tracking-widest pointer-events-none" style={{ textShadow: "0 0 10px rgba(255,153,0,0.5)" }}>
-                    '{String(new Date().getFullYear()).slice(-2)} {String(new Date().getMonth() + 1).padStart(2, '0')} {String(new Date().getDate()).padStart(2, '0')}
+                    '{String(new Date().getFullYear()).slice(-2)} {String(new Date().getMonth() + 1).padStart(2, "0")} {String(new Date().getDate()).padStart(2, "0")}
                   </div>
-                  {/* Disposable Viewfinder Frame Mask */}
+                  {/* ✅ Black camera body frame — flash dot is INSIDE it */}
                   <div className="absolute inset-0 pointer-events-none border-[12vw] border-black/90 shadow-[inset_0_0_20px_rgba(0,0,0,0.8)] rounded-[20vw] z-20 mix-blend-multiply" />
+                  {/* Flash dot — sits inside the black frame top-right corner */}
+                  <div
+                    className="absolute z-30 pointer-events-none"
+                    style={{ top: "calc(12vw - 18px)", right: "calc(12vw - 18px)" }}
+                  >
+                    <div
+                      className="w-5 h-5 rounded-full border-2 border-orange-400/60"
+                      style={{
+                        background: flashDotActive
+                          ? "radial-gradient(circle, #fff 10%, #ffdd00 50%, #ff6600 100%)"
+                          : "radial-gradient(circle, #ffaa00 20%, #cc5500 100%)",
+                        boxShadow: flashDotActive
+                          ? "0 0 18px 8px rgba(255,220,0,0.8)"
+                          : "0 0 6px 2px rgba(255,120,0,0.4)",
+                        transition: "background 0.08s, box-shadow 0.08s",
+                      }}
+                    />
+                  </div>
                 </>
               )}
             </div>
           )}
         </div>
 
-        <div className="absolute bottom-0 left-0 right-0 p-6 flex justify-between items-center z-10 bg-gradient-to-t from-black/60 to-transparent pb-[max(1.5rem,env(safe-area-inset-bottom))]">
-          <button 
-            onClick={() => fileInputRef.current?.click()} 
-            className="w-12 h-12 rounded-xl border border-white/20 bg-black/40 backdrop-blur-sm flex items-center justify-center text-white hover:bg-white/10 active:scale-95 transition-all overflow-hidden"
-          >
-            <ImageIcon className="w-6 h-6" />
-          </button>
-          
-          <div className="relative flex items-center justify-center">
-            {/* Camera Mode Cycle Button */}
-            <button
-              onClick={() => {
-                setCameraMode(prev => {
-                  if (prev === "normal") return "vintage";
-                  if (prev === "vintage") return "disposable";
-                  return "normal";
-                });
-              }}
-              className="absolute -right-16 w-11 h-11 rounded-full flex flex-col items-center justify-center transition-all bg-black/40 border border-white/20 hover:bg-white/10 overflow-hidden shadow-lg z-30"
-              title="Cycle Camera Mode"
-            >
-              {cameraMode === "normal" ? (
-                <div className="w-5 h-5 rounded-full border-2 border-white" />
-              ) : cameraMode === "vintage" ? (
-                <img src={vintageCameraImg} alt="Vintage" loading="eager" fetchPriority="high" className="w-full h-full object-cover bg-neutral-800" />
-              ) : (
-                <img src={disposableCameraImg} alt="Disposable" loading="eager" fetchPriority="high" className="w-full h-full object-cover bg-neutral-800" />
-              )}
-            </button>
+        {/* ── Bottom bar ────────────────────────────────────── */}
+        <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/80 to-transparent pb-[max(1.5rem,env(safe-area-inset-bottom))]">
 
-            {/* Capture button */}
-            <div className="relative flex items-center justify-center z-20">
-              <button 
-                onClick={handleCapture}
-                className={`w-20 h-20 rounded-full border-4 flex items-center justify-center transition-all active:scale-90 ${
-                  cameraMode === "vintage" ? "border-[#ff9900]/80 shadow-[0_0_20px_rgba(255,153,0,0.4)] p-0.5" : 
-                  cameraMode === "disposable" ? "border-green-500/80 shadow-[0_0_20px_rgba(34,197,94,0.4)] p-0.5" : 
-                  "border-white"
-                }`}
-              >
-                {cameraMode === "vintage" ? (
-                  <img src={vintageCameraImg} alt="Vintage Camera" loading="eager" fetchPriority="high" className="w-full h-full rounded-full object-cover bg-neutral-800" />
-                ) : cameraMode === "disposable" ? (
-                  <img src={disposableCameraImg} alt="Disposable Camera" loading="eager" fetchPriority="high" className="w-full h-full rounded-full object-cover bg-neutral-800" />
-                ) : (
-                  <div className="w-16 h-16 rounded-full transition-all bg-white" />
-                )}
-              </button>
+          {/* ── Pill-style mode selector ── */}
+          <div className="flex items-center justify-center mb-3 px-4">
+            <div className="flex gap-1 p-1 bg-black/50 rounded-full backdrop-blur-md border border-white/10 overflow-x-auto max-w-full scrollbar-hide">
+              {MODES.map(({ key, label, img }) => (
+                <button
+                  key={key}
+                  onClick={() => switchMode(key)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all active:scale-95 ${
+                    cameraMode === key
+                      ? "bg-white text-black shadow-sm"
+                      : "text-white/70 hover:text-white hover:bg-white/10"
+                  }`}
+                >
+                  {img && (
+                    <img
+                      src={img}
+                      alt={label}
+                      className="w-4 h-4 rounded-full object-cover"
+                    />
+                  )}
+                  {label}
+                </button>
+              ))}
             </div>
           </div>
 
-          <button 
-            onClick={toggleCamera}
-            className="w-12 h-12 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white hover:bg-white/10 active:scale-95 transition-all"
-          >
-            <RefreshCcw className="w-6 h-6" />
-          </button>
+          {/* ── Photo booth: per-shot style selector ── */}
+          {cameraMode === "photoBooth" && !boothComplete && (
+            <div className="flex items-center justify-center mb-2 gap-2">
+              {(["normal", "vintage", "disposable"] as CameraStyle[]).map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setPhotoBoothStyle(s)}
+                  className={`px-3 py-1 rounded-full text-xs font-semibold border transition-all active:scale-95 ${
+                    photoBoothStyle === s
+                      ? "bg-white text-black border-white"
+                      : "bg-transparent text-white/60 border-white/20 hover:border-white/50"
+                  }`}
+                >
+                  {s === "normal" ? "Default" : s.charAt(0).toUpperCase() + s.slice(1)}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div className="p-4 flex justify-between items-center">
+            {/* Gallery button */}
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="w-12 h-12 rounded-xl border border-white/20 bg-black/40 backdrop-blur-sm flex items-center justify-center text-white hover:bg-white/10 active:scale-95 transition-all overflow-hidden"
+            >
+              <ImageIcon className="w-6 h-6" />
+            </button>
+
+            {/* Centre: capture or upload collage */}
+            <div className="relative flex items-center justify-center">
+              {cameraMode === "photoBooth" && boothComplete ? (
+                <button
+                  onClick={handleBoothUpload}
+                  className="px-6 h-14 rounded-full bg-white text-black font-bold text-base active:scale-95 transition-all shadow-lg"
+                >
+                  Upload 4 Shots
+                </button>
+              ) : (
+                <button
+                  onClick={handleCapture}
+                  className={`w-20 h-20 rounded-full border-4 flex items-center justify-center transition-all active:scale-90 ${
+                    isVintage
+                      ? "border-[#ff9900]/80 shadow-[0_0_20px_rgba(255,153,0,0.4)] p-0.5"
+                      : isDisposable
+                      ? "border-green-500/80 shadow-[0_0_20px_rgba(34,197,94,0.4)] p-0.5"
+                      : cameraMode === "photoBooth"
+                      ? "border-purple-400/80 shadow-[0_0_20px_rgba(168,85,247,0.4)] p-0.5"
+                      : "border-white"
+                  }`}
+                >
+                  {isVintage ? (
+                    <img src={vintageCameraImg} alt="Vintage" className="w-full h-full rounded-full object-cover bg-neutral-800" />
+                  ) : isDisposable ? (
+                    <img src={disposableCameraImg} alt="Disposable" className="w-full h-full rounded-full object-cover bg-neutral-800" />
+                  ) : cameraMode === "photoBooth" ? (
+                    <img src={photoBoothImg} alt="Photo Booth" className="w-full h-full rounded-full object-cover bg-neutral-800" />
+                  ) : (
+                    <div className="w-16 h-16 rounded-full bg-white" />
+                  )}
+                </button>
+              )}
+            </div>
+
+            {/* Flip camera */}
+            <button
+              onClick={toggleCamera}
+              className="w-12 h-12 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white hover:bg-white/10 active:scale-95 transition-all"
+            >
+              <RefreshCcw className="w-6 h-6" />
+            </button>
+          </div>
         </div>
 
         <input
