@@ -31,7 +31,8 @@ export default memo(function Home() {
   const [stories, setStories] = useState<ApiStory[]>([]);
   const [showCamera, setShowCamera] = useState(false);
   const [viewingStories, setViewingStories] = useState<ApiStory[] | null>(null);
-  const [showMyStoryOptions, setShowMyStoryOptions] = useState(false);
+  const [showMyOptions, setShowMyOptions] = useState(false);
+  const [showPartnerOptions, setShowPartnerOptions] = useState(false);
   const [initialStoryIndex, setInitialStoryIndex] = useState(0);
 
   const [notes, setNotes] = useState<ApiAvatarNote[]>([]);
@@ -132,25 +133,36 @@ export default memo(function Home() {
       window.dispatchEvent(new Event("LIBRARY_MODE_CHANGED"));
     }
     
-    // Fetch stories
-    api.getStories().then(data => {
-      setStories(data);
-      // Auto-open specific story if URL has storyId
-      const params = new URLSearchParams(window.location.search);
-      const storyId = params.get("storyId");
-      if (storyId) {
-        const idx = data.findIndex(s => s.id === storyId);
-        if (idx !== -1) {
-          setInitialStoryIndex(idx);
-          setViewingStories(data);
-        }
-        // Clean up URL
-        window.history.replaceState({}, "", "/");
-      }
-    }).catch(console.error);
+    // Fetch stories and notes together
+    Promise.all([api.getStories(), api.getAvatarNotes()]).then(([storyData, noteData]) => {
+      setStories(storyData);
+      setNotes(noteData);
 
-    api.getAvatarNotes().then(setNotes).catch(console.error);
+      // Auto-open logic moved to searchParams effect
+    }).catch(console.error);
   }, []);
+
+  // Listen to searchParams changes for stories and notes
+  useEffect(() => {
+    const storyId = searchParams.get("storyId");
+    if (storyId && stories.length > 0) {
+      const idx = stories.findIndex(s => s.id === storyId);
+      if (idx !== -1) {
+        setInitialStoryIndex(idx);
+        setViewingStories(stories);
+      }
+      window.history.replaceState({}, "", "/");
+    }
+
+    const noteUserId = searchParams.get("noteUserId");
+    if (noteUserId) {
+      api.getUsers().then(users => {
+        const u = users.find(u => u.id === noteUserId);
+        if (u) setSelectedNoteUser(u);
+      });
+      window.history.replaceState({}, "", "/");
+    }
+  }, [searchParams, stories]);
 
   const handleStoryComplete = (uploaded?: boolean, story?: any) => {
     setShowCamera(false);
@@ -213,31 +225,13 @@ export default memo(function Home() {
               className={`relative flex items-center justify-center gap-5 sm:gap-7 mt-8 mb-3 w-full max-w-[340px] mx-auto ${appTheme === 'library' ? 'library-locket-container' : ''} ${appTheme === 'mint' ? 'home-avatar-mint-glow' : ''}`}
             >
               <div className="relative">
-                {/* Note Bubble - View Only */}
-                {myNote && (
-                  <button
-                    type="button"
-                    className="absolute -top-14 left-1/2 -translate-x-1/2 z-40 transition-transform active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-2xl"
-                    onClick={() => { if (user) { setSelectedNoteUser(user); } }}
-                    aria-label="View your note"
-                  >
-                    <div className="relative group">
-                      <div className="absolute inset-0 bg-primary/25 blur-md rounded-2xl scale-110 opacity-70" />
-                      <div className="relative bg-gradient-to-br from-white via-white to-primary/10 text-foreground px-3.5 py-2 rounded-2xl rounded-bl-[4px] text-[13px] shadow-lg shadow-black/10 max-w-[130px] font-semibold leading-snug line-clamp-2">
-                        {myNote.text}
-                      </div>
-                    </div>
-                  </button>
-                )}
+                {/* Removed Note Bubble */}
 
                 {/* My avatar — tap to view/add story */}
                 <button
                   type="button"
                   className={`relative z-10 p-0.5 rounded-full cursor-pointer transition-transform active:scale-95 ${myStories.length > 0 ? "bg-gradient-to-tr from-yellow-400 to-primary" : ""}`}
-                  onClick={() => {
-                    if (myStories.length > 0) setShowMyStoryOptions(true);
-                    else setShowCamera(true);
-                  }}
+                  onClick={() => setShowMyOptions(true)}
                 >
                 <AvatarImage
                   src={user?.avatar}
@@ -285,34 +279,18 @@ export default memo(function Home() {
               </Link>
 
               <div className="relative">
-                {/* Partner Note Bubble */}
-                {partnerNote && (
-                  <button
-                    type="button"
-                    className="absolute -top-14 left-1/2 -translate-x-1/2 z-40 transition-transform active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-2xl"
-                    onClick={() => { setSelectedNoteUser(partner); }}
-                    aria-label={`View ${partner.name}'s note`}
-                  >
-                    <div className="relative">
-                      <div className="absolute inset-0 bg-primary/20 blur-md rounded-2xl scale-110 opacity-60" />
-                      <div className="relative bg-gradient-to-br from-white via-white to-rose-50 text-foreground px-3.5 py-2 rounded-2xl rounded-br-[4px] text-[13px] shadow-lg shadow-black/10 max-w-[130px] font-semibold leading-snug line-clamp-2">
-                        {partnerNote.text}
-                      </div>
-                    </div>
-                  </button>
-                )}
+                {/* Removed Partner Note Bubble */}
 
                 {/* Partner avatar — tap to view story if they have one, else do nothing */}
                 <button
                   type="button"
-                  className={`relative z-10 p-0.5 rounded-full transition-transform ${partnerStories.length > 0 ? "cursor-pointer active:scale-95 bg-gradient-to-tr from-yellow-400 to-primary" : "cursor-default"}`}
+                  className={`relative z-10 p-0.5 rounded-full transition-transform ${(partnerStories.length > 0 || partnerNote) ? "cursor-pointer active:scale-95 bg-gradient-to-tr from-yellow-400 to-primary" : "cursor-default"}`}
                   onClick={() => {
-                    if (partnerStories.length > 0) {
-                      setInitialStoryIndex(0);
-                      setViewingStories(partnerStories);
+                    if (partnerStories.length > 0 || partnerNote) {
+                      setShowPartnerOptions(true);
                     }
                   }}
-                  disabled={partnerStories.length === 0}
+                  disabled={partnerStories.length === 0 && !partnerNote}
                 >
                 <AvatarImage
                   src={partner.avatar}
@@ -413,9 +391,9 @@ export default memo(function Home() {
         />
       )}
 
-      {/* "View or Add Story" bottom sheet */}
+      {/* User Options bottom sheet */}
       <AnimatePresence>
-        {showMyStoryOptions && (
+        {showMyOptions && (
           <>
             {/* Backdrop */}
             <motion.div
@@ -423,7 +401,7 @@ export default memo(function Home() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="fixed inset-0 z-[400] bg-black/50 backdrop-blur-sm"
-              onClick={() => setShowMyStoryOptions(false)}
+              onClick={() => setShowMyOptions(false)}
             />
             {/* Sheet */}
             <motion.div
@@ -440,10 +418,10 @@ export default memo(function Home() {
               {/* Header */}
               <div className="flex items-center justify-between px-4 pb-3 border-b border-border/50">
                 <div>
-                  <p className="font-semibold text-sm">Your Stories</p>
+                  <p className="font-semibold text-sm">Your Status</p>
                 </div>
                 <button
-                  onClick={() => setShowMyStoryOptions(false)}
+                  onClick={() => setShowMyOptions(false)}
                   className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-secondary transition-colors"
                 >
                   <X className="w-4 h-4 text-muted-foreground" />
@@ -451,27 +429,29 @@ export default memo(function Home() {
               </div>
 
               {/* Options */}
+              {myStories.length > 0 && (
+                <button
+                  onClick={() => {
+                    setShowMyOptions(false);
+                    setInitialStoryIndex(0);
+                    setViewingStories(myStories);
+                  }}
+                  className="w-full flex items-center gap-4 px-5 py-4 hover:bg-secondary/50 transition-colors"
+                >
+                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <Eye className="w-5 h-5 text-primary" />
+                  </div>
+                  <div className="text-left">
+                    <p className="font-semibold text-base">View my story</p>
+                  </div>
+                </button>
+              )}
+
+              {myStories.length > 0 && <div className="border-t border-border/30 mx-4" />}
+
               <button
                 onClick={() => {
-                  setShowMyStoryOptions(false);
-                  setInitialStoryIndex(0);
-                  setViewingStories(myStories);
-                }}
-                className="w-full flex items-center gap-4 px-5 py-4 hover:bg-secondary/50 transition-colors"
-              >
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                  <Eye className="w-5 h-5 text-primary" />
-                </div>
-                <div className="text-left">
-                  <p className="font-semibold text-base">View my story</p>
-                </div>
-              </button>
-
-              <div className="border-t border-border/30 mx-4" />
-
-              <button
-                onClick={() => {
-                  setShowMyStoryOptions(false);
+                  setShowMyOptions(false);
                   setShowCamera(true);
                 }}
                 className="w-full flex items-center gap-4 px-5 py-4 hover:bg-secondary/50 transition-colors"
@@ -480,11 +460,99 @@ export default memo(function Home() {
                   <Camera className="w-5 h-5 text-primary" />
                 </div>
                 <div className="text-left">
-                  <p className="font-semibold text-base">Add to story</p>
+                  <p className="font-semibold text-base">Add a story</p>
                 </div>
               </button>
 
+              <div className="border-t border-border/30 mx-4" />
 
+              <button
+                onClick={() => {
+                  setShowMyOptions(false);
+                  if (user) setSelectedNoteUser(user);
+                }}
+                className="w-full flex items-center gap-4 px-5 py-4 hover:bg-secondary/50 transition-colors"
+              >
+                <div className="w-10 h-10 rounded-full bg-indigo-500/10 flex items-center justify-center shrink-0">
+                  <StickyNote className="w-5 h-5 text-indigo-500" />
+                </div>
+                <div className="text-left">
+                  <p className="font-semibold text-base">{myNote ? "View your note" : "Add a note"}</p>
+                </div>
+              </button>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Partner Options bottom sheet */}
+      <AnimatePresence>
+        {showPartnerOptions && partner && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[400] bg-black/50 backdrop-blur-sm"
+              onClick={() => setShowPartnerOptions(false)}
+            />
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 26, stiffness: 280 }}
+              className="fixed bottom-0 left-0 right-0 z-[401] bg-background rounded-t-2xl shadow-2xl overflow-hidden"
+              style={{ paddingBottom: "max(5rem, env(safe-area-inset-bottom))" }}
+            >
+              <div className="w-10 h-1 bg-muted-foreground/20 rounded-full mx-auto mt-3 mb-2" />
+              <div className="flex items-center justify-between px-4 pb-3 border-b border-border/50">
+                <div>
+                  <p className="font-semibold text-sm">{partner.name}'s Status</p>
+                </div>
+                <button
+                  onClick={() => setShowPartnerOptions(false)}
+                  className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-secondary transition-colors"
+                >
+                  <X className="w-4 h-4 text-muted-foreground" />
+                </button>
+              </div>
+
+              {partnerStories.length > 0 && (
+                <button
+                  onClick={() => {
+                    setShowPartnerOptions(false);
+                    setInitialStoryIndex(0);
+                    setViewingStories(partnerStories);
+                  }}
+                  className="w-full flex items-center gap-4 px-5 py-4 hover:bg-secondary/50 transition-colors"
+                >
+                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <Eye className="w-5 h-5 text-primary" />
+                  </div>
+                  <div className="text-left">
+                    <p className="font-semibold text-base">View story</p>
+                  </div>
+                </button>
+              )}
+
+              {partnerStories.length > 0 && partnerNote && <div className="border-t border-border/30 mx-4" />}
+
+              {partnerNote && (
+                <button
+                  onClick={() => {
+                    setShowPartnerOptions(false);
+                    setSelectedNoteUser(partner);
+                  }}
+                  className="w-full flex items-center gap-4 px-5 py-4 hover:bg-secondary/50 transition-colors"
+                >
+                  <div className="w-10 h-10 rounded-full bg-indigo-500/10 flex items-center justify-center shrink-0">
+                    <StickyNote className="w-5 h-5 text-indigo-500" />
+                  </div>
+                  <div className="text-left">
+                    <p className="font-semibold text-base">View note</p>
+                  </div>
+                </button>
+              )}
             </motion.div>
           </>
         )}
