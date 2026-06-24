@@ -139,6 +139,10 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
         text: replyText,
         type: "text",
         senderId: user?.id ?? "me",
+        replyToId: currentStory.id,
+        replyToText: "Story",
+        replyToImageUrl: currentStory.mediaUrl,
+        replyToSenderId: currentStory.authorId,
       } as any);
       setReplyText("");
       setIsReplying(false);

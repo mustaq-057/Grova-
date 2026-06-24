@@ -69,9 +69,10 @@ export function AvatarNoteModal({ mode, user, note, onClose, onNoteAdded, onNote
       await api.sendMessage({
         text: replyText.trim(),
         type: "text",
-        replyToId: note.id,
+        replyToId: `__note__${note.userId}`,
         replyToText: note.text,
         replyToSenderId: note.userId,
+        replyToImageUrl: user.avatar,
       });
       onReplySent?.();
       onClose();

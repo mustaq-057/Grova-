@@ -665,6 +665,9 @@ export const MessageItem = memo(function MessageItem({
               onClick={() => {
                 if (msg.replyToText === "Story") {
                   window.location.href = `/?storyId=${msg.replyToId}`;
+                } else if (msg.replyToId?.startsWith("__note__")) {
+                  const noteUserId = msg.replyToId.replace("__note__", "");
+                  window.location.href = `/?noteUserId=${noteUserId}`;
                 } else if (msg.replyToId && onJumpToMessage) {
                   onJumpToMessage(msg.replyToId);
                 }
