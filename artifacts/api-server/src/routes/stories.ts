@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { Router } from "express";
 import db from "../lib/db";
 import { authenticate } from "../lib/auth-middleware";
@@ -54,7 +55,7 @@ router.post("/stories", authenticate, rateLimiters.messages, async (req, res) =>
       return;
     }
 
-    const id = crypto.randomUUID();
+    const id = randomUUID();
     const created_at = Date.now().toString();
     const expires_at = (Date.now() + 24 * 60 * 60 * 1000).toString(); // 24 hours from now
 

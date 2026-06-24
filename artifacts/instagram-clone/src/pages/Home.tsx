@@ -286,8 +286,13 @@ export default memo(function Home() {
                   type="button"
                   className={`relative z-10 p-0.5 rounded-full transition-transform ${(partnerStories.length > 0 || partnerNote) ? "cursor-pointer active:scale-95 bg-gradient-to-tr from-yellow-400 to-primary" : "cursor-default"}`}
                   onClick={() => {
-                    if (partnerStories.length > 0 || partnerNote) {
+                    if (partnerStories.length > 0 && partnerNote) {
                       setShowPartnerOptions(true);
+                    } else if (partnerStories.length > 0) {
+                      setInitialStoryIndex(0);
+                      setViewingStories(partnerStories);
+                    } else if (partnerNote) {
+                      setSelectedNoteUser(partner);
                     }
                   }}
                   disabled={partnerStories.length === 0 && !partnerNote}

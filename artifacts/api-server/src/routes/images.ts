@@ -202,7 +202,7 @@ router.get("/media/b2-sign", authenticate, async (req, res) => {
     });
 
     // We generate a unique file key
-    const fileId = crypto.randomUUID();
+    const fileId = randomUUID();
     const key = `pdfs/${fileId}.pdf`;
 
     const command = new PutObjectCommand({
@@ -246,7 +246,7 @@ router.get("/media/b2-sign-story", authenticate, async (req, res) => {
     });
 
     // We generate a unique file key for a story
-    const fileId = crypto.randomUUID();
+    const fileId = randomUUID();
     const isVideo = req.query.type === "video";
     const key = `stories/${fileId}.${isVideo ? "mp4" : "jpg"}`;
     const contentType = isVideo ? "video/mp4" : "image/jpeg";

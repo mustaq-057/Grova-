@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { Router } from "express";
 import db from "../lib/db";
 import { authenticate } from "../lib/auth-middleware";
@@ -49,7 +50,7 @@ router.post("/notes", authenticate, rateLimiters.messages, async (req, res) => {
     }
 
     const now = Date.now();
-    const id = crypto.randomUUID();
+    const id = randomUUID();
     const createdAt = now.toString();
     const expiresAt = (now + NOTE_TTL_MS).toString();
 
