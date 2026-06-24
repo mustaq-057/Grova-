@@ -330,7 +330,12 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
                onWheel={handleWheel}
             >
               <video
-                ref={videoRef}
+                ref={(node) => {
+                  videoRef.current = node;
+                  if (node && streamRef.current && node.srcObject !== streamRef.current) {
+                    node.srcObject = streamRef.current;
+                  }
+                }}
                 autoPlay
                 playsInline
                 muted

@@ -108,6 +108,10 @@ function TransformableImage({
         rotate,
         touchAction: "none" 
       }}
+      initial={isMain ? false : { scale: 0, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      exit={{ scale: 0, opacity: 0 }}
+      transition={{ type: "spring", damping: 20, stiffness: 300 }}
       className={
         isMain
           ? "w-full h-full object-contain absolute inset-0 pointer-events-auto z-0"
@@ -378,18 +382,22 @@ export function StoryEditor({ file, onClose, onComplete }: StoryEditorProps) {
           />
         ) : null}
 
-        {!isVideo && stickers.map(sticker => (
-          <TransformableImage
-            key={sticker.id}
-            src={sticker.url}
-            isTyping={isTyping}
-            flipped={sticker.flipped}
-            onFlipToggle={() => setStickers(prev => prev.map(st => st.id === sticker.id ? { ...st, flipped: !st.flipped } : st))}
-            onTransformChange={(x, y, s, r) => setStickers(prev => prev.map(st => st.id === sticker.id ? { ...st, x, y, scale: s, rotate: r } : st))}
-            onDragOver={pos => handleStickerDragOver(sticker.id, pos)}
-            onDragEnd={pos => handleStickerDragEnd(sticker.id, pos)}
-          />
-        ))}
+        {!isVideo && (
+          <AnimatePresence>
+            {stickers.map(sticker => (
+              <TransformableImage
+                key={sticker.id}
+                src={sticker.url}
+                isTyping={isTyping}
+                flipped={sticker.flipped}
+                onFlipToggle={() => setStickers(prev => prev.map(st => st.id === sticker.id ? { ...st, flipped: !st.flipped } : st))}
+                onTransformChange={(x, y, s, r) => setStickers(prev => prev.map(st => st.id === sticker.id ? { ...st, x, y, scale: s, rotate: r } : st))}
+                onDragOver={pos => handleStickerDragOver(sticker.id, pos)}
+                onDragEnd={pos => handleStickerDragEnd(sticker.id, pos)}
+              />
+            ))}
+          </AnimatePresence>
+        )}
 
         <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/40 pointer-events-none" />
       </div>
@@ -454,23 +462,45 @@ export function StoryEditor({ file, onClose, onComplete }: StoryEditorProps) {
         />
       )}
 
-      {/* Delete bin — appears at bottom center while dragging a sticker */}
+      {/* Delete bin — appears at bottom center while dragging */}
       <AnimatePresence>
         {isDraggingAnySticker && (
           <motion.div
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 40 }}
+            initial={{ opacity: 0, y: 60, scale: 0.6 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 60, scale: 0.6 }}
+            transition={{ type: "spring", damping: 18, stiffness: 300 }}
             ref={binRef}
-            className="absolute bottom-safe mb-8 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-1 pointer-events-none"
-            style={{ bottom: "max(2rem, env(safe-area-inset-bottom))" }}
+            className="absolute left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2 pointer-events-none"
+            style={{ bottom: "max(2.5rem, env(safe-area-inset-bottom))" }}
           >
-            <div className={`w-16 h-16 rounded-full flex items-center justify-center transition-all duration-150 ${hoveredBin ? "bg-red-500 scale-125" : "bg-black/60 border-2 border-white/30"}`}>
-              <Trash2 className={`w-7 h-7 ${hoveredBin ? "text-white" : "text-white/70"}`} />
-            </div>
-            <span className="text-white/70 text-xs font-medium drop-shadow-sm">
-              {hoveredBin ? "Release to delete" : "Drag here to delete"}
-            </span>
+            <motion.div
+              animate={hoveredBin ? {
+                scale: [1.2, 1.35, 1.2],
+                rotate: [-6, 6, -6, 0],
+              } : { scale: 1, rotate: 0 }}
+              transition={hoveredBin ? { repeat: Infinity, duration: 0.4 } : { duration: 0.2 }}
+              className={`w-18 h-18 w-[72px] h-[72px] rounded-full flex items-center justify-center shadow-2xl transition-colors duration-150 ${
+                hoveredBin
+                  ? "bg-red-500 shadow-red-500/60"
+                  : "bg-black/70 border-2 border-white/40 backdrop-blur-md"
+              }`}
+              style={hoveredBin ? { boxShadow: "0 0 32px rgba(239,68,68,0.8), 0 0 64px rgba(239,68,68,0.4)" } : {}}
+            >
+              <Trash2
+                className={`w-8 h-8 transition-all duration-150 ${
+                  hoveredBin ? "text-white drop-shadow-lg" : "text-white/70"
+                }`}
+              />
+            </motion.div>
+            <motion.span
+              animate={hoveredBin ? { opacity: 1, scale: 1.05 } : { opacity: 0.7, scale: 1 }}
+              className={`text-xs font-semibold drop-shadow-lg tracking-wide ${
+                hoveredBin ? "text-red-400" : "text-white/70"
+              }`}
+            >
+              {hoveredBin ? "🔥 Release to delete" : "Drag here to delete"}
+            </motion.span>
           </motion.div>
         )}
       </AnimatePresence>
