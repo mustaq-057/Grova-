@@ -5,21 +5,6 @@ import ReactDOM from "react-dom";
 import { api } from "../lib/api";
 import type { ApiStory } from "../lib/api";
 
-/**
- * Convert B2 S3-compatible endpoint URL → public download URL.
- * e.g.  https://s3.us-east-005.backblazeb2.com/bucket/key
- *  →    https://f005.backblazeb2.com/file/bucket/key
- * Leaves Cloudinary / already-correct f00X URLs untouched.
- */
-function normalizeMediaUrl(raw: string): string {
-  if (!raw) return raw;
-  const m = raw.match(/https:\/\/s3\.([a-z]+-[a-z]+-\d+)\.backblazeb2\.com\/([^/]+)\/(.+)/);
-  if (m) {
-    const cluster = m[1].match(/(\d+)$/)?.[1]?.padStart(3, "0") ?? "005";
-    return `https://f${cluster}.backblazeb2.com/file/${m[2]}/${m[3]}`;
-  }
-  return raw;
-}
 import { useAuth } from "@/lib/auth";
 
 interface StoryViewerProps {
@@ -191,8 +176,8 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
     try { textOverlayData = JSON.parse(currentStory.textOverlay); } catch { }
   }
 
-  const mediaUrl = normalizeMediaUrl(currentStory.mediaUrl ?? "");
-  const isVideo = mediaUrl.includes(".mp4") || mediaUrl.includes(".webm") || currentStory.kind === "reel";
+  const mediaUrl = currentStory.mediaUrl ?? "";
+  const isVideo = mediaUrl.includes(".mp4") || mediaUrl.includes(".webm") || currentStory.kind === "reel" || mediaUrl.includes("video");
   const isLiked = likedIds.has(currentStory.id);
 
   return ReactDOM.createPortal(

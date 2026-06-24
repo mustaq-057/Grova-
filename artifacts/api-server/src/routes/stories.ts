@@ -45,6 +45,48 @@ async function deleteB2File(url: string) {
   }
 }
 
+async function signB2GetUrl(url: string): Promise<string> {
+  try {
+    const { S3Client, GetObjectCommand } = await import("@aws-sdk/client-s3");
+    const { getSignedUrl } = await import("@aws-sdk/s3-request-presigner");
+    const region = process.env.AWS_REGION || "us-east-005";
+    const endpoint = process.env.B2_ENDPOINT;
+    const bucket = process.env.B2_BUCKET_NAME;
+    const accessKeyId = process.env.B2_KEY_ID;
+    const secretAccessKey = process.env.B2_APPLICATION_KEY;
+
+    if (!endpoint || !bucket || !accessKeyId || !secretAccessKey) return url;
+
+    // extract key from url
+    let key = "";
+    try {
+      const parsedUrl = new URL(url);
+      if (parsedUrl.pathname.includes(`/file/${bucket}/`)) {
+        key = parsedUrl.pathname.split(`/file/${bucket}/`)[1];
+      } else if (parsedUrl.hostname === new URL(endpoint).hostname) {
+         key = parsedUrl.pathname.split(`/${bucket}/`)[1];
+      } else if (process.env.B2_PUBLIC_URL && url.startsWith(process.env.B2_PUBLIC_URL)) {
+         key = url.slice(process.env.B2_PUBLIC_URL.length).replace(/^\//, "");
+      }
+    } catch { }
+
+    if (!key) return url;
+
+    const s3 = new S3Client({
+      region,
+      endpoint,
+      credentials: { accessKeyId, secretAccessKey },
+    });
+
+    const command = new GetObjectCommand({ Bucket: bucket, Key: key });
+    // 24 hours expiry
+    return await getSignedUrl(s3 as any, command as any, { expiresIn: 86400 });
+  } catch (err) {
+    console.error("Failed to sign B2 GET url:", err);
+    return url;
+  }
+}
+
 router.post("/stories", authenticate, rateLimiters.messages, async (req, res) => {
   try {
     const userId = (req as any).user.id;
@@ -80,7 +122,11 @@ router.post("/stories", authenticate, rateLimiters.messages, async (req, res) =>
       WHERE id = $1`, 
       [id]
     );
-    res.json(result.rows[0]);
+    const row = result.rows[0];
+    if (row && row.mediaUrl) {
+      row.mediaUrl = await signB2GetUrl(row.mediaUrl);
+    }
+    res.json(row);
   } catch (error) {
     console.error("Create story error:", error);
     res.status(500).json({ error: "Failed to create story" });
@@ -127,7 +173,17 @@ router.get("/stories", authenticate, rateLimiters.read, async (req, res) => {
       [now]
     );
     
-    res.json(result.rows);
+    // Sign URLs since the bucket is private
+    const storiesWithSignedUrls = await Promise.all(
+      result.rows.map(async (row: any) => {
+        if (row.mediaUrl) {
+          row.mediaUrl = await signB2GetUrl(row.mediaUrl);
+        }
+        return row;
+      })
+    );
+    
+    res.json(storiesWithSignedUrls);
   } catch (error) {
     console.error("Get stories error:", error);
     res.status(500).json({ error: "Failed to fetch stories" });
