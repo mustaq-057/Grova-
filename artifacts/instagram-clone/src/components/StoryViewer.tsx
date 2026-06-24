@@ -139,9 +139,6 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
         text: replyText,
         type: "text",
         senderId: user?.id ?? "me",
-        replyToImageUrl: currentStory.mediaUrl,
-        replyToText: "Story",
-        replyToId: currentStory.id,
       } as any);
       setReplyText("");
       setIsReplying(false);
@@ -166,9 +163,6 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
         text: "❤️",
         type: "text",
         senderId: user?.id ?? "me",
-        replyToImageUrl: story.mediaUrl,
-        replyToText: "Story",
-        replyToId: id,
       } as any).catch(console.error);
     }
   };
@@ -444,8 +438,8 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
           </AnimatePresence>
         </div>
 
-        {/* ── BOTTOM BAR: Like + Reply ── */}
-        {!showDeleteConfirm && (
+        {/* ── BOTTOM BAR: Like + Reply — only shown to the person viewing someone else's story ── */}
+        {!showDeleteConfirm && currentStory.authorId !== user?.id && (
           <div
             className="absolute bottom-0 left-0 right-0 z-20 story-controls"
             style={{ paddingBottom: "max(1.25rem, env(safe-area-inset-bottom))" }}

@@ -25,14 +25,6 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
   const [zoom, setZoom] = useState(1);
   const pinchStartRef = useRef<{ dist: number, zoom: number } | null>(null);
   
-  // Video recording state
-  const [isRecording, setIsRecording] = useState(false);
-  const [recordingProgress, setRecordingProgress] = useState(0);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
-  const recordIntervalRef = useRef<number | null>(null);
-  const holdTimerRef = useRef<number | null>(null);
-  const isHeldRef = useRef(false);
   const startCamera = useCallback(async (mode: "user" | "environment") => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(t => t.stop());
@@ -86,76 +78,6 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
 
   const toggleRatio = () => {
     setAspectRatio(prev => prev === "Full" ? "16:9" : prev === "16:9" ? "4:3" : prev === "4:3" ? "1:1" : "Full");
-  };
-
-  const startRecording = () => {
-    if (!streamRef.current) return;
-    
-    try {
-      const options = { mimeType: "video/webm;codecs=vp8,opus", videoBitsPerSecond: 2500000 };
-      const recorder = new MediaRecorder(streamRef.current, MediaRecorder.isTypeSupported(options.mimeType) ? options : { videoBitsPerSecond: 2500000 });
-      mediaRecorderRef.current = recorder;
-      chunksRef.current = [];
-
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data);
-      };
-
-      recorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: recorder.mimeType || "video/mp4" });
-        const file = new File([blob], `video-${Date.now()}.${recorder.mimeType.includes("webm") ? "webm" : "mp4"}`, { type: recorder.mimeType || "video/mp4" });
-        if (mode === "story") {
-          setStoryFile(file);
-        } else if (onCapture) {
-          onCapture(file);
-        }
-        setIsRecording(false);
-        setRecordingProgress(0);
-        if (recordIntervalRef.current) clearInterval(recordIntervalRef.current);
-      };
-
-      recorder.start(200);
-      setIsRecording(true);
-      setRecordingProgress(0);
-      
-      const startTime = Date.now();
-      const maxDuration = 30000; // 30 seconds
-      
-      recordIntervalRef.current = window.setInterval(() => {
-        const elapsed = Date.now() - startTime;
-        setRecordingProgress((elapsed / maxDuration) * 100);
-        if (elapsed >= maxDuration) {
-          stopRecording();
-        }
-      }, 100);
-    } catch (err) {
-      console.error("Failed to start recording", err);
-      setError("Video recording not supported on this device.");
-    }
-  };
-
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-      mediaRecorderRef.current.stop();
-    }
-  };
-
-  const handlePointerDown = () => {
-    isHeldRef.current = false;
-    holdTimerRef.current = window.setTimeout(() => {
-      isHeldRef.current = true;
-      startRecording();
-    }, 400); // 400ms to distinguish from a tap
-  };
-
-  const handlePointerUp = () => {
-    if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
-    if (isHeldRef.current) {
-      stopRecording();
-    } else {
-      handleCapture();
-    }
-    isHeldRef.current = false;
   };
 
   const handleCapture = () => {
@@ -249,6 +171,11 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (file.type.startsWith("video/")) {
+      setError("Stories support photos only.");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
     if (mode === "story") {
       setStoryFile(file);
     } else if (onCapture) {
@@ -382,29 +309,14 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
 
             {/* Capture button */}
             <div className="relative flex items-center justify-center">
-              {isRecording && (
-                <svg className="absolute w-[90px] h-[90px] -rotate-90 pointer-events-none" viewBox="0 0 100 100">
-                  <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="6" />
-                  <circle 
-                    cx="50" cy="50" r="42" 
-                    fill="none" stroke="#ef4444" strokeWidth="6" 
-                    strokeDasharray="264" 
-                    strokeDashoffset={264 - (264 * recordingProgress) / 100} 
-                    strokeLinecap="round"
-                    className="transition-all duration-100 ease-linear"
-                  />
-                </svg>
-              )}
               <button 
-                onPointerDown={handlePointerDown}
-                onPointerUp={handlePointerUp}
-                onPointerCancel={handlePointerUp}
-                className={`w-20 h-20 rounded-full border-4 flex items-center justify-center transition-all ${vintageMode ? "border-[#ff9900]/80 shadow-[0_0_20px_rgba(255,153,0,0.4)] p-0.5" : "border-white"} ${isRecording ? "scale-110" : "active:scale-90"}`}
+                onClick={handleCapture}
+                className={`w-20 h-20 rounded-full border-4 flex items-center justify-center transition-all active:scale-90 ${vintageMode ? "border-[#ff9900]/80 shadow-[0_0_20px_rgba(255,153,0,0.4)] p-0.5" : "border-white"}`}
               >
                 {vintageMode ? (
                   <img src={vintageCameraImg} alt="Vintage Camera" loading="eager" fetchPriority="high" className="w-full h-full rounded-full object-cover bg-neutral-800" />
                 ) : (
-                  <div className={`w-16 h-16 rounded-full transition-all ${isRecording ? "bg-red-500 scale-50" : "bg-white"}`} />
+                  <div className="w-16 h-16 rounded-full transition-all bg-white" />
                 )}
               </button>
             </div>
@@ -421,7 +333,7 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/*,video/*"
+          accept="image/*"
           className="hidden"
           onChange={handleFileChange}
         />

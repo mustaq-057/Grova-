@@ -217,7 +217,8 @@ export const MessageItem = memo(function MessageItem({
   );
   const quotedText = msg.replyToText ?? legacyReply?.quoted;
   const displayText = legacyReply?.body ?? msg.text;
-  const hasReply = Boolean(quotedText);
+  const isStoryReply = quotedText === "Story";
+  const hasReply = Boolean(quotedText) && !isStoryReply;
 
   const replyThumbSrc = useMemo(() => {
     const rawUrl = replySource

@@ -58,7 +58,9 @@ function notificationIcon(type: AppNotification["type"]) {
     case "file":
       return { Icon: ImageIcon, className: "text-blue-500 bg-blue-500/15" };
     case "reaction":
-      return { Icon: Smile, className: "text-yellow-500 bg-yellow-500/15" };
+      return { Icon: Smile, className: "text-orange-500 bg-orange-500/15" };
+    case "note":
+      return { Icon: MessageSquare, className: "text-indigo-500 bg-indigo-500/15" };
     case "greeting":
       return { Icon: Zap, className: "text-primary bg-primary/15" };
     case "calendar":
@@ -90,6 +92,7 @@ function defaultPath(type: AppNotification["type"]): string {
     case "comment":
     case "like":
     case "story":
+    case "note":
       return "/";
     default:
       return "/notifications";
@@ -99,12 +102,12 @@ function defaultPath(type: AppNotification["type"]): string {
 export default memo(function Notifications() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
-  const [items, setItems] = useState(() => getNotifications());
+  const [items, setItems] = useState(() => getNotifications().filter(n => n.actorId !== user?.id));
 
   useEffect(() => {
     if (user) setNotificationViewer(user.id, user.name);
-    hydrateNotifications().then(() => setItems(getNotifications()));
-    const refresh = () => setItems(getNotifications());
+    hydrateNotifications().then(() => setItems(getNotifications().filter(n => n.actorId !== user?.id)));
+    const refresh = () => setItems(getNotifications().filter(n => n.actorId !== user?.id));
     window.addEventListener(NOTIFY_CHANGED, refresh);
     return () => window.removeEventListener(NOTIFY_CHANGED, refresh);
   }, [user?.id, user?.name]);

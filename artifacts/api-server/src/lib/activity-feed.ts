@@ -16,6 +16,7 @@ export type ActivityType =
   | "file"
   | "greeting"
   | "calendar"
+  | "note"
   | "checkin";
 
 export async function postCoupleActivity(

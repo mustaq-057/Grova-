@@ -199,6 +199,14 @@ export type ApiUser = {
   avatar: string;
 };
 
+export type ApiAvatarNote = {
+  id: string;
+  userId: string;
+  text: string;
+  createdAt: string;
+  expiresAt: string;
+};
+
 export type ApiMessage = {
   id: string;
   senderId: string;
@@ -360,6 +368,7 @@ export type AppNotification = {
   | "like"
   | "comment"
   | "story"
+  | "note"
   | "dua"
   | "call"
   | "location"
@@ -448,9 +457,12 @@ export const api = {
     apiFetch<{ success: boolean }>("/auth/couple-code", { method: "PUT", body: JSON.stringify({ currentCode, newCode }) }),
 
   getUsers: () => apiFetch<ApiUser[]>("/users"),
-
   updateProfile: (id: string, data: { name?: string; bio?: string; avatar?: string }) =>
     apiFetch<ApiUser>(`/users/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+
+  getAvatarNotes: () => apiFetch<ApiAvatarNote[]>("/notes"),
+  addAvatarNote: (text: string) => apiFetch<ApiAvatarNote>("/notes", { method: "POST", body: JSON.stringify({ text }) }),
+  deleteAvatarNote: (id: string) => apiFetch<{ success: true }>(`/notes/${id}`, { method: "DELETE" }),
 
   getMessages: (params?: { offset?: number; cursor?: string; limit?: number }) => {
     const q = new URLSearchParams();

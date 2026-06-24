@@ -1,9 +1,9 @@
 import { useEffect, useState, memo } from "react";
 import { Link } from "wouter";
-import { MessageCircle, BookOpen, Heart, ImagePlus, Shield, Clock, Plus, X, Camera, Eye } from "lucide-react";
+import { MessageCircle, BookOpen, Heart, Shield, Clock, Plus, X, Camera, Eye, StickyNote } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/lib/auth";
-import { api, type ApiUser, type ApiStory } from "@/lib/api";
+import { api, type ApiUser, type ApiStory, type ApiAvatarNote } from "@/lib/api";
 import { isEncryptionReady } from "@/lib/crypto";
 import { AvatarImage } from "@/components/AvatarImage";
 import { PostFeed } from "@/components/PostFeed";
@@ -15,6 +15,7 @@ import { parsePresenceResponse } from "@/lib/presence-api";
 import { USER_TIMEZONES } from "@/lib/timezones";
 import { CameraOverlay } from "@/components/CameraOverlay";
 import { StoryViewer } from "@/components/StoryViewer";
+import { AvatarNoteModal } from "@/components/AvatarNoteModal";
 
 
 export default memo(function Home() {
@@ -31,6 +32,11 @@ export default memo(function Home() {
   const [showCamera, setShowCamera] = useState(false);
   const [viewingStories, setViewingStories] = useState<ApiStory[] | null>(null);
   const [showMyStoryOptions, setShowMyStoryOptions] = useState(false);
+  const [initialStoryIndex, setInitialStoryIndex] = useState(0);
+
+  const [notes, setNotes] = useState<ApiAvatarNote[]>([]);
+  const [selectedNoteUser, setSelectedNoteUser] = useState<ApiUser | null>(null);
+  const [noteMode, setNoteMode] = useState<"create" | "view">("view");
 
   const partnerId = user?.id === "me" ? "wife" : "me";
 
@@ -142,6 +148,8 @@ export default memo(function Home() {
         window.history.replaceState({}, "", "/");
       }
     }).catch(console.error);
+
+    api.getAvatarNotes().then(setNotes).catch(console.error);
   }, []);
 
   const handleStoryComplete = (uploaded?: boolean, story?: any) => {
@@ -154,6 +162,9 @@ export default memo(function Home() {
 
   const myStories = stories.filter(s => s.authorId === user?.id);
   const partnerStories = partner ? stories.filter(s => s.authorId === partner.id) : [];
+
+  const myNote = notes.find(n => n.userId === user?.id);
+  const partnerNote = partner ? notes.find(n => n.userId === partner.id) : null;
 
   const shortcuts = [
     { href: "/chat", icon: MessageCircle, label: "Chat", desc: "Messages & calls" },
@@ -201,15 +212,37 @@ export default memo(function Home() {
               transition={{ delay: 0.2, duration: 0.3 }}
               className={`relative flex items-center justify-center gap-5 sm:gap-7 mt-8 mb-3 w-full max-w-[340px] mx-auto ${appTheme === 'library' ? 'library-locket-container' : ''} ${appTheme === 'mint' ? 'home-avatar-mint-glow' : ''}`}
             >
-              {/* My avatar — tap to view/add story */}
-              <button
-                type="button"
-                className={`relative z-10 p-0.5 rounded-full cursor-pointer transition-transform active:scale-95 ${myStories.length > 0 ? "bg-gradient-to-tr from-yellow-400 to-primary" : ""}`}
-                onClick={() => {
-                  if (myStories.length > 0) setShowMyStoryOptions(true);
-                  else setShowCamera(true);
-                }}
-              >
+              <div className="relative">
+                {/* Note Bubble */}
+                <button
+                  type="button"
+                  className="absolute -top-14 left-1/2 -translate-x-1/2 z-40 transition-transform active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-2xl"
+                  onClick={() => { if (user) { setSelectedNoteUser(user); setNoteMode(myNote ? "view" : "create"); } }}
+                  aria-label={myNote ? "View your note" : "Add a note"}
+                >
+                  {myNote ? (
+                    <div className="relative group">
+                      <div className="absolute inset-0 bg-primary/25 blur-md rounded-2xl scale-110 opacity-70" />
+                      <div className="relative bg-gradient-to-br from-white via-white to-primary/10 text-foreground px-3.5 py-2 rounded-2xl rounded-bl-[4px] text-[13px] shadow-lg shadow-black/10 max-w-[130px] font-semibold leading-snug line-clamp-2">
+                        {myNote.text}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1.5 bg-gradient-to-br from-primary/25 to-primary/5 backdrop-blur-md px-3 py-1.5 rounded-2xl rounded-bl-[4px] border border-primary/25 text-xs font-semibold text-primary shadow-md shadow-primary/10 hover:from-primary/35 transition-colors">
+                      <StickyNote className="w-3.5 h-3.5" /> Note
+                    </div>
+                  )}
+                </button>
+
+                {/* My avatar — tap to view/add story */}
+                <button
+                  type="button"
+                  className={`relative z-10 p-0.5 rounded-full cursor-pointer transition-transform active:scale-95 ${myStories.length > 0 ? "bg-gradient-to-tr from-yellow-400 to-primary" : ""}`}
+                  onClick={() => {
+                    if (myStories.length > 0) setShowMyStoryOptions(true);
+                    else setShowCamera(true);
+                  }}
+                >
                 <AvatarImage
                   src={user?.avatar}
                   userId={user?.id ?? "me"}
@@ -230,6 +263,7 @@ export default memo(function Home() {
                   </div>
                 )}
               </button>
+              </div>
 
               {/* Animated heart in the middle — tap to go to chat */}
               <Link href="/chat">
@@ -254,15 +288,36 @@ export default memo(function Home() {
                 </motion.div>
               </Link>
 
-              {/* Partner avatar — tap to view story if they have one, else do nothing */}
-              <button
-                type="button"
-                className={`relative z-10 p-0.5 rounded-full transition-transform ${partnerStories.length > 0 ? "cursor-pointer active:scale-95 bg-gradient-to-tr from-yellow-400 to-primary" : "cursor-default"}`}
-                onClick={() => {
-                  if (partnerStories.length > 0) setViewingStories(partnerStories);
-                }}
-                disabled={partnerStories.length === 0}
-              >
+              <div className="relative">
+                {/* Partner Note Bubble */}
+                {partnerNote && (
+                  <button
+                    type="button"
+                    className="absolute -top-14 left-1/2 -translate-x-1/2 z-40 transition-transform active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-2xl"
+                    onClick={() => { setSelectedNoteUser(partner); setNoteMode("view"); }}
+                    aria-label={`View ${partner.name}'s note`}
+                  >
+                    <div className="relative">
+                      <div className="absolute inset-0 bg-primary/20 blur-md rounded-2xl scale-110 opacity-60" />
+                      <div className="relative bg-gradient-to-br from-white via-white to-rose-50 text-foreground px-3.5 py-2 rounded-2xl rounded-br-[4px] text-[13px] shadow-lg shadow-black/10 max-w-[130px] font-semibold leading-snug line-clamp-2">
+                        {partnerNote.text}
+                      </div>
+                    </div>
+                  </button>
+                )}
+
+                {/* Partner avatar — tap to view story if they have one, else do nothing */}
+                <button
+                  type="button"
+                  className={`relative z-10 p-0.5 rounded-full transition-transform ${partnerStories.length > 0 ? "cursor-pointer active:scale-95 bg-gradient-to-tr from-yellow-400 to-primary" : "cursor-default"}`}
+                  onClick={() => {
+                    if (partnerStories.length > 0) {
+                      setInitialStoryIndex(0);
+                      setViewingStories(partnerStories);
+                    }
+                  }}
+                  disabled={partnerStories.length === 0}
+                >
                 <AvatarImage
                   src={partner.avatar}
                   userId={partner.id}
@@ -280,6 +335,7 @@ export default memo(function Home() {
                   </div>
                 )}
               </button>
+              </div>
             </motion.div>
         )}
         {partner && (
@@ -354,7 +410,8 @@ export default memo(function Home() {
 
       {viewingStories && (
         <StoryViewer 
-          stories={viewingStories} 
+          stories={viewingStories}
+          initialIndex={initialStoryIndex}
           onClose={() => setViewingStories(null)} 
           onStoriesChanged={handleStoryComplete}
         />
@@ -401,6 +458,7 @@ export default memo(function Home() {
               <button
                 onClick={() => {
                   setShowMyStoryOptions(false);
+                  setInitialStoryIndex(0);
                   setViewingStories(myStories);
                 }}
                 className="w-full flex items-center gap-4 px-5 py-4 hover:bg-secondary/50 transition-colors"
@@ -433,23 +491,39 @@ export default memo(function Home() {
               <div className="border-t border-border/30 mx-4" />
 
               <button
-                disabled
-                className="w-full flex items-center gap-4 px-5 py-4 transition-colors opacity-50 cursor-not-allowed"
+                onClick={() => {
+                  setShowMyStoryOptions(false);
+                  if (user) {
+                    setSelectedNoteUser(user);
+                    setNoteMode(myNote ? "view" : "create");
+                  }
+                }}
+                className="w-full flex items-center gap-4 px-5 py-4 hover:bg-secondary/50 transition-colors"
               >
                 <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                  <MessageCircle className="w-5 h-5 text-primary" />
+                  <StickyNote className="w-5 h-5 text-primary" />
                 </div>
                 <div className="text-left flex-1">
-                  <p className="font-semibold text-base">Add a note</p>
-                </div>
-                <div className="bg-primary/20 text-primary text-[10px] uppercase font-bold px-2 py-0.5 rounded-full">
-                  Coming Soon
+                  <p className="font-semibold text-base">{myNote ? "View my note" : "Add a note"}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Share a short thought · 24h</p>
                 </div>
               </button>
             </motion.div>
           </>
         )}
       </AnimatePresence>
+
+      {/* Avatar Note Modal */}
+      {selectedNoteUser && user && (
+        <AvatarNoteModal
+          mode={noteMode}
+          user={selectedNoteUser}
+          note={notes.find(n => n.userId === selectedNoteUser.id)}
+          onClose={() => setSelectedNoteUser(null)}
+          onNoteAdded={note => setNotes(prev => [...prev.filter(n => n.userId !== note.userId), note])}
+          onNoteDeleted={id => setNotes(prev => prev.filter(n => n.id !== id))}
+        />
+      )}
     </div>
   );
 });

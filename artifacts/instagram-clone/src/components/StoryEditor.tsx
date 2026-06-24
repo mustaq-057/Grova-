@@ -201,7 +201,6 @@ export function StoryEditor({ file, onClose, onComplete }: StoryEditorProps) {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const binRef = useRef<HTMLDivElement>(null);
-  const isVideo = file.type.startsWith("video");
 
   useEffect(() => {
     const url = URL.createObjectURL(file);
@@ -250,92 +249,77 @@ export function StoryEditor({ file, onClose, onComplete }: StoryEditorProps) {
     setUploading(true);
     try {
       let finalBlob: Blob | File = file;
-      let textOverlayObj = null;
 
-      if (!isVideo) {
-        const dpr = 2;
-        const canvas = document.createElement("canvas");
-        const W = window.innerWidth;
-        const H = window.innerHeight;
-        canvas.width = W * dpr;
-        canvas.height = H * dpr;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) throw new Error("No canvas context");
-        ctx.scale(dpr, dpr);
+      const dpr = 2;
+      const canvas = document.createElement("canvas");
+      const W = window.innerWidth;
+      const H = window.innerHeight;
+      canvas.width = W * dpr;
+      canvas.height = H * dpr;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("No canvas context");
+      ctx.scale(dpr, dpr);
 
-        const mainImg = await loadImage(imageUrl);
-        ctx.fillStyle = "#111";
-        ctx.fillRect(0, 0, W, H);
+      const mainImg = await loadImage(imageUrl);
+      ctx.fillStyle = "#111";
+      ctx.fillRect(0, 0, W, H);
 
+      ctx.save();
+      ctx.filter = "blur(30px) brightness(0.6)";
+      const bgRatio = Math.max(W / mainImg.width, H / mainImg.height);
+      ctx.drawImage(mainImg, (W - mainImg.width * bgRatio) / 2, (H - mainImg.height * bgRatio) / 2, mainImg.width * bgRatio, mainImg.height * bgRatio);
+      ctx.restore();
+
+      ctx.save();
+      ctx.translate(W / 2 + mainTransform.x, H / 2 + mainTransform.y);
+      ctx.rotate((mainTransform.rotate * Math.PI) / 180);
+      ctx.scale(mainTransform.flipped ? -mainTransform.scale : mainTransform.scale, mainTransform.scale);
+      const imgRatio = Math.min(W / mainImg.width, H / mainImg.height);
+      ctx.drawImage(mainImg, -(mainImg.width * imgRatio) / 2, -(mainImg.height * imgRatio) / 2, mainImg.width * imgRatio, mainImg.height * imgRatio);
+      ctx.restore();
+
+      for (const sticker of stickers) {
+        const sImg = await loadImage(sticker.url);
         ctx.save();
-        ctx.filter = "blur(30px) brightness(0.6)";
-        const bgRatio = Math.max(W / mainImg.width, H / mainImg.height);
-        ctx.drawImage(mainImg, (W - mainImg.width * bgRatio) / 2, (H - mainImg.height * bgRatio) / 2, mainImg.width * bgRatio, mainImg.height * bgRatio);
+        ctx.translate(W / 2 + sticker.x, H / 2 + sticker.y);
+        ctx.rotate((sticker.rotate * Math.PI) / 180);
+        ctx.scale(sticker.flipped ? -sticker.scale : sticker.scale, sticker.scale);
+        const sRatio = Math.min((W * 0.5) / sImg.width, (H * 0.5) / sImg.height);
+        const sdw = sImg.width * sRatio;
+        const sdh = sImg.height * sRatio;
+        ctx.shadowColor = "rgba(0,0,0,0.5)";
+        ctx.shadowBlur = 15;
+        ctx.shadowOffsetY = 5;
+        ctx.beginPath();
+        ctx.roundRect(-sdw / 2, -sdh / 2, sdw, sdh, 12);
+        ctx.clip();
+        ctx.drawImage(sImg, -sdw / 2, -sdh / 2, sdw, sdh);
         ctx.restore();
-
-        ctx.save();
-        ctx.translate(W / 2 + mainTransform.x, H / 2 + mainTransform.y);
-        ctx.rotate((mainTransform.rotate * Math.PI) / 180);
-        ctx.scale(mainTransform.flipped ? -mainTransform.scale : mainTransform.scale, mainTransform.scale);
-        const imgRatio = Math.min(W / mainImg.width, H / mainImg.height);
-        ctx.drawImage(mainImg, -(mainImg.width * imgRatio) / 2, -(mainImg.height * imgRatio) / 2, mainImg.width * imgRatio, mainImg.height * imgRatio);
-        ctx.restore();
-
-        for (const sticker of stickers) {
-          const sImg = await loadImage(sticker.url);
-          ctx.save();
-          ctx.translate(W / 2 + sticker.x, H / 2 + sticker.y);
-          ctx.rotate((sticker.rotate * Math.PI) / 180);
-          ctx.scale(sticker.flipped ? -sticker.scale : sticker.scale, sticker.scale);
-          const sRatio = Math.min((W * 0.5) / sImg.width, (H * 0.5) / sImg.height);
-          const sdw = sImg.width * sRatio;
-          const sdh = sImg.height * sRatio;
-          ctx.shadowColor = "rgba(0,0,0,0.5)";
-          ctx.shadowBlur = 15;
-          ctx.shadowOffsetY = 5;
-          ctx.beginPath();
-          ctx.roundRect(-sdw / 2, -sdh / 2, sdw, sdh, 12);
-          ctx.clip();
-          ctx.drawImage(sImg, -sdw / 2, -sdh / 2, sdw, sdh);
-          ctx.restore();
-        }
-
-        if (text.trim()) {
-          ctx.save();
-          ctx.translate(W / 2 + textTransform.x, H / 2 + textTransform.y);
-          ctx.rotate((textTransform.rotate * Math.PI) / 180);
-          ctx.scale(textTransform.scale, textTransform.scale);
-          ctx.font = `bold 36px ${fontFamily}`;
-          ctx.fillStyle = textColor;
-          ctx.textAlign = "center";
-          ctx.textBaseline = "middle";
-          ctx.shadowColor = "rgba(0,0,0,0.5)";
-          ctx.shadowBlur = 10;
-          ctx.fillText(text, 0, 0);
-          ctx.restore();
-        }
-
-        const blob = await new Promise<Blob | null>(res => canvas.toBlob(res, "image/jpeg", 0.85));
-        if (!blob) throw new Error("Canvas export failed");
-        finalBlob = blob;
-      } else {
-        if (text.trim()) {
-          textOverlayObj = { 
-            text, 
-            fontFamily, 
-            textColor, 
-            x: (window.innerWidth / 2 + textTransform.x) / window.innerWidth, 
-            y: (window.innerHeight / 2 + textTransform.y) / window.innerHeight,
-            scale: textTransform.scale,
-            rotate: textTransform.rotate
-          };
-        }
       }
 
-      // Use the blob's actual content type (video/webm from camera, image/jpeg from canvas)
-      const mime = finalBlob instanceof File ? finalBlob.type : isVideo ? "video/mp4" : "image/jpeg";
-      const url = await uploadMediaFile(finalBlob, mime || (isVideo ? "video/mp4" : "image/jpeg"));
-      const story = await api.addStory({ mediaUrl: url, kind: isVideo ? "reel" : "story", text_overlay: textOverlayObj ? JSON.stringify(textOverlayObj) : undefined });
+      if (text.trim()) {
+        ctx.save();
+        ctx.translate(W / 2 + textTransform.x, H / 2 + textTransform.y);
+        ctx.rotate((textTransform.rotate * Math.PI) / 180);
+        ctx.scale(textTransform.scale, textTransform.scale);
+        ctx.font = `bold 36px ${fontFamily}`;
+        ctx.fillStyle = textColor;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.shadowColor = "rgba(0,0,0,0.5)";
+        ctx.shadowBlur = 10;
+        ctx.fillText(text, 0, 0);
+        ctx.restore();
+      }
+
+      const blob = await new Promise<Blob | null>(res => canvas.toBlob(res, "image/jpeg", 0.85));
+      if (!blob) throw new Error("Canvas export failed");
+      finalBlob = blob;
+
+      // Always upload as image/jpeg — ensures cross-device compat (fixes Sara's upload issue)
+      const mime = (finalBlob instanceof File && finalBlob.type) ? finalBlob.type : "image/jpeg";
+      const url = await uploadMediaFile(finalBlob, mime);
+      const story = await api.addStory({ mediaUrl: url, kind: "story" });
       onComplete(true, story);
     } catch (err) {
       console.error("Failed to upload story", err);
@@ -354,7 +338,7 @@ export function StoryEditor({ file, onClose, onComplete }: StoryEditorProps) {
       className="fixed inset-0 z-[400] bg-black flex flex-col font-sans touch-none overflow-hidden"
     >
       {/* Blurred background */}
-      {!isVideo && imageUrl && (
+      {imageUrl && (
         <div
           className="absolute inset-0 z-0 scale-110"
           style={{ backgroundImage: `url(${imageUrl})`, backgroundSize: "cover", backgroundPosition: "center", filter: "blur(30px) brightness(0.5)" }}
@@ -363,9 +347,7 @@ export function StoryEditor({ file, onClose, onComplete }: StoryEditorProps) {
 
       {/* Media layer */}
       <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
-        {imageUrl && isVideo ? (
-          <video src={imageUrl} autoPlay loop muted playsInline className="w-full h-full object-cover pointer-events-auto" />
-        ) : imageUrl ? (
+        {imageUrl ? (
           <TransformableImage
             src={imageUrl}
             isMain
@@ -380,51 +362,44 @@ export function StoryEditor({ file, onClose, onComplete }: StoryEditorProps) {
             onDragEnd={pos => {
               setDraggingStickerPos(null);
               setHoveredBin(false);
-              if (isOverBin(pos)) onClose(); // discard story if main image dropped in bin
+              if (isOverBin(pos)) onClose();
             }}
           />
         ) : null}
 
-        {!isVideo && (
-          <AnimatePresence>
-            {stickers.map(sticker => (
-              <TransformableImage
-                key={sticker.id}
-                src={sticker.url}
-                isTyping={isTyping}
-                flipped={sticker.flipped}
-                onFlipToggle={() => setStickers(prev => prev.map(st => st.id === sticker.id ? { ...st, flipped: !st.flipped } : st))}
-                onTransformChange={(x, y, s, r) => setStickers(prev => prev.map(st => st.id === sticker.id ? { ...st, x, y, scale: s, rotate: r } : st))}
-                onDragOver={pos => handleStickerDragOver(sticker.id, pos)}
-                onDragEnd={pos => handleStickerDragEnd(sticker.id, pos)}
-              />
-            ))}
-          </AnimatePresence>
-        )}
-
-        <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/40 pointer-events-none" />
+        <AnimatePresence>
+          {stickers.map(sticker => (
+            <TransformableImage
+              key={sticker.id}
+              src={sticker.url}
+              isTyping={isTyping}
+              flipped={sticker.flipped}
+              onFlipToggle={() => setStickers(prev => prev.map(st => st.id === sticker.id ? { ...st, flipped: !st.flipped } : st))}
+              onTransformChange={(x, y, s, r) => setStickers(prev => prev.map(st => st.id === sticker.id ? { ...st, x, y, scale: s, rotate: r } : st))}
+              onDragOver={pos => handleStickerDragOver(sticker.id, pos)}
+              onDragEnd={pos => handleStickerDragEnd(sticker.id, pos)}
+            />
+          ))}
+        </AnimatePresence>
       </div>
 
-      {/* Top Controls — Close | ImagePlus | Aa  |  (space)  |  ✓ Done */}
+      <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/40 pointer-events-none" />
+
       {!isTyping && (
         <div className="absolute top-safe left-0 right-0 z-30 px-4 pt-4 flex items-center justify-between pointer-events-none">
-          {/* Left group */}
           <div className="flex items-center gap-2 pointer-events-auto">
             <button onClick={onClose} className="p-2 text-white hover:bg-white/10 rounded-full transition-colors">
               <X className="w-7 h-7 drop-shadow-md" />
             </button>
 
-            {!isVideo && (
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="p-2 text-white hover:bg-white/10 rounded-full transition-colors"
-                title="Add image sticker"
-              >
-                <ImagePlus className="w-6 h-6 drop-shadow-md" />
-              </button>
-            )}
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="p-2 text-white hover:bg-white/10 rounded-full transition-colors"
+              title="Add image sticker"
+            >
+              <ImagePlus className="w-6 h-6 drop-shadow-md" />
+            </button>
 
-            {/* Aa button — now in left group, right after ImagePlus */}
             <button
               onClick={() => setIsTyping(true)}
               className="p-2 text-white hover:bg-white/10 rounded-full transition-colors pointer-events-auto flex items-center justify-center"
@@ -434,7 +409,6 @@ export function StoryEditor({ file, onClose, onComplete }: StoryEditorProps) {
             </button>
           </div>
 
-          {/* Right — Done / upload button */}
           <button
             onClick={bakeAndUpload}
             disabled={uploading}

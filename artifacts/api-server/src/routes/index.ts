@@ -31,6 +31,7 @@ import coupleSyncRouter from "./couple-sync";
 import libraryRouter from "./library";
 import doodleRouter from "./doodle";
 import storiesRouter from "./stories";
+import avatarNotesRouter from "./avatar-notes";
 
 const router: IRouter = Router();
 
@@ -69,7 +70,8 @@ router.use(hiddenMessagesRouter);
 router.use(exportRouter);
 router.use(coupleSyncRouter);
 router.use(libraryRouter);
-router.use(storiesRouter);
 router.use("/doodle", doodleRouter);
+router.use(storiesRouter);
+router.use(avatarNotesRouter);
 
 export default router;

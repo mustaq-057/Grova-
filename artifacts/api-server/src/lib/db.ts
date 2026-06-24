@@ -305,6 +305,17 @@ export async function initDb() {
     }
 
     await db.execute(`
+      CREATE TABLE IF NOT EXISTS avatar_notes (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        text TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        expires_at TEXT NOT NULL
+      )
+    `);
+    await db.execute(`CREATE INDEX IF NOT EXISTS idx_avatar_notes_user ON avatar_notes(user_id)`);
+
+    await db.execute(`
       CREATE TABLE IF NOT EXISTS post_reactions (
         post_id TEXT NOT NULL,
         user_id TEXT NOT NULL,
@@ -683,7 +694,7 @@ export async function initDb() {
         expires_at BIGINT NOT NULL
       )
     `);
-    
+
     // Add expires_at to existing call_signals table
     for (const sql of ["ALTER TABLE call_signals ADD COLUMN IF NOT EXISTS expires_at BIGINT NOT NULL DEFAULT 0"]) {
       try {
