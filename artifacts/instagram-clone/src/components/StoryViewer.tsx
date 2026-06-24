@@ -217,7 +217,7 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
     }
 
     // Removed double-tap detection for like to avoid accidental triggers when tapping left/right
-    lastTapTimeRef.current = now;
+    lastTapTimeRef.current = Date.now();
     lastTapPosRef.current = { x: clientX, y: clientY };
 
     if ((e.target as HTMLElement).closest(".story-controls")) return;

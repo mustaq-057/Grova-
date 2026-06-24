@@ -119,6 +119,7 @@ export function AvatarNoteModal({
       await api.sendMessage({
         text: replyText.trim(),
         type: "text",
+        senderId: currentUser?.id ?? "me",
         replyToId: `__note__${note.userId}`,
         replyToText: note.text,           // shows as the quoted bubble text
         replyToSenderId: note.userId,
@@ -130,6 +131,7 @@ export function AvatarNoteModal({
       setTimeout(() => onClose(), 1200);
     } catch (err) {
       console.error("Failed to send reply", err);
+    } finally {
       setIsSubmitting(false);
     }
   };
