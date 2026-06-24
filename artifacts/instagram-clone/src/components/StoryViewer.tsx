@@ -156,8 +156,8 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
     }
     lastTapTimeRef.current = now;
 
-    if (showDeleteConfirm) { setShowDeleteConfirm(false); setIsPaused(false); return; }
     if ((e.target as HTMLElement).closest(".story-controls")) return;
+    if (showDeleteConfirm) { setShowDeleteConfirm(false); setIsPaused(false); return; }
 
     const clientX = "touches" in e
       ? (e as React.TouchEvent).changedTouches[0]?.clientX
