@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { X, Pause, Play, Trash2, Heart, Send } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useMotionValue } from "framer-motion";
+import { usePinch } from "@use-gesture/react";
 import ReactDOM from "react-dom";
 import { api } from "../lib/api";
 import type { ApiStory } from "../lib/api";
@@ -22,7 +23,9 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
 
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [progress, setProgress] = useState(0);
-  const [isPaused, setIsPaused] = useState(false);
+  const [isManuallyPaused, setIsManuallyPaused] = useState(false);
+  const [isTouchingToPause, setIsTouchingToPause] = useState(false);
+  const isPaused = isManuallyPaused || isTouchingToPause;
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [localStories, setLocalStories] = useState(stories);
@@ -105,7 +108,8 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
       setCurrentIndex(c => Math.min(c, updated.length - 1));
       setProgress(0);
       setShowDeleteConfirm(false);
-      setIsPaused(false);
+      setIsManuallyPaused(false);
+      setIsTouchingToPause(false);
     }
 
     // Perform actual API delete in background
@@ -128,7 +132,8 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
       } as any);
       setReplyText("");
       setIsReplying(false);
-      setIsPaused(false);
+      setIsManuallyPaused(false);
+      setIsTouchingToPause(false);
       setReplySent(true);
     } catch (e) {
       console.error("Failed to send story reply", e);
@@ -157,7 +162,12 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
     lastTapTimeRef.current = now;
 
     if ((e.target as HTMLElement).closest(".story-controls")) return;
-    if (showDeleteConfirm) { setShowDeleteConfirm(false); setIsPaused(false); return; }
+    if (showDeleteConfirm) { 
+      setShowDeleteConfirm(false); 
+      setIsManuallyPaused(false); 
+      setIsTouchingToPause(false); 
+      return; 
+    }
 
     const clientX = "touches" in e
       ? (e as React.TouchEvent).changedTouches[0]?.clientX
@@ -180,6 +190,19 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
   if (currentStory.textOverlay) {
     try { textOverlayData = JSON.parse(currentStory.textOverlay); } catch { }
   }
+
+  const scale = useMotionValue(1);
+
+  const bindPinch = usePinch(({ offset: [s], last }) => {
+    if (last) {
+      scale.set(1);
+    } else {
+      scale.set(s);
+    }
+  }, {
+    scaleBounds: { min: 1, max: 4 },
+    rubberband: true
+  });
 
   const mediaUrl = currentStory.mediaUrl ?? "";
   const isVideo = mediaUrl.includes(".mp4") || mediaUrl.includes(".webm") || currentStory.kind === "reel" || mediaUrl.includes("video");
@@ -228,13 +251,13 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
 
           <div className="flex items-center gap-0.5">
             <button
-              onClick={() => setIsPaused(p => !p)}
+              onClick={() => setIsManuallyPaused(p => !p)}
               className="w-9 h-9 flex items-center justify-center text-white hover:bg-white/10 rounded-full"
             >
-              {isPaused ? <Play className="w-5 h-5" /> : <Pause className="w-5 h-5" />}
+              {isManuallyPaused ? <Play className="w-5 h-5" /> : <Pause className="w-5 h-5" />}
             </button>
             <button
-              onClick={() => { setShowDeleteConfirm(true); setIsPaused(true); }}
+              onClick={() => { setShowDeleteConfirm(true); setIsManuallyPaused(true); }}
               className="w-9 h-9 flex items-center justify-center text-white hover:bg-white/10 rounded-full"
             >
               <Trash2 className="w-5 h-5" />
@@ -247,12 +270,27 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
 
         {/* ── MEDIA AREA ── */}
         <div
-          className="absolute inset-0 flex items-center justify-center overflow-hidden"
-          onMouseDown={() => { if (!showDeleteConfirm && !isReplying) setIsPaused(true); }}
-          onMouseUp={e => { setIsPaused(false); handleTap(e); }}
-          onMouseLeave={() => setIsPaused(false)}
-          onTouchStart={() => { if (!showDeleteConfirm && !isReplying) setIsPaused(true); }}
-          onTouchEnd={e => { setIsPaused(false); handleTap(e); }}
+          {...bindPinch()}
+          className="absolute inset-0 flex items-center justify-center overflow-hidden touch-none"
+          onMouseDown={() => { if (!showDeleteConfirm && !isReplying) setIsTouchingToPause(true); }}
+          onMouseUp={e => { setIsTouchingToPause(false); handleTap(e); }}
+          onMouseLeave={() => setIsTouchingToPause(false)}
+          onTouchStart={e => { 
+            if (!showDeleteConfirm && !isReplying && e.touches.length === 1) {
+              setIsTouchingToPause(true); 
+            }
+          }}
+          onTouchMove={e => {
+            if (e.touches.length > 1) {
+              setIsTouchingToPause(false);
+            }
+          }}
+          onTouchEnd={e => { 
+            if (e.touches.length === 0) {
+              setIsTouchingToPause(false); 
+              handleTap(e); 
+            }
+          }}
           onContextMenu={e => e.preventDefault()}
         >
           {/* Blurred background (images only) */}
@@ -271,11 +309,12 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
           {/* Media */}
           {mediaUrl && (
             isVideo ? (
-              <video
+              <motion.video
                 key={mediaUrl}
                 ref={videoRef}
                 src={mediaUrl}
                 className="relative w-full h-full object-contain z-10"
+                style={{ scale }}
                 autoPlay
                 loop
                 playsInline
@@ -283,10 +322,11 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
                 draggable={false}
               />
             ) : (
-              <img
+              <motion.img
                 key={mediaUrl}
                 src={mediaUrl}
                 className="relative max-w-full max-h-full object-contain z-10 drop-shadow-2xl"
+                style={{ scale }}
                 draggable={false}
                 alt="Story"
                 onError={e => {
@@ -383,7 +423,7 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
                 onClick={() => {
                   if (!isReplying) {
                     setIsReplying(true);
-                    setIsPaused(true);
+                    setIsManuallyPaused(true);
                     setTimeout(() => replyInputRef.current?.focus(), 60);
                   }
                 }}
@@ -395,10 +435,19 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
                     onChange={e => setReplyText(e.target.value)}
                     onKeyDown={e => {
                       if (e.key === "Enter") handleReply();
-                      if (e.key === "Escape") { setIsReplying(false); setIsPaused(false); setReplyText(""); }
+                      if (e.key === "Escape") { 
+                        setIsReplying(false); 
+                        setIsManuallyPaused(false); 
+                        setIsTouchingToPause(false); 
+                        setReplyText(""); 
+                      }
                     }}
                     onBlur={() => {
-                      if (!replyText.trim()) { setIsReplying(false); setIsPaused(false); }
+                      if (!replyText.trim()) { 
+                        setIsReplying(false); 
+                        setIsManuallyPaused(false); 
+                        setIsTouchingToPause(false); 
+                      }
                     }}
                     className="flex-1 bg-transparent text-white text-sm outline-none placeholder:text-white/50 min-w-0"
                     placeholder="Send a message…"
@@ -448,7 +497,11 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
               <motion.div
                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                 className="absolute inset-0 bg-black/60 z-30"
-                onClick={() => { setShowDeleteConfirm(false); setIsPaused(false); }}
+                onClick={() => { 
+                  setShowDeleteConfirm(false); 
+                  setIsManuallyPaused(false); 
+                  setIsTouchingToPause(false); 
+                }}
               />
               <motion.div
                 initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
@@ -472,7 +525,11 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
                 </div>
                 <div className="border-t border-white/10">
                   <button
-                    onClick={() => { setShowDeleteConfirm(false); setIsPaused(false); }}
+                    onClick={() => { 
+                      setShowDeleteConfirm(false); 
+                      setIsManuallyPaused(false); 
+                      setIsTouchingToPause(false); 
+                    }}
                     className="w-full py-4 text-white font-medium text-[16px] hover:bg-white/5 active:bg-white/10 transition-colors"
                   >
                     Cancel
