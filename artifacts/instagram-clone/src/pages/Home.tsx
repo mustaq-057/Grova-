@@ -367,7 +367,7 @@ export default memo(function Home() {
               exit={{ y: "100%" }}
               transition={{ type: "spring", damping: 26, stiffness: 280 }}
               className="fixed bottom-0 left-0 right-0 z-[401] bg-background rounded-t-2xl shadow-2xl overflow-hidden"
-              style={{ paddingBottom: "max(3rem, env(safe-area-inset-bottom))" }}
+              style={{ paddingBottom: "max(5rem, env(safe-area-inset-bottom))" }}
             >
               {/* Handle bar */}
               <div className="w-10 h-1 bg-muted-foreground/20 rounded-full mx-auto mt-3 mb-2" />
@@ -376,9 +376,6 @@ export default memo(function Home() {
               <div className="flex items-center justify-between px-4 pb-3 border-b border-border/50">
                 <div>
                   <p className="font-semibold text-sm">Your Stories</p>
-                  <p className="text-xs text-muted-foreground">
-                    {myStories.length} active · each expires in 24 h
-                  </p>
                 </div>
                 <button
                   onClick={() => setShowMyStoryOptions(false)}
@@ -400,8 +397,7 @@ export default memo(function Home() {
                   <Eye className="w-5 h-5 text-primary" />
                 </div>
                 <div className="text-left">
-                  <p className="font-semibold text-sm">View my story</p>
-                  <p className="text-xs text-muted-foreground">See all {myStories.length} slide{myStories.length !== 1 ? "s" : ""}</p>
+                  <p className="font-semibold text-base">View my story</p>
                 </div>
               </button>
 
@@ -418,8 +414,7 @@ export default memo(function Home() {
                   <Camera className="w-5 h-5 text-primary" />
                 </div>
                 <div className="text-left">
-                  <p className="font-semibold text-sm">Add to story</p>
-                  <p className="text-xs text-muted-foreground">Adds a new slide · expires in 24 h</p>
+                  <p className="font-semibold text-base">Add to story</p>
                 </div>
               </button>
             </motion.div>
