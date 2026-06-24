@@ -2,15 +2,38 @@ import { Router } from "express";
 import db from "../lib/db";
 import { authenticate } from "../lib/auth-middleware";
 import { rateLimiters } from "../lib/security";
-import { deleteImage } from "../lib/storage";
+import { deleteImage, deleteCloudinaryAsset } from "../lib/storage";
 
 const router = Router();
 
-function extractCloudinaryKey(url: string): string | null {
+/** Parse a Cloudinary URL into { publicId, resourceType } for precise deletion. */
+function extractCloudinaryInfo(url: string): { publicId: string; resourceType: "image" | "video" | "raw" } | null {
   if (!url) return null;
-  const match = url.match(/\/grova\/([^/?]+)/);
-  if (match) return match[1];
-  return null;
+  try {
+    // URL format: https://res.cloudinary.com/{cloud}/{resource_type}/upload[/v{version}]/{public_id}[.{ext}]
+    const parsed = new URL(url);
+    if (!parsed.hostname.includes("cloudinary.com")) return null;
+    const parts = parsed.pathname.split("/").filter(Boolean); // remove empty strings
+    // parts: [cloud_name, resource_type, "upload", optional_version?, ...public_id_parts]
+    const uploadIdx = parts.indexOf("upload");
+    if (uploadIdx === -1) return null;
+    const resourceType = (parts[1] ?? "image") as "image" | "video" | "raw";
+    let startIdx = uploadIdx + 1;
+    // Skip optional version segment like "v1234567890"
+    if (parts[startIdx]?.match(/^v\d+$/)) startIdx++;
+    // Join remaining parts as public_id (may include folder/filename)
+    const publicId = parts.slice(startIdx).join("/");
+    if (!publicId) return null;
+    // Images: Cloudinary stores public_id WITHOUT extension; videos/raw WITH extension
+    const finalPublicId =
+      resourceType === "image" ? publicId.replace(/\.[^.]+$/, "") : publicId;
+    return { publicId: finalPublicId, resourceType };
+  } catch {
+    // Fallback: try matching /grova/<key> pattern
+    const match = url.match(/\/grova\/([^/?]+)/);
+    if (match) return { publicId: `grova/${match[1].replace(/\.[^.]+$/, "")}`, resourceType: "image" };
+    return null;
+  }
 }
 
 router.post("/stories", authenticate, rateLimiters.messages, async (req, res) => {
@@ -75,11 +98,18 @@ router.get("/stories", authenticate, rateLimiters.read, async (req, res) => {
         const ids = expiredResult.rows.map((r: any) => `'${r.id}'`).join(',');
         await db.execute(`DELETE FROM stories WHERE id IN (${ids})`);
         
-        // Delete from Cloudinary in background
+        // Delete from Cloudinary in background (fire-and-forget)
         expiredResult.rows.forEach((r: any) => {
           if (r.media_url) {
-            const key = extractCloudinaryKey(r.media_url);
-            if (key) deleteImage(key);
+            const info = extractCloudinaryInfo(r.media_url);
+            if (info) {
+              deleteCloudinaryAsset(info.publicId, info.resourceType).catch(err =>
+                console.error("Failed to delete expired story from Cloudinary:", err)
+              );
+            } else {
+              // Fallback to legacy key-based delete
+              deleteImage(r.media_url).catch(() => {});
+            }
           }
         });
       }
@@ -133,10 +163,16 @@ router.delete("/stories/:id", authenticate, async (req, res) => {
       return;
     }
 
-    // Delete from Cloudinary
+    // Delete from Cloudinary (fire-and-forget so response is instant)
     if (storyRes.rows[0]?.media_url) {
-      const key = extractCloudinaryKey(storyRes.rows[0].media_url);
-      if (key) deleteImage(key);
+      const info = extractCloudinaryInfo(storyRes.rows[0].media_url);
+      if (info) {
+        deleteCloudinaryAsset(info.publicId, info.resourceType).catch(err =>
+          console.error("Failed to delete story from Cloudinary:", err)
+        );
+      } else {
+        deleteImage(storyRes.rows[0].media_url).catch(() => {});
+      }
     }
 
     res.json({ success: true });

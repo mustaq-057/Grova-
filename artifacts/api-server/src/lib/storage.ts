@@ -89,8 +89,29 @@ export async function uploadMedia(key: string, buffer: Buffer, contentType: stri
 
 export async function deleteImage(key: string): Promise<void> {
   ensureCloudinary();
-  const publicId = `grova/${key.replace(/\.[^.]+$/, "")}`;
-  await cloudinary.uploader.destroy(publicId, { resource_type: "image" }).catch(() => {});
-  await cloudinary.uploader.destroy(publicId, { resource_type: "raw" }).catch(() => {});
-  await cloudinary.uploader.destroy(publicId, { resource_type: "video" }).catch(() => {});
+  // Images are stored without extension in public_id, videos/raw with extension
+  const publicIdNoExt = `grova/${key.replace(/\.[^.]+$/, "")}`;
+  const publicIdWithExt = `grova/${key}`;
+  await Promise.all([
+    cloudinary.uploader.destroy(publicIdNoExt, { resource_type: "image" }).catch(() => {}),
+    cloudinary.uploader.destroy(publicIdNoExt, { resource_type: "raw" }).catch(() => {}),
+    cloudinary.uploader.destroy(publicIdNoExt, { resource_type: "video" }).catch(() => {}),
+    // Also try with extension for video/raw which may have been uploaded with it
+    cloudinary.uploader.destroy(publicIdWithExt, { resource_type: "video" }).catch(() => {}),
+    cloudinary.uploader.destroy(publicIdWithExt, { resource_type: "raw" }).catch(() => {}),
+  ]);
 }
+
+/**
+ * Delete a Cloudinary asset using the full public_id and resource_type
+ * parsed directly from the Cloudinary URL. More reliable than deleteImage.
+ */
+export async function deleteCloudinaryAsset(publicId: string, resourceType: "image" | "video" | "raw"): Promise<void> {
+  ensureCloudinary();
+  await cloudinary.uploader.destroy(publicId, { resource_type: resourceType }).catch(() => {});
+  // Try image as fallback in case the resource_type was incorrectly identified
+  if (resourceType !== "image") {
+    await cloudinary.uploader.destroy(publicId, { resource_type: "image" }).catch(() => {});
+  }
+}
+

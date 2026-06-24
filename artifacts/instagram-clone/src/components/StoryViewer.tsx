@@ -101,29 +101,33 @@ export function StoryViewer({ stories, initialIndex = 0, onClose, onStoriesChang
 
   const handleDelete = async () => {
     const id = localStories[currentIndex]?.id;
-    if (!id) return;
+    if (!id || deleting) return;
 
-    // Optimistic delete
+    setDeleting(true);
+
+    // Optimistic UI: remove from local list immediately so it feels instant
     const updated = localStories.filter(s => s.id !== id);
-    onStoriesChanged?.(); // tell Home to refresh story list → clears ring
-    
+    setShowDeleteConfirm(false);
+    setIsManuallyPaused(false);
+    setIsTouchingToPause(false);
+
     if (updated.length === 0) {
       onClose(); // instantly close if no stories left
     } else {
       setLocalStories(updated);
       setCurrentIndex(c => Math.min(c, updated.length - 1));
       setProgress(0);
-      setShowDeleteConfirm(false);
-      setIsManuallyPaused(false);
-      setIsTouchingToPause(false);
     }
 
-    // Perform actual API delete in background
+    // Perform actual API delete — THEN notify parent to refresh
+    // (calling onStoriesChanged before delete completes causes the story to bounce back)
     try {
       await api.deleteStory(id);
+      onStoriesChanged?.(); // refresh AFTER delete is confirmed in DB + Cloudinary
     } catch (e) {
       console.error("Failed to delete story", e);
-      // could show toast error here but usually fine to ignore
+    } finally {
+      setDeleting(false);
     }
   };
 
