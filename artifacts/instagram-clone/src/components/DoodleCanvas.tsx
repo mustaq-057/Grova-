@@ -149,12 +149,21 @@ export default function DoodleCanvas({ onClose, onSend, onError, onDrawStart, is
     const container = containerRef.current;
     if (!canvas || !container) return;
 
+    let initialSnap: string | null = null;
+    const draft = localStorage.getItem("doodle_draft");
+    if (draft && !historyRef.current.length) {
+      initialSnap = draft;
+      historyRef.current = [draft];
+      setCanUndo(true);
+      setHasStrokes(true);
+    }
+
     const resize = () => {
       const rect = container.getBoundingClientRect();
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
 
-      const snap = historyRef.current.length ? canvas.toDataURL("image/png") : null;
+      const snap = (historyRef.current.length || initialSnap) ? canvas.toDataURL("image/png") : null;
       const dpr = window.devicePixelRatio || 1;
 
       canvas.width = rect.width * dpr;
@@ -162,7 +171,8 @@ export default function DoodleCanvas({ onClose, onSend, onError, onDrawStart, is
       canvas.style.width = `${rect.width}px`;
       canvas.style.height = `${rect.height}px`;
 
-      fillCanvas(canvasBg, snap);
+      fillCanvas(canvasBg, initialSnap || snap);
+      initialSnap = null;
     };
 
     resize();
@@ -174,9 +184,11 @@ export default function DoodleCanvas({ onClose, onSend, onError, onDrawStart, is
   const saveHistory = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    historyRef.current.push(canvas.toDataURL("image/png"));
+    const dataUrl = canvas.toDataURL("image/png");
+    historyRef.current.push(dataUrl);
     if (historyRef.current.length > 30) historyRef.current.shift();
     setCanUndo(true);
+    localStorage.setItem("doodle_draft", dataUrl);
   }, []);
 
   const restoreCanvas = useCallback((snap: string | undefined) => {
@@ -186,11 +198,23 @@ export default function DoodleCanvas({ onClose, onSend, onError, onDrawStart, is
   const undo = useCallback(() => {
     if (!historyRef.current.length) return;
     historyRef.current.pop();
-    const prev = historyRef.current[historyRef.current.length - 1];
+    const prev = historyRef.current.length > 0 ? historyRef.current[historyRef.current.length - 1] : undefined;
     restoreCanvas(prev);
     setCanUndo(historyRef.current.length > 0);
-    if (!historyRef.current.length) setHasStrokes(false);
-  }, [restoreCanvas]);
+    if (!historyRef.current.length) {
+      setHasStrokes(false);
+      localStorage.removeItem("doodle_draft");
+    } else if (prev) {
+      localStorage.setItem("doodle_draft", prev);
+    }
+    
+    if (isLiveMode && partnerId) {
+      void api.syncDoodleStrokes(partnerId, [], color, brushSize, true, canvasBg);
+      // It's heavy to send the full state on undo, so we just send a clear+canvasBg for simplicity, 
+      // or we can just send the clear event. To properly sync undo, we would need to send the whole canvas.
+      // But for a live sketch, a clear is an acceptable fallback if they undo the first stroke.
+    }
+  }, [restoreCanvas, isLiveMode, partnerId, color, brushSize, canvasBg]);
 
   const applyBackground = useCallback((bg: string) => {
     setCanvasBg(bg);
@@ -198,7 +222,11 @@ export default function DoodleCanvas({ onClose, onSend, onError, onDrawStart, is
     fillCanvas(bg);
     saveHistory();
     setHasStrokes(true);
-  }, [fillCanvas, saveHistory]);
+    
+    if (isLiveMode && partnerId) {
+      void api.syncDoodleStrokes(partnerId, [], "#000000", 8, true, bg);
+    }
+  }, [fillCanvas, saveHistory, isLiveMode, partnerId]);
 
   const applyBrush = useCallback((ctx: CanvasRenderingContext2D) => {
     ctx.globalCompositeOperation = "source-over";
@@ -233,6 +261,12 @@ export default function DoodleCanvas({ onClose, onSend, onError, onDrawStart, is
 
       if (data.clear) {
         ctx.clearRect(0, 0, rect.width, rect.height);
+        if (data.canvasBg) {
+          setCanvasBg(data.canvasBg);
+        } else {
+          fillCanvas(canvasBg);
+        }
+        saveHistory();
         return;
       }
 
@@ -261,6 +295,8 @@ export default function DoodleCanvas({ onClose, onSend, onError, onDrawStart, is
       }
 
       ctx.restore();
+      saveHistory(); // Ensure remote strokes are saved to history so resize doesn't wipe them
+      setHasStrokes(true);
     };
 
     const handleSync = (e: Event) => {
@@ -521,6 +557,7 @@ export default function DoodleCanvas({ onClose, onSend, onError, onDrawStart, is
             reader.onload = () => {
               if (exportGenRef.current !== gen) return;
               setSending(false);
+              localStorage.removeItem("doodle_draft");
               onSend({
                 imageData: reader.result as string,
                 blob,

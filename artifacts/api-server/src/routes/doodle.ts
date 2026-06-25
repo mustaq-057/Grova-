@@ -6,7 +6,7 @@ import db from "../lib/db";
 const router = Router();
 
 router.post("/sync", authenticate, (req, res) => {
-  const { strokes, partnerId, color, brushSize, clear } = req.body;
+  const { strokes, partnerId, color, brushSize, clear, canvasBg } = req.body;
   const authenticatedUserId = (req as any).user.id;
 
   if (!partnerId) {
@@ -20,6 +20,7 @@ router.post("/sync", authenticate, (req, res) => {
     color,
     brushSize,
     clear,
+    canvasBg,
   };
 
   // Broadcast to the partner (works on local/single-instance)

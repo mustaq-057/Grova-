@@ -723,10 +723,10 @@ export const api = {
 
   getCallSignals: () => apiFetch<{ event: string; data: any }[]>("/call/signals"),
 
-  syncDoodleStrokes: (partnerId: string, strokes: { x: number; y: number }[], color: string, brushSize: number, clear?: boolean) =>
+  syncDoodleStrokes: (partnerId: string, strokes: { x: number; y: number }[], color: string, brushSize: number, clear?: boolean, canvasBg?: string) =>
     apiFetch<{ success: boolean }>("/doodle/sync", {
       method: "POST",
-      body: JSON.stringify({ partnerId, strokes, color, brushSize, clear }),
+      body: JSON.stringify({ partnerId, strokes, color, brushSize, clear, canvasBg }),
     }),
 
   getDoodleSignals: () => apiFetch<{ signals: any[] }>("/doodle/signals"),
