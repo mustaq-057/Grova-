@@ -85,7 +85,7 @@ function TransformableImage({
       },
     },
     {
-      drag: { 
+      drag: {
         from: () => [x.get(), y.get()],
         filterTaps: true,
       },
@@ -101,13 +101,13 @@ function TransformableImage({
     <motion.img
       {...(bind() as any)}
       src={src}
-      style={{ 
-        x, 
-        y, 
+      style={{
+        x,
+        y,
         scaleX,
         scaleY: scale,
         rotate,
-        touchAction: "none" 
+        touchAction: "none"
       }}
       initial={isMain ? false : { scale: 0, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
@@ -167,19 +167,27 @@ function DraggableText({
   );
 
   return (
-    <motion.div
-      {...(bind() as any)}
-      style={{
-        x, y, scale, rotate, touchAction: "none",
-        fontFamily, color,
-        fontSize: "clamp(24px, 8vw, 36px)",
-        fontWeight: "bold",
-        textShadow: "0px 2px 10px rgba(0,0,0,0.5)",
-      }}
-      className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-30 pointer-events-auto text-center whitespace-pre-wrap select-none"
-    >
-      {text}
-    </motion.div>
+    <div style={{ position: "absolute", left: "50%", top: "50%", transform: "translate(-50%, -50%)", zIndex: 30 }}>
+      <motion.div
+        {...(bind() as any)}
+        style={{
+          x, y, scale, rotate,
+          touchAction: "none",
+          fontFamily,
+          color,
+          fontSize: "clamp(24px, 8vw, 36px)",
+          fontWeight: "bold",
+          textShadow: "0px 2px 10px rgba(0,0,0,0.5)",
+          // Lock text to horizontal — stops mobile Safari/Chrome from
+          // silently flipping to vertical writing mode
+          writingMode: "horizontal-tb" as const,
+          direction: "ltr" as const,
+        }}
+        className="pointer-events-auto text-center whitespace-pre-wrap select-none"
+      >
+        {text}
+      </motion.div>
+    </div>
   );
 }
 
@@ -328,7 +336,7 @@ export function StoryEditor({ files, onClose, onComplete }: StoryEditorProps) {
       const mime = (finalBlob instanceof File && finalBlob.type) ? finalBlob.type : "image/jpeg";
       const url = await uploadMediaFile(finalBlob, mime);
       const story = await api.addStory({ mediaUrl: url, kind: "story" });
-      
+
       if (fileIndex < files.length - 1) {
         setFileIndex(prev => prev + 1);
         setUploading(false);
@@ -429,13 +437,12 @@ export function StoryEditor({ files, onClose, onComplete }: StoryEditorProps) {
               {files.map((_, i) => (
                 <div
                   key={i}
-                  className={`rounded-full transition-all duration-300 ${
-                    i < fileIndex
+                  className={`rounded-full transition-all duration-300 ${i < fileIndex
                       ? "w-2 h-2 bg-white/50"
                       : i === fileIndex
-                      ? "w-2.5 h-2.5 bg-white shadow-[0_0_6px_rgba(255,255,255,0.8)]"
-                      : "w-2 h-2 bg-white/30"
-                  }`}
+                        ? "w-2.5 h-2.5 bg-white shadow-[0_0_6px_rgba(255,255,255,0.8)]"
+                        : "w-2 h-2 bg-white/30"
+                    }`}
                 />
               ))}
             </div>
@@ -444,11 +451,10 @@ export function StoryEditor({ files, onClose, onComplete }: StoryEditorProps) {
           <button
             onClick={bakeAndUpload}
             disabled={uploading}
-            className={`h-12 ${
-              fileIndex < files.length - 1
+            className={`h-12 ${fileIndex < files.length - 1
                 ? "px-4 rounded-full flex items-center gap-1.5 text-sm font-bold bg-white text-black"
                 : "w-14 rounded-full flex items-center justify-center bg-white text-black"
-            } hover:scale-105 active:scale-95 transition-all shadow-lg disabled:opacity-50 pointer-events-auto`}
+              } hover:scale-105 active:scale-95 transition-all shadow-lg disabled:opacity-50 pointer-events-auto`}
           >
             {uploading ? (
               <Loader2 className="w-6 h-6 animate-spin" />
@@ -502,24 +508,21 @@ export function StoryEditor({ files, onClose, onComplete }: StoryEditorProps) {
                 rotate: [-6, 6, -6, 0],
               } : { scale: 1, rotate: 0 }}
               transition={hoveredBin ? { repeat: Infinity, duration: 0.4 } : { duration: 0.2 }}
-              className={`w-18 h-18 w-[72px] h-[72px] rounded-full flex items-center justify-center shadow-2xl transition-colors duration-150 ${
-                hoveredBin
+              className={`w-18 h-18 w-[72px] h-[72px] rounded-full flex items-center justify-center shadow-2xl transition-colors duration-150 ${hoveredBin
                   ? "bg-red-500 shadow-red-500/60"
                   : "bg-black/70 border-2 border-white/40 backdrop-blur-md"
-              }`}
+                }`}
               style={hoveredBin ? { boxShadow: "0 0 32px rgba(239,68,68,0.8), 0 0 64px rgba(239,68,68,0.4)" } : {}}
             >
               <Trash2
-                className={`w-8 h-8 transition-all duration-150 ${
-                  hoveredBin ? "text-white drop-shadow-lg" : "text-white/70"
-                }`}
+                className={`w-8 h-8 transition-all duration-150 ${hoveredBin ? "text-white drop-shadow-lg" : "text-white/70"
+                  }`}
               />
             </motion.div>
             <motion.span
               animate={hoveredBin ? { opacity: 1, scale: 1.05 } : { opacity: 0.7, scale: 1 }}
-              className={`text-xs font-semibold drop-shadow-lg tracking-wide ${
-                hoveredBin ? "text-red-400" : "text-white/70"
-              }`}
+              className={`text-xs font-semibold drop-shadow-lg tracking-wide ${hoveredBin ? "text-red-400" : "text-white/70"
+                }`}
             >
               {hoveredBin ? "🔥 Release to delete" : "Drag here to delete"}
             </motion.span>
@@ -543,7 +546,17 @@ export function StoryEditor({ files, onClose, onComplete }: StoryEditorProps) {
                 value={text}
                 onChange={e => setText(e.target.value)}
                 className="w-full bg-transparent text-center resize-none outline-none overflow-hidden"
-                style={{ fontFamily, color: textColor, fontSize: "clamp(24px, 8vw, 36px)", fontWeight: "bold", textShadow: "0px 2px 10px rgba(0,0,0,0.5)" }}
+                style={{
+                  fontFamily,
+                  color: textColor,
+                  fontSize: "clamp(24px, 8vw, 36px)",
+                  fontWeight: "bold",
+                  textShadow: "0px 2px 10px rgba(0,0,0,0.5)",
+                  // Explicitly lock to horizontal — prevents mobile Safari/Chrome
+                  // from silently applying vertical writing mode on focus/keyboard open
+                  writingMode: "horizontal-tb",
+                  direction: "ltr",
+                }}
                 placeholder="Type something..."
                 rows={4}
               />
