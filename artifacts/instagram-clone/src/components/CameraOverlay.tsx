@@ -578,8 +578,11 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
                           }
                         }}
                         autoPlay playsInline muted
-                        className={`w-full h-full object-cover ${facingMode === "user" ? "scale-x-[-1]" : ""}`}
-                        style={{ filter: liveFilter }}
+                        className="w-full h-full object-cover"
+                        style={{ 
+                          filter: liveFilter,
+                          transform: `scale(${zoom}) ${facingMode === "user" ? "scaleX(-1)" : ""}`
+                        }}
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-white/20 text-4xl font-bold">{idx + 1}</div>
