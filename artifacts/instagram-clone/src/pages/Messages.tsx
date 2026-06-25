@@ -2833,7 +2833,8 @@ export default function Messages() {
         if (e.data.size > 0) chunksRef.current.push(e.data);
       };
       recorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: mimeType || "audio/webm" });
+        const actualMime = recorder.mimeType || mimeType || "audio/mp4";
+        const blob = new Blob(chunksRef.current, { type: actualMime });
         stream.getTracks().forEach((t) => t.stop());
         streamRef.current = null;
         chunksRef.current = [];
@@ -2855,8 +2856,9 @@ export default function Messages() {
         scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
         void (async () => {
           try {
-            const voiceMime = (mimeType || "audio/webm").split(";")[0]?.trim() || "audio/webm";
-            const voiceFile = new File([blob], `voice-${Date.now()}.webm`, { type: voiceMime });
+            const voiceMime = actualMime.split(";")[0]?.trim() || "audio/mp4";
+            const ext = voiceMime.includes("mp4") ? "mp4" : "webm";
+            const voiceFile = new File([blob], `voice-${Date.now()}.${ext}`, { type: voiceMime });
             const [url, outgoing] = await Promise.all([
               uploadMediaFile(voiceFile, voiceMime),
               prepareOutgoingMessage({

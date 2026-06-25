@@ -118,14 +118,17 @@ export default function SecretNotes() {
         ? "audio/webm;codecs=opus"
         : MediaRecorder.isTypeSupported("audio/webm")
           ? "audio/webm"
-          : undefined;
+          : MediaRecorder.isTypeSupported("audio/mp4")
+            ? "audio/mp4"
+            : undefined;
       const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
       noteChunksRef.current = [];
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) noteChunksRef.current.push(e.data);
       };
       recorder.onstop = () => {
-        const blob = new Blob(noteChunksRef.current, { type: mimeType || "audio/webm" });
+        const actualMime = recorder.mimeType || mimeType || "audio/mp4";
+        const blob = new Blob(noteChunksRef.current, { type: actualMime });
         noteChunksRef.current = [];
         noteRecorderRef.current = null;
         stream.getTracks().forEach((t) => t.stop());
