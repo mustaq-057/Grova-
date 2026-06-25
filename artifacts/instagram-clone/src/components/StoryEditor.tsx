@@ -167,7 +167,7 @@ function DraggableText({
   );
 
   return (
-    <div style={{ position: "absolute", left: "50%", top: "50%", transform: "translate(-50%, -50%)", zIndex: 30 }}>
+    <div style={{ position: "absolute", left: "50%", top: "50%", transform: "translate(-50%, -50%)", zIndex: 30, width: "90vw", maxWidth: "90vw" }}>
       <motion.div
         {...(bind() as any)}
         style={{
@@ -324,7 +324,36 @@ export function StoryEditor({ files, onClose, onComplete }: StoryEditorProps) {
         ctx.textBaseline = "middle";
         ctx.shadowColor = "rgba(0,0,0,0.5)";
         ctx.shadowBlur = 10;
-        ctx.fillText(text, 0, 0);
+
+        // Handle multi-line text (explicit \n and word wrapping)
+        const maxTextWidth = W * 0.9;
+        const lineHeight = 42; 
+        const paragraphs = text.split('\n');
+        const linesToDraw: string[] = [];
+
+        for (let i = 0; i < paragraphs.length; i++) {
+          const words = paragraphs[i].split(' ');
+          let currentLine = '';
+
+          for (let n = 0; n < words.length; n++) {
+            const testLine = currentLine + words[n] + ' ';
+            const metrics = ctx.measureText(testLine);
+            const testWidth = metrics.width;
+            if (testWidth > maxTextWidth && n > 0) {
+              linesToDraw.push(currentLine.trim());
+              currentLine = words[n] + ' ';
+            } else {
+              currentLine = testLine;
+            }
+          }
+          linesToDraw.push(currentLine.trim());
+        }
+
+        const startY = -((linesToDraw.length - 1) * lineHeight) / 2;
+        linesToDraw.forEach((line, index) => {
+          ctx.fillText(line, 0, startY + (index * lineHeight));
+        });
+
         ctx.restore();
       }
 
