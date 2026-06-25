@@ -64,72 +64,64 @@ async function fetchViaMediaInline(url: string): Promise<{ blob: Blob; contentTy
   return { blob: new Blob([buf], { type: "application/pdf" }), contentType: "application/pdf" };
 }
 
+/**
+ * Returns the best URL to pass directly to react-pdf without downloading a blob.
+ * For B2/Cloudinary we get a signed/direct URL from the API.
+ * For Internet Archive we resolve the redirect on the server.
+ * Falls back to null if we should use the blob proxy.
+ */
+async function resolveDirectPdfUrl(
+  bookId: string,
+  url: string,
+): Promise<string | null> {
+  try {
+    const info = await apiFetch<{ proxy: boolean; url: string }>(`/library/${bookId}/file-url`);
+    if (!info.proxy && info.url) return info.url;
+    // proxy: true means it's a private bucket — must stream through API
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 async function fetchPdfBlob(
   bookId: string,
   url: string,
 ): Promise<{ blob: Blob; contentType: string }> {
   const errors: string[] = [];
 
-  // Try direct fetch first for Cloudinary/B2 to bypass Vercel 4.5MB limits
-  if (/cloudinary\.com|backblazeb2\.com/i.test(url)) {
-    try {
-      const res = await fetch(url);
-      if (res.ok) {
-        const buf = await res.arrayBuffer();
-        if (isPdfBuffer(buf)) {
-          return {
-            blob: new Blob([buf], { type: "application/pdf" }),
-            contentType: "application/pdf",
-          };
-        }
-        errors.push("Direct fetch returned a file that is not a valid PDF.");
-      } else {
-        errors.push(`Direct fetch failed with HTTP ${res.status}`);
-      }
-    } catch (e) {
-      errors.push(e instanceof Error ? e.message : "Direct fetch failed (CORS/Network).");
-    }
-  }
-
-  // FIRST: Get the direct URL to avoid proxying 50MB PDFs through Vercel
+  // FIRST: Try to get a direct URL (skips Vercel proxy for large files)
   try {
-    const info = await apiFetch<{ proxy: boolean; url: string }>(`/library/${bookId}/file-url`);
-    
-    if (!info.proxy && info.url) {
-      // Fetch directly from the source without credentials (bypasses CORS restrictions on wildcards)
-      const res = await fetch(info.url, { mode: "cors" });
+    const directUrl = await resolveDirectPdfUrl(bookId, url);
+    if (directUrl) {
+      const res = await fetch(directUrl, { mode: "cors" });
       if (res.ok) {
         const buf = await res.arrayBuffer();
         if (isPdfBuffer(buf)) {
-           return {
-             blob: new Blob([buf], { type: "application/pdf" }),
-             contentType: res.headers.get("content-type") || "application/pdf"
-           };
+          return { blob: new Blob([buf], { type: "application/pdf" }), contentType: "application/pdf" };
         }
         errors.push("Direct fetch returned a file that is not a valid PDF.");
       } else {
-        errors.push(`Direct fetch failed: HTTP ${res.status}`);
+        errors.push(`Direct URL fetch failed: HTTP ${res.status}`);
       }
     }
   } catch (e) {
-    errors.push(e instanceof Error ? e.message : "Failed to fetch file URL");
+    errors.push(e instanceof Error ? e.message : "Failed to resolve direct URL");
   }
 
-  // Fallback: Always load through our API — direct browser fetch hits CORS on archive.org redirects, Gutenberg, Cloudinary, etc.
+  // FALLBACK: Stream through our API proxy (handles private B2 buckets, CORS)
   try {
     const proxied = await apiFetchBlob(`/library/${bookId}/file`);
     const buf = await proxied.blob.arrayBuffer();
     if (isPdfBuffer(buf)) {
-      return {
-        blob: new Blob([buf], { type: "application/pdf" }),
-        contentType: proxied.contentType || "application/pdf",
-      };
+      return { blob: new Blob([buf], { type: "application/pdf" }), contentType: proxied.contentType || "application/pdf" };
     }
     errors.push("Server returned a file that is not a valid PDF.");
   } catch (e) {
     errors.push(e instanceof Error ? e.message : "Could not download book from server.");
   }
 
+  // Last resort: direct Cloudinary URL via /media/inline
   if (/cloudinary\.com|backblazeb2\.com/i.test(url)) {
     try {
       return await fetchViaMediaInline(url);
@@ -138,10 +130,7 @@ async function fetchPdfBlob(
     }
   }
 
-  throw new Error(
-    errors[0] ||
-      "Could not open this book. Try again, or remove it and re-add from search or upload.",
-  );
+  throw new Error(errors[0] || "Could not open this book. Try again, or remove it and re-add from search or upload.");
 }
 
 const PDF_PAGE_BUFFER = 3;
@@ -343,6 +332,13 @@ export default function EReader() {
     };
   }, [id, loading, epubData, flushReadingSession]);
 
+  // Parse ?page= (PDF note jump) and ?location= (epub cfi) from URL
+  const [initialPdfPage] = useState<number>(() => {
+    const p = new URLSearchParams(window.location.search).get("page");
+    if (p) return parseInt(p, 10) || 0;
+    return 0;
+  });
+
   useEffect(() => {
     const loc = new URLSearchParams(window.location.search).get("location");
     if (loc) setBookLocation(loc);
@@ -397,9 +393,11 @@ export default function EReader() {
         if (!cancelled) {
           setIsPdf(true);
           setEpubData(blobUrl);
-          if (savedPageRef.current > 0 && book.totalPages) {
-            setCurrentPage(savedPageRef.current);
-            setProgressPct(Math.round((savedPageRef.current / book.totalPages) * 100));
+          // If arriving from a note link (?page=N), prefer that over saved progress
+          const jumpPage = initialPdfPage > 0 ? initialPdfPage : savedPageRef.current;
+          if (jumpPage > 0 && book.totalPages) {
+            setCurrentPage(jumpPage);
+            setProgressPct(Math.round((jumpPage / book.totalPages) * 100));
           }
         } else {
           URL.revokeObjectURL(blobUrl);
@@ -583,9 +581,22 @@ export default function EReader() {
   };
 
   const scrollToSavedPage = (page: number, numPages: number) => {
-    if (!pdfContainerRef.current || page <= 1) return;
-    const ratio = (page - 1) / Math.max(numPages - 1, 1);
-    pdfContainerRef.current.scrollTop = ratio * (pdfContainerRef.current.scrollHeight - pdfContainerRef.current.clientHeight);
+    if (page <= 1) return;
+    // Try multiple times to handle the case where pages haven't rendered yet
+    let attempts = 0;
+    const tryScroll = () => {
+      const container = pdfContainerRef.current;
+      if (!container) return;
+      const ratio = (page - 1) / Math.max(numPages - 1, 1);
+      const target = ratio * (container.scrollHeight - container.clientHeight);
+      container.scrollTop = target;
+      // If scrollHeight hasn't expanded yet (pages still rendering), retry
+      if (container.scrollHeight <= container.clientHeight + 10 && attempts < 10) {
+        attempts++;
+        setTimeout(tryScroll, 300);
+      }
+    };
+    setTimeout(tryScroll, 150);
   };
 
   const t = THEMES[theme];
@@ -710,21 +721,22 @@ export default function EReader() {
               file={epubData} 
               onLoadSuccess={({ numPages }) => {
                 setTotalPages(numPages);
-                const resume = savedPageRef.current;
-                const startPage = resume > 0 ? Math.min(resume, numPages) : 1;
+                // Prefer ?page=N (from note link) over saved reading progress
+                const jumpPage = initialPdfPage > 0 ? initialPdfPage : savedPageRef.current;
+                const startPage = jumpPage > 0 ? Math.min(jumpPage, numPages) : 1;
                 setCurrentPage(startPage);
                 setProgressPct(Math.round((startPage / numPages) * 100));
-                pdfExpandedRef.current = resume > 1;
+                pdfExpandedRef.current = startPage > 1;
                 setPdfWindow(
-                  resume > 1
+                  startPage > 1
                     ? {
                         start: Math.max(1, startPage - PDF_PAGE_BUFFER),
                         end: Math.min(numPages, startPage + PDF_PAGE_BUFFER),
                       }
                     : { start: 1, end: 1 },
                 );
-                if (resume > 1) {
-                  setTimeout(() => scrollToSavedPage(resume, numPages), 300);
+                if (startPage > 1) {
+                  scrollToSavedPage(startPage, numPages);
                 }
                 apiFetch(`/library/${id}/progress`, {
                   method: "PUT",

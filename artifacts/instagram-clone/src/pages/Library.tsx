@@ -1608,18 +1608,25 @@ export default function Library() {
                   <p className="text-[var(--lib-muted)] font-medium">There are no reading notes yet.</p>
                 </div>
               ) : (
-                allNotes.map((note) => (
-                  <div key={note.id} className="bg-[var(--lib-card)] border border-[var(--lib-border)] rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow">
+              allNotes.map((note) => {
+                // Parse page number from "Page 5" format so we can deep-link into the PDF
+                const pageMatch = note.chapterOrPage?.match(/page\s*(\d+)/i);
+                const pageNum = pageMatch ? parseInt(pageMatch[1], 10) : null;
+                const href = `/read/${note.bookId}${pageNum ? `?page=${pageNum}` : note.chapterOrPage ? `?location=${encodeURIComponent(note.chapterOrPage)}` : ''}`;
+
+                return (
+                  <div
+                    key={note.id}
+                    className="bg-[var(--lib-card)] border border-[var(--lib-border)] rounded-2xl p-4 shadow-sm hover:shadow-md transition-all active:scale-[0.98] cursor-pointer"
+                    onClick={() => setLocation(href)}
+                  >
                     <div className="flex items-start gap-3">
                       <div className="bg-primary/10 p-2 rounded-xl shrink-0">
                         <MessageSquare className="w-5 h-5 text-primary" />
                       </div>
                       <div className="flex-1">
                         <p className="text-[10px] text-[var(--lib-muted)] font-bold uppercase tracking-wider mb-1 flex items-center justify-between">
-                          <span
-                            className="line-clamp-1 flex-1 mr-2 cursor-pointer hover:text-primary transition-colors"
-                            onClick={() => setLocation(`/read/${note.bookId}?location=${encodeURIComponent(note.chapterOrPage || "")}`)}
-                          >
+                          <span className="line-clamp-1 flex-1 mr-2 text-primary">
                             {note.bookTitle || "Unknown Book"}
                           </span>
                           <span className="shrink-0">{new Date(note.timestamp).toLocaleDateString()}</span>
@@ -1633,7 +1640,8 @@ export default function Library() {
                       </div>
                     </div>
                   </div>
-                ))
+                );
+              })
               )}
             </div>
           </div>
