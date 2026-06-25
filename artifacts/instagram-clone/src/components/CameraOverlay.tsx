@@ -501,7 +501,7 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
         <div 
           className={`absolute left-0 right-0 flex justify-between items-center z-50 transition-all ${
             isDisposable
-              ? "top-[1.5vw] px-[4vw]"
+              ? "top-[8vw] px-[15vw]"
               : "top-0 p-4 bg-gradient-to-b from-black/50 to-transparent pt-[max(1rem,env(safe-area-inset-top))]"
           }`}
         >
@@ -652,45 +652,86 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
 
               {isDisposable && (
                 <>
-                  {/* Fujifilm QuickSnap Flash 400 Styling */}
-                  <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(circle, rgba(255,255,255,0.05) 20%, rgba(0,0,0,0) 50%, rgba(0,0,0,0.6) 100%)" }} />
-                  <div className="absolute inset-0 pointer-events-none mix-blend-overlay opacity-30" style={{ backgroundImage: "url('data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.85%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E')" }} />
-                  
-                  {/* The main plastic body border - deep dark grey/green tint */}
-                  <div className="absolute inset-0 pointer-events-none border-[12vw] border-[#151c16] shadow-[inset_0_0_30px_rgba(0,0,0,1)] rounded-[15vw] z-20 mix-blend-normal">
-                    {/* Inner bezel depth */}
-                    <div className="absolute inset-0 border-[4px] border-black/80 rounded-[3vw]" />
+                  {/* ── Fujifilm QuickSnap Flash 400 Body ──
+                      The body is a thick frame that "masks" the edges of the screen,
+                      leaving a clean rectangular viewfinder window in the center.
+                      All decorations are inside the body frame area. */}
+
+                  {/* Main plastic body — dark green-grey, thick border all around */}
+                  <div
+                    className="absolute inset-0 pointer-events-none z-20"
+                    style={{
+                      boxShadow: "inset 0 0 0 13vw #131a14",
+                      borderRadius: "10vw",
+                    }}
+                  />
+
+                  {/* Inner bezel / viewfinder rim */}
+                  <div
+                    className="absolute inset-0 pointer-events-none z-20"
+                    style={{
+                      boxShadow: "inset 0 0 0 calc(13vw - 3px) transparent, inset 0 0 0 calc(13vw + 2px) rgba(0,0,0,0.7)",
+                      borderRadius: "10vw",
+                    }}
+                  />
+
+                  {/* Top color stripes — contained INSIDE the top body band */}
+                  <div className="absolute z-30 pointer-events-none" style={{ top: "2.5vw", left: "13.5vw", right: "13.5vw" }}>
+                    <div className="h-[1.4vw] bg-[#22c55e] rounded-full mb-[0.6vw] shadow-[0_0_8px_rgba(34,197,94,0.4)]" />
+                    <div className="h-[0.8vw] bg-[#ef4444] rounded-full shadow-[0_0_8px_rgba(239,68,68,0.4)]" />
                   </div>
 
-                  {/* Red/Green QuickSnap Accents */}
-                  <div className="absolute z-30 pointer-events-none w-full h-full inset-0">
-                     <div className="absolute top-[3vw] left-[5vw] right-[5vw] h-[1vw] bg-green-500/80 rounded-full shadow-[0_0_10px_rgba(34,197,94,0.3)]" />
-                     <div className="absolute top-[6vw] left-[5vw] right-[5vw] h-[0.5vw] bg-red-500/80 rounded-full shadow-[0_0_10px_rgba(239,68,68,0.3)]" />
-                     <div className="absolute bottom-[4vw] right-[30vw] text-[#ddd] text-[3vw] font-bold tracking-widest font-mono opacity-80 mix-blend-screen">FLASH 400</div>
+                  {/* Bottom label area — FLASH 400 text */}
+                  <div className="absolute z-30 pointer-events-none" style={{ bottom: "3vw", right: "15vw" }}>
+                    <span className="text-[#cccccc] font-bold tracking-widest font-mono opacity-90" style={{ fontSize: "3vw" }}>
+                      FLASH 400
+                    </span>
                   </div>
 
-                  {/* Flash Ready Light */}
-                  <div className="absolute z-30 pointer-events-none" style={{ top: "calc(12vw - 22px)", right: "calc(12vw - 12px)" }}>
+                  {/* Fujifilm logo area (top-left of body) */}
+                  <div className="absolute z-30 pointer-events-none" style={{ top: "5vw", left: "15vw" }}>
+                    <span className="text-[#22c55e] font-bold font-sans opacity-70" style={{ fontSize: "2.5vw", letterSpacing: "0.05em" }}>
+                      FUJIFILM
+                    </span>
+                  </div>
+
+                  {/* Flash ready LED — top-right of body */}
+                  <div
+                    className="absolute z-30 pointer-events-none"
+                    style={{ top: "calc(13vw - 2.2rem)", right: "calc(13vw - 1.4rem)" }}
+                  >
                     <div
-                      className="w-4 h-4 rounded-full border-2 border-[#555]"
+                      className="w-5 h-5 rounded-full border-2 border-[#444]"
                       style={{
                         background: flashDotActive
-                          ? "radial-gradient(circle, #fff 10%, #ff1100 50%, #880000 100%)"
-                          : "radial-gradient(circle, #880000 20%, #330000 100%)",
+                          ? "radial-gradient(circle, #fff 5%, #ff2200 45%, #880000 100%)"
+                          : "radial-gradient(circle, #991111 20%, #330000 100%)",
                         boxShadow: flashDotActive
-                          ? "0 0 20px 10px rgba(255,0,0,0.9)"
+                          ? "0 0 18px 8px rgba(255,30,0,0.85)"
                           : "inset 0 2px 4px rgba(0,0,0,0.8)",
                         transition: "background 0.05s, box-shadow 0.05s",
                       }}
                     />
                   </div>
+
+                  {/* Subtle vignette inside the viewfinder */}
+                  <div
+                    className="absolute inset-0 pointer-events-none z-10"
+                    style={{
+                      background: "radial-gradient(ellipse at center, rgba(255,255,255,0.04) 0%, rgba(0,0,0,0) 50%, rgba(0,0,0,0.35) 100%)",
+                    }}
+                  />
                 </>
               )}
             </div>
           )}
         </div>
 
-        <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/80 to-transparent pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+        <div className={`absolute bottom-0 left-0 right-0 z-40 pb-[max(1.5rem,env(safe-area-inset-bottom))] ${
+          isDisposable
+            ? "bg-transparent"
+            : "bg-gradient-to-t from-black/80 to-transparent"
+        }`}>
           <div className="flex items-center justify-center mb-6 px-4 w-full">
             <div className="flex gap-8 overflow-x-auto w-full scrollbar-hide snap-x snap-mandatory px-[30vw]">
               {MODES.map(({ key, label }) => {
