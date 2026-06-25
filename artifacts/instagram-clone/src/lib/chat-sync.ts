@@ -46,7 +46,6 @@ export function preserveDroppedMessages(
   next: ApiMessage[],
   opts?: { keepIds?: ReadonlySet<string> },
 ): ApiMessage[] {
-  if (next.length >= prev.length) return next;
   const nextIds = new Set(next.map((m) => m.id));
   const missing = prev.filter((m) => {
     if (nextIds.has(m.id) || m.deleted) return false;

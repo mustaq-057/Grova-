@@ -188,27 +188,55 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
     const vh = video.videoHeight;
     const videoRatio = vw / vh;
 
-    let targetRatio = 9 / 16;
-    if (aspectRatio === "Full" || style === "disposable") targetRatio = vw / vh;
+    const screenW = window.innerWidth;
+    const screenH = window.innerHeight;
+    const screenRatio = screenW / screenH;
+
+    let visibleW = vw;
+    let visibleH = vh;
+    let offsetX = 0;
+    let offsetY = 0;
+
+    if (videoRatio > screenRatio) {
+      visibleW = vh * screenRatio;
+      offsetX = (vw - visibleW) / 2;
+    } else {
+      visibleH = vw / screenRatio;
+      offsetY = (vh - visibleH) / 2;
+    }
+
+    let targetRatio = screenRatio;
     if (aspectRatio === "4:3") targetRatio = 3 / 4;
     if (aspectRatio === "1:1") targetRatio = 1;
     if (vw > vh && targetRatio < 1) targetRatio = 1 / targetRatio;
 
-    let cw = vw, ch = vh;
-    if (videoRatio > targetRatio) cw = vh * targetRatio;
-    else ch = vw / targetRatio;
+    let cw = visibleW, ch = visibleH;
+    let sx = offsetX, sy = offsetY;
 
-    const cropW = cw / zoom;
-    const cropH = ch / zoom;
-    const sx = (vw - cropW) / 2;
-    const sy = (vh - cropH) / 2;
+    if (style === "disposable") {
+      const borderPx = visibleW * 0.12; 
+      cw = visibleW - (2 * borderPx);
+      ch = visibleH - (2 * borderPx);
+      sx = offsetX + borderPx;
+      sy = offsetY + borderPx;
+    } else {
+      if (screenRatio > targetRatio) cw = visibleH * targetRatio;
+      else ch = visibleW / targetRatio;
+      sx = offsetX + (visibleW - cw) / 2;
+      sy = offsetY + (visibleH - ch) / 2;
+    }
+
+    const finalCropW = cw / zoom;
+    const finalCropH = ch / zoom;
+    const finalSx = sx + (cw - finalCropW) / 2;
+    const finalSy = sy + (ch - finalCropH) / 2;
 
     const canvas = document.createElement("canvas");
     canvas.width = cw;
     canvas.height = ch;
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
-    applyStyleToCanvas(ctx, video, sx, sy, cropW, cropH, cw, ch, style, facingMode);
+    applyStyleToCanvas(ctx, video, finalSx, finalSy, finalCropW, finalCropH, cw, ch, style, facingMode);
     return canvas;
   };
 
@@ -621,20 +649,35 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
 
               {isDisposable && (
                 <>
+                  {/* Fujifilm QuickSnap Flash 400 Styling */}
                   <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(circle, rgba(255,255,255,0.05) 20%, rgba(0,0,0,0) 50%, rgba(0,0,0,0.6) 100%)" }} />
-                  <div className="absolute inset-0 pointer-events-none mix-blend-overlay opacity-50" style={{ backgroundImage: "url('data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.85%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E')" }} />
-                  <div className="absolute inset-0 pointer-events-none border-[12vw] border-black/90 shadow-[inset_0_0_20px_rgba(0,0,0,0.8)] rounded-[20vw] z-20 mix-blend-multiply" />
-                  <div className="absolute z-30 pointer-events-none" style={{ top: "calc(12vw - 18px)", right: "calc(12vw - 18px)" }}>
+                  <div className="absolute inset-0 pointer-events-none mix-blend-overlay opacity-30" style={{ backgroundImage: "url('data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.85%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E')" }} />
+                  
+                  {/* The main plastic body border - deep dark grey/green tint */}
+                  <div className="absolute inset-0 pointer-events-none border-[12vw] border-[#151c16] shadow-[inset_0_0_30px_rgba(0,0,0,1)] rounded-[15vw] z-20 mix-blend-normal">
+                    {/* Inner bezel depth */}
+                    <div className="absolute inset-0 border-[4px] border-black/80 rounded-[3vw]" />
+                  </div>
+
+                  {/* Red/Green QuickSnap Accents */}
+                  <div className="absolute z-30 pointer-events-none w-full h-full inset-0">
+                     <div className="absolute top-[3vw] left-[5vw] right-[5vw] h-[1vw] bg-green-500/80 rounded-full shadow-[0_0_10px_rgba(34,197,94,0.3)]" />
+                     <div className="absolute top-[6vw] left-[5vw] right-[5vw] h-[0.5vw] bg-red-500/80 rounded-full shadow-[0_0_10px_rgba(239,68,68,0.3)]" />
+                     <div className="absolute bottom-[4vw] right-[30vw] text-[#ddd] text-[3vw] font-bold tracking-widest font-mono opacity-80 mix-blend-screen">FLASH 400</div>
+                  </div>
+
+                  {/* Flash Ready Light */}
+                  <div className="absolute z-30 pointer-events-none" style={{ top: "calc(12vw - 22px)", right: "calc(12vw - 12px)" }}>
                     <div
-                      className="w-5 h-5 rounded-full border-2 border-orange-400/60"
+                      className="w-4 h-4 rounded-full border-2 border-[#555]"
                       style={{
                         background: flashDotActive
-                          ? "radial-gradient(circle, #fff 10%, #ffdd00 50%, #ff6600 100%)"
-                          : "radial-gradient(circle, #ffaa00 20%, #cc5500 100%)",
+                          ? "radial-gradient(circle, #fff 10%, #ff1100 50%, #880000 100%)"
+                          : "radial-gradient(circle, #880000 20%, #330000 100%)",
                         boxShadow: flashDotActive
-                          ? "0 0 18px 8px rgba(255,220,0,0.8)"
-                          : "0 0 6px 2px rgba(255,120,0,0.4)",
-                        transition: "background 0.08s, box-shadow 0.08s",
+                          ? "0 0 20px 10px rgba(255,0,0,0.9)"
+                          : "inset 0 2px 4px rgba(0,0,0,0.8)",
+                        transition: "background 0.05s, box-shadow 0.05s",
                       }}
                     />
                   </div>
