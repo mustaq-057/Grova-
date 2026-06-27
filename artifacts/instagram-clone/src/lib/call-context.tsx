@@ -36,7 +36,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
   
   const [callState, setCallState] = useState<CallState>(null);
   const [incomingCall, setIncomingCall] = useState<{ type: CallType; offer?: RTCSessionDescriptionInit } | null>(null);
-  const [callSignal, setCallSignal] = useState<{ type: "answer" | "ice"; data: unknown; seq: number } | null>(null);
+  const [callSignals, setCallSignals] = useState<{ type: "answer" | "ice" | "offer"; data: unknown; seq: number }[]>([]);
   
   const callSignalSeq = useRef(0);
   const callConnectedAtRef = useRef(0);
@@ -48,9 +48,9 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const partnerName = authPartner?.name ?? readSessionSnapshot()?.partner?.name ?? "Partner";
   const partnerAvatar = authPartner?.avatar ?? readSessionSnapshot()?.partner?.avatar ?? "";
 
-  const pushCallSignal = useCallback((type: "answer" | "ice", data: unknown) => {
+  const pushCallSignal = useCallback((type: "answer" | "ice" | "offer", data: unknown) => {
     callSignalSeq.current += 1;
-    setCallSignal({ type, data, seq: callSignalSeq.current });
+    setCallSignals(prev => [...prev, { type, data, seq: callSignalSeq.current }]);
   }, []);
 
   const sendCallLogMsg = useCallback(async (text: string) => {
@@ -77,7 +77,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
     callLoggedStartRef.current = false;
     callConnectedAtRef.current = 0;
     setCallState(null);
-    setCallSignal(null);
+    setCallSignals([]);
     setIncomingCall(null);
     
     if (role === "outgoing") {
@@ -118,7 +118,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
     callRoleRef.current = "outgoing";
     callLoggedStartRef.current = false;
     callConnectedAtRef.current = 0;
-    setCallSignal(null);
+    setCallSignals([]);
     setCallState({ status: "outgoing", type });
     setIncomingCall(null);
     
@@ -131,7 +131,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
     callRoleRef.current = "incoming";
     callLoggedStartRef.current = false;
     callConnectedAtRef.current = 0;
-    setCallSignal(null);
+    setCallSignals([]);
     setCallState({ status: "incoming", type: incomingCall.type, incomingOffer: incomingCall.offer });
     setIncomingCall(null);
   }, [incomingCall]);
@@ -155,6 +155,11 @@ export function CallProvider({ children }: { children: ReactNode }) {
     if (type === "call-offer") {
       const d = data as { from: string; callType: CallType; sdp?: RTCSessionDescriptionInit };
       if (d.from !== partnerId || !d.sdp) return;
+      if (callState) {
+        // We already have a call (likely an ICE restart renegotiation) - push the offer to the screen
+        pushCallSignal("offer", d.sdp);
+        return;
+      }
       setIncomingCall({ type: d.callType, offer: d.sdp });
       if (Notification.permission === "granted") {
         new Notification(`${partnerName} is calling`, {
@@ -281,7 +286,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
           }}
           onEnd={endCall}
           onConnected={onCallConnected}
-          incomingSignal={callSignal || undefined}
+          incomingSignals={callSignals}
         />
       )}
     </CallContext.Provider>

@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Phone, PhoneOff, Video, VideoOff, Mic, MicOff, Volume2, Volume1, VolumeX, SwitchCamera, ChevronDown, AlertCircle, MonitorUp, PictureInPicture, Gauge } from "lucide-react";
+import { Phone, PhoneOff, Video, VideoOff, Mic, MicOff, Volume2, Volume1, VolumeX, SwitchCamera, ChevronDown, AlertCircle, MonitorUp, PictureInPicture, Gauge, AlarmClock, MessageSquare } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@/lib/api";
-
+import { getAuthHeaders } from "@/lib/session";
 const DEFAULT_RTC: RTCConfiguration = {
   iceServers: [
     { urls: "stun:stun.l.google.com:19302" },
@@ -77,7 +77,7 @@ interface Props {
   }) => void;
   onEnd: () => void;
   onConnected?: () => void;
-  incomingSignal?: { type: "answer" | "ice"; data: unknown; seq: number };
+  incomingSignals?: { type: "answer" | "ice" | "offer"; data: unknown; seq: number }[];
 }
 
 export default function CallScreen({
@@ -88,7 +88,7 @@ export default function CallScreen({
   onSendSignal,
   onEnd,
   onConnected,
-  incomingSignal,
+  incomingSignals = [],
 }: Props) {
   const [muted, setMuted] = useState(false);
   const [speakerOff, setSpeakerOff] = useState(false);
@@ -118,6 +118,7 @@ export default function CallScreen({
   const startTimeRef = useRef<number>(0);
   const rtcConfigRef = useRef<RTCConfiguration>(DEFAULT_RTC);
   const onConnectedFiredRef = useRef(false);
+  const lastProcessedSeq = useRef(0);
 
   // Queue for ICE candidates that arrive before Remote Description is set
   const iceCandidateQueue = useRef<RTCIceCandidateInit[]>([]);
@@ -272,8 +273,13 @@ export default function CallScreen({
   // Orphaned call prevention: Send end signal if the tab is closed
   useEffect(() => {
     const handleBeforeUnload = () => {
-      const blob = new Blob([JSON.stringify({ type: "end", senderId: myId })], { type: "application/json" });
-      navigator.sendBeacon("/api/call/signal", blob);
+      const body = JSON.stringify({ type: "end", senderId: myId });
+      fetch("/api/call/signal", {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body,
+        keepalive: true,
+      }).catch(() => {});
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
@@ -537,29 +543,49 @@ export default function CallScreen({
   // Signal Handling
   useEffect(() => {
     const pc = pcRef.current;
-    if (!incomingSignal || !pc) return;
+    if (!pc || incomingSignals.length === 0) return;
     
-    if (incomingSignal.type === "answer") {
-      void pc
-        .setRemoteDescription(new RTCSessionDescription(incomingSignal.data as RTCSessionDescriptionInit))
-        .then(() => {
-          isRemoteDescriptionSet.current = true;
-          setConnected(true);
-          while (iceCandidateQueue.current.length > 0) {
-            const candidate = iceCandidateQueue.current.shift();
-            if (candidate) void pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(() => {});
+    const newSignals = incomingSignals.filter(s => s.seq > lastProcessedSeq.current);
+    if (newSignals.length === 0) return;
+
+    const processSignals = async () => {
+      for (const signal of newSignals) {
+        lastProcessedSeq.current = signal.seq;
+        try {
+          if (signal.type === "answer") {
+            await pc.setRemoteDescription(new RTCSessionDescription(signal.data as RTCSessionDescriptionInit));
+            isRemoteDescriptionSet.current = true;
+            setConnected(true);
+            while (iceCandidateQueue.current.length > 0) {
+              const candidate = iceCandidateQueue.current.shift();
+              if (candidate) await pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(() => {});
+            }
+          } else if (signal.type === "ice") {
+            const candidateInit = signal.data as RTCIceCandidateInit;
+            if (isRemoteDescriptionSet.current) {
+              await pc.addIceCandidate(new RTCIceCandidate(candidateInit)).catch(() => {});
+            } else {
+              iceCandidateQueue.current.push(candidateInit);
+            }
+          } else if (signal.type === "offer") {
+            await pc.setRemoteDescription(new RTCSessionDescription(signal.data as RTCSessionDescriptionInit));
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            isRemoteDescriptionSet.current = true;
+            onSendSignal({ type: "answer", senderId: myId, sdp: answer });
+            while (iceCandidateQueue.current.length > 0) {
+              const candidate = iceCandidateQueue.current.shift();
+              if (candidate) await pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(() => {});
+            }
           }
-        })
-        .catch(() => {});
-    } else if (incomingSignal.type === "ice") {
-      const candidateInit = incomingSignal.data as RTCIceCandidateInit;
-      if (isRemoteDescriptionSet.current) {
-        void pc.addIceCandidate(new RTCIceCandidate(candidateInit)).catch(() => {});
-      } else {
-        iceCandidateQueue.current.push(candidateInit);
+        } catch (err) {
+          console.error("Error processing signal:", signal, err);
+        }
       }
-    }
-  }, [incomingSignal?.seq]);
+    };
+
+    void processSignals();
+  }, [incomingSignals]);
 
   const isVideo = call.type === "video";
 
@@ -781,41 +807,72 @@ export function IncomingCallOverlay({
   return (
     <AnimatePresence>
       <motion.div
-        initial={{ y: -150, opacity: 0, scale: 0.9 }}
-        animate={{ y: 0, opacity: 1, scale: 1 }}
-        exit={{ y: -150, opacity: 0, scale: 0.9 }}
-        transition={{ type: "spring", damping: 25, stiffness: 300 }}
-        className="fixed top-safe mt-4 left-4 right-4 md:left-auto md:right-4 md:w-96 z-[200] bg-[#1c1c1e]/90 backdrop-blur-xl border border-white/10 rounded-[28px] p-4 shadow-2xl"
-        data-testid="incoming-call"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.3 }}
+        className="fixed inset-0 z-[200] bg-[#f2f2f7] dark:bg-[#1c1c1e] flex flex-col justify-between overflow-hidden"
+        data-testid="incoming-call-fullscreen"
       >
-        <div className="flex flex-col gap-4">
-          <div className="flex items-center gap-4 px-2">
-            <div className="relative">
-              <img src={callerAvatar} alt={callerName} className="w-14 h-14 rounded-full object-cover ring-2 ring-white/10" />
-              <div className="absolute -bottom-1 -right-1 bg-green-500 rounded-full p-1 ring-2 ring-[#1c1c1e]">
-                {callType === "video" ? <Video className="w-3 h-3 text-white" /> : <Phone className="w-3 h-3 text-white" fill="currentColor" />}
-              </div>
-            </div>
-            <div className="flex-1">
-              <p className="text-white font-semibold text-lg leading-tight">{callerName}</p>
-              <p className="text-white/60 text-sm">{callType === "video" ? "Incoming video call..." : "Incoming audio call..."}</p>
-            </div>
-          </div>
-          <div className="flex gap-3">
+        {/* Animated Background blobs similar to native Android */}
+        <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none flex items-center justify-center opacity-30 dark:opacity-20">
+           <motion.div 
+             animate={{ rotate: 360, scale: [1, 1.2, 1] }}
+             transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+             className="w-[150vw] h-[150vw] rounded-full bg-gradient-to-tr from-indigo-500/30 to-purple-500/30 blur-3xl"
+           />
+        </div>
+
+        {/* Top Info */}
+        <div className="relative z-10 pt-safe mt-16 flex flex-col items-center">
+          <h1 className="text-4xl font-semibold text-zinc-900 dark:text-white mb-2">{callerName}</h1>
+          <p className="text-zinc-500 dark:text-zinc-400 text-lg">{callType === "video" ? "Incoming video call" : "Incoming audio call"}</p>
+        </div>
+
+        {/* Center Profile */}
+        <div className="relative z-10 flex-1 flex items-center justify-center">
+          <motion.div
+             animate={{ scale: [1, 1.05, 1] }}
+             transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+             className="relative"
+          >
+             {/* Glowing ring */}
+             <div className="absolute inset-0 rounded-full bg-indigo-500/20 animate-ping blur-xl"></div>
+             <img src={callerAvatar} alt={callerName} className="relative w-40 h-40 rounded-full object-cover ring-4 ring-white/50 shadow-2xl" />
+          </motion.div>
+        </div>
+
+        {/* Bottom Controls */}
+        <div className="relative z-10 pb-safe pb-12 px-8 flex flex-col gap-10">
+          {/* Main Action Buttons */}
+          <div className="flex justify-between items-center px-4">
             <button
               type="button"
               onClick={onReject}
-              className="flex-1 bg-white/10 hover:bg-white/20 text-white py-3 rounded-2xl font-semibold flex items-center justify-center gap-2 transition-colors"
+              className="w-20 h-20 bg-red-500 hover:bg-red-600 rounded-full flex flex-col items-center justify-center text-white transition-transform active:scale-90 shadow-xl"
             >
-              <PhoneOff className="w-5 h-5" /> Decline
+              <PhoneOff className="w-8 h-8 mb-1" fill="currentColor" stroke="none" />
             </button>
+
             <button
               type="button"
               onClick={onAccept}
               disabled={!canAccept}
-              className="flex-1 bg-green-500 hover:bg-green-600 text-white py-3 rounded-2xl font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
+              className="w-20 h-20 bg-green-500 hover:bg-green-600 rounded-full flex flex-col items-center justify-center text-white transition-transform active:scale-90 shadow-xl disabled:opacity-50 animate-bounce"
             >
-              <Phone className="w-5 h-5" fill="currentColor" /> Accept
+              <Phone className="w-8 h-8 mb-1" fill="currentColor" stroke="none" />
+            </button>
+          </div>
+
+          {/* Secondary Actions */}
+          <div className="flex justify-between items-center px-6">
+            <button type="button" className="flex flex-col items-center gap-2 text-zinc-600 dark:text-zinc-300 active:scale-90 transition-transform">
+              <AlarmClock className="w-6 h-6" />
+              <span className="text-sm font-medium">Reminder</span>
+            </button>
+            <button type="button" className="flex flex-col items-center gap-2 text-zinc-600 dark:text-zinc-300 active:scale-90 transition-transform">
+              <MessageSquare className="w-6 h-6" />
+              <span className="text-sm font-medium">Reply</span>
             </button>
           </div>
         </div>
