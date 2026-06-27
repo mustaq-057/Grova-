@@ -293,6 +293,7 @@ export const MessageItem = memo(function MessageItem({
   }, [onOpenMenu, msg]);
 
   if (msg.deleted) {
+    if (msg.companionSticker?.includes("__vanish__")) return null;
     return <DeletedMessageNotice isMe={isMe} partnerName={partnerName} />;
   }
 

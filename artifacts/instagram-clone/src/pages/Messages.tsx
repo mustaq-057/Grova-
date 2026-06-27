@@ -219,6 +219,17 @@ export default function Messages() {
   const isVanishModeRef = useRef(false);
   const vanishMessageIdsRef = useRef<Set<string>>(new Set());
 
+  const sendMessageWithVanish = useCallback(async (outgoing: Partial<ApiMessage>) => {
+    if (isVanishModeRef.current) {
+      outgoing.companionSticker = outgoing.companionSticker ? `${outgoing.companionSticker},__vanish__` : "__vanish__";
+    }
+    const saved = await api.sendMessage(outgoing);
+    if (isVanishModeRef.current) {
+      vanishMessageIdsRef.current.add(saved.id);
+    }
+    return saved;
+  }, []);
+
   useEffect(() => {
     isVanishModeRef.current = isVanishMode;
     if (!isVanishMode && vanishMessageIdsRef.current.size > 0) {
@@ -473,7 +484,7 @@ export default function Messages() {
           imageUrl: url,
           text: posText,
         });
-        const saved = await api.sendMessage(outgoing);
+        const saved = await sendMessageWithVanish(outgoing);
         const [display] = await normalizeMessages([saved]);
 
         setMessages((prev) => {
@@ -1846,10 +1857,7 @@ export default function Messages() {
       requestStickToBottom();
 
       const outgoing = await prepareOutgoingMessage({ senderId: user.id, ...partial });
-      const saved = await api.sendMessage(outgoing);
-      if (isVanishModeRef.current) {
-        vanishMessageIdsRef.current.add(saved.id);
-      }
+      const saved = await sendMessageWithVanish(outgoing);
       const [display] = await normalizeMessages([saved]);
       setMessages((prev) => {
         const next = replaceOptimisticMessage(prev, tempId!, display, user.id);
@@ -1899,7 +1907,7 @@ export default function Messages() {
           imageUrl: url,
           ...(sticker ? { companionSticker: sticker } : {}),
         });
-        const saved = await api.sendMessage(outgoing);
+        const saved = await sendMessageWithVanish(outgoing);
         const [display] = await normalizeMessages([saved]);
         setMessages((prev) => {
           const next = replaceOptimisticMessage(prev, tempId, display, user.id);
@@ -1970,7 +1978,7 @@ export default function Messages() {
               companionSticker: sticker,
             }),
         });
-        const saved = await api.sendMessage(outgoing);
+        const saved = await sendMessageWithVanish(outgoing);
         const [display] = await normalizeMessages([saved]);
         pendingOutgoingRef.current.delete(tempId);
         setMessages((prev) => {
@@ -2461,7 +2469,7 @@ export default function Messages() {
           fileType: file.type,
           fileSize: file.size,
         });
-        const saved = await api.sendMessage(outgoing);
+        const saved = await sendMessageWithVanish(outgoing);
         const [display] = await normalizeMessages([saved]);
         pendingOutgoingRef.current.delete(tempId);
         setMessages((prev) => replaceOptimisticMessage(prev, tempId, display, user.id));
@@ -2679,7 +2687,7 @@ export default function Messages() {
               fileSize: normalized.size,
               ...(sticker ? { companionSticker: sticker } : {}),
             });
-            const saved = await api.sendMessage(outgoing);
+            const saved = await sendMessageWithVanish(outgoing);
             const [display] = await normalizeMessages([saved]);
             pendingOutgoingRef.current.delete(tempId);
             setMessages((prev) => {
@@ -2819,7 +2827,7 @@ export default function Messages() {
         imageUrl: url,
         companionSticker: sticker,
       });
-      const saved = await api.sendMessage(outgoing);
+      const saved = await sendMessageWithVanish(outgoing);
       const [display] = await normalizeMessages([saved]);
       pendingOutgoingRef.current.delete(tempId);
       setMessages((prev) => replaceOptimisticMessage(prev, tempId, display, user.id));
@@ -2888,7 +2896,7 @@ export default function Messages() {
               }),
             ]);
             outgoing.audioData = url;
-            const saved = await api.sendMessage(outgoing);
+            const saved = await sendMessageWithVanish(outgoing);
             const [display] = await normalizeMessages([saved]);
             pendingOutgoingRef.current.delete(tempId);
             setMessages((prev) => replaceOptimisticMessage(prev, tempId, display, senderId));
