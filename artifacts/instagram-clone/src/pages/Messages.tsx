@@ -1,5 +1,5 @@
 import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, startTransition, type ReactElement } from "react";
-import { Info, Heart, Mic, X, Trash2, Ban, Phone, Video, WifiOff, Wifi, Search, AlertCircle, Palette, MessageCircle, Shield } from "lucide-react";
+import { Info, Heart, Mic, X, Trash2, Ban, Phone, Video, WifiOff, Wifi, Search, AlertCircle, Palette, MessageCircle, Shield, Ghost } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { api, type ApiMessage } from "@/lib/api";
 import type { ScheduledMessage } from "@/lib/types";
@@ -215,6 +215,21 @@ export default function Messages() {
   });
   const [isTyping, setIsTyping] = useState(false);
   const [isPartnerDoodling, setIsPartnerDoodling] = useState(false);
+  const [isVanishMode, setIsVanishMode] = useState(false);
+  const isVanishModeRef = useRef(false);
+  const vanishMessageIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    isVanishModeRef.current = isVanishMode;
+    if (!isVanishMode && vanishMessageIdsRef.current.size > 0) {
+      const ids = Array.from(vanishMessageIdsRef.current);
+      vanishMessageIdsRef.current.clear();
+      ids.forEach((id) => {
+        api.deleteMessage(id).catch(console.error);
+        setMessages(prev => prev.filter(m => m.id !== id));
+      });
+    }
+  }, [isVanishMode]);
   const [appThemeId, setAppThemeId] = useState<AppThemeId>(() => getStoredAppTheme());
   const searchParams = useAppSearchParams();
   const highlightParam = searchParams.get("highlight");
@@ -1832,6 +1847,9 @@ export default function Messages() {
 
       const outgoing = await prepareOutgoingMessage({ senderId: user.id, ...partial });
       const saved = await api.sendMessage(outgoing);
+      if (isVanishModeRef.current) {
+        vanishMessageIdsRef.current.add(saved.id);
+      }
       const [display] = await normalizeMessages([saved]);
       setMessages((prev) => {
         const next = replaceOptimisticMessage(prev, tempId!, display, user.id);
@@ -3185,7 +3203,7 @@ export default function Messages() {
         />
       )}
       <div
-        className={`chat-panel flex-1 min-w-0 h-full min-h-0 relative ${premiumChatClass}`}
+        className={`chat-panel flex-1 min-w-0 h-full min-h-0 relative ${premiumChatClass} transition-colors duration-500 ${isVanishMode ? 'bg-zinc-950' : ''}`}
       >
         {showChatAurora && <ChatAuroraLayer />}
 
@@ -3221,6 +3239,14 @@ export default function Messages() {
               </div>
 
 
+              <button
+                onClick={() => setIsVanishMode(s => !s)}
+                className={`p-1.5 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 active:scale-95 ${isVanishMode ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground hover:bg-secondary"}`}
+                aria-label="Vanish Mode"
+                title="Vanish Mode"
+              >
+                <Ghost className="w-4 h-4" strokeWidth={1.5} />
+              </button>
               {appThemeId !== "mint" && (
                 <button
                   onClick={() => setShowBubbleColors(true)}

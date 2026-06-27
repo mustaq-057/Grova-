@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Phone, PhoneOff, Video, VideoOff, Mic, MicOff, Volume2, Volume1, VolumeX, SwitchCamera, ChevronDown, AlertCircle, MonitorUp, PictureInPicture, Gauge, AlarmClock, MessageSquare } from "lucide-react";
+import { Phone, PhoneOff, Video, VideoOff, Mic, MicOff, Volume2, Volume1, VolumeX, SwitchCamera, ChevronDown, AlertCircle, MonitorUp, PictureInPicture, Gauge, AlarmClock, MessageSquare, Wand2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@/lib/api";
 import { getAuthHeaders } from "@/lib/session";
@@ -103,8 +103,12 @@ export default function CallScreen({
   const [isReconnecting, setIsReconnecting] = useState(false);
   const [audioOutput, setAudioOutput] = useState<"speaker" | "earpiece">("speaker");
   const [lowDataMode, setLowDataMode] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<string>("none");
   
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const canvasStreamRef = useRef<MediaStream | null>(null);
+  const rafRef = useRef<number>(0);
   
   const audioCtxRef = useRef<AudioContext | null>(null);
   const ringtoneAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -259,9 +263,40 @@ export default function CallScreen({
   const cleanupMedia = useCallback(() => {
     localStreamRef.current?.getTracks().forEach((t) => t.stop());
     localStreamRef.current = null;
+    canvasStreamRef.current?.getTracks().forEach((t) => t.stop());
+    canvasStreamRef.current = null;
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
     pcRef.current?.close();
     pcRef.current = null;
   }, []);
+
+  useEffect(() => {
+    if (call.type !== "video" || !localVideoRef.current || !canvasRef.current) return;
+    const video = localVideoRef.current;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const render = () => {
+      if (video.videoWidth && video.videoHeight) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.filter = activeFilter;
+        if (cameraFacing === "user") {
+          ctx.translate(canvas.width, 0);
+          ctx.scale(-1, 1);
+        }
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        if (cameraFacing === "user") {
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+        }
+      }
+      rafRef.current = requestAnimationFrame(render);
+    };
+    render();
+    
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [call.type, activeFilter, cameraFacing]);
 
   const handleEnd = useCallback(() => {
     if (ringingIntervalRef.current) clearInterval(ringingIntervalRef.current);
@@ -311,7 +346,18 @@ export default function CallScreen({
 
         const pc = new RTCPeerConnection(rtcConfigRef.current);
         pcRef.current = pc;
-        stream.getTracks().forEach((t) => pc.addTrack(t, stream));
+        
+        let outStream = stream;
+        if (call.type === "video" && canvasRef.current) {
+          const cStream = canvasRef.current.captureStream(30);
+          canvasStreamRef.current = cStream;
+          outStream = new MediaStream([
+            stream.getAudioTracks()[0],
+            cStream.getVideoTracks()[0]
+          ].filter(Boolean) as MediaStreamTrack[]);
+        }
+        
+        outStream.getTracks().forEach((t) => pc.addTrack(t, outStream));
 
         pc.ontrack = (e) => {
           attachRemoteStream(e.streams[0] ?? new MediaStream([e.track]));
@@ -629,6 +675,7 @@ export default function CallScreen({
       data-testid="call-screen"
     >
       <audio ref={remoteAudioRef} autoPlay playsInline className="sr-only" aria-hidden />
+      <canvas ref={canvasRef} className="hidden" />
 
       {isReconnecting && (
         <div className="absolute inset-0 z-[250] bg-black/60 backdrop-blur-md flex flex-col items-center justify-center pointer-events-none">
@@ -711,6 +758,28 @@ export default function CallScreen({
                 </div>
               )}
             </motion.div>
+          </div>
+
+          {/* AR Filters */}
+          <div className="absolute bottom-28 inset-x-0 z-20 flex justify-center pb-2 px-2 overflow-x-auto snap-x no-scrollbar">
+            <div className="flex gap-2 px-4 snap-center bg-black/40 p-1.5 rounded-full backdrop-blur-md border border-white/10 shadow-xl">
+              <div className="flex items-center justify-center pl-2 pr-1"><Wand2 className="w-4 h-4 text-white/70" /></div>
+              {[
+                { id: "none", label: "Normal" },
+                { id: "grayscale(1)", label: "B&W" },
+                { id: "sepia(1)", label: "Sepia" },
+                { id: "invert(1)", label: "Invert" },
+                { id: "hue-rotate(90deg)", label: "Alien" }
+              ].map(f => (
+                <button
+                  key={f.id}
+                  onClick={() => setActiveFilter(f.id)}
+                  className={`px-3 py-1 rounded-full text-[11px] font-semibold transition-all active:scale-95 ${activeFilter === f.id ? "bg-white text-black" : "text-white/80 hover:bg-white/20"}`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Bottom Controls */}
