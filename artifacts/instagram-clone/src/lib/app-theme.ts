@@ -8,7 +8,8 @@ export type AppThemeId =
   | "moonlight-saga"
   | "floura"
   | "mint"
-  | "library";
+  | "library"
+  | "mustaq";
 
 const PREMIUM_ANIMATED_THEMES: AppThemeId[] = ["moonlight-saga"];
 
@@ -27,6 +28,7 @@ const THEME_BACKGROUNDS: Partial<Record<AppThemeId, string>> = {
   "floura": "/themes/saralikedtheme.png",
   "mint": "/mint-home.png",
   "library": "/themes/library-bg.png",
+  "mustaq": "/themes/mustaq-bg.png",
 };
 
 export const APP_THEME_CHANGED = "grova-app-theme-changed";
@@ -172,6 +174,28 @@ export const APP_THEMES: {
         "--app-border": "210 18% 85%",
       },
     },
+    {
+      id: "mustaq",
+      name: "Mustaq",
+      description: "Dark, sleek, and premium obsidian vibes ✦",
+      swatch: "bg-gradient-to-br from-neutral-900 via-zinc-900 to-amber-900/50",
+      dark: {
+        "--app-background": "240 10% 4%",
+        "--app-foreground": "45 20% 90%",
+        "--app-primary": "40 80% 60%", // Gold/Amber accent
+        "--app-card": "240 8% 8%",
+        "--app-secondary": "240 6% 12%",
+        "--app-border": "240 5% 18%",
+      },
+      light: {
+        "--app-background": "240 5% 96%",
+        "--app-foreground": "240 20% 10%",
+        "--app-primary": "35 90% 40%", // Darker gold for light mode
+        "--app-card": "0 0% 100%",
+        "--app-secondary": "240 5% 90%",
+        "--app-border": "240 5% 85%",
+      },
+    },
   ];
 
 let currentAppTheme: AppThemeId = "sara-lavender";
@@ -277,6 +301,7 @@ export function getThemeBackgroundOpacity(themeId?: AppThemeId): number {
   if (id === "floura") return 1.0;
   if (id === "mint") return 1.0;
   if (id === "library") return 1.0;
+  if (id === "mustaq") return 1.0;
   return 0.28;
 }
 
@@ -305,6 +330,11 @@ export function getPhotoScrimGradient(themeId: AppThemeId, dark: boolean): strin
     return dark
       ? "linear-gradient(180deg, rgba(30,20,15,0.5) 0%, rgba(20,10,5,0.85) 100%)"
       : "linear-gradient(180deg, rgba(250,240,230,0.4) 0%, rgba(240,230,215,0.7) 100%)";
+  }
+  if (themeId === "mustaq") {
+    return dark
+      ? "linear-gradient(180deg, rgba(10,10,12,0.4) 0%, rgba(5,5,8,0.85) 100%)"
+      : "linear-gradient(180deg, rgba(250,250,252,0.3) 0%, rgba(240,240,245,0.6) 100%)";
   }
 
   return dark
