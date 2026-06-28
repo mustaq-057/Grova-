@@ -1354,9 +1354,9 @@ export default function Messages() {
   useEffect(() => {
     if (chatAnimationsEnabled) return;
     if (messages.length === 0) return;
-    // Wait until initial paint + scroll settle before enabling animations
-    // (prevents visible flash when messages first render)
-    const t = window.setTimeout(() => setChatAnimationsEnabled(true), 250);
+    // Wait just enough for layout to settle before revealing to prevent visual snap,
+    // but keep it fast enough (40ms) to feel instantaneous.
+    const t = window.setTimeout(() => setChatAnimationsEnabled(true), 40);
     return () => window.clearTimeout(t);
   }, [chatAnimationsEnabled, messages.length]);
 
