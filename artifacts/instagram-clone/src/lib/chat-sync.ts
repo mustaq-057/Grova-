@@ -206,12 +206,16 @@ export function reconcilePendingOptimistics(
   pendingIds: Set<string>,
 ): ApiMessage[] {
   const pending = prev.filter((m) => pendingIds.has(m.id));
+  const matchedFreshIds = new Set<string>();
+
   const cleaned = prev.filter((m) => {
     if (!pendingIds.has(m.id)) return true;
-    const match = findOptimisticMatch(m, fresh);
+    const availableFresh = fresh.filter((f) => !matchedFreshIds.has(f.id));
+    const match = findOptimisticMatch(m, availableFresh);
     if (match) {
       match.clientUniqueId = m.clientUniqueId || m.id;
       pendingIds.delete(m.id);
+      matchedFreshIds.add(match.id);
       return false;
     }
     return true;
@@ -234,7 +238,7 @@ export function replaceOptimisticMessage(
 
   if (prev.some((m) => m.id === merged.id && m.id !== tempId)) {
     return prev
-      .map((m) => (m.id === merged.id ? { ...m, clientUniqueId: tempId } : m))
+      .map((m) => (m.id === merged.id ? { ...merged, clientUniqueId: tempId } : m))
       .filter((m) => m.id !== tempId);
   }
 
