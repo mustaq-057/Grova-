@@ -293,17 +293,11 @@
   grid-row: 2;
   min-height: 0;
   overflow-x: hidden;
-  overflow-anchor: none;
   scroll-padding-bottom: 2rem;
   padding-bottom: 1.25rem;
 }
 
-.chat-panel-messages > * {
-  overflow-anchor: none;
-}
-
 .scroll-anchor-bottom {
-  overflow-anchor: auto;
   height: 1px;
   width: 100%;
 }
