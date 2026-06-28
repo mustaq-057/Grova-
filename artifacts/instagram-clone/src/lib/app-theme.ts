@@ -9,7 +9,9 @@ export type AppThemeId =
   | "floura"
   | "mint"
   | "library"
-  | "mustaq";
+  | "mustaq"
+  | "autumn-amber"
+  | "petrichor";
 
 const PREMIUM_ANIMATED_THEMES: AppThemeId[] = ["moonlight-saga"];
 
@@ -29,6 +31,8 @@ const THEME_BACKGROUNDS: Partial<Record<AppThemeId, string>> = {
   "mint": "/mint-home.png",
   "library": "/themes/library-bg.png",
   "mustaq": "/themes/mustaq-bg.png",
+  "autumn-amber": "/themes/autumn-amber-bg.png",
+  "petrichor": "/themes/petrichor-bg.png",
 };
 
 export const APP_THEME_CHANGED = "grova-app-theme-changed";
@@ -196,6 +200,50 @@ export const APP_THEMES: {
         "--app-border": "240 5% 85%",
       },
     },
+    {
+      id: "autumn-amber",
+      name: "Autumn Amber",
+      description: "Warm, cozy golden canopy 🍂",
+      swatch: "bg-gradient-to-br from-amber-600 via-orange-500 to-yellow-600",
+      dark: {
+        "--app-background": "25 25% 10%",
+        "--app-foreground": "35 30% 95%",
+        "--app-primary": "25 80% 60%", // Warm amber/orange
+        "--app-card": "25 20% 12%",
+        "--app-secondary": "25 15% 18%",
+        "--app-border": "25 15% 24%",
+      },
+      light: {
+        "--app-background": "35 20% 96%",
+        "--app-foreground": "25 30% 15%",
+        "--app-primary": "25 85% 50%", // Darker amber for light mode
+        "--app-card": "0 0% 100%",
+        "--app-secondary": "35 15% 92%",
+        "--app-border": "35 10% 88%",
+      },
+    },
+    {
+      id: "petrichor",
+      name: "Petrichor",
+      description: "Calm, rainy forest window 🌧️",
+      swatch: "bg-gradient-to-br from-slate-700 via-zinc-600 to-gray-700",
+      dark: {
+        "--app-background": "200 15% 12%",
+        "--app-foreground": "200 10% 95%",
+        "--app-primary": "180 30% 60%", // Muted teal/silver
+        "--app-card": "200 12% 16%",
+        "--app-secondary": "200 10% 20%",
+        "--app-border": "200 8% 28%",
+      },
+      light: {
+        "--app-background": "200 10% 94%",
+        "--app-foreground": "200 15% 15%",
+        "--app-primary": "180 35% 45%", // Muted teal for light mode
+        "--app-card": "0 0% 100%",
+        "--app-secondary": "200 12% 88%",
+        "--app-border": "200 10% 82%",
+      },
+    },
   ];
 
 let currentAppTheme: AppThemeId = "sara-lavender";
@@ -289,6 +337,14 @@ export function isMustaqTheme(themeId?: AppThemeId): boolean {
   return (themeId ?? getStoredAppTheme()) === "mustaq";
 }
 
+export function isAutumnAmberTheme(themeId?: AppThemeId): boolean {
+  return (themeId ?? getStoredAppTheme()) === "autumn-amber";
+}
+
+export function isPetrichorTheme(themeId?: AppThemeId): boolean {
+  return (themeId ?? getStoredAppTheme()) === "petrichor";
+}
+
 export function getThemeBackgroundUrl(themeId?: AppThemeId): string | null {
   const id = themeId ?? getStoredAppTheme();
   return THEME_BACKGROUNDS[id] ?? null;
@@ -306,6 +362,8 @@ export function getThemeBackgroundOpacity(themeId?: AppThemeId): number {
   if (id === "mint") return 1.0;
   if (id === "library") return 1.0;
   if (id === "mustaq") return 1.0;
+  if (id === "autumn-amber") return 1.0;
+  if (id === "petrichor") return 1.0;
   return 0.28;
 }
 
@@ -339,6 +397,16 @@ export function getPhotoScrimGradient(themeId: AppThemeId, dark: boolean): strin
     return dark
       ? "linear-gradient(180deg, rgba(10,10,12,0.4) 0%, rgba(5,5,8,0.85) 100%)"
       : "linear-gradient(180deg, rgba(250,250,252,0.3) 0%, rgba(240,240,245,0.6) 100%)";
+  }
+  if (themeId === "autumn-amber") {
+    return dark
+      ? "linear-gradient(180deg, rgba(30,20,10,0.3) 0%, rgba(20,10,5,0.7) 100%)"
+      : "linear-gradient(180deg, rgba(250,240,230,0.3) 0%, rgba(245,235,220,0.6) 100%)";
+  }
+  if (themeId === "petrichor") {
+    return dark
+      ? "linear-gradient(180deg, rgba(20,25,30,0.4) 0%, rgba(15,20,25,0.8) 100%)"
+      : "linear-gradient(180deg, rgba(230,235,240,0.3) 0%, rgba(220,225,230,0.6) 100%)";
   }
 
   return dark

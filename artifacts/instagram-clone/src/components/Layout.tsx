@@ -16,6 +16,8 @@ import { AvatarImage } from "@/components/AvatarImage";
 import { FallingFlowersOverlay } from "@/components/FallingFlowersOverlay";
 import { FallingNamesOverlay } from "@/components/FallingNamesOverlay";
 import { FallingMustaqOverlay } from "@/components/FallingMustaqOverlay";
+import { FallingAutumnOverlay } from "@/components/FallingAutumnOverlay";
+import { RainstormOverlay } from "@/components/RainstormOverlay";
 import { PremiumThemeOverlay } from "@/components/PremiumThemeOverlay";
 import { ThemeBackgroundOverlay } from "@/components/ThemeBackgroundOverlay";
 import {
@@ -26,6 +28,8 @@ import {
   isSaraLavenderTheme,
   isPremiumAnimatedTheme,
   isMustaqTheme,
+  isAutumnAmberTheme,
+  isPetrichorTheme,
   themeUsesPhotoBackground,
   type AppThemeId,
 } from "@/lib/app-theme";
@@ -55,6 +59,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const showAurora = isMoonlightSagaTheme(appTheme);
   const showSaraLavender = isSaraLavenderTheme(appTheme);
   const showMustaqNames = isMustaqTheme(appTheme);
+  const showAutumnLeaves = isAutumnAmberTheme(appTheme);
+  const showRainstorm = isPetrichorTheme(appTheme);
   const showPremiumScene = isPremiumAnimatedTheme(appTheme) && !isChat;
   const showThemeBg = themeUsesPhotoBackground(appTheme);
   const isLibrary = location.startsWith("/library") || location.startsWith("/read");
@@ -163,6 +169,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
       {showSakura && <FallingFlowersOverlay />}
       {showSaraLavender && <FallingNamesOverlay />}
       {showMustaqNames && <FallingMustaqOverlay />}
+      {showAutumnLeaves && <FallingAutumnOverlay />}
+      {showRainstorm && <RainstormOverlay />}
       {/* Desktop Sidebar */}
       {!libraryMode && (
         <nav
