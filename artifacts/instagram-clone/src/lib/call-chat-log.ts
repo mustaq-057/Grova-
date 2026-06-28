@@ -24,7 +24,17 @@ export function missedCallText(callType: "audio" | "video", at = new Date()): st
   return `📞 Missed ${kind} call · ${formatChatTime(at)}`;
 }
 
-const CALL_LOG_RE = /^📞 (Audio|Video|Missed) /;
+export function canceledCallText(callType: "audio" | "video", at = new Date()): string {
+  const kind = callType === "video" ? "video" : "audio";
+  return `📞 Canceled ${kind} call · ${formatChatTime(at)}`;
+}
+
+export function declinedCallText(callType: "audio" | "video", at = new Date()): string {
+  const kind = callType === "video" ? "video" : "audio";
+  return `📞 Declined ${kind} call · ${formatChatTime(at)}`;
+}
+
+const CALL_LOG_RE = /^📞 (Audio|Video|Missed|Canceled|Declined) /;
 
 export function isCallLogMessage(text?: string): boolean {
   return Boolean(text && CALL_LOG_RE.test(text));

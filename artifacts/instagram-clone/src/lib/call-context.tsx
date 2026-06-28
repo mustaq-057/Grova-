@@ -4,7 +4,7 @@ import { useAuth } from "./auth";
 import CallScreen, { IncomingCallOverlay } from "@/components/CallScreen";
 import { isChatBlocked } from "./client-memory";
 import { readSessionSnapshot } from "./profile-cache";
-import { callStartedText, callEndedText, missedCallText } from "./call-chat-log";
+import { callStartedText, callEndedText, missedCallText, canceledCallText, declinedCallText } from "./call-chat-log";
 import { openLiveChannel, type LiveChannel } from "./sse-client";
 
 export type CallType = "audio" | "video";
@@ -67,7 +67,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
     }
   }, [user]);
 
-  const endCall = useCallback((opts?: { fromRemote?: boolean }) => {
+  const endCall = useCallback((opts?: { fromRemote?: boolean; reason?: "timeout" }) => {
     const type = activeCallTypeRef.current;
     const startedAt = callConnectedAtRef.current;
     const hadSession = callLoggedStartRef.current;
@@ -87,7 +87,13 @@ export function CallProvider({ children }: { children: ReactNode }) {
         const durationSec = startedAt ? Math.max(0, Math.floor((Date.now() - startedAt) / 1000)) : 0;
         void sendCallLogMsg(callEndedText(type, durationSec));
       } else {
-        void sendCallLogMsg(missedCallText(type));
+        if (opts?.reason === "timeout") {
+          void sendCallLogMsg(missedCallText(type));
+        } else if (opts?.fromRemote) {
+          void sendCallLogMsg(declinedCallText(type));
+        } else {
+          void sendCallLogMsg(canceledCallText(type));
+        }
       }
     }
   }, [sendCallLogMsg]);
@@ -194,7 +200,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
     if (callState?.status !== "outgoing") return;
     
     const timer = setTimeout(() => {
-      endCall();
+      endCall({ reason: "timeout" });
     }, 60000);
     
     return () => clearTimeout(timer);
