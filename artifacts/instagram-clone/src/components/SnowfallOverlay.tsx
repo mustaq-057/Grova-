@@ -206,22 +206,16 @@ export const SnowfallOverlay = memo(function SnowfallOverlay() {
               "--base-opacity": f.opacity,
             }}
           >
-            {/* Very blurred background flakes are better rendered as pure CSS circles for performance, 
-                but mid/foreground are SVG crystals */}
-            {f.blur > 2 ? (
-               <div className="w-full h-full rounded-full bg-white" />
-            ) : (
-               <div 
-                 className="w-full h-full"
-                 style={{ 
-                   animation: `snowSpin ${f.spinDuration}s linear ${f.delay}s infinite`,
-                   // @ts-expect-error
-                   "--start-spin": `${f.spin}deg`
-                 }}
-               >
-                 {SNOWFLAKE_SVGS[f.shapeIndex]}
-               </div>
-            )}
+            <div 
+              className="w-full h-full"
+              style={{ 
+                animation: `snowSpin ${f.spinDuration}s linear ${f.delay}s infinite`,
+                // @ts-expect-error
+                "--start-spin": `${f.spin}deg`
+              }}
+            >
+              {SNOWFLAKE_SVGS[f.shapeIndex]}
+            </div>
           </div>
         ))}
       </div>
