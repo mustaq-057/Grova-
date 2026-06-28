@@ -38,9 +38,6 @@ type Firefly = {
 };
 
 export const FallingAutumnOverlay = memo(function FallingAutumnOverlay() {
-  const [globalWind, setGlobalWind] = useState(0);
-  const [touchWindX, setTouchWindX] = useState(0);
-  const [touchWindY, setTouchWindY] = useState(0);
   const [isNight, setIsNight] = useState(false);
 
   // Time of Day Logic
@@ -52,80 +49,6 @@ export const FallingAutumnOverlay = memo(function FallingAutumnOverlay() {
     checkTime();
     const interval = setInterval(checkTime, 60000);
     return () => clearInterval(interval);
-  }, []);
-
-  // Global scroll listener for wind physics
-  useEffect(() => {
-    let lastScrollY = window.scrollY;
-    let ticking = false;
-    let windTimeout: ReturnType<typeof setTimeout>;
-
-    const handleScroll = (e: Event) => {
-      if (!ticking) {
-        window.requestAnimationFrame(() => {
-          const target = e.target as HTMLElement | Document;
-          const currentScrollY = target === document ? window.scrollY : (target as HTMLElement).scrollTop;
-          const velocity = currentScrollY - lastScrollY;
-          lastScrollY = currentScrollY;
-
-          if (Math.abs(velocity) > 5) {
-            const windForce = Math.max(-100, Math.min(100, velocity * (target === document ? 2 : -1.5)));
-            setGlobalWind(windForce);
-            
-            clearTimeout(windTimeout);
-            windTimeout = setTimeout(() => setGlobalWind(0), 300);
-          }
-          ticking = false;
-        });
-        ticking = true;
-      }
-    };
-
-    window.addEventListener("scroll", handleScroll, { passive: true, capture: true });
-    return () => window.removeEventListener("scroll", handleScroll, { capture: true });
-  }, []);
-
-  // Interactive Touch/Mouse Wind
-  useEffect(() => {
-    let lastX = 0;
-    let lastY = 0;
-    let lastTime = Date.now();
-    let windTimeout: ReturnType<typeof setTimeout>;
-
-    const handleMove = (e: MouseEvent | TouchEvent) => {
-      const now = Date.now();
-      if (now - lastTime < 16) return; // limit to ~60fps
-      
-      const clientX = 'touches' in e ? e.touches[0].clientX : (e as MouseEvent).clientX;
-      const clientY = 'touches' in e ? e.touches[0].clientY : (e as MouseEvent).clientY;
-      
-      if (lastX !== 0 && lastY !== 0) {
-        const dx = clientX - lastX;
-        const dy = clientY - lastY;
-        
-        // Calculate velocity vector
-        setTouchWindX(Math.max(-200, Math.min(200, dx * 3)));
-        setTouchWindY(Math.max(-200, Math.min(200, dy * 3)));
-        
-        clearTimeout(windTimeout);
-        windTimeout = setTimeout(() => {
-          setTouchWindX(0);
-          setTouchWindY(0);
-        }, 150);
-      }
-      
-      lastX = clientX;
-      lastY = clientY;
-      lastTime = now;
-    };
-
-    window.addEventListener("mousemove", handleMove, { passive: true });
-    window.addEventListener("touchmove", handleMove, { passive: true });
-    
-    return () => {
-      window.removeEventListener("mousemove", handleMove);
-      window.removeEventListener("touchmove", handleMove);
-    };
   }, []);
 
   const flakes = useMemo<Flake[]>(() => {
@@ -168,7 +91,7 @@ export const FallingAutumnOverlay = memo(function FallingAutumnOverlay() {
           0% { transform: translate3d(0, -15vh, 0) scale(0.85); opacity: 0; }
           10% { opacity: 1; }
           90% { opacity: 1; }
-          100% { transform: translate3d(calc(var(--drift) + var(--wind-x)), calc(115vh + var(--wind-y)), 0) scale(1.1); opacity: 0; }
+          100% { transform: translate3d(var(--drift), 115vh, 0) scale(1.1); opacity: 0; }
         }
         @keyframes autumnSway {
           0%, 100% { margin-left: 0; }
@@ -220,11 +143,8 @@ export const FallingAutumnOverlay = memo(function FallingAutumnOverlay() {
         }}
       />
 
-      {/* Container responding to wind forces */}
-      <div 
-        className="absolute inset-0 transition-transform duration-500 ease-out"
-        style={{ transform: `translate3d(${touchWindX * 0.5}px, ${(globalWind * 0.3) + (touchWindY * 0.5)}px, 0)` }}
-      >
+      {/* Container without interactive wind transform */}
+      <div className="absolute inset-0 transition-transform duration-500 ease-out">
         {/* Render Leaves during the day, or Fireflies during the night */}
         {!isNight ? (
           flakes.map((f) => (
@@ -242,8 +162,6 @@ export const FallingAutumnOverlay = memo(function FallingAutumnOverlay() {
                 // @ts-expect-error css vars
                 "--drift": `${f.drift}px`,
                 "--sway": `${f.sway}px`,
-                "--wind-x": `${touchWindX}px`,
-                "--wind-y": `${globalWind}px`,
               }}
             >
               <div className="w-full h-full" style={{ transform: `rotate(${f.spin}deg)` }}>
@@ -269,8 +187,8 @@ export const FallingAutumnOverlay = memo(function FallingAutumnOverlay() {
                   fireflyBlink ${1 + Math.random() * 2}s ease-in-out ${f.delay}s infinite alternate
                 `,
                 // @ts-expect-error vars
-                "--drift-x": `${f.driftX + (touchWindX * 0.5)}px`,
-                "--drift-y": `${f.driftY + (touchWindY * 0.5)}px`,
+                "--drift-x": `${f.driftX}px`,
+                "--drift-y": `${f.driftY}px`,
                 "--max-opacity": f.opacity
               }}
             />

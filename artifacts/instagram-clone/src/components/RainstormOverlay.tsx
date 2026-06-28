@@ -35,35 +35,12 @@ export const RainstormOverlay = memo(function RainstormOverlay() {
   const [lightningFlash, setLightningFlash] = useState(0); 
   const [ripples, setRipples] = useState<Ripple[]>([]);
   const [splashes, setSplashes] = useState<PuddleSplash[]>([]);
-  const [gyroX, setGyroX] = useState(0);
-
-  // Device Orientation (Gyroscope) Engine
-  useEffect(() => {
-    const handleOrientation = (e: DeviceOrientationEvent) => {
-      if (e.gamma === null) return;
-      // gamma is the left/right tilt in degrees (-90 to 90)
-      // Clamp between -45 and 45 to prevent extreme shifting
-      const tilt = Math.max(-45, Math.min(45, e.gamma));
-      setGyroX(tilt);
-    };
-
-    // Note: iOS requires permission for DeviceOrientation, but Android usually doesn't.
-    // If not supported/permitted, it stays at 0.
-    if (window.DeviceOrientationEvent) {
-      window.addEventListener("deviceorientation", handleOrientation);
-    }
-    return () => {
-      if (window.DeviceOrientationEvent) {
-        window.removeEventListener("deviceorientation", handleOrientation);
-      }
-    };
-  }, []);
 
   // Organic Lightning Engine
   useEffect(() => {
     let timeout: ReturnType<typeof setTimeout>;
     const scheduleLightning = () => {
-      const nextStrikeIn = 5000 + Math.random() * 15000;
+      const nextStrikeIn = 3000 + Math.random() * 8000; // More frequent thunder
       timeout = setTimeout(() => {
         const intensity = Math.random() > 0.7 ? 2 : 1;
         setLightningFlash(intensity);
@@ -140,7 +117,7 @@ export const RainstormOverlay = memo(function RainstormOverlay() {
 
 
   const drops = useMemo<Drop[]>(() => {
-    return Array.from({ length: 70 }, (_, i) => ({
+    return Array.from({ length: 200 }, (_, i) => ({ // Increased from 70 to 200 for heavier rain
       id: i,
       left: Math.random() * 100,
       width: 1 + Math.random() * 1.5, 
@@ -165,8 +142,8 @@ export const RainstormOverlay = memo(function RainstormOverlay() {
     <div className="pointer-events-none fixed inset-0 z-[1] overflow-hidden" aria-hidden>
       <style>{`
         @keyframes rainFall {
-          0% { transform: translate3d(0, -20vh, 0) skewX(var(--gyro-skew)); }
-          100% { transform: translate3d(calc(var(--gyro-x) * 1px), 120vh, 0) skewX(var(--gyro-skew)); }
+          0% { transform: translate3d(0, -20vh, 0); }
+          100% { transform: translate3d(0, 120vh, 0); }
         }
         @keyframes rippleExpand {
           0% { transform: scale(0); opacity: 0.6; }
@@ -183,15 +160,12 @@ export const RainstormOverlay = memo(function RainstormOverlay() {
       <div 
         className={cn(
           "absolute inset-0 transition-colors duration-75",
-          lightningFlash === 2 ? "bg-white/10" : lightningFlash === 1 ? "bg-white/5" : "bg-transparent"
+          lightningFlash === 2 ? "bg-white/20" : lightningFlash === 1 ? "bg-white/10" : "bg-transparent" // Intensified thunder
         )}
       />
 
-      {/* Static Refracting Droplets - shifts slightly with gyro */}
-      <div 
-        className="absolute inset-0 transition-transform duration-200 ease-out"
-        style={{ transform: `translateX(${gyroX * 0.5}px)` }}
-      >
+      {/* Static Refracting Droplets */}
+      <div className="absolute inset-0 transition-transform duration-200 ease-out">
         {staticDroplets.map((d) => (
           <div
             key={`static-${d.id}`}
@@ -223,9 +197,6 @@ export const RainstormOverlay = memo(function RainstormOverlay() {
             opacity: d.opacity,
             filter: d.blur ? `blur(${d.blur}px)` : 'none',
             animation: `rainFall ${d.duration}s linear ${d.delay}s infinite`,
-            // @ts-expect-error css vars
-            '--gyro-x': `${gyroX * 10}`,
-            '--gyro-skew': `${-gyroX * 0.5}deg`, 
           }}
         />
       ))}

@@ -24,78 +24,6 @@ type Snowflake = {
 };
 
 export const SnowfallOverlay = memo(function SnowfallOverlay() {
-  const [touchWindX, setTouchWindX] = useState(0);
-  const [touchWindY, setTouchWindY] = useState(0);
-  const [tiltX, setTiltX] = useState(0);
-
-  // Interactive Touch/Mouse Wind
-  useEffect(() => {
-    let lastX = 0;
-    let lastY = 0;
-    let lastTime = Date.now();
-    let windTimeout: ReturnType<typeof setTimeout>;
-
-    const handleMove = (e: MouseEvent | TouchEvent) => {
-      const now = Date.now();
-      if (now - lastTime < 16) return; // limit to ~60fps
-      
-      const clientX = 'touches' in e ? e.touches[0].clientX : (e as MouseEvent).clientX;
-      const clientY = 'touches' in e ? e.touches[0].clientY : (e as MouseEvent).clientY;
-      
-      if (lastX !== 0 && lastY !== 0) {
-        const dx = clientX - lastX;
-        const dy = clientY - lastY;
-        
-        // Calculate velocity vector
-        setTouchWindX(Math.max(-150, Math.min(150, dx * 2)));
-        setTouchWindY(Math.max(-150, Math.min(150, dy * 2)));
-        
-        clearTimeout(windTimeout);
-        windTimeout = setTimeout(() => {
-          setTouchWindX(0);
-          setTouchWindY(0);
-        }, 300);
-      }
-      
-      lastX = clientX;
-      lastY = clientY;
-      lastTime = now;
-    };
-
-    window.addEventListener("mousemove", handleMove, { passive: true });
-    window.addEventListener("touchmove", handleMove, { passive: true });
-    
-    return () => {
-      window.removeEventListener("mousemove", handleMove);
-      window.removeEventListener("touchmove", handleMove);
-    };
-  }, []);
-
-  // Device Orientation Physics (Gyroscope)
-  useEffect(() => {
-    const handleOrientation = (event: DeviceOrientationEvent) => {
-      const gamma = event.gamma; // In degree in the range [-90,90]
-      if (gamma !== null) {
-        // Map tilt to wind force (-45deg to 45deg maps to -100px to 100px)
-        const tiltForce = Math.max(-100, Math.min(100, gamma * 2.2));
-        setTiltX(tiltForce);
-      }
-    };
-
-    // Need to request permission for iOS 13+
-    // But for simplicity, we just listen if it's available without prompt 
-    // (some browsers still allow it, or it will be ignored).
-    if (typeof window !== "undefined" && window.DeviceOrientationEvent) {
-      window.addEventListener("deviceorientation", handleOrientation, true);
-    }
-
-    return () => {
-      if (typeof window !== "undefined" && window.DeviceOrientationEvent) {
-        window.removeEventListener("deviceorientation", handleOrientation, true);
-      }
-    };
-  }, []);
-
   // Parallax Snowflakes
   const flakes = useMemo<Snowflake[]>(() => {
     return Array.from({ length: 60 }, (_, i) => {
@@ -145,7 +73,7 @@ export const SnowfallOverlay = memo(function SnowfallOverlay() {
       <style>{`
         @keyframes snowfall {
           0% { transform: translate3d(0, -10vh, 0); }
-          100% { transform: translate3d(calc(var(--tilt) + var(--wind-x)), calc(110vh + var(--wind-y)), 0); }
+          100% { transform: translate3d(0, 110vh, 0); }
         }
         @keyframes snowSway {
           0%, 100% { margin-left: 0; }
@@ -178,11 +106,8 @@ export const SnowfallOverlay = memo(function SnowfallOverlay() {
       {/* Frost Vignette (Glassmorphism edges) */}
       <div className="absolute inset-0 pointer-events-none shadow-[inset_0_0_120px_rgba(255,255,255,0.05)] ring-1 ring-white/5 mix-blend-overlay backdrop-blur-[1px] opacity-40 dark:opacity-20" />
 
-      {/* Container responding to touch/tilt forces for smooth lerping */}
-      <div 
-        className="absolute inset-0 transition-transform duration-500 ease-out"
-        style={{ transform: `translate3d(${touchWindX * 0.5 + tiltX * 0.3}px, ${touchWindY * 0.3}px, 0)` }}
-      >
+      {/* Container - no interactive wind transform needed */}
+      <div className="absolute inset-0 transition-transform duration-500 ease-out">
         {flakes.map((f) => (
           <div
             key={`snow-${f.id}`}
@@ -200,9 +125,6 @@ export const SnowfallOverlay = memo(function SnowfallOverlay() {
               `,
               // @ts-expect-error css vars
               "--sway": `${f.sway}px`,
-              "--tilt": `${tiltX * f.depth}px`,
-              "--wind-x": `${touchWindX * f.depth}px`,
-              "--wind-y": `${touchWindY * f.depth}px`,
               "--base-opacity": f.opacity,
             }}
           >

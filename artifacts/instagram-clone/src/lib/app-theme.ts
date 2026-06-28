@@ -34,6 +34,7 @@ const THEME_BACKGROUNDS: Partial<Record<AppThemeId, string>> = {
   "mustaq": "/themes/mustaq-bg.png",
   "autumn-amber": "/themes/autumn-amber-bg.png",
   "petrichor": "/themes/petrichor-bg.png",
+  "snowfall": "/themes/snowfall-bg.png",
 };
 
 export const APP_THEME_CHANGED = "grova-app-theme-changed";
@@ -391,6 +392,7 @@ export function getThemeBackgroundOpacity(themeId?: AppThemeId): number {
   if (id === "mustaq") return 1.0;
   if (id === "autumn-amber") return 1.0;
   if (id === "petrichor") return 1.0;
+  if (id === "snowfall") return 1.0;
   return 0.28;
 }
 
