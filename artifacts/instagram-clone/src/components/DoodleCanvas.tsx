@@ -315,7 +315,7 @@ export default function DoodleCanvas({ onClose, onSend, onError, onDrawStart, is
           }
         }
       }).catch(() => {});
-    }, 1000);
+    }, 5000);
 
     return () => {
       window.removeEventListener("doodle_sync_event", handleSync);

@@ -1183,7 +1183,7 @@ export default function Messages() {
 
       if (channel.mode === "poll") {
         livePollStop = channel.stop;
-        presencePollId = window.setInterval(syncPresenceFromServer, 1_000);
+        presencePollId = window.setInterval(syncPresenceFromServer, 15_000);
         void syncPresenceFromServer();
         
         const pollCallSignals = async () => {
@@ -1205,7 +1205,7 @@ export default function Messages() {
             console.error("Failed to poll call signals:", err);
           }
         };
-        const callPollId = window.setInterval(pollCallSignals, 1000);
+        const callPollId = window.setInterval(pollCallSignals, 15_000);
         const originalStop = livePollStop;
         livePollStop = () => {
           originalStop();
@@ -1264,7 +1264,7 @@ export default function Messages() {
           void openLiveChannel(user!.id, pollSyncMessages, { forcePoll: true }).then((channel) => {
             if (!mounted || !channel || channel.mode !== "poll") return;
             livePollStop = channel.stop;
-            presencePollId = window.setInterval(syncPresenceFromServer, 1_000);
+            presencePollId = window.setInterval(syncPresenceFromServer, 15_000);
             void syncPresenceFromServer();
           });
           return;

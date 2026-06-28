@@ -162,6 +162,7 @@ async function findExistingLibraryBook(
 
 // ─── GET CURATED CATALOG ─────────────────────────────────────────────────────
 libraryRouter.get("/library/catalog", authenticate, async (req, res) => {
+  res.set("Cache-Control", "public, s-maxage=60, stale-while-revalidate=86400");
   const category = typeof req.query.category === "string" ? req.query.category : undefined;
   const q = (req.query.q as string || "").trim();
   try {
@@ -451,6 +452,7 @@ libraryRouter.get("/library/search", authenticate, async (req, res) => {
 
 // ─── GET ALL BOOKS (with camelCase mapping) ──────────────────────────────────
 libraryRouter.get("/library", authenticate, async (req, res) => {
+  res.set("Cache-Control", "public, s-maxage=30, stale-while-revalidate=86400");
   try {
     const result = await db.query(
       `SELECT id, title, author,
@@ -476,6 +478,7 @@ libraryRouter.get("/library", authenticate, async (req, res) => {
 
 // ─── GET LIBRARY STATS ───────────────────────────────────────────────────────
 libraryRouter.get("/library/stats", authenticate, async (req: AuthenticatedRequest, res) => {
+  res.set("Cache-Control", "public, s-maxage=60, stale-while-revalidate=86400");
   try {
     const userId = req.user?.id;
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
@@ -1015,6 +1018,7 @@ libraryRouter.post("/library/:id/notes", authenticate, async (req: Authenticated
 
 // ─── GET ALL COLLECTIONS ────────────────────────────────────────────────────────
 libraryRouter.get("/library/collections", authenticate, async (req: AuthenticatedRequest, res) => {
+  res.set("Cache-Control", "public, s-maxage=30, stale-while-revalidate=86400");
   try {
     const userId = req.user?.id;
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
@@ -1072,6 +1076,7 @@ libraryRouter.delete("/library/collections/:id", authenticate, async (req: Authe
 
 // ─── GET COLLECTION DETAILS AND BOOKS ────────────────────────────────────────
 libraryRouter.get("/library/collections/:id", authenticate, async (req: AuthenticatedRequest, res) => {
+  res.set("Cache-Control", "public, s-maxage=30, stale-while-revalidate=86400");
   try {
     // Get collection metadata
     const colResult = await db.query(

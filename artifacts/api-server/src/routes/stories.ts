@@ -85,6 +85,7 @@ router.post("/stories", authenticate, rateLimiters.messages, async (req, res) =>
 });
 
 router.get("/stories", authenticate, rateLimiters.read, async (req, res) => {
+  res.set("Cache-Control", "public, s-maxage=10, stale-while-revalidate=60");
   try {
     const now = Date.now();
     
