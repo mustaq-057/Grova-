@@ -16,6 +16,9 @@ import { USER_TIMEZONES } from "@/lib/timezones";
 import { CameraOverlay } from "@/components/CameraOverlay";
 import { StoryViewer } from "@/components/StoryViewer";
 import { AvatarNoteModal } from "@/components/AvatarNoteModal";
+import { isAutumnAmberTheme, isPetrichorTheme } from "@/lib/app-theme";
+import { AutumnHomeDecor } from "@/components/AutumnHomeDecor";
+import { PetrichorHomeDecor } from "@/components/PetrichorHomeDecor";
 
 
 export default memo(function Home() {
@@ -196,8 +199,13 @@ export default memo(function Home() {
     { href: "/library", icon: BookOpen, label: "Library", desc: "Shared books" },
   ];
 
+  const isAutumnAmber = isAutumnAmberTheme(appTheme);
+  const isPetrichor = isPetrichorTheme(appTheme);
+
   return (
-    <div className="max-w-[470px] mx-auto pb-20 md:pb-6">
+    <div className="max-w-[470px] mx-auto pb-20 md:pb-6 relative min-h-[100dvh]">
+      {isAutumnAmber && <AutumnHomeDecor />}
+      {isPetrichor && <PetrichorHomeDecor />}
       <motion.div 
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
