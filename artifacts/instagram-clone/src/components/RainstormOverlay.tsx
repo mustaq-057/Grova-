@@ -31,12 +31,9 @@ type PuddleSplash = {
   left: number;
 };
 
-export const RainstormOverlay = memo(function RainstormOverlay() {
+const LightningEngine = memo(function LightningEngine() {
   const [lightningFlash, setLightningFlash] = useState(0); 
-  const [ripples, setRipples] = useState<Ripple[]>([]);
-  const [splashes, setSplashes] = useState<PuddleSplash[]>([]);
 
-  // Organic Lightning Engine
   useEffect(() => {
     let timeout: ReturnType<typeof setTimeout>;
     const scheduleLightning = () => {
@@ -63,6 +60,61 @@ export const RainstormOverlay = memo(function RainstormOverlay() {
     scheduleLightning();
     return () => clearTimeout(timeout);
   }, []);
+
+  if (lightningFlash === 0) return null;
+
+  return (
+    <div 
+      className={cn(
+        "absolute inset-0 transition-colors duration-75 pointer-events-none",
+        lightningFlash === 2 ? "bg-white/20" : "bg-white/10"
+      )}
+    />
+  );
+});
+
+const SplashEngine = memo(function SplashEngine() {
+  const [splashes, setSplashes] = useState<PuddleSplash[]>([]);
+
+  useEffect(() => {
+    let timeout: ReturnType<typeof setTimeout>;
+    const scheduleSplash = () => {
+      timeout = setTimeout(() => {
+        const newSplash = { id: Date.now(), left: 10 + Math.random() * 80 };
+        setSplashes(prev => [...prev.slice(-10), newSplash]);
+        
+        setTimeout(() => {
+          setSplashes(prev => prev.filter(s => s.id !== newSplash.id));
+        }, 300); // Splashes are very fast
+        
+        scheduleSplash();
+      }, 50 + Math.random() * 150); // High frequency
+    };
+    scheduleSplash();
+    return () => clearTimeout(timeout);
+  }, []);
+
+  if (splashes.length === 0) return null;
+
+  return (
+    <div className="absolute bottom-0 left-0 right-0 h-10 overflow-hidden pointer-events-none">
+      {splashes.map(s => (
+        <div
+          key={`splash-${s.id}`}
+          className="absolute bottom-2 w-0.5 bg-white/40 rounded-full"
+          style={{
+            left: `${s.left}%`,
+            height: '10px',
+            animation: 'puddleSplash 0.3s ease-out forwards',
+          }}
+        />
+      ))}
+    </div>
+  );
+});
+
+export const RainstormOverlay = memo(function RainstormOverlay() {
+  const [ripples, setRipples] = useState<Ripple[]>([]);
 
   // Interactive Ripples Engine
   useEffect(() => {
@@ -96,28 +148,8 @@ export const RainstormOverlay = memo(function RainstormOverlay() {
     };
   }, []);
 
-  // Autonomous Puddle Splashes Engine
-  useEffect(() => {
-    let timeout: ReturnType<typeof setTimeout>;
-    const scheduleSplash = () => {
-      timeout = setTimeout(() => {
-        const newSplash = { id: Date.now(), left: 10 + Math.random() * 80 };
-        setSplashes(prev => [...prev.slice(-10), newSplash]);
-        
-        setTimeout(() => {
-          setSplashes(prev => prev.filter(s => s.id !== newSplash.id));
-        }, 300); // Splashes are very fast
-        
-        scheduleSplash();
-      }, 50 + Math.random() * 150); // High frequency
-    };
-    scheduleSplash();
-    return () => clearTimeout(timeout);
-  }, []);
-
-
   const drops = useMemo<Drop[]>(() => {
-    return Array.from({ length: 200 }, (_, i) => ({ // Increased from 70 to 200 for heavier rain
+    return Array.from({ length: 200 }, (_, i) => ({ 
       id: i,
       left: Math.random() * 100,
       width: 1 + Math.random() * 1.5, 
@@ -156,13 +188,7 @@ export const RainstormOverlay = memo(function RainstormOverlay() {
         }
       `}</style>
       
-      {/* Lightning Flash Overlay */}
-      <div 
-        className={cn(
-          "absolute inset-0 transition-colors duration-75",
-          lightningFlash === 2 ? "bg-white/20" : lightningFlash === 1 ? "bg-white/10" : "bg-transparent" // Intensified thunder
-        )}
-      />
+      <LightningEngine />
 
       {/* Static Refracting Droplets */}
       <div className="absolute inset-0 transition-transform duration-200 ease-out">
@@ -175,16 +201,15 @@ export const RainstormOverlay = memo(function RainstormOverlay() {
               top: `${d.top}%`,
               width: `${d.size}px`,
               height: `${d.size}px`,
-              backdropFilter: 'blur(4px) brightness(1.2) contrast(1.1)',
-              WebkitBackdropFilter: 'blur(4px) brightness(1.2) contrast(1.1)',
-              boxShadow: 'inset 0 2px 4px rgba(255,255,255,0.4), inset 0 -1px 3px rgba(0,0,0,0.2), 0 1px 2px rgba(0,0,0,0.1)',
-              opacity: 0.7,
+              background: 'radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0.05))',
+              boxShadow: 'inset 0 1px 2px rgba(255,255,255,0.4), 0 1px 2px rgba(0,0,0,0.1)',
+              opacity: 0.6,
             }}
           />
         ))}
       </div>
 
-      {/* Falling Rain Streaks - affected heavily by gyro skew */}
+      {/* Falling Rain Streaks */}
       {drops.map((d) => (
         <div
           key={`streak-${d.id}`}
@@ -201,20 +226,7 @@ export const RainstormOverlay = memo(function RainstormOverlay() {
         />
       ))}
 
-      {/* Autonomous Puddle Splashes (at the bottom) */}
-      <div className="absolute bottom-0 left-0 right-0 h-10 overflow-hidden">
-        {splashes.map(s => (
-          <div
-            key={`splash-${s.id}`}
-            className="absolute bottom-2 w-0.5 bg-white/40 rounded-full"
-            style={{
-              left: `${s.left}%`,
-              height: '10px',
-              animation: 'puddleSplash 0.3s ease-out forwards',
-            }}
-          />
-        ))}
-      </div>
+      <SplashEngine />
 
       {/* Interactive Puddle Ripples */}
       {ripples.map(r => (
