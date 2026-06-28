@@ -43,6 +43,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const callLoggedStartRef = useRef(false);
   const activeCallTypeRef = useRef<CallType>("audio");
   const callRoleRef = useRef<"outgoing" | "incoming" | "none">("none");
+  const lastEndedCallAtRef = useRef<number>(0);
 
   const partnerId = user?.id === "me" ? "wife" : "me";
   const partnerName = authPartner?.name ?? readSessionSnapshot()?.partner?.name ?? "Partner";
@@ -76,6 +77,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
     callRoleRef.current = "none";
     callLoggedStartRef.current = false;
     callConnectedAtRef.current = 0;
+    lastEndedCallAtRef.current = Date.now();
     setCallState(null);
     setCallSignals([]);
     setIncomingCall(null);
@@ -140,6 +142,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
     if (user) {
       api.sendCallSignal({ type: "reject", senderId: user.id }).catch(() => { });
     }
+    lastEndedCallAtRef.current = Date.now();
     setIncomingCall(null);
   }, [user]);
 
@@ -153,6 +156,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
     const isLibraryMode = window.localStorage.getItem("libraryMode") === "true";
 
     if (type === "call-offer") {
+      if (Date.now() - lastEndedCallAtRef.current < 5000) return;
       const d = data as { from: string; callType: CallType; sdp?: RTCSessionDescriptionInit };
       if (d.from !== partnerId || !d.sdp) return;
       if (callState) {
@@ -168,6 +172,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
         });
       }
     } else if (type === "call-ring") {
+      if (Date.now() - lastEndedCallAtRef.current < 5000) return;
       const d = data as { from: string; callType: CallType };
       if (d.from !== partnerId) return;
       setIncomingCall((prev) => prev ?? { type: d.callType });

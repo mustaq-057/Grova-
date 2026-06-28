@@ -54,6 +54,18 @@ router.post("/call/signal", rateLimiters.messages, authenticate, (req, res) => {
     "INSERT INTO call_signals (receiver_id, event, data, created_at, expires_at) VALUES ($1, $2, $3, $4, $5)",
     [partnerId, event, JSON.stringify(payload), Date.now(), expiresAt]
   ).catch(err => console.error("Failed to save call signal:", err));
+
+  if (type === "reject" || type === "answer") {
+    db.execute(
+      "DELETE FROM call_signals WHERE receiver_id = $1 AND event IN ('call-offer', 'call-ring')",
+      [authenticatedUserId]
+    ).catch(err => console.error("Failed to clear signals on answer/reject:", err));
+  } else if (type === "end") {
+    db.execute(
+      "DELETE FROM call_signals WHERE (receiver_id = $1 OR receiver_id = $2) AND event IN ('call-offer', 'call-ring')",
+      [authenticatedUserId, partnerId]
+    ).catch(err => console.error("Failed to clear signals on end:", err));
+  }
   
   if (type === "offer") {
     // Send web push notification
