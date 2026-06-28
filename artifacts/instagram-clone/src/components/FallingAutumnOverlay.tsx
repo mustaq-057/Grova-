@@ -277,6 +277,7 @@ export const FallingAutumnOverlay = memo(function FallingAutumnOverlay() {
           ))
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 });
