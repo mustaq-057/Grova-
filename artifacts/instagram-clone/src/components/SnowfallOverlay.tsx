@@ -150,6 +150,14 @@ export const SnowfallOverlay = memo(function SnowfallOverlay() {
       {/* Background illumination */}
       <div className="absolute inset-0 snowfall-gradient-bg opacity-70" />
 
+      {/* Decorative Snowman and Penguin */}
+      <div className="absolute bottom-[80px] left-8 text-5xl opacity-30 drop-shadow-[0_0_15px_rgba(255,255,255,0.6)] animate-pulse" style={{ animationDuration: '4s' }}>
+        ⛄
+      </div>
+      <div className="absolute bottom-[80px] right-8 text-4xl opacity-30 drop-shadow-[0_0_15px_rgba(255,255,255,0.6)] animate-pulse" style={{ animationDuration: '5s' }}>
+        🐧
+      </div>
+
       {/* Frost Vignette (Glassmorphism edges) */}
       <div className="absolute inset-0 pointer-events-none shadow-[inset_0_0_120px_rgba(255,255,255,0.05)] ring-1 ring-white/5 mix-blend-overlay backdrop-blur-[1px] opacity-40 dark:opacity-20" />
 
