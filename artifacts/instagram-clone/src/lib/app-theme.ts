@@ -400,8 +400,8 @@ export function getPhotoScrimGradient(themeId: AppThemeId, dark: boolean): strin
   }
   if (themeId === "autumn-amber") {
     return dark
-      ? "linear-gradient(180deg, rgba(30,20,10,0.3) 0%, rgba(20,10,5,0.7) 100%)"
-      : "linear-gradient(180deg, rgba(250,240,230,0.3) 0%, rgba(245,235,220,0.6) 100%)";
+      ? "linear-gradient(180deg, rgba(20,10,5,0.6) 0%, rgba(10,5,2,0.92) 100%)" // Darker
+      : "linear-gradient(180deg, rgba(250,240,230,0.5) 0%, rgba(235,225,210,0.85) 100%)";
   }
   if (themeId === "petrichor") {
     return dark

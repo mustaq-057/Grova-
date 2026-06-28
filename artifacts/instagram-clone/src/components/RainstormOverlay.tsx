@@ -26,28 +26,49 @@ type Ripple = {
   y: number;
 };
 
+type PuddleSplash = {
+  id: number;
+  left: number;
+};
+
 export const RainstormOverlay = memo(function RainstormOverlay() {
-  const [lightningFlash, setLightningFlash] = useState(0); // 0 = off, 1 = dim, 2 = bright
+  const [lightningFlash, setLightningFlash] = useState(0); 
   const [ripples, setRipples] = useState<Ripple[]>([]);
+  const [splashes, setSplashes] = useState<PuddleSplash[]>([]);
+  const [gyroX, setGyroX] = useState(0);
+
+  // Device Orientation (Gyroscope) Engine
+  useEffect(() => {
+    const handleOrientation = (e: DeviceOrientationEvent) => {
+      if (e.gamma === null) return;
+      // gamma is the left/right tilt in degrees (-90 to 90)
+      // Clamp between -45 and 45 to prevent extreme shifting
+      const tilt = Math.max(-45, Math.min(45, e.gamma));
+      setGyroX(tilt);
+    };
+
+    // Note: iOS requires permission for DeviceOrientation, but Android usually doesn't.
+    // If not supported/permitted, it stays at 0.
+    if (window.DeviceOrientationEvent) {
+      window.addEventListener("deviceorientation", handleOrientation);
+    }
+    return () => {
+      if (window.DeviceOrientationEvent) {
+        window.removeEventListener("deviceorientation", handleOrientation);
+      }
+    };
+  }, []);
 
   // Organic Lightning Engine
   useEffect(() => {
     let timeout: ReturnType<typeof setTimeout>;
-    
     const scheduleLightning = () => {
-      // Random interval between 5 and 20 seconds
       const nextStrikeIn = 5000 + Math.random() * 15000;
-      
       timeout = setTimeout(() => {
-        // Start strike
         const intensity = Math.random() > 0.7 ? 2 : 1;
         setLightningFlash(intensity);
-        
-        // Dim
         setTimeout(() => {
           setLightningFlash(0);
-          
-          // 40% chance of a double strike
           if (Math.random() > 0.6) {
             setTimeout(() => {
               setLightningFlash(1);
@@ -60,10 +81,8 @@ export const RainstormOverlay = memo(function RainstormOverlay() {
             scheduleLightning();
           }
         }, 50 + Math.random() * 150);
-        
       }, nextStrikeIn);
     };
-
     scheduleLightning();
     return () => clearTimeout(timeout);
   }, []);
@@ -71,21 +90,18 @@ export const RainstormOverlay = memo(function RainstormOverlay() {
   // Interactive Ripples Engine
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
-      // Ignore clicks on inputs/textareas to not interrupt typing, unless it's just visually fine
       const target = e.target as HTMLElement;
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
 
       const newRipple = { id: Date.now(), x: e.clientX, y: e.clientY };
-      setRipples(prev => [...prev.slice(-4), newRipple]); // Keep max 5 ripples
+      setRipples(prev => [...prev.slice(-4), newRipple]); 
       
-      // Remove ripple after animation completes
       setTimeout(() => {
         setRipples(prev => prev.filter(r => r.id !== newRipple.id));
       }, 1000);
     };
 
     window.addEventListener('mousedown', handleClick);
-    // Touch support
     const handleTouch = (e: TouchEvent) => {
       const touch = e.touches[0];
       if (!touch) return;
@@ -103,27 +119,45 @@ export const RainstormOverlay = memo(function RainstormOverlay() {
     };
   }, []);
 
-  // Falling Rain Streaks
+  // Autonomous Puddle Splashes Engine
+  useEffect(() => {
+    let timeout: ReturnType<typeof setTimeout>;
+    const scheduleSplash = () => {
+      timeout = setTimeout(() => {
+        const newSplash = { id: Date.now(), left: 10 + Math.random() * 80 };
+        setSplashes(prev => [...prev.slice(-10), newSplash]);
+        
+        setTimeout(() => {
+          setSplashes(prev => prev.filter(s => s.id !== newSplash.id));
+        }, 300); // Splashes are very fast
+        
+        scheduleSplash();
+      }, 50 + Math.random() * 150); // High frequency
+    };
+    scheduleSplash();
+    return () => clearTimeout(timeout);
+  }, []);
+
+
   const drops = useMemo<Drop[]>(() => {
     return Array.from({ length: 70 }, (_, i) => ({
       id: i,
       left: Math.random() * 100,
-      width: 1 + Math.random() * 1.5, // Very thin
-      height: 15 + Math.random() * 45, // Streaks
-      delay: Math.random() * 5, // Fast repetition
-      duration: 0.35 + Math.random() * 0.4, // Extremely fast falling (0.35s to 0.75s)
-      opacity: 0.1 + Math.random() * 0.25, // Transparent/subtle
+      width: 1 + Math.random() * 1.5, 
+      height: 15 + Math.random() * 45, 
+      delay: Math.random() * 5, 
+      duration: 0.35 + Math.random() * 0.4, 
+      opacity: 0.1 + Math.random() * 0.25, 
       blur: Math.random() > 0.5 ? Math.random() * 2 : 0,
     }));
   }, []);
 
-  // Static refracting droplets on the "lens"
   const staticDroplets = useMemo<StaticDroplet[]>(() => {
     return Array.from({ length: 30 }, (_, i) => ({
       id: i,
       left: Math.random() * 100,
       top: Math.random() * 100,
-      size: 4 + Math.random() * 12, // 4px to 16px droplet
+      size: 4 + Math.random() * 12, 
     }));
   }, []);
 
@@ -131,12 +165,17 @@ export const RainstormOverlay = memo(function RainstormOverlay() {
     <div className="pointer-events-none fixed inset-0 z-[1] overflow-hidden" aria-hidden>
       <style>{`
         @keyframes rainFall {
-          0% { transform: translate3d(0, -20vh, 0); }
-          100% { transform: translate3d(0, 120vh, 0); }
+          0% { transform: translate3d(0, -20vh, 0) skewX(var(--gyro-skew)); }
+          100% { transform: translate3d(calc(var(--gyro-x) * 1px), 120vh, 0) skewX(var(--gyro-skew)); }
         }
         @keyframes rippleExpand {
           0% { transform: scale(0); opacity: 0.6; }
           100% { transform: scale(4); opacity: 0; }
+        }
+        @keyframes puddleSplash {
+          0% { transform: scaleY(0) translateY(0); opacity: 1; }
+          50% { transform: scaleY(1) translateY(-10px); opacity: 0.8; }
+          100% { transform: scaleY(0) translateY(-15px); opacity: 0; }
         }
       `}</style>
       
@@ -148,27 +187,30 @@ export const RainstormOverlay = memo(function RainstormOverlay() {
         )}
       />
 
-      {/* Static Refracting Droplets (Glassmorphism) */}
-      {staticDroplets.map((d) => (
-        <div
-          key={`static-${d.id}`}
-          className="absolute rounded-full"
-          style={{
-            left: `${d.left}%`,
-            top: `${d.top}%`,
-            width: `${d.size}px`,
-            height: `${d.size}px`,
-            // Refraction magic: blurs and distorts the background immediately behind the droplet
-            backdropFilter: 'blur(4px) brightness(1.2) contrast(1.1)',
-            WebkitBackdropFilter: 'blur(4px) brightness(1.2) contrast(1.1)',
-            // Simulate water volume and light reflection
-            boxShadow: 'inset 0 2px 4px rgba(255,255,255,0.4), inset 0 -1px 3px rgba(0,0,0,0.2), 0 1px 2px rgba(0,0,0,0.1)',
-            opacity: 0.7,
-          }}
-        />
-      ))}
+      {/* Static Refracting Droplets - shifts slightly with gyro */}
+      <div 
+        className="absolute inset-0 transition-transform duration-200 ease-out"
+        style={{ transform: `translateX(${gyroX * 0.5}px)` }}
+      >
+        {staticDroplets.map((d) => (
+          <div
+            key={`static-${d.id}`}
+            className="absolute rounded-full"
+            style={{
+              left: `${d.left}%`,
+              top: `${d.top}%`,
+              width: `${d.size}px`,
+              height: `${d.size}px`,
+              backdropFilter: 'blur(4px) brightness(1.2) contrast(1.1)',
+              WebkitBackdropFilter: 'blur(4px) brightness(1.2) contrast(1.1)',
+              boxShadow: 'inset 0 2px 4px rgba(255,255,255,0.4), inset 0 -1px 3px rgba(0,0,0,0.2), 0 1px 2px rgba(0,0,0,0.1)',
+              opacity: 0.7,
+            }}
+          />
+        ))}
+      </div>
 
-      {/* Falling Rain Streaks */}
+      {/* Falling Rain Streaks - affected heavily by gyro skew */}
       {drops.map((d) => (
         <div
           key={`streak-${d.id}`}
@@ -177,13 +219,31 @@ export const RainstormOverlay = memo(function RainstormOverlay() {
             left: `${d.left}%`,
             width: `${d.width}px`,
             height: `${d.height}px`,
-            backgroundColor: 'rgba(210, 230, 240, 1)', // Icy rain color
+            backgroundColor: 'rgba(210, 230, 240, 1)', 
             opacity: d.opacity,
             filter: d.blur ? `blur(${d.blur}px)` : 'none',
             animation: `rainFall ${d.duration}s linear ${d.delay}s infinite`,
+            // @ts-expect-error css vars
+            '--gyro-x': `${gyroX * 10}`,
+            '--gyro-skew': `${-gyroX * 0.5}deg`, 
           }}
         />
       ))}
+
+      {/* Autonomous Puddle Splashes (at the bottom) */}
+      <div className="absolute bottom-0 left-0 right-0 h-10 overflow-hidden">
+        {splashes.map(s => (
+          <div
+            key={`splash-${s.id}`}
+            className="absolute bottom-2 w-0.5 bg-white/40 rounded-full"
+            style={{
+              left: `${s.left}%`,
+              height: '10px',
+              animation: 'puddleSplash 0.3s ease-out forwards',
+            }}
+          />
+        ))}
+      </div>
 
       {/* Interactive Puddle Ripples */}
       {ripples.map(r => (
