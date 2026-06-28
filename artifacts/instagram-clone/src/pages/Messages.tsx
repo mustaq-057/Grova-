@@ -647,7 +647,9 @@ export default function Messages() {
     if (loadingMore || !hasMore || messages.length === 0) return;
 
     const oldest = messages[0];
-    const cursor = oldest?.id;
+    // The server filters with `m.timestamp < cursor`, so pass the timestamp (not the id)
+    const cursor = oldest?.timestamp;
+    // Still pass offset as a fallback for servers that don't support cursor
     const offset = messages.length;
 
     const container = messagesContainerRef.current;
@@ -674,37 +676,43 @@ export default function Messages() {
       setMessages((prev) => {
         const existing = new Set(prev.map((m) => m.id));
         const unique = older.filter((m) => !existing.has(m.id));
-        if (unique.length === 0) return prev;
+        if (unique.length === 0) {
+          // All returned messages already exist — no more unique older messages
+          isPrependingRef.current = false;
+          prependScrollHeightRef.current = null;
+          return prev;
+        }
         return [...unique, ...prev];
       });
-      const more = data.pagination?.hasMore ?? false;
-      setHasMore(more && older.length > 0);
+      // Use the server's hasMore field; if it returned a full page, there may be more
+      const serverHasMore = data.pagination?.hasMore ?? false;
+      setHasMore(serverHasMore && older.length > 0);
     } catch (err) {
       console.error("Failed to load more messages:", err);
-      // Don't set error state for load more failures, just log it
+      isPrependingRef.current = false;
+      prependScrollHeightRef.current = null;
     } finally {
       setLoadingMore(false);
       if (prependScrollHeightRef.current === null) {
         isPrependingRef.current = false;
       }
     }
-  }, [loadingMore, hasMore, messages.length]);
+  }, [loadingMore, hasMore, messages]);
 
   // Intersection Observer for loading more messages on scroll to top
+  // Note: deps intentionally exclude messages.length to avoid re-creating the observer
+  // on every message change — loadMoreMessages already captures the latest state via closure.
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
         if (
           entries[0].isIntersecting &&
-          !loadingMore &&
-          !isPrependingRef.current &&
-          hasMore &&
-          messages.length > 0
+          !isPrependingRef.current
         ) {
           loadMoreMessages();
         }
       },
-      { rootMargin: '80px', threshold: 0.1 }
+      { rootMargin: '150px', threshold: 0 }
     );
 
     if (messagesStartRef.current) {
@@ -712,7 +720,7 @@ export default function Messages() {
     }
 
     return () => observer.disconnect();
-  }, [loadingMore, hasMore, loadMoreMessages, messages.length]);
+  }, [loadMoreMessages]);
 
   // SSE real-time connection with automatic reconnection
   useEffect(() => {

@@ -198,12 +198,18 @@ router.get("/messages", optionalAuth, async (req, res) => {
     console.log("Database query result:", result.rows.length, "messages found");
     const messages = result.rows.map((row) => rowToMessage(row, authenticatedUserId)).reverse();
 
+    // Count only messages that are eligible given the same filters (including cursor)
+    // so that `hasMore` is accurate for cursor-based pagination.
     let countSql =
       "SELECT COUNT(*) as total FROM messages WHERE (sender_id = ? OR sender_id = ?)";
     const countParams: unknown[] = [authenticatedUserId, partnerId];
     if (chatClearedAt) {
       countSql += " AND timestamp > ?";
       countParams.push(chatClearedAt);
+    }
+    if (cursor) {
+      countSql += " AND timestamp < ?";
+      countParams.push(cursor);
     }
     const countResult = await db.query(countSql, countParams);
     const total = Number(countResult.rows[0]?.total || 0);
@@ -215,7 +221,8 @@ router.get("/messages", optionalAuth, async (req, res) => {
         total,
         limit,
         offset,
-        hasMore: offset + limit < total,
+        // hasMore: are there more rows older than what we just fetched?
+        hasMore: offset + messages.length < total,
         nextCursor: messages.length > 0 ? messages[messages.length - 1].timestamp : null
       }
     });
