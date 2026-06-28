@@ -542,11 +542,13 @@ export default function Messages() {
     api.heartbeat(user.id).catch(() => { });
     refreshPresence();
     const hb = setInterval(() => {
-      if (isShowPresenceEnabled()) api.heartbeat(user.id).catch(() => { });
-    }, 10_000);
+      if (document.visibilityState === "visible" && isShowPresenceEnabled()) {
+        api.heartbeat(user.id).catch(() => { });
+      }
+    }, 30_000);
     const poll = setInterval(() => {
       if (document.visibilityState === "visible") refreshPresence();
-    }, 10_000);
+    }, 30_000);
     return () => { clearInterval(hb); clearInterval(poll); };
   }, [user?.id, partnerId]);
 

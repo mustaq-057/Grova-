@@ -93,7 +93,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
     if (!user) return;
     if (location === "/chat") return;
     void syncChatBadgeFromServer();
-    const t = setInterval(() => void syncChatBadgeFromServer(), 30_000);
+    const t = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void syncChatBadgeFromServer();
+      }
+    }, 30_000);
     return () => clearInterval(t);
   }, [user?.id, location]);
 

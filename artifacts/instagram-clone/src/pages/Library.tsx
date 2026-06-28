@@ -395,7 +395,7 @@ export default function Library() {
       api.heartbeat(user.id, { inLibrary: true }).catch(() => { });
     };
     sendHeartbeat();
-    const interval = setInterval(sendHeartbeat, 10000);
+    const interval = setInterval(sendHeartbeat, 30000);
 
     const onVisibilityChange = () => {
       if (document.visibilityState === "visible") sendHeartbeat();
