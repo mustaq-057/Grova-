@@ -168,7 +168,7 @@ export const FallingAutumnOverlay = memo(function FallingAutumnOverlay() {
           0% { transform: translate3d(0, -15vh, 0) scale(0.85); opacity: 0; }
           10% { opacity: 1; }
           90% { opacity: 1; }
-          100% { transform: translate3d(calc(var(--drift) + var(--wind-x)), calc(115vh + var(--wind-y))), 0) scale(1.1); opacity: 0; }
+          100% { transform: translate3d(calc(var(--drift) + var(--wind-x)), calc(115vh + var(--wind-y)), 0) scale(1.1); opacity: 0; }
         }
         @keyframes autumnSway {
           0%, 100% { margin-left: 0; }
