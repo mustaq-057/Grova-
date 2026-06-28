@@ -646,6 +646,8 @@ export default function Messages() {
   const loadMoreMessages = useCallback(async () => {
     if (loadingMore || !hasMore || messages.length === 0) return;
 
+    const oldest = messages[0];
+    const cursor = oldest?.id;
     const offset = messages.length;
 
     const container = messagesContainerRef.current;
@@ -658,7 +660,7 @@ export default function Messages() {
 
     setLoadingMore(true);
     try {
-      const data = await api.getMessages({ offset });
+      const data = await api.getMessages({ offset, cursor });
       const older = await normalizeMessages(data.messages || []);
       if (older.length === 0) {
         setHasMore(false);
@@ -702,7 +704,7 @@ export default function Messages() {
           loadMoreMessages();
         }
       },
-      { rootMargin: '320px', threshold: 0.05 }
+      { rootMargin: '80px', threshold: 0.1 }
     );
 
     if (messagesStartRef.current) {
@@ -811,17 +813,10 @@ export default function Messages() {
         pollTickCount = 0;
       }
 
-      const container = messagesContainerRef.current;
-      const readingHistory = !isNearBottomRef.current && !stickToBottomRef.current;
-      if (readingHistory && container) {
-        scrollPreserveRef.current = {
-          top: container.scrollTop,
-          height: container.scrollHeight,
-        };
-      }
       void api.getMessages().then(async (data) => {
         const raw = data.messages ?? [];
         if (raw.length === 0) return;
+        // Capture scroll position right before we update state — NOT before the async fetch
         const readingHistory = !isNearBottomRef.current && !stickToBottomRef.current;
         const container = messagesContainerRef.current;
         if (readingHistory && container) {
@@ -1498,22 +1493,23 @@ export default function Messages() {
   // Restore scroll position after prepending older messages (load more / jump-to-memory)
   useLayoutEffect(() => {
     const before = prependScrollHeightRef.current;
-    if (before === null) return;
+    if (before === null || !isPrependingRef.current) return;
     prependScrollHeightRef.current = null;
     const container = messagesContainerRef.current;
     if (!container) return;
 
-    let isRestored = false;
+    // The browser has now rendered the prepended messages at the top.
+    // Adjust scrollTop by the height difference so the user stays in place.
     const diff = container.scrollHeight - before;
     if (diff > 0) {
       container.scrollTop += diff;
-      isRestored = true;
     }
 
+    // Double-check after a paint in case images/lazy content shifted things
     requestAnimationFrame(() => {
-      if (!isRestored) {
-        const nextDiff = container.scrollHeight - before;
-        if (nextDiff > 0) container.scrollTop += nextDiff;
+      const lateDiff = container.scrollHeight - before - diff;
+      if (lateDiff > 0) {
+        container.scrollTop += lateDiff;
       }
       isPrependingRef.current = false;
     });
@@ -3304,7 +3300,6 @@ export default function Messages() {
           ref={messagesContainerRef}
           style={{
             scrollBehavior: "auto",
-            contain: "strict",
             opacity: chatAnimationsEnabled || messages.length === 0 ? 1 : 0,
             transition: "opacity 0.15s ease-in",
           }}
