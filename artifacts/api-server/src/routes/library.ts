@@ -1013,4 +1013,132 @@ libraryRouter.post("/library/:id/notes", authenticate, async (req: Authenticated
   }
 });
 
+// ─── GET ALL COLLECTIONS ────────────────────────────────────────────────────────
+libraryRouter.get("/library/collections", authenticate, async (req: AuthenticatedRequest, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+    const result = await db.query(
+      `SELECT c.id, c.name, c.banner_url AS "bannerUrl", c.created_at AS "createdAt",
+              (SELECT COUNT(*) FROM library_collection_books cb WHERE cb.collection_id = c.id) AS "bookCount"
+       FROM library_collections c
+       WHERE c.created_by = $1
+       ORDER BY c.created_at DESC`,
+      [userId]
+    );
+    return res.json(result.rows);
+  } catch (err) {
+    console.error("Library collections GET error:", err);
+    return res.status(500).json({ error: "Failed to fetch collections" });
+  }
+});
+
+// ─── CREATE COLLECTION ───────────────────────────────────────────────────────
+libraryRouter.post("/library/collections", authenticate, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { name, bannerUrl } = req.body;
+    if (!name) return res.status(400).json({ error: "name is required" });
+
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+    const id = randomUUID();
+    const timestamp = new Date().toISOString();
+
+    await db.execute(
+      `INSERT INTO library_collections (id, name, banner_url, created_by, created_at)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [id, name, bannerUrl || null, userId, timestamp]
+    );
+    
+    return res.json({ id, name, bannerUrl, createdAt: timestamp, bookCount: 0 });
+  } catch (err) {
+    console.error("Library collection POST error:", err);
+    return res.status(500).json({ error: "Failed to create collection" });
+  }
+});
+
+// ─── DELETE COLLECTION ───────────────────────────────────────────────────────
+libraryRouter.delete("/library/collections/:id", authenticate, async (req: AuthenticatedRequest, res) => {
+  try {
+    await db.execute(`DELETE FROM library_collections WHERE id = $1`, [req.params.id]);
+    return res.json({ success: true });
+  } catch (err) {
+    console.error("Library collection DELETE error:", err);
+    return res.status(500).json({ error: "Failed to delete collection" });
+  }
+});
+
+// ─── GET COLLECTION DETAILS AND BOOKS ────────────────────────────────────────
+libraryRouter.get("/library/collections/:id", authenticate, async (req: AuthenticatedRequest, res) => {
+  try {
+    // Get collection metadata
+    const colResult = await db.query(
+      `SELECT id, name, banner_url AS "bannerUrl", created_at AS "createdAt"
+       FROM library_collections WHERE id = $1`,
+      [req.params.id]
+    );
+    if (!colResult.rows[0]) return res.status(404).json({ error: "Collection not found" });
+
+    // Get books in collection
+    const booksResult = await db.query(
+      `SELECT b.id, b.title, b.author, b.cover_url AS "coverUrl", b.description,
+              b.epub_url AS "epubUrl", b.source, b.added_by AS "addedBy",
+              b.added_at AS "addedAt", b.status, b.current_page AS "currentPage",
+              b.total_pages AS "totalPages", b.is_favorite AS "isFavorite",
+              cb.added_at AS "collectionAddedAt"
+       FROM library_collection_books cb
+       JOIN library_books b ON cb.book_id = b.id
+       WHERE cb.collection_id = $1
+       ORDER BY cb.added_at DESC`,
+      [req.params.id]
+    );
+
+    return res.json({
+      ...colResult.rows[0],
+      books: booksResult.rows
+    });
+  } catch (err) {
+    console.error("Library collection details GET error:", err);
+    return res.status(500).json({ error: "Failed to fetch collection details" });
+  }
+});
+
+// ─── ADD BOOK TO COLLECTION ──────────────────────────────────────────────────
+libraryRouter.post("/library/collections/:id/books", authenticate, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { bookId } = req.body;
+    if (!bookId) return res.status(400).json({ error: "bookId is required" });
+
+    const timestamp = new Date().toISOString();
+
+    await db.execute(
+      `INSERT INTO library_collection_books (collection_id, book_id, added_at)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (collection_id, book_id) DO NOTHING`,
+      [req.params.id, bookId, timestamp]
+    );
+    
+    return res.json({ success: true });
+  } catch (err) {
+    console.error("Library collection book POST error:", err);
+    return res.status(500).json({ error: "Failed to add book to collection" });
+  }
+});
+
+// ─── REMOVE BOOK FROM COLLECTION ─────────────────────────────────────────────
+libraryRouter.delete("/library/collections/:id/books/:bookId", authenticate, async (req: AuthenticatedRequest, res) => {
+  try {
+    await db.execute(
+      `DELETE FROM library_collection_books WHERE collection_id = $1 AND book_id = $2`,
+      [req.params.id, req.params.bookId]
+    );
+    return res.json({ success: true });
+  } catch (err) {
+    console.error("Library collection book DELETE error:", err);
+    return res.status(500).json({ error: "Failed to remove book from collection" });
+  }
+});
+
 export default libraryRouter;

@@ -24,6 +24,15 @@ type ApiBook = {
   isFavorite?: boolean;
 };
 
+type ApiCollection = {
+  id: string;
+  name: string;
+  bannerUrl: string | null;
+  createdAt: string;
+  bookCount: number;
+  books?: ApiBook[]; // When fetched specifically
+};
+
 type SearchResult = {
   id: string;
   title: string;
@@ -164,8 +173,16 @@ export default function Library() {
   const [selectedPreviewBook, setSelectedPreviewBook] = useState<SearchResult | null>(null);
   const [selectedResultIds, setSelectedResultIds] = useState<Set<string>>(new Set());
   const [batchAdding, setBatchAdding] = useState(false);
-  const [activeTab, setActiveTab] = useState<"myShelf" | "partnerShelf" | "finished" | "favorites" | "paused" | "gaveUp">("myShelf");
+  const [activeTab, setActiveTab] = useState<"myShelf" | "partnerShelf" | "finished" | "favorites" | "paused" | "gaveUp" | "collections">("myShelf");
   const [libraryTab, setLibraryTab] = useState<"dashboard" | "memorize" | "achievements">("dashboard");
+  const [collections, setCollections] = useState<ApiCollection[]>([]);
+  const [activeCollection, setActiveCollection] = useState<ApiCollection | null>(null);
+  const [showCreateCollection, setShowCreateCollection] = useState(false);
+  const [newCollectionName, setNewCollectionName] = useState("");
+  const [newCollectionBannerUrl, setNewCollectionBannerUrl] = useState<string | null>(null);
+  const [isCreatingCollection, setIsCreatingCollection] = useState(false);
+  const [showCollectionBooksModal, setShowCollectionBooksModal] = useState(false);
+  const collectionBannerInputRef = useRef<HTMLInputElement>(null);
   const [allNotes, setAllNotes] = useState<LibraryNote[]>([]);
   const [stats, setStats] = useState<{
     streakDays: number;
@@ -320,16 +337,26 @@ export default function Library() {
     }
   }, []);
 
+  const loadCollections = useCallback(async () => {
+    try {
+      const data = await apiFetch<ApiCollection[]>("/library/collections");
+      setCollections(data);
+    } catch (err) {
+      console.error("Failed to load collections:", err);
+    }
+  }, []);
+
   useEffect(() => {
     loadBooks();
     loadNotes();
     loadStats();
     loadCatalog();
+    loadCollections();
 
     const handleNotesUpdate = () => loadNotes();
     window.addEventListener("LIBRARY_NOTES_UPDATED", handleNotesUpdate);
     return () => window.removeEventListener("LIBRARY_NOTES_UPDATED", handleNotesUpdate);
-  }, [loadBooks, loadNotes, loadStats, loadCatalog]);
+  }, [loadBooks, loadNotes, loadStats, loadCatalog, loadCollections]);
 
   useEffect(() => {
     localStorage.setItem("grova-pending-uploads", JSON.stringify(pendingUploads));
@@ -686,6 +713,103 @@ export default function Library() {
       }
     }
     setLocation(`/read/${book.id}`);
+  };
+
+  const handleCreateCollection = async () => {
+    if (!newCollectionName.trim()) return;
+    setIsCreatingCollection(true);
+    try {
+      const res = await apiFetch<ApiCollection>("/library/collections", {
+        method: "POST",
+        body: JSON.stringify({
+          name: newCollectionName.trim(),
+          bannerUrl: newCollectionBannerUrl
+        })
+      });
+      setCollections([res, ...collections]);
+      setShowCreateCollection(false);
+      setNewCollectionName("");
+      setNewCollectionBannerUrl(null);
+    } catch (err) {
+      console.error("Failed to create collection:", err);
+      alert(libLang === "ar" ? "فشل إنشاء المجموعة" : "Failed to create collection");
+    } finally {
+      setIsCreatingCollection(false);
+    }
+  };
+
+  const handleDeleteCollection = async (id: string) => {
+    if (!confirm(libLang === "ar" ? "هل أنت متأكد من حذف هذه المجموعة؟ لن يتم حذف الكتب." : "Are you sure you want to delete this collection? Books will not be deleted.")) return;
+    try {
+      await apiFetch(`/library/collections/${id}`, { method: "DELETE" });
+      setCollections(prev => prev.filter(c => c.id !== id));
+      if (activeCollection?.id === id) setActiveCollection(null);
+    } catch (err) {
+      console.error("Failed to delete collection:", err);
+    }
+  };
+
+  const viewCollection = async (id: string) => {
+    try {
+      const col = await apiFetch<ApiCollection>(`/library/collections/${id}`);
+      setActiveCollection(col);
+    } catch (err) {
+      console.error("Failed to load collection:", err);
+    }
+  };
+
+  const handleAddBookToCollection = async (bookId: string, collectionId: string) => {
+    try {
+      await apiFetch(`/library/collections/${collectionId}/books`, {
+        method: "POST",
+        body: JSON.stringify({ bookId })
+      });
+      
+      // Update collections count
+      setCollections(prev => prev.map(c => 
+        c.id === collectionId ? { ...c, bookCount: c.bookCount + 1 } : c
+      ));
+
+      // Refresh active collection if open
+      if (activeCollection?.id === collectionId) {
+        viewCollection(collectionId);
+      }
+      
+      alert(libLang === "ar" ? "تمت إضافة الكتاب إلى المجموعة" : "Book added to collection");
+    } catch (err) {
+      console.error("Failed to add book to collection:", err);
+    }
+  };
+
+  const handleRemoveBookFromCollection = async (bookId: string, collectionId: string) => {
+    try {
+      await apiFetch(`/library/collections/${collectionId}/books/${bookId}`, {
+        method: "DELETE"
+      });
+      
+      // Update collections count
+      setCollections(prev => prev.map(c => 
+        c.id === collectionId ? { ...c, bookCount: Math.max(0, c.bookCount - 1) } : c
+      ));
+
+      // Refresh active collection if open
+      if (activeCollection?.id === collectionId) {
+        setActiveCollection(prev => prev ? { ...prev, books: prev.books?.filter(b => b.id !== bookId) } : null);
+      }
+    } catch (err) {
+      console.error("Failed to remove book from collection:", err);
+    }
+  };
+
+  const handleBannerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const url = await uploadMediaFile(file, file.type);
+      if (url) setNewCollectionBannerUrl(url);
+    } catch (err) {
+      console.error("Failed to upload banner:", err);
+    }
   };
 
   const changeStatus = async (bookId: string, options: { status?: ApiBook["status"], favorite?: boolean }) => {
@@ -1465,6 +1589,12 @@ export default function Library() {
                   >
                     Gave Up
                   </button>
+                  <button
+                    onClick={() => setActiveTab("collections")}
+                    className={`shrink-0 min-w-[80px] py-2 px-3 text-xs font-bold rounded-xl transition-all ${activeTab === "collections" ? "bg-[var(--lib-card)] text-[var(--lib-text)] shadow-sm" : "text-[var(--lib-muted)] hover:text-[var(--lib-text)]"}`}
+                  >
+                    Custom
+                  </button>
                 </div>
 
                 <AnimatePresence mode="wait">
@@ -1572,6 +1702,37 @@ export default function Library() {
                         updatingStatus={updatingStatus}
                         isLoading={loading}
                       />
+                    )}
+                    {activeTab === "collections" && (
+                      <div className="py-2">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                          <div
+                            onClick={() => setShowCreateCollection(true)}
+                            className="bg-[var(--lib-input)] border border-dashed border-[var(--lib-border)] rounded-2xl flex flex-col items-center justify-center p-6 cursor-pointer hover:bg-[var(--lib-btn-hover)] transition-colors text-[var(--lib-muted)] hover:text-primary min-h-[160px]"
+                          >
+                            <Plus className="w-8 h-8 mb-2 opacity-70" />
+                            <p className="font-bold text-sm">New Collection</p>
+                          </div>
+                          {collections.map(c => (
+                            <div 
+                              key={c.id} 
+                              onClick={() => viewCollection(c.id)}
+                              className="bg-[var(--lib-card)] border border-[var(--lib-border)] rounded-2xl overflow-hidden cursor-pointer hover:shadow-md transition-all group relative min-h-[160px]"
+                            >
+                              <div className="absolute inset-0 bg-black/60 z-10" />
+                              {c.bannerUrl ? (
+                                <img src={c.bannerUrl} alt={c.name} className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                              ) : (
+                                <div className="absolute inset-0 w-full h-full bg-gradient-to-br from-primary/60 to-purple-600/60" />
+                              )}
+                              <div className="relative z-20 p-4 h-full flex flex-col justify-end">
+                                <h4 className="text-white font-bold text-lg drop-shadow-md line-clamp-2">{c.name}</h4>
+                                <p className="text-white/80 text-xs font-medium">{c.bookCount} books</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     )}
                   </motion.div>
                 </AnimatePresence>
@@ -1987,6 +2148,211 @@ export default function Library() {
             </motion.div>
           )}
         </AnimatePresence>
+        {/* ── Create Collection Modal ── */}
+        <AnimatePresence>
+          {showCreateCollection && (
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+            >
+              <motion.div
+                initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}
+                className="bg-[var(--lib-bg)] rounded-3xl w-full max-w-sm overflow-hidden border border-[var(--lib-border)] shadow-2xl"
+              >
+                <div className="p-5 border-b border-[var(--lib-border)] flex items-center justify-between">
+                  <h3 className="font-bold text-lg text-[var(--lib-text)]">New Collection</h3>
+                  <button onClick={() => setShowCreateCollection(false)} className="text-[var(--lib-muted)] hover:text-[var(--lib-text)]">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                <div className="p-5 space-y-4">
+                  <div>
+                    <label className="text-xs font-bold text-[var(--lib-muted)] uppercase mb-1.5 block">Name</label>
+                    <input
+                      type="text"
+                      value={newCollectionName}
+                      onChange={e => setNewCollectionName(e.target.value)}
+                      className="w-full bg-[var(--lib-input)] border border-[var(--lib-border)] rounded-xl py-3 px-4 text-sm text-[var(--lib-text)] focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+                      placeholder="e.g. Sci-Fi Favorites"
+                      autoFocus
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-[var(--lib-muted)] uppercase mb-1.5 block">Banner Image (Optional)</label>
+                    <div 
+                      onClick={() => collectionBannerInputRef.current?.click()}
+                      className="w-full h-32 bg-[var(--lib-input)] border border-dashed border-[var(--lib-border)] rounded-xl flex items-center justify-center cursor-pointer hover:bg-[var(--lib-btn-hover)] transition-colors relative overflow-hidden"
+                    >
+                      {newCollectionBannerUrl ? (
+                        <img src={newCollectionBannerUrl} alt="Banner Preview" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="flex flex-col items-center opacity-60">
+                          <Plus className="w-6 h-6 mb-1" />
+                          <span className="text-xs font-medium">Upload Image</span>
+                        </div>
+                      )}
+                      <input 
+                        type="file" 
+                        ref={collectionBannerInputRef}
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleBannerUpload}
+                      />
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleCreateCollection}
+                    disabled={!newCollectionName.trim() || isCreatingCollection}
+                    className="w-full bg-primary text-primary-foreground font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95 transition-all mt-2"
+                  >
+                    {isCreatingCollection ? <Loader2 className="w-5 h-5 animate-spin" /> : "Create Collection"}
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ── Active Collection Modal ── */}
+        <AnimatePresence>
+          {activeCollection && (
+            <motion.div
+              initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 50 }}
+              className="fixed inset-0 z-40 bg-[var(--lib-bg)] flex flex-col overflow-hidden"
+            >
+              <div className="relative h-64 shrink-0 bg-black">
+                {activeCollection.bannerUrl ? (
+                  <img src={activeCollection.bannerUrl} alt={activeCollection.name} className="w-full h-full object-cover opacity-70" />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-primary to-purple-600 opacity-80" />
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-[var(--lib-bg)] to-transparent" />
+                <div className="absolute top-4 left-4 z-10 flex gap-2">
+                  <button 
+                    onClick={() => setActiveCollection(null)}
+                    className="w-10 h-10 bg-black/40 backdrop-blur-md rounded-full flex items-center justify-center text-white hover:bg-black/60 transition-colors"
+                  >
+                    <ChevronLeft className="w-6 h-6" />
+                  </button>
+                </div>
+                <div className="absolute top-4 right-4 z-10 flex gap-2">
+                  <button 
+                    onClick={() => handleDeleteCollection(activeCollection.id)}
+                    className="w-10 h-10 bg-red-500/80 backdrop-blur-md rounded-full flex items-center justify-center text-white hover:bg-red-600 transition-colors"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+                </div>
+                <div className="absolute bottom-0 left-0 p-6 w-full">
+                  <h2 className="text-3xl font-bold font-serif text-white mb-1 drop-shadow-md">{activeCollection.name}</h2>
+                  <p className="text-white/80 text-sm font-medium">{activeCollection.bookCount} books</p>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-bold text-[var(--lib-text)] text-lg">Books</h3>
+                  <button 
+                    onClick={() => setShowCollectionBooksModal(true)}
+                    className="bg-primary/10 text-primary font-bold py-1.5 px-3 rounded-full text-xs flex items-center gap-1 hover:bg-primary/20 transition-colors"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Add Book
+                  </button>
+                </div>
+                
+                {!activeCollection.books || activeCollection.books.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-center border border-dashed border-[var(--lib-border)] rounded-2xl">
+                    <BookMarked className="w-10 h-10 mb-3 opacity-20 text-[var(--lib-text)]" />
+                    <p className="font-bold text-[var(--lib-text)] mb-1">Collection is empty</p>
+                    <p className="text-xs text-[var(--lib-muted)]">Add books to start organizing</p>
+                    <button 
+                      onClick={() => setShowCollectionBooksModal(true)}
+                      className="mt-4 bg-[var(--lib-input)] border border-[var(--lib-border)] text-[var(--lib-text)] text-xs font-bold py-2 px-4 rounded-full"
+                    >
+                      Add Books
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
+                    {activeCollection.books.map((book) => (
+                      <div key={book.id} className="relative group cursor-pointer" onClick={() => openBook(book)}>
+                        <div className="aspect-[2/3] w-full bg-[var(--lib-input)] rounded-xl overflow-hidden shadow-sm mb-1">
+                          <BookCover coverUrl={book.coverUrl} title={book.title} size="sm" />
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleRemoveBookFromCollection(book.id, activeCollection.id); }}
+                            className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/70 backdrop-blur-md rounded-full items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity flex z-10 hover:bg-red-500 hover:text-white"
+                          >
+                            <X className="w-3.5 h-3.5 text-white" />
+                          </button>
+                        </div>
+                        <p className="font-bold text-[11px] line-clamp-1 leading-tight text-[var(--lib-text)]">{book.title}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ── Add Books to Collection Modal ── */}
+        <AnimatePresence>
+          {showCollectionBooksModal && activeCollection && (
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[60] flex flex-col justify-end"
+            >
+              <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowCollectionBooksModal(false)} />
+              <motion.div
+                initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
+                transition={{ type: "spring", damping: 25, stiffness: 200 }}
+                className="relative bg-[var(--lib-bg)] w-full h-[85vh] rounded-t-3xl shadow-2xl flex flex-col overflow-hidden border-t border-[var(--lib-border)]"
+              >
+                <div className="p-4 border-b border-[var(--lib-border)] flex items-center justify-between bg-[var(--lib-bg)]">
+                  <h3 className="font-bold text-lg text-[var(--lib-text)]">Add to {activeCollection.name}</h3>
+                  <button onClick={() => setShowCollectionBooksModal(false)} className="p-2 bg-[var(--lib-input)] rounded-full text-[var(--lib-text)]">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                <div className="flex-1 overflow-y-auto p-4">
+                  {books.length === 0 ? (
+                    <p className="text-center text-[var(--lib-muted)] py-10">Your shelf is empty.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {books.map(book => {
+                        const inCollection = activeCollection.books?.some(b => b.id === book.id);
+                        return (
+                          <div key={book.id} className="flex items-center gap-3 p-2 rounded-xl bg-[var(--lib-input)] border border-[var(--lib-border)]">
+                            <div className="w-10 h-14 shrink-0 rounded overflow-hidden">
+                              <BookCover coverUrl={book.coverUrl} title={book.title} size="sm" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-bold text-sm text-[var(--lib-text)] truncate">{book.title}</p>
+                              <p className="text-xs text-[var(--lib-muted)] truncate">{book.author}</p>
+                            </div>
+                            {inCollection ? (
+                              <button disabled className="shrink-0 p-2 text-emerald-500">
+                                <CheckCircle2 className="w-5 h-5" />
+                              </button>
+                            ) : (
+                              <button 
+                                onClick={() => handleAddBookToCollection(book.id, activeCollection.id)}
+                                className="shrink-0 bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground font-bold py-1.5 px-3 rounded-full text-xs transition-colors"
+                              >
+                                Add
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
       </div>
     </>
   );

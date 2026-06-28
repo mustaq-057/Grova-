@@ -636,6 +636,27 @@ export async function initDb() {
     }
 
     await db.execute(`
+      CREATE TABLE IF NOT EXISTS library_collections (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        banner_url TEXT,
+        created_by TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      )
+    `);
+
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS library_collection_books (
+        collection_id TEXT NOT NULL,
+        book_id TEXT NOT NULL,
+        added_at TEXT NOT NULL,
+        PRIMARY KEY (collection_id, book_id),
+        FOREIGN KEY (collection_id) REFERENCES library_collections(id) ON DELETE CASCADE,
+        FOREIGN KEY (book_id) REFERENCES library_books(id) ON DELETE CASCADE
+      )
+    `);
+
+    await db.execute(`
       CREATE TABLE IF NOT EXISTS library_notes (
         id TEXT PRIMARY KEY,
         book_id TEXT NOT NULL,
