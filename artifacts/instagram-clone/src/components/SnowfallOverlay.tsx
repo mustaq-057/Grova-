@@ -1,13 +1,23 @@
 import { memo, useMemo, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
+const SNOWFLAKE_SVGS = [
+  // Intricate crystal star
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20"/><path d="M4 12h16"/><path d="m19.07 4.93-14.14 14.14"/><path d="M4.93 4.93l14.14 14.14"/><path d="m7.76 7.76 2.12-2.12"/><path d="m16.24 16.24-2.12 2.12"/><path d="m7.76 16.24 2.12 2.12"/><path d="m16.24 7.76-2.12-2.12"/></svg>,
+  // Frosty branch snowflake
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"><path d="m10 20-3-3 3-3"/><path d="M12 22V2"/><path d="m14 20 3-3-3-3"/><path d="m5 17-3-3 3-3"/><path d="M2 12h20"/><path d="m19 17 3-3-3-3"/><path d="m10 4-3 3 3 3"/><path d="m14 4 3 3-3 3"/></svg>
+];
+
 type Snowflake = {
   id: number;
+  shapeIndex: number;
   left: number;
   size: number;
   delay: number;
   duration: number;
   sway: number;
+  spin: number;
+  spinDuration: number;
   opacity: number;
   blur: number;
   depth: number;
@@ -95,31 +105,34 @@ export const SnowfallOverlay = memo(function SnowfallOverlay() {
       
       if (layer === 0) { // Background (small, slow, blurry)
         depth = 0.3;
-        size = 2 + Math.random() * 3;
+        size = 4 + Math.random() * 4;
         duration = 20 + Math.random() * 15;
-        opacity = 0.4 + Math.random() * 0.3;
-        blur = 2 + Math.random() * 2;
+        opacity = 0.3 + Math.random() * 0.2;
+        blur = 3 + Math.random() * 2;
       } else if (layer === 1) { // Midground (medium, normal, sharp)
         depth = 0.7;
-        size = 4 + Math.random() * 4;
+        size = 12 + Math.random() * 8;
         duration = 12 + Math.random() * 10;
-        opacity = 0.6 + Math.random() * 0.4;
+        opacity = 0.5 + Math.random() * 0.4;
         blur = Math.random() > 0.7 ? 1 : 0;
       } else { // Foreground (large, fast, slightly out of focus)
         depth = 1.2;
-        size = 8 + Math.random() * 6;
+        size = 24 + Math.random() * 16;
         duration = 6 + Math.random() * 6;
-        opacity = 0.8 + Math.random() * 0.2;
-        blur = 3 + Math.random() * 3; // Depth of field blur
+        opacity = 0.7 + Math.random() * 0.3;
+        blur = 2 + Math.random() * 3; // Depth of field blur
       }
 
       return {
         id: i,
+        shapeIndex: i % SNOWFLAKE_SVGS.length,
         left: -20 + Math.random() * 140, // Allow spawning slightly offscreen
         size,
         delay: Math.random() * -30, // Negative delay so they are already falling
         duration,
-        sway: 20 + Math.random() * 40, 
+        sway: 20 + Math.random() * 40,
+        spin: Math.random() * 360,
+        spinDuration: 8 + Math.random() * 15,
         opacity,
         blur,
         depth,
@@ -138,9 +151,13 @@ export const SnowfallOverlay = memo(function SnowfallOverlay() {
           0%, 100% { margin-left: 0; }
           50% { margin-left: var(--sway); }
         }
+        @keyframes snowSpin {
+          0% { transform: rotate(var(--start-spin)); }
+          100% { transform: rotate(calc(var(--start-spin) + 360deg)); }
+        }
         @keyframes snowShimmer {
-          0%, 100% { opacity: var(--base-opacity); }
-          50% { opacity: 1; box-shadow: 0 0 10px 2px rgba(255, 255, 255, 0.8); }
+          0%, 100% { opacity: var(--base-opacity); filter: drop-shadow(0 0 2px rgba(255,255,255,0.2)); }
+          50% { opacity: 1; filter: drop-shadow(0 0 12px rgba(255, 255, 255, 0.9)); }
         }
         .snowfall-gradient-bg {
            background: radial-gradient(circle at 50% 0%, rgba(255,255,255,0.05) 0%, transparent 60%);
@@ -169,7 +186,7 @@ export const SnowfallOverlay = memo(function SnowfallOverlay() {
         {flakes.map((f) => (
           <div
             key={`snow-${f.id}`}
-            className="absolute top-0 rounded-full bg-white select-none"
+            className="absolute top-0 text-white select-none"
             style={{
               left: `${f.left}%`,
               width: `${f.size}px`,
@@ -188,7 +205,24 @@ export const SnowfallOverlay = memo(function SnowfallOverlay() {
               "--wind-y": `${touchWindY * f.depth}px`,
               "--base-opacity": f.opacity,
             }}
-          />
+          >
+            {/* Very blurred background flakes are better rendered as pure CSS circles for performance, 
+                but mid/foreground are SVG crystals */}
+            {f.blur > 2 ? (
+               <div className="w-full h-full rounded-full bg-white" />
+            ) : (
+               <div 
+                 className="w-full h-full"
+                 style={{ 
+                   animation: `snowSpin ${f.spinDuration}s linear ${f.delay}s infinite`,
+                   // @ts-expect-error
+                   "--start-spin": `${f.spin}deg`
+                 }}
+               >
+                 {SNOWFLAKE_SVGS[f.shapeIndex]}
+               </div>
+            )}
+          </div>
         ))}
       </div>
     </div>,
