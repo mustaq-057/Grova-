@@ -11,7 +11,8 @@ export type AppThemeId =
   | "library"
   | "mustaq"
   | "autumn-amber"
-  | "petrichor";
+  | "petrichor"
+  | "snowfall";
 
 const PREMIUM_ANIMATED_THEMES: AppThemeId[] = ["moonlight-saga"];
 
@@ -244,6 +245,28 @@ export const APP_THEMES: {
         "--app-border": "200 10% 82%",
       },
     },
+    {
+      id: "snowfall",
+      name: "Snowfall",
+      description: "Deep winter parallax snow ❄️",
+      swatch: "bg-gradient-to-br from-slate-300 via-blue-100 to-white",
+      dark: {
+        "--app-background": "220 30% 10%",
+        "--app-foreground": "210 20% 95%",
+        "--app-primary": "210 80% 80%", // Frosty blue
+        "--app-card": "220 25% 14%",
+        "--app-secondary": "220 20% 18%",
+        "--app-border": "220 15% 24%",
+      },
+      light: {
+        "--app-background": "210 20% 96%",
+        "--app-foreground": "220 30% 15%",
+        "--app-primary": "210 70% 50%", // Deep icy blue
+        "--app-card": "0 0% 100%",
+        "--app-secondary": "210 15% 92%",
+        "--app-border": "210 10% 88%",
+      },
+    },
   ];
 
 let currentAppTheme: AppThemeId = "sara-lavender";
@@ -343,6 +366,10 @@ export function isAutumnAmberTheme(themeId?: AppThemeId): boolean {
 
 export function isPetrichorTheme(themeId?: AppThemeId): boolean {
   return (themeId ?? getStoredAppTheme()) === "petrichor";
+}
+
+export function isSnowfallTheme(themeId?: AppThemeId): boolean {
+  return (themeId ?? getStoredAppTheme()) === "snowfall";
 }
 
 export function getThemeBackgroundUrl(themeId?: AppThemeId): string | null {

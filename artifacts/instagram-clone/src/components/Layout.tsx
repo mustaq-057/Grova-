@@ -18,6 +18,7 @@ import { FallingNamesOverlay } from "@/components/FallingNamesOverlay";
 import { FallingMustaqOverlay } from "@/components/FallingMustaqOverlay";
 import { FallingAutumnOverlay } from "@/components/FallingAutumnOverlay";
 import { RainstormOverlay } from "@/components/RainstormOverlay";
+import { SnowfallOverlay } from "@/components/SnowfallOverlay";
 import { PremiumThemeOverlay } from "@/components/PremiumThemeOverlay";
 import { ThemeBackgroundOverlay } from "@/components/ThemeBackgroundOverlay";
 import {
@@ -30,6 +31,7 @@ import {
   isMustaqTheme,
   isAutumnAmberTheme,
   isPetrichorTheme,
+  isSnowfallTheme,
   themeUsesPhotoBackground,
   type AppThemeId,
 } from "@/lib/app-theme";
@@ -61,6 +63,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const showMustaqNames = isMustaqTheme(appTheme);
   const showAutumnLeaves = isAutumnAmberTheme(appTheme);
   const showRainstorm = isPetrichorTheme(appTheme);
+  const showSnowfall = isSnowfallTheme(appTheme);
   const showPremiumScene = isPremiumAnimatedTheme(appTheme) && !isChat;
   const showThemeBg = themeUsesPhotoBackground(appTheme);
   const isLibrary = location.startsWith("/library") || location.startsWith("/read");
@@ -171,6 +174,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       {showMustaqNames && <FallingMustaqOverlay />}
       {showAutumnLeaves && <FallingAutumnOverlay />}
       {showRainstorm && <RainstormOverlay />}
+      {showSnowfall && <SnowfallOverlay />}
       {/* Desktop Sidebar */}
       {!libraryMode && (
         <nav
