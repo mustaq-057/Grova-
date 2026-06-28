@@ -285,6 +285,10 @@ export function isSaraLavenderTheme(themeId?: AppThemeId): boolean {
   return (themeId ?? getStoredAppTheme()) === "sara-lavender";
 }
 
+export function isMustaqTheme(themeId?: AppThemeId): boolean {
+  return (themeId ?? getStoredAppTheme()) === "mustaq";
+}
+
 export function getThemeBackgroundUrl(themeId?: AppThemeId): string | null {
   const id = themeId ?? getStoredAppTheme();
   return THEME_BACKGROUNDS[id] ?? null;
