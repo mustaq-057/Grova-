@@ -357,6 +357,15 @@ export function PostFeed({
                         <MapPin className="w-3 h-3" /> {post.location}
                       </p>
                     ) : null}
+                    <p className="text-[10px] text-muted-foreground/70 mt-0.5">
+                      {post.createdAt
+                        ? new Date(post.createdAt).toLocaleDateString("en-GB", {
+                            day: "numeric",
+                            month: "long",
+                            year: "numeric",
+                          })
+                        : null}
+                    </p>
                   </div>
                   {isMine ? (
                     <button
