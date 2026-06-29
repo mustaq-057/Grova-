@@ -35,6 +35,20 @@ export function writeSessionSnapshot(user: ApiUser, partner: ApiUser | null): vo
   try {
     const payload: SessionSnapshot = { user, partner, updatedAt: Date.now() };
     storage()?.setItem(SESSION_KEY, JSON.stringify(payload));
+    
+    const rows: LoginProfileRow[] = [{ id: user.id, name: user.name, avatar: user.avatar }];
+    if (partner) {
+      rows.push({ id: partner.id as "me" | "wife", name: partner.name, avatar: partner.avatar });
+    }
+    const existing = readLoginProfiles() || [];
+    const merged = existing.map((p) => {
+      const updated = rows.find((r) => r.id === p.id);
+      return updated ? updated : p;
+    });
+    rows.forEach((r) => {
+      if (!merged.find((m) => m.id === r.id)) merged.push(r);
+    });
+    writeLoginProfiles(merged);
   } catch {
     /* ignore */
   }

@@ -88,11 +88,60 @@ export default memo(function Login() {
     };
   }, []);
 
+  const performLogin = async (id: "me" | "wife", loginCode: string) => {
+    setLoading(true);
+    setError("");
+    try {
+      const { user, encryptionKey } = await api.login(id, loginCode);
+      await initEncryption(encryptionKey.trim());
+      localStorage.setItem(`grova_code_${id}`, loginCode);
+      localStorage.setItem("grova_last_profile", id);
+      setUser(user as ApiUser);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "";
+      if (msg.includes("fetch") || msg.includes("Failed") || msg.includes("Network") || msg.includes("API running") || msg.includes("Connection lost")) {
+        setError(
+          import.meta.env.PROD
+            ? "Cannot reach Grova API. Open /api/healthz — fix DATABASE_URL or ENCRYPTION_* on Vercel if it shows degraded, then redeploy."
+            : "Cannot reach the server. Run pnpm dev:grova and open http://localhost:5000",
+        );
+      } else if (msg.toLowerCase().includes("too many")) {
+        setError("Too many wrong attempts. Wait 30 minutes or restart the server, then try again.");
+      } else if (/Attempts remaining: (\d+)/i.test(msg)) {
+        const left = Number(msg.match(/Attempts remaining: (\d+)/i)?.[1] ?? 0);
+        setError(
+          left === 1 ? "Wrong code. One attempt left." : `Wrong code. ${left} attempts left.`,
+        );
+      } else if (msg.toLowerCase().includes("invalid code")) {
+        setError("Wrong code. Check spelling and try again.");
+      } else if (msg.toLowerCase().includes("primary authentication")) {
+        setError("Email sign-in expired. Go back and sign in with your email again.");
+      } else {
+        setError("Login failed. Please try again.");
+      }
+      setStep("code");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!authReady) return;
     setCode("");
     setError("");
     setSelectedId(null);
+    
+    if (trustedDevice && localStorage.getItem("grova_autoconnect") === "true") {
+      const lastId = localStorage.getItem("grova_last_profile") as "me" | "wife";
+      if (lastId) {
+        const savedCode = localStorage.getItem(`grova_code_${lastId}`);
+        if (savedCode) {
+          void performLogin(lastId, savedCode);
+          return;
+        }
+      }
+    }
+
     setStep(trustedDevice ? "pick" : "primary");
     api
       .getLoginProfiles()
@@ -146,41 +195,7 @@ export default memo(function Login() {
     }
   };
 
-  const performLogin = async (id: "me" | "wife", loginCode: string) => {
-    setLoading(true);
-    setError("");
-    try {
-      const { user, encryptionKey } = await api.login(id, loginCode);
-      await initEncryption(encryptionKey.trim());
-      localStorage.setItem(`grova_code_${id}`, loginCode); // Save code for auto-connect
-      setUser(user as ApiUser);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "";
-      if (msg.includes("fetch") || msg.includes("Failed") || msg.includes("Network") || msg.includes("API running") || msg.includes("Connection lost")) {
-        setError(
-          import.meta.env.PROD
-            ? "Cannot reach Grova API. Open /api/healthz — fix DATABASE_URL or ENCRYPTION_* on Vercel if it shows degraded, then redeploy."
-            : "Cannot reach the server. Run pnpm dev:grova and open http://localhost:5000",
-        );
-      } else if (msg.toLowerCase().includes("too many")) {
-        setError("Too many wrong attempts. Wait 30 minutes or restart the server, then try again.");
-      } else if (/Attempts remaining: (\d+)/i.test(msg)) {
-        const left = Number(msg.match(/Attempts remaining: (\d+)/i)?.[1] ?? 0);
-        setError(
-          left === 1 ? "Wrong code. One attempt left." : `Wrong code. ${left} attempts left.`,
-        );
-      } else if (msg.toLowerCase().includes("invalid code")) {
-        setError("Wrong code. Check spelling and try again.");
-      } else if (msg.toLowerCase().includes("primary authentication")) {
-        setError("Email sign-in expired. Go back and sign in with your email again.");
-      } else {
-        setError("Login failed. Please try again.");
-      }
-      setStep("code");
-    } finally {
-      setLoading(false);
-    }
-  };
+
 
   const handlePick = (id: "me" | "wife") => {
     setSelectedId(id);
