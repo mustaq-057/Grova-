@@ -65,6 +65,9 @@ export function StickerzPicker({ onSelect, onClose }: StickerzPickerProps) {
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
+  
+  const [stickerToDelete, setStickerToDelete] = useState<CustomSticker | null>(null);
+  const [alertMessage, setAlertMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const onUpdate = () => setStickers(getAllStickers());
@@ -101,7 +104,7 @@ export function StickerzPicker({ onSelect, onClose }: StickerzPickerProps) {
       }
     } catch (e) {
       console.error(e);
-      alert("Failed to crop image.");
+      setAlertMessage("Failed to crop image.");
     }
   };
 
@@ -116,7 +119,7 @@ export function StickerzPicker({ onSelect, onClose }: StickerzPickerProps) {
       setStep("list");
     } catch (err) {
       console.error("Failed to upload custom sticker", err);
-      alert("Failed to save sticker. Please try again.");
+      setAlertMessage("Failed to save sticker. Please try again.");
     } finally {
       setIsSaving(false);
     }
@@ -125,9 +128,14 @@ export function StickerzPicker({ onSelect, onClose }: StickerzPickerProps) {
   const handleContextMenu = (e: React.MouseEvent, sticker: CustomSticker) => {
     if (sticker.category === "Custom") {
       e.preventDefault();
-      if (confirm(`Delete custom sticker "${sticker.caption}"?`)) {
-        removeCustomSticker(sticker.id);
-      }
+      setStickerToDelete(sticker);
+    }
+  };
+
+  const confirmDelete = () => {
+    if (stickerToDelete) {
+      removeCustomSticker(stickerToDelete.id);
+      setStickerToDelete(null);
     }
   };
 
@@ -156,6 +164,41 @@ export function StickerzPicker({ onSelect, onClose }: StickerzPickerProps) {
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        <AnimatePresence>
+          {stickerToDelete && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+            >
+              <div className="bg-[#1c1c1c] border border-white/10 rounded-2xl p-6 w-full max-w-sm flex flex-col gap-4 shadow-2xl">
+                <h3 className="text-white text-lg font-bold">Delete Sticker?</h3>
+                <p className="text-white/70 text-sm">Are you sure you want to delete "{stickerToDelete.caption}"? This cannot be undone.</p>
+                <div className="flex justify-end gap-3 mt-2">
+                  <button onClick={() => setStickerToDelete(null)} className="px-4 py-2 rounded-xl bg-white/10 text-white text-sm font-medium hover:bg-white/20 transition-colors">Cancel</button>
+                  <button onClick={confirmDelete} className="px-4 py-2 rounded-xl bg-red-500 text-white text-sm font-bold hover:bg-red-600 transition-colors">Delete</button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {alertMessage && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+            >
+              <div className="bg-[#1c1c1c] border border-white/10 rounded-2xl p-6 w-full max-w-xs flex flex-col gap-4 items-center text-center shadow-2xl">
+                <h3 className="text-white text-lg font-bold">Notice</h3>
+                <p className="text-white/70 text-sm">{alertMessage}</p>
+                <button onClick={() => setAlertMessage(null)} className="mt-2 w-full py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-bold transition-colors">OK</button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {step === "list" && (
           <div className="px-4 py-3 shrink-0">

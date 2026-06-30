@@ -181,6 +181,7 @@ export default function Library() {
   const [newCollectionName, setNewCollectionName] = useState("");
   const [newCollectionBannerUrl, setNewCollectionBannerUrl] = useState<string | null>(null);
   const [isCreatingCollection, setIsCreatingCollection] = useState(false);
+  const [collectionToDelete, setCollectionToDelete] = useState<string | null>(null);
   const [showCollectionBooksModal, setShowCollectionBooksModal] = useState(false);
   const collectionBannerInputRef = useRef<HTMLInputElement>(null);
   const [allNotes, setAllNotes] = useState<LibraryNote[]>([]);
@@ -738,14 +739,20 @@ export default function Library() {
     }
   };
 
-  const handleDeleteCollection = async (id: string) => {
-    if (!confirm(libLang === "ar" ? "هل أنت متأكد من حذف هذه المجموعة؟ لن يتم حذف الكتب." : "Are you sure you want to delete this collection? Books will not be deleted.")) return;
+  const handleDeleteCollection = (id: string) => {
+    setCollectionToDelete(id);
+  };
+
+  const confirmDeleteCollection = async () => {
+    if (!collectionToDelete) return;
     try {
-      await apiFetch(`/library/collections/${id}`, { method: "DELETE" });
-      setCollections(prev => prev.filter(c => c.id !== id));
-      if (activeCollection?.id === id) setActiveCollection(null);
+      await apiFetch(`/library/collections/${collectionToDelete}`, { method: "DELETE" });
+      setCollections(prev => prev.filter(c => c.id !== collectionToDelete));
+      if (activeCollection?.id === collectionToDelete) setActiveCollection(null);
     } catch (err) {
       console.error("Failed to delete collection:", err);
+    } finally {
+      setCollectionToDelete(null);
     }
   };
 
@@ -968,6 +975,38 @@ export default function Library() {
         }
       `}</style>
       <div className={`min-h-full pb-24 lib-theme-${libTheme} bg-[var(--lib-bg)] text-[var(--lib-text)] transition-colors duration-300`}>
+        
+        {/* Custom Confirm Dialog for Collection Deletion */}
+        <AnimatePresence>
+          {collectionToDelete && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+            >
+              <div className="bg-[var(--lib-card)] border border-[var(--lib-border)] rounded-2xl p-6 w-full max-w-sm flex flex-col gap-4 shadow-2xl">
+                <h3 className="text-[var(--lib-text)] text-lg font-bold font-serif">
+                  {libLang === "ar" ? "حذف المجموعة؟" : "Delete Collection?"}
+                </h3>
+                <p className="text-[var(--lib-muted)] text-sm">
+                  {libLang === "ar" 
+                    ? "هل أنت متأكد من حذف هذه المجموعة؟ لن يتم حذف الكتب التي بداخلها من مكتبتك الأساسية." 
+                    : "Are you sure you want to delete this collection? Books inside it will not be deleted from your main library."}
+                </p>
+                <div className="flex justify-end gap-3 mt-2">
+                  <button onClick={() => setCollectionToDelete(null)} className="px-4 py-2 rounded-xl bg-[var(--lib-input)] text-[var(--lib-text)] text-sm font-medium hover:bg-[var(--lib-btn-hover)] transition-colors">
+                    {libLang === "ar" ? "إلغاء" : "Cancel"}
+                  </button>
+                  <button onClick={confirmDeleteCollection} className="px-4 py-2 rounded-xl bg-red-500/20 text-red-500 border border-red-500/20 text-sm font-bold hover:bg-red-500 hover:text-white transition-all">
+                    {libLang === "ar" ? "حذف" : "Delete"}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* ── Sticky Search Header ── */}
         <div className="sticky top-0 z-20 backdrop-blur-md pt-[max(1rem,env(safe-area-inset-top))] px-4 pb-4 border-b border-[var(--lib-border)] bg-[var(--lib-header)] transition-colors duration-300">
           <div className="flex items-center gap-2 mb-3">

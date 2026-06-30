@@ -9,6 +9,7 @@ import { AuthProvider, useAuth, PROFILE_INACTIVITY_MS } from "@/lib/auth";
 import { CallProvider } from "@/lib/call-context";
 import Login from "@/pages/Login";
 import Home from "@/pages/Home";
+import { toast } from "sonner";
 import { useEffect, useRef, type ReactNode } from "react";
 import Messages from "@/pages/Messages";
 import Create from "@/pages/Create";
@@ -137,6 +138,22 @@ function ProtectedRouter() {
 }
 
 function App() {
+  // Override native alert globally to use our beautiful toast system
+  useEffect(() => {
+    const originalAlert = window.alert;
+    window.alert = (message: string) => {
+      // Don't show empty alerts
+      if (!message) return;
+      toast(message, { 
+        duration: 4000, 
+        position: 'top-center' 
+      });
+    };
+    return () => {
+      window.alert = originalAlert;
+    };
+  }, []);
+
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
