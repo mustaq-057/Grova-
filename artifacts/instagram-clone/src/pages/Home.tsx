@@ -17,7 +17,7 @@ import { CameraOverlay } from "@/components/CameraOverlay";
 import { StoryViewer } from "@/components/StoryViewer";
 import { AvatarNoteModal } from "@/components/AvatarNoteModal";
 import { isAutumnAmberTheme, isPetrichorTheme } from "@/lib/app-theme";
-import { AutumnHomeDecor } from "@/components/AutumnHomeDecor";
+import { AutumnHomeDecor, AutumnBranch } from "@/components/AutumnHomeDecor";
 import { PetrichorHomeDecor } from "@/components/PetrichorHomeDecor";
 
 
@@ -384,7 +384,7 @@ export default memo(function Home() {
                 transition={{ delay: 0.3 + (i * 0.05) }}
                 whileHover={{ scale: 1.02, y: -2 }}
                 whileTap={{ scale: 0.98 }}
-                className={`p-4 bg-gradient-to-br from-card to-card/50 border border-border/50 rounded-2xl hover:border-primary/40 hover:shadow-lg transition-all cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${appTheme === 'library' ? 'library-shortcut-card' : ''}`}
+                className={`relative overflow-hidden p-4 bg-gradient-to-br from-card to-card/50 border border-border/50 rounded-2xl hover:border-primary/40 hover:shadow-lg transition-all cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${appTheme === 'library' ? 'library-shortcut-card' : ''}`}
                 role="button"
                 tabIndex={0}
                 aria-label={`Navigate to ${s.label}: ${s.desc}`}
@@ -394,6 +394,12 @@ export default memo(function Home() {
                 </div>
                 <p className={`font-semibold text-sm ${appTheme === 'library' ? 'library-shortcut-title' : ''}`}>{s.label}</p>
                 <p className={`text-xs text-muted-foreground mt-0.5 ${appTheme === 'library' ? 'library-shortcut-desc' : ''}`}>{s.desc}</p>
+                
+                {isAutumnAmber && (
+                  <div className="absolute -top-4 -right-4 w-20 h-20 opacity-30 pointer-events-none rotate-12">
+                    <AutumnBranch />
+                  </div>
+                )}
               </motion.div>
             </Link>
           );

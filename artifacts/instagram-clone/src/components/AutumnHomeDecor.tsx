@@ -2,7 +2,7 @@ import { memo } from "react";
 import { motion } from "framer-motion";
 
 // Beautiful SVG branch that will hang from the top right
-const AutumnBranch = () => (
+export const AutumnBranch = () => (
   <svg 
     viewBox="0 0 300 300" 
     fill="none" 
@@ -25,7 +25,7 @@ const AutumnBranch = () => (
 );
 
 // A simple scattered leaf
-const StaticLeaf = ({ className, fill }: { className?: string, fill: string }) => (
+export const StaticLeaf = ({ className, fill }: { className?: string, fill: string }) => (
   <svg viewBox="0 0 100 100" className={className} style={{ filter: "drop-shadow(0 4px 6px rgba(0,0,0,0.4))" }}>
     <path d="M 50 20 Q 20 40, 30 70 Q 50 90, 70 70 Q 80 40, 50 20 Z" fill={fill} />
   </svg>
