@@ -114,7 +114,6 @@ export const ImageCropModal = memo(function ImageCropModal({
 
   // Retouching (Healing Brush) State
   const [brushSize, setBrushSize] = useState(20);
-  const [healMode, setHealMode] = useState<'local' | 'ai'>('local');
   const [aiPrompt, setAiPrompt] = useState('');
   const retouchCanvasRef = useRef<HTMLCanvasElement>(null);
   const [canvasRect, setCanvasRect] = useState<{ left: number, top: number, width: number, height: number } | null>(null);
@@ -245,129 +244,6 @@ export const ImageCropModal = memo(function ImageCropModal({
     } finally {
       setProcessing(false);
     }
-  };
-
-  // Advanced Multi-pass Content-Aware Healing
-  const processRetouch = () => {
-    if (pathRef.current.length === 0 || !canvasRect) return;
-    
-    setProcessing(true);
-    setTimeout(() => {
-      const img = new Image();
-      img.crossOrigin = "anonymous";
-      img.src = currentImageSrc;
-      img.onload = () => {
-          const W = img.width;
-          const H = img.height;
-
-          const scaleX = W / canvasRect.width;
-          const scaleY = H / canvasRect.height;
-          const brushR = Math.round((brushSize * (scaleX + scaleY)) / 2);
-
-          const maskCanvas = document.createElement('canvas');
-          maskCanvas.width = W; maskCanvas.height = H;
-          const mCtx = maskCanvas.getContext('2d')!;
-          mCtx.lineCap = "round"; mCtx.lineJoin = "round";
-          mCtx.lineWidth = brushR * 2; mCtx.strokeStyle = "white"; mCtx.fillStyle = "white";
-          mCtx.beginPath();
-          mCtx.moveTo(pathRef.current[0].x * scaleX, pathRef.current[0].y * scaleY);
-          for (let i = 1; i < pathRef.current.length; i++) {
-              mCtx.lineTo(pathRef.current[i].x * scaleX, pathRef.current[i].y * scaleY);
-          }
-          mCtx.closePath();
-          mCtx.stroke();
-          mCtx.fill(); // Smart Lasso for local mode too
-          const maskData = mCtx.getImageData(0, 0, W, H).data;
-
-          const srcCanvas = document.createElement('canvas');
-          srcCanvas.width = W; srcCanvas.height = H;
-          const sCtx = srcCanvas.getContext('2d')!;
-          sCtx.drawImage(img, 0, 0);
-          const srcData = sCtx.getImageData(0, 0, W, H);
-          const pixels = srcData.data;
-
-          const sourceRingWidth = Math.max(4, Math.round(brushR * 0.4));
-          const featherRadius = Math.max(2, Math.round(brushR * 0.15));
-
-          const maskedPixels: number[] = [];
-          for (let y = 0; y < H; y++) {
-            for (let x = 0; x < W; x++) {
-              if (maskData[(y * W + x) * 4 + 3] > 128) maskedPixels.push(y * W + x);
-            }
-          }
-
-          for (let pass = 0; pass < 2; pass++) {
-            for (const idx of maskedPixels) {
-              const px = idx % W; const py = Math.floor(idx / W);
-              let rAcc = 0, gAcc = 0, bAcc = 0, wTotal = 0;
-              const innerR = brushR + pass * 2;
-              const outerR = innerR + sourceRingWidth;
-
-              for (let dy = -outerR; dy <= outerR; dy++) {
-                for (let dx = -outerR; dx <= outerR; dx++) {
-                  const nx = px + dx; const ny = py + dy;
-                  if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
-                  const dist2 = dx * dx + dy * dy;
-                  if (dist2 > outerR * outerR) continue;
-
-                  const ni = ny * W + nx;
-                  if (maskData[ni * 4 + 3] > 64) continue;
-
-                  const dist = Math.sqrt(dist2);
-                  const weight = 1.0 / (dist + 1.0);
-
-                  rAcc += pixels[ni * 4] * weight;
-                  gAcc += pixels[ni * 4 + 1] * weight;
-                  bAcc += pixels[ni * 4 + 2] * weight;
-                  wTotal += weight;
-                }
-              }
-
-              if (wTotal > 0) {
-                pixels[idx * 4] = Math.round(rAcc / wTotal);
-                pixels[idx * 4 + 1] = Math.round(gAcc / wTotal);
-                pixels[idx * 4 + 2] = Math.round(bAcc / wTotal);
-              }
-            }
-          }
-
-          const healCanvas = document.createElement('canvas');
-          healCanvas.width = W; healCanvas.height = H;
-          const hCtx = healCanvas.getContext('2d')!;
-          hCtx.putImageData(srcData, 0, 0);
-
-          const blendCanvas = document.createElement('canvas');
-          blendCanvas.width = W; blendCanvas.height = H;
-          const blCtx = blendCanvas.getContext('2d')!;
-          blCtx.filter = `blur(${featherRadius}px)`;
-          blCtx.drawImage(img, 0, 0);
-          blCtx.filter = 'none';
-          blCtx.globalCompositeOperation = 'destination-in';
-          blCtx.drawImage(maskCanvas, 0, 0);
-
-          const finalCanvas = document.createElement('canvas');
-          finalCanvas.width = W; finalCanvas.height = H;
-          const fCtx = finalCanvas.getContext('2d')!;
-          fCtx.drawImage(img, 0, 0);
-          fCtx.drawImage(healCanvas, 0, 0);
-          fCtx.drawImage(blendCanvas, 0, 0);
-
-          const newDataUrl = finalCanvas.toDataURL("image/jpeg", 1.0); // Highest quality
-          setCurrentImageSrc(newDataUrl);
-          if (cropperRef.current?.cropper) {
-             cropperRef.current.cropper.replace(newDataUrl);
-          }
-          
-          const overlayCtx = retouchCanvasRef.current?.getContext('2d');
-          if (overlayCtx) overlayCtx.clearRect(0, 0, canvasRect.width, canvasRect.height);
-          pathRef.current = [];
-          setProcessing(false);
-      };
-      img.onerror = () => {
-        setProcessing(false);
-        pathRef.current = [];
-      };
-    }, 10);
   };
 
   const combinedFilter = [
@@ -738,12 +614,12 @@ export const ImageCropModal = memo(function ImageCropModal({
                    ctx.fill();
                 }
 
-                if (healMode === 'local') processRetouch(); 
+                processAiRetouch(); 
              }}
              onPointerOut={() => { 
                 if (isDrawing.current) { 
                   isDrawing.current = false; 
-                  if (healMode === 'local') processRetouch(); 
+                  processAiRetouch(); 
                 } 
              }}
           />
@@ -771,6 +647,15 @@ export const ImageCropModal = memo(function ImageCropModal({
             <button onClick={() => { cropperRef.current?.cropper.scaleX(cropperRef.current.cropper.getData().scaleX === -1 ? 1 : -1); hapticFeedback(); }} className="w-10 h-10 rounded-full bg-black/60 backdrop-blur-xl flex items-center justify-center text-white hover:text-[#FFD700] transition-colors shadow-xl border border-white/10"><FlipHorizontal className="w-4 h-4" /></button>
             <button onClick={() => { cropperRef.current?.cropper.scaleY(cropperRef.current.cropper.getData().scaleY === -1 ? 1 : -1); hapticFeedback(); }} className="w-10 h-10 rounded-full bg-black/60 backdrop-blur-xl flex items-center justify-center text-white hover:text-[#FFD700] transition-colors shadow-xl border border-white/10"><FlipVertical className="w-4 h-4" /></button>
             <button onClick={() => { cropperRef.current?.cropper.reset(); setAspect('free'); setRotation(0); hapticFeedback(); }} className="w-10 h-10 rounded-full bg-red-500/20 backdrop-blur-xl flex items-center justify-center text-red-400 hover:text-red-300 transition-colors mt-2 border border-red-500/30"><RotateCcw className="w-4 h-4" /></button>
+          </div>
+        )}
+
+        {/* PROCESSING OVERLAY */}
+        {processing && (
+          <div className="absolute inset-0 z-[1000] bg-black/70 backdrop-blur-md flex flex-col items-center justify-center animate-in fade-in rounded-[40px]">
+             <div className="w-12 h-12 border-4 border-[#FFD700]/30 border-t-[#FFD700] rounded-full animate-spin shadow-[0_0_15px_rgba(255,215,0,0.5)]"></div>
+             <span className="mt-4 text-white font-bold tracking-widest uppercase text-sm animate-pulse">AI Magic in Progress...</span>
+             <span className="text-white/50 text-[10px] mt-2 max-w-[200px] text-center">(This may take up to 20s if the AI is waking up)</span>
           </div>
         )}
 
@@ -968,17 +853,10 @@ export const ImageCropModal = memo(function ImageCropModal({
           {activeTab === 'heal' && (
             <div className="flex flex-col items-center justify-center w-full px-6 gap-2 animate-in fade-in h-full">
                
-               <div className="flex items-center gap-2 mb-1 w-full max-w-sm bg-white/5 rounded-full p-1 border border-white/10">
-                 <button onClick={() => setHealMode('local')} className={`flex-1 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest ${healMode === 'local' ? 'bg-white text-black shadow-sm' : 'text-white/50 hover:text-white/80'}`}>Local Fast</button>
-                 <button onClick={() => setHealMode('ai')} className={`flex-1 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-1.5 ${healMode === 'ai' ? 'bg-[#FFD700] text-black shadow-[0_0_15px_rgba(255,215,0,0.4)]' : 'text-[#FFD700]/50 hover:text-[#FFD700]/80'}`}><Sparkles className="w-3 h-3" /> Cloud AI</button>
+               <div className="flex flex-col w-full max-w-sm mb-2 mt-1">
+                 <span className="text-[11px] font-bold text-white flex items-center justify-center gap-1.5 uppercase tracking-widest"><Sparkles className="w-4 h-4 text-[#FFD700]" /> AI Magic Eraser</span>
+                 <span className="text-[10px] text-white/50 text-center mt-1 leading-tight">Draw a circle around an object to seamlessly remove it using Generative Fill.</span>
                </div>
-
-               {healMode === 'ai' && (
-                 <div className="flex items-center gap-2 w-full max-w-sm">
-                   <input type="text" placeholder="Prompt (e.g. remove object)" value={aiPrompt} onChange={e => setAiPrompt(e.target.value)} className="flex-1 bg-white/10 border border-white/20 rounded-xl px-3 py-1.5 text-xs text-white outline-none focus:border-[#FFD700] transition-colors" />
-                   <button onClick={processAiRetouch} disabled={processing || pathRef.current.length === 0} className="bg-[#FFD700] text-black px-4 py-1.5 rounded-xl text-xs font-bold disabled:opacity-50 hover:bg-[#FFF055] transition-colors">Generate</button>
-                 </div>
-               )}
 
                <div className="flex items-center justify-between w-full max-w-sm mt-1">
                   <span className="text-[10px] font-bold text-white/70 uppercase tracking-widest">Brush Size</span>
