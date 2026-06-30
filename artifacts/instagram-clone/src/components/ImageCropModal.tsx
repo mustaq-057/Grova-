@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { 
   Check, X, RotateCw, Settings2, 
   Image as ImageIcon, Crop, Sun, Sliders, Droplet, Thermometer, ChevronLeft, Wand2, Eye, Aperture,
-  Focus, FlipHorizontal, FlipVertical, RotateCcw, Palette, CloudFog, Lock, Unlock
+  Focus, FlipHorizontal, FlipVertical, RotateCcw, Palette, CloudFog, Lock, Unlock, Eraser
 } from "lucide-react";
 import Cropper, { ReactCropperElement } from "react-cropper";
 import "cropperjs/dist/cropper.css";
@@ -42,6 +42,7 @@ export const ImageCropModal = memo(function ImageCropModal({
   onCancel,
   onApply,
 }: Props) {
+  const [currentImageSrc, setCurrentImageSrc] = useState(imageSrc);
   const [aspect, setAspect] = useState<CropAspect>(initialAspect);
   const [lockedAspect, setLockedAspect] = useState<number | null>(null);
   const [rotation, setRotation] = useState(0);
@@ -59,19 +60,118 @@ export const ImageCropModal = memo(function ImageCropModal({
     bgBlur: 30,
   });
 
-  const [activeTab, setActiveTab] = useState<"crop" | "edit" | "filter">("crop");
+  const [activeTab, setActiveTab] = useState<"crop" | "edit" | "filter" | "retouch">("crop");
   const [activeTool, setActiveTool] = useState<EditTool | null>(null);
   const [isComparing, setIsComparing] = useState(false);
   const [processing, setProcessing] = useState(false);
+
+  // Retouching (Healing Brush) State
+  const [brushSize, setBrushSize] = useState(25);
+  const retouchCanvasRef = useRef<HTMLCanvasElement>(null);
+  const [canvasRect, setCanvasRect] = useState<{ left: number, top: number, width: number, height: number } | null>(null);
+  const isDrawing = useRef(false);
+  const pathRef = useRef<{x: number, y: number}[]>([]);
 
   const cropperRef = useRef<ReactCropperElement>(null);
 
   useEffect(() => {
     setAspect(initialAspect);
     const img = new Image();
-    img.src = imageSrc;
+    img.src = currentImageSrc;
     img.onload = () => setNaturalAspect(img.width / img.height);
-  }, [initialAspect, imageSrc]);
+  }, [initialAspect, currentImageSrc]);
+
+  // Sync Cropper layout and disable interactions when in Retouch mode
+  useEffect(() => {
+    const cropper = cropperRef.current?.cropper;
+    if (!cropper) return;
+
+    if (activeTab === "retouch") {
+      cropper.disable();
+      const updateRect = () => {
+        const data = cropper.getCanvasData();
+        if (data) setCanvasRect(data);
+      };
+      updateRect();
+      // Ensure it updates if window resizes
+      window.addEventListener('resize', updateRect);
+      return () => window.removeEventListener('resize', updateRect);
+    } else {
+      cropper.enable();
+      setCanvasRect(null);
+      return undefined;
+    }
+  }, [activeTab]);
+
+  const processRetouch = () => {
+    if (pathRef.current.length === 0 || !canvasRect) return;
+    
+    setProcessing(true);
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.src = currentImageSrc;
+    img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        ctx.drawImage(img, 0, 0);
+
+        const scaleX = img.width / canvasRect.width;
+        const scaleY = img.height / canvasRect.height;
+        
+        const maskCanvas = document.createElement('canvas');
+        maskCanvas.width = img.width;
+        maskCanvas.height = img.height;
+        const mCtx = maskCanvas.getContext('2d');
+        if (!mCtx) return;
+        
+        mCtx.lineCap = "round";
+        mCtx.lineJoin = "round";
+        mCtx.lineWidth = brushSize * scaleX;
+        mCtx.strokeStyle = "white";
+        mCtx.beginPath();
+        mCtx.moveTo(pathRef.current[0].x * scaleX, pathRef.current[0].y * scaleY);
+        for (let i = 1; i < pathRef.current.length; i++) {
+            mCtx.lineTo(pathRef.current[i].x * scaleX, pathRef.current[i].y * scaleY);
+        }
+        mCtx.stroke();
+
+        // Algorithmic Inpaint Simulation (Blur & Smudge clone)
+        const blurCanvas = document.createElement('canvas');
+        blurCanvas.width = img.width;
+        blurCanvas.height = img.height;
+        const bCtx = blurCanvas.getContext('2d');
+        if (!bCtx) return;
+        
+        // Heavy blur to smudge surrounding colors into the erased area
+        bCtx.filter = `blur(${brushSize * scaleX * 0.8}px)`;
+        bCtx.drawImage(img, 0, 0);
+        
+        bCtx.filter = "none";
+        bCtx.globalCompositeOperation = "destination-in";
+        bCtx.drawImage(maskCanvas, 0, 0);
+
+        // Draw the smudge patch back over the original image
+        ctx.drawImage(blurCanvas, 0, 0);
+
+        const newDataUrl = canvas.toDataURL("image/jpeg", 1.0);
+        setCurrentImageSrc(newDataUrl);
+        if (cropperRef.current?.cropper) {
+           cropperRef.current.cropper.replace(newDataUrl);
+        }
+        
+        const overlayCtx = retouchCanvasRef.current?.getContext('2d');
+        if (overlayCtx) overlayCtx.clearRect(0, 0, canvasRect.width, canvasRect.height);
+        pathRef.current = [];
+        setProcessing(false);
+    };
+    img.onerror = () => {
+      setProcessing(false);
+      pathRef.current = [];
+    };
+  };
 
   const combinedFilter = [
     presetFilter !== "none" ? presetFilter : "",
@@ -256,7 +356,7 @@ export const ImageCropModal = memo(function ImageCropModal({
             type="button" 
             onClick={autoEnhance} 
             className="p-2 text-white/80 hover:text-[#FFD700] transition-opacity active:opacity-50"
-            aria-label="Auto Enhance"
+            title="AI Smart Lighting"
           >
             <Wand2 className="w-5 h-5" />
           </button>
@@ -287,6 +387,71 @@ export const ImageCropModal = memo(function ImageCropModal({
            transition: "opacity 0.2s"
         }} />
 
+        {/* Retouching (Healing Brush) Overlay Canvas */}
+        {activeTab === "retouch" && canvasRect && (
+          <canvas
+             ref={retouchCanvasRef}
+             style={{
+               position: 'absolute',
+               left: canvasRect.left,
+               top: canvasRect.top,
+               width: canvasRect.width,
+               height: canvasRect.height,
+               zIndex: 200,
+               touchAction: 'none',
+               cursor: 'crosshair',
+               pointerEvents: processing ? 'none' : 'auto'
+             }}
+             width={canvasRect.width}
+             height={canvasRect.height}
+             onPointerDown={(e) => {
+                isDrawing.current = true;
+                const rect = retouchCanvasRef.current?.getBoundingClientRect();
+                if (!rect) return;
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                const ctx = retouchCanvasRef.current?.getContext('2d');
+                if (!ctx) return;
+                ctx.lineCap = "round";
+                ctx.lineJoin = "round";
+                ctx.lineWidth = brushSize;
+                ctx.strokeStyle = "rgba(255, 215, 0, 0.6)"; // Aesthetic yellow smudge line
+                ctx.beginPath();
+                ctx.moveTo(x, y);
+                pathRef.current = [{x, y}];
+             }}
+             onPointerMove={(e) => {
+                if (!isDrawing.current) return;
+                const rect = retouchCanvasRef.current?.getBoundingClientRect();
+                if (!rect) return;
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                const ctx = retouchCanvasRef.current?.getContext('2d');
+                if (!ctx) return;
+                ctx.lineTo(x, y);
+                ctx.stroke();
+                pathRef.current.push({x, y});
+             }}
+             onPointerUp={() => {
+                isDrawing.current = false;
+                processRetouch();
+             }}
+             onPointerCancel={() => {
+                isDrawing.current = false;
+                pathRef.current = [];
+                const ctx = retouchCanvasRef.current?.getContext('2d');
+                if (ctx) ctx.clearRect(0, 0, canvasRect.width, canvasRect.height);
+             }}
+             onPointerOut={(e) => {
+                if (isDrawing.current) {
+                  isDrawing.current = false;
+                  processRetouch();
+                }
+             }}
+          />
+        )}
+
+        {/* Top Right Crop Buttons */}
         {activeTab === "crop" && (
           <div className="absolute top-10 right-6 flex flex-col gap-3 z-[140] animate-in fade-in slide-in-from-right-4">
             <button 
@@ -313,9 +478,9 @@ export const ImageCropModal = memo(function ImageCropModal({
           </div>
         )}
 
-        <div className="w-full h-full relative" style={{ filter: isComparing ? "none" : combinedFilter, transition: "filter 0.2s" }}>
+        <div className={`w-full h-full relative ${activeTab === "retouch" ? "opacity-90" : ""}`} style={{ filter: isComparing ? "none" : combinedFilter, transition: "filter 0.2s" }}>
           <Cropper
-            src={imageSrc}
+            src={currentImageSrc}
             style={{ height: "100%", width: "100%" }}
             initialAspectRatio={NaN}
             aspectRatio={getCropperAspect()}
@@ -333,74 +498,35 @@ export const ImageCropModal = memo(function ImageCropModal({
           />
         </div>
         <style>{`
-          .cropper-custom-styles .cropper-modal {
-            background-color: rgba(0,0,0,0.85);
-          }
-          .cropper-custom-styles .cropper-view-box {
-            outline: 1.5px solid #FFD700;
-            outline-color: rgba(255, 215, 0, 0.6);
-            border-radius: 0;
-          }
-          .cropper-custom-styles .cropper-line {
-            background-color: transparent;
-          }
-          .cropper-custom-styles .cropper-dashed {
-            border: 0 dashed rgba(255,255,255,0.4);
-          }
-          .cropper-custom-styles .cropper-dashed.dashed-h {
-            border-top-width: 1px; border-bottom-width: 1px; top: 33.333%; height: 33.333%;
-          }
-          .cropper-custom-styles .cropper-dashed.dashed-v {
-            border-left-width: 1px; border-right-width: 1px; left: 33.333%; width: 33.333%;
-          }
+          .cropper-custom-styles .cropper-modal { background-color: rgba(0,0,0,0.85); }
+          .cropper-custom-styles .cropper-view-box { outline: 1.5px solid #FFD700; outline-color: rgba(255, 215, 0, 0.6); border-radius: 0; }
+          .cropper-custom-styles .cropper-line { background-color: transparent; }
+          .cropper-custom-styles .cropper-dashed { border: 0 dashed rgba(255,255,255,0.4); }
+          .cropper-custom-styles .cropper-dashed.dashed-h { border-top-width: 1px; border-bottom-width: 1px; top: 33.333%; height: 33.333%; }
+          .cropper-custom-styles .cropper-dashed.dashed-v { border-left-width: 1px; border-right-width: 1px; left: 33.333%; width: 33.333%; }
           .cropper-custom-styles .cropper-center { display: none; }
-          .cropper-custom-styles .cropper-point {
-            background-color: transparent !important; opacity: 1 !important;
-          }
+          .cropper-custom-styles .cropper-point { background-color: transparent !important; opacity: 1 !important; }
           .cropper-custom-styles .cropper-point.point-nw, .cropper-custom-styles .cropper-point.point-ne,
-          .cropper-custom-styles .cropper-point.point-sw, .cropper-custom-styles .cropper-point.point-se {
-            width: 30px; height: 30px;
-          }
+          .cropper-custom-styles .cropper-point.point-sw, .cropper-custom-styles .cropper-point.point-se { width: 30px; height: 30px; }
           .cropper-custom-styles .cropper-point.point-n, .cropper-custom-styles .cropper-point.point-s,
-          .cropper-custom-styles .cropper-point.point-e, .cropper-custom-styles .cropper-point.point-w {
-            width: 30px; height: 30px;
-          }
-          .cropper-custom-styles .cropper-point::before {
-             content: ''; position: absolute; background: transparent; border: 0 solid #FFD700;
-          }
-          .cropper-custom-styles .cropper-point.point-nw::before {
-             width: 16px; height: 16px; border-top-width: 3px; border-left-width: 3px; top: 0; left: 0;
-          }
-          .cropper-custom-styles .cropper-point.point-ne::before {
-             width: 16px; height: 16px; border-top-width: 3px; border-right-width: 3px; top: 0; right: 0;
-          }
-          .cropper-custom-styles .cropper-point.point-sw::before {
-             width: 16px; height: 16px; border-bottom-width: 3px; border-left-width: 3px; bottom: 0; left: 0;
-          }
-          .cropper-custom-styles .cropper-point.point-se::before {
-             width: 16px; height: 16px; border-bottom-width: 3px; border-right-width: 3px; bottom: 0; right: 0;
-          }
-          .cropper-custom-styles .cropper-point.point-n::before {
-             width: 20px; height: 0; border-top-width: 3px; top: 0; left: 5px;
-          }
-          .cropper-custom-styles .cropper-point.point-s::before {
-             width: 20px; height: 0; border-bottom-width: 3px; bottom: 0; left: 5px;
-          }
-          .cropper-custom-styles .cropper-point.point-e::before {
-             height: 20px; width: 0; border-right-width: 3px; top: 5px; right: 0;
-          }
-          .cropper-custom-styles .cropper-point.point-w::before {
-             height: 20px; width: 0; border-left-width: 3px; top: 5px; left: 0;
-          }
+          .cropper-custom-styles .cropper-point.point-e, .cropper-custom-styles .cropper-point.point-w { width: 30px; height: 30px; }
+          .cropper-custom-styles .cropper-point::before { content: ''; position: absolute; background: transparent; border: 0 solid #FFD700; }
+          .cropper-custom-styles .cropper-point.point-nw::before { width: 16px; height: 16px; border-top-width: 3px; border-left-width: 3px; top: 0; left: 0; }
+          .cropper-custom-styles .cropper-point.point-ne::before { width: 16px; height: 16px; border-top-width: 3px; border-right-width: 3px; top: 0; right: 0; }
+          .cropper-custom-styles .cropper-point.point-sw::before { width: 16px; height: 16px; border-bottom-width: 3px; border-left-width: 3px; bottom: 0; left: 0; }
+          .cropper-custom-styles .cropper-point.point-se::before { width: 16px; height: 16px; border-bottom-width: 3px; border-right-width: 3px; bottom: 0; right: 0; }
+          .cropper-custom-styles .cropper-point.point-n::before { width: 20px; height: 0; border-top-width: 3px; top: 0; left: 5px; }
+          .cropper-custom-styles .cropper-point.point-s::before { width: 20px; height: 0; border-bottom-width: 3px; bottom: 0; left: 5px; }
+          .cropper-custom-styles .cropper-point.point-e::before { height: 20px; width: 0; border-right-width: 3px; top: 5px; right: 0; }
+          .cropper-custom-styles .cropper-point.point-w::before { height: 20px; width: 0; border-left-width: 3px; top: 5px; left: 0; }
         `}</style>
       </div>
 
       <div className="shrink-0 bg-[#0a0a0a] border-t border-white/5 pb-6 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] z-[150]">
         
-        {/* Rotation Dial permanently above the tabs when Crop is active */}
         {activeTab === "crop" && (
            <div className="flex flex-col items-center w-full px-6 pt-4 pb-2 animate-in fade-in slide-in-from-bottom-2">
-             <span className="text-[10px] text-[#FFD700] font-mono mb-1">{rotation}°</span>
+             <span className="text-[10px] text-[#FFD700] font-mono mb-1">{rotation}Â°</span>
              <div className="flex-1 relative flex items-center w-full max-w-sm">
                 <div className="absolute inset-0 flex justify-between px-2 items-center pointer-events-none opacity-20">
                    {[...Array(15)].map((_, i) => (
@@ -431,6 +557,24 @@ export const ImageCropModal = memo(function ImageCropModal({
         )}
 
         <div className="h-[90px] flex items-center justify-center border-b border-white/5 relative">
+          
+          {/* RETOUCH TAB */}
+          {activeTab === "retouch" && (
+            <div className="flex flex-col items-center justify-center w-full px-6 gap-2 animate-in fade-in slide-in-from-left-4 h-full">
+               <div className="flex items-center justify-between w-full max-w-sm">
+                  <span className="text-xs font-semibold text-white/70">Healing Brush Size</span>
+                  <span className="text-xs text-[#FFD700] font-mono">{brushSize}px</span>
+               </div>
+               <div className="flex items-center gap-4 w-full max-w-sm relative">
+                  <input 
+                    type="range" min="5" max="100" value={brushSize}
+                    onChange={(e) => { setBrushSize(Number(e.target.value)); hapticFeedback(); }}
+                    className="flex-1 accent-[#FFD700] touch-none h-2"
+                  />
+               </div>
+            </div>
+          )}
+
           {activeTab === "crop" && (
             <div className="flex items-center gap-3 px-4 w-full overflow-x-auto no-scrollbar animate-in fade-in py-2 absolute inset-0">
               <button
@@ -529,7 +673,7 @@ export const ImageCropModal = memo(function ImageCropModal({
                     }`}
                     style={{ filter: f.value !== 'none' ? f.value : 'none' }}
                   >
-                    <img src={imageSrc} className="w-full h-full object-cover" alt={f.name} />
+                    <img src={currentImageSrc} className="w-full h-full object-cover" alt={f.name} />
                   </button>
                   <span className={`text-[10px] font-semibold mt-1 ${presetFilter === f.value ? "text-[#FFD700]" : "text-white/50"}`}>
                     {f.name}
@@ -540,7 +684,7 @@ export const ImageCropModal = memo(function ImageCropModal({
           )}
         </div>
 
-        <div className="flex justify-around items-center pt-4 px-4 max-w-sm mx-auto">
+        <div className="flex justify-around items-center pt-4 px-2 max-w-sm mx-auto">
           <button
             type="button"
             onClick={() => { setActiveTab("crop"); setActiveTool(null); hapticFeedback(); }}
@@ -567,6 +711,15 @@ export const ImageCropModal = memo(function ImageCropModal({
             <Settings2 className="w-5 h-5 mb-0.5" />
             <span className="text-[10px] font-bold tracking-wide">Adjust</span>
             {activeTab === "edit" && <div className="w-1 h-1 rounded-full bg-[#FFD700] mt-1 animate-in zoom-in" />}
+          </button>
+          <button
+            type="button"
+            onClick={() => { setActiveTab("retouch"); hapticFeedback(); }}
+            className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all w-16 ${activeTab === "retouch" ? "text-[#FFD700] -translate-y-1" : "text-white/40 hover:text-white/80"}`}
+          >
+            <Eraser className="w-5 h-5 mb-0.5" />
+            <span className="text-[10px] font-bold tracking-wide">Heal</span>
+            {activeTab === "retouch" && <div className="w-1 h-1 rounded-full bg-[#FFD700] mt-1 animate-in zoom-in" />}
           </button>
         </div>
       </div>
