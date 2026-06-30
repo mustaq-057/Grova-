@@ -182,13 +182,15 @@ export const ImageCropModal = memo(function ImageCropModal({
       
       // Draw white mask
       mCtx.lineCap = "round"; mCtx.lineJoin = "round";
-      mCtx.lineWidth = brushR * 2; mCtx.strokeStyle = "white";
+      mCtx.lineWidth = brushR * 2; mCtx.strokeStyle = "white"; mCtx.fillStyle = "white";
       mCtx.beginPath();
       mCtx.moveTo(pathRef.current[0].x * scaleX, pathRef.current[0].y * scaleY);
       for (let i = 1; i < pathRef.current.length; i++) {
           mCtx.lineTo(pathRef.current[i].x * scaleX, pathRef.current[i].y * scaleY);
       }
+      mCtx.closePath();
       mCtx.stroke();
+      mCtx.fill(); // Smart Lasso: Fills the drawn loop automatically
 
       const maskDataUrl = maskCanvas.toDataURL("image/jpeg");
 
@@ -244,13 +246,15 @@ export const ImageCropModal = memo(function ImageCropModal({
           maskCanvas.width = W; maskCanvas.height = H;
           const mCtx = maskCanvas.getContext('2d')!;
           mCtx.lineCap = "round"; mCtx.lineJoin = "round";
-          mCtx.lineWidth = brushR * 2; mCtx.strokeStyle = "white";
+          mCtx.lineWidth = brushR * 2; mCtx.strokeStyle = "white"; mCtx.fillStyle = "white";
           mCtx.beginPath();
           mCtx.moveTo(pathRef.current[0].x * scaleX, pathRef.current[0].y * scaleY);
           for (let i = 1; i < pathRef.current.length; i++) {
               mCtx.lineTo(pathRef.current[i].x * scaleX, pathRef.current[i].y * scaleY);
           }
+          mCtx.closePath();
           mCtx.stroke();
+          mCtx.fill(); // Smart Lasso for local mode too
           const maskData = mCtx.getImageData(0, 0, W, H).data;
 
           const srcCanvas = document.createElement('canvas');
@@ -703,6 +707,15 @@ export const ImageCropModal = memo(function ImageCropModal({
              }}
              onPointerUp={() => { 
                 isDrawing.current = false; 
+                
+                // Smart Lasso: visually fill the shape on screen
+                const ctx = retouchCanvasRef.current?.getContext('2d');
+                if (ctx && pathRef.current.length > 2) {
+                   ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+                   ctx.closePath();
+                   ctx.fill();
+                }
+
                 if (healMode === 'local') processRetouch(); 
              }}
              onPointerOut={() => { 
