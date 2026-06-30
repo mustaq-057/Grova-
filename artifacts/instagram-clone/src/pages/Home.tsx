@@ -20,6 +20,7 @@ import { isAutumnAmberTheme, isPetrichorTheme, isSnowfallTheme } from "@/lib/app
 import { AutumnHomeDecor, AutumnBranch } from "@/components/AutumnHomeDecor";
 import { PetrichorHomeDecor, PetrichorCloud } from "@/components/PetrichorHomeDecor";
 import { SnowflakeDecor } from "@/components/SnowfallOverlay";
+import { ThemeCornerDecor, ThemeShortcutDecor } from "@/components/ThemeDecor";
 
 
 export default memo(function Home() {
@@ -208,6 +209,7 @@ export default memo(function Home() {
     <div className="max-w-[470px] mx-auto pb-20 md:pb-6 relative min-h-[100dvh]">
       {isAutumnAmber && <AutumnHomeDecor />}
       {isPetrichor && <PetrichorHomeDecor />}
+      <ThemeCornerDecor theme={appTheme} />
       <motion.div 
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -412,6 +414,8 @@ export default memo(function Home() {
                     <PetrichorCloud className="w-full h-full" />
                   </div>
                 )}
+                
+                <ThemeShortcutDecor theme={appTheme} />
               </motion.div>
             </Link>
           );
