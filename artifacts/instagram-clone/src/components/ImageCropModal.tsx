@@ -3,12 +3,12 @@ import { createPortal } from "react-dom";
 import { 
   Check, X, RotateCw, Settings2, 
   Image as ImageIcon, Crop, Sun, Sliders, Droplet, Thermometer, ChevronLeft, Wand2, Eye, Aperture,
-  Focus, FlipHorizontal, FlipVertical, RotateCcw, Palette, CloudFog
+  Focus, FlipHorizontal, FlipVertical, RotateCcw, Palette, CloudFog, Lock, Unlock
 } from "lucide-react";
 import Cropper, { ReactCropperElement } from "react-cropper";
 import "cropperjs/dist/cropper.css";
 
-export type CropAspect = "free" | "original" | "1:1" | "4:5" | "16:9";
+export type CropAspect = "free" | "original" | "1:1" | "4:5" | "16:9" | "locked";
 
 type Props = {
   imageSrc: string;
@@ -33,7 +33,7 @@ const FILTERS = [
   { name: "Perpetua", value: "contrast(1.1) brightness(1.25) saturate(1.1)" },
 ];
 
-type EditTool = "rotate" | "brightness" | "contrast" | "saturation" | "warmth" | "tint" | "fade" | "vignette" | "bgBlur";
+type EditTool = "brightness" | "contrast" | "saturation" | "warmth" | "tint" | "fade" | "vignette" | "bgBlur";
 
 export const ImageCropModal = memo(function ImageCropModal({
   imageSrc,
@@ -43,6 +43,7 @@ export const ImageCropModal = memo(function ImageCropModal({
   onApply,
 }: Props) {
   const [aspect, setAspect] = useState<CropAspect>(initialAspect);
+  const [lockedAspect, setLockedAspect] = useState<number | null>(null);
   const [rotation, setRotation] = useState(0);
   const [naturalAspect, setNaturalAspect] = useState(1);
   
@@ -102,7 +103,6 @@ export const ImageCropModal = memo(function ImageCropModal({
       const ctx = finalCanvas.getContext("2d");
       
       if (ctx) {
-        // 1. Background Blur (if padded)
         if (adjustments.bgBlur > 0) {
            ctx.filter = `blur(${adjustments.bgBlur}px) brightness(0.6) ${combinedFilter}`;
            const scale = Math.max(finalCanvas.width / sourceCanvas.width, finalCanvas.height / sourceCanvas.height);
@@ -111,20 +111,17 @@ export const ImageCropModal = memo(function ImageCropModal({
            ctx.drawImage(sourceCanvas, (finalCanvas.width - bgW) / 2, (finalCanvas.height - bgH) / 2, bgW, bgH);
         }
 
-        // 2. Draw Main Image with CSS Filters
         ctx.filter = combinedFilter;
         ctx.drawImage(sourceCanvas, 0, 0);
 
-        // 3. Apply Film Fade (Lighten blend mode with grey overlay)
         if (adjustments.fade > 0) {
           ctx.filter = "none";
           ctx.globalCompositeOperation = "screen";
           ctx.fillStyle = `rgba(50, 45, 45, ${adjustments.fade / 100})`;
           ctx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
-          ctx.globalCompositeOperation = "source-over"; // Reset
+          ctx.globalCompositeOperation = "source-over";
         }
 
-        // 4. Apply Vignette (Radial Gradient)
         if (adjustments.vignette > 0) {
           const v = adjustments.vignette / 100;
           const gradient = ctx.createRadialGradient(
@@ -155,11 +152,29 @@ export const ImageCropModal = memo(function ImageCropModal({
   };
 
   const getCropperAspect = () => {
+    if (aspect === "locked" && lockedAspect) return lockedAspect;
     if (aspect === "1:1") return 1;
     if (aspect === "4:5") return 4 / 5;
     if (aspect === "16:9") return 16 / 9;
     if (aspect === "original") return naturalAspect;
     return NaN; 
+  };
+
+  const toggleAspectLock = () => {
+    const cropper = cropperRef.current?.cropper;
+    if (!cropper) return;
+    
+    if (aspect === "locked") {
+      setAspect("free");
+      hapticFeedback();
+    } else {
+      const data = cropper.getCropBoxData();
+      if (data.width && data.height) {
+        setLockedAspect(data.width / data.height);
+        setAspect("locked");
+        hapticFeedback();
+      }
+    }
   };
 
   const updateAdjustment = (key: keyof typeof adjustments, value: number) => {
@@ -184,57 +199,6 @@ export const ImageCropModal = memo(function ImageCropModal({
 
   const renderToolSlider = () => {
     if (!activeTool) return null;
-
-    if (activeTool === "rotate") {
-      return (
-        <div className="flex items-center gap-4 w-full px-6 animate-in fade-in slide-in-from-right-4 duration-200">
-          <button onClick={() => setActiveTool(null)} className="p-2 -ml-2 text-white/70 hover:text-white">
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-          <span className="text-xs text-[#FFD700] w-8 font-mono">{rotation}°</span>
-          
-          <div className="flex-1 relative flex items-center">
-            <div className="absolute inset-0 flex justify-between px-2 items-center pointer-events-none opacity-20">
-               {[...Array(11)].map((_, i) => (
-                 <div key={i} className={`w-0.5 bg-white ${i === 5 ? 'h-3' : 'h-1.5'}`} />
-               ))}
-            </div>
-            <input 
-              type="range" min="-45" max="45" value={rotation}
-              onChange={(e) => {
-                const val = Number(e.target.value);
-                setRotation(val);
-                cropperRef.current?.cropper.rotateTo(val);
-                hapticFeedback();
-              }}
-              onDoubleClick={() => {
-                 setRotation(0);
-                 cropperRef.current?.cropper.rotateTo(0);
-                 hapticFeedback();
-              }}
-              className="w-full accent-[#FFD700] touch-none h-8 opacity-0 z-10"
-            />
-            <div 
-               className="absolute w-1 h-4 bg-[#FFD700] pointer-events-none rounded-full"
-               style={{ left: `calc(${((rotation + 45) / 90) * 100}% - 2px)` }}
-            />
-          </div>
-
-          <button
-            type="button"
-            onClick={() => {
-              const r = (rotation + 90) % 360;
-              setRotation(r);
-              cropperRef.current?.cropper.rotateTo(r);
-              hapticFeedback();
-            }}
-            className="p-2 bg-white/10 rounded-full text-white shrink-0"
-          >
-            <RotateCw className="w-4 h-4" />
-          </button>
-        </div>
-      );
-    }
 
     const config = {
       brightness: { min: 0, max: 200, val: adjustments.brightness, label: "Brightness", default: 100 },
@@ -307,7 +271,7 @@ export const ImageCropModal = memo(function ImageCropModal({
         </div>
       </div>
 
-      <div className="flex-1 relative w-full overflow-hidden min-h-0 py-8 px-4">
+      <div className="flex-1 relative w-full overflow-hidden min-h-0 pt-8 pb-4 px-4">
         
         {/* Real-time Film Fade Preview layer */}
         <div className="absolute inset-0 z-[5] pointer-events-none mix-blend-screen" style={{
@@ -340,7 +304,7 @@ export const ImageCropModal = memo(function ImageCropModal({
               <FlipVertical className="w-4 h-4" />
             </button>
             <button 
-              onClick={() => { cropperRef.current?.cropper.reset(); setAspect("free"); hapticFeedback(); }}
+              onClick={() => { cropperRef.current?.cropper.reset(); setAspect("free"); hapticFeedback(); setRotation(0); }}
               className="w-9 h-9 rounded-full bg-[#FFD700]/10 backdrop-blur-xl flex items-center justify-center text-[#FFD700] border border-[#FFD700]/30 transition-transform active:scale-90 mt-2 shadow-lg shadow-black/20"
               title="Reset Crop"
             >
@@ -384,39 +348,25 @@ export const ImageCropModal = memo(function ImageCropModal({
             border: 0 dashed rgba(255,255,255,0.4);
           }
           .cropper-custom-styles .cropper-dashed.dashed-h {
-            border-top-width: 1px;
-            border-bottom-width: 1px;
-            top: 33.333%;
-            height: 33.333%;
+            border-top-width: 1px; border-bottom-width: 1px; top: 33.333%; height: 33.333%;
           }
           .cropper-custom-styles .cropper-dashed.dashed-v {
-            border-left-width: 1px;
-            border-right-width: 1px;
-            left: 33.333%;
-            width: 33.333%;
+            border-left-width: 1px; border-right-width: 1px; left: 33.333%; width: 33.333%;
           }
           .cropper-custom-styles .cropper-center { display: none; }
           .cropper-custom-styles .cropper-point {
-            background-color: transparent !important;
-            opacity: 1 !important;
+            background-color: transparent !important; opacity: 1 !important;
           }
-          .cropper-custom-styles .cropper-point.point-nw,
-          .cropper-custom-styles .cropper-point.point-ne,
-          .cropper-custom-styles .cropper-point.point-sw,
-          .cropper-custom-styles .cropper-point.point-se {
+          .cropper-custom-styles .cropper-point.point-nw, .cropper-custom-styles .cropper-point.point-ne,
+          .cropper-custom-styles .cropper-point.point-sw, .cropper-custom-styles .cropper-point.point-se {
             width: 30px; height: 30px;
           }
-          .cropper-custom-styles .cropper-point.point-n,
-          .cropper-custom-styles .cropper-point.point-s,
-          .cropper-custom-styles .cropper-point.point-e,
-          .cropper-custom-styles .cropper-point.point-w {
+          .cropper-custom-styles .cropper-point.point-n, .cropper-custom-styles .cropper-point.point-s,
+          .cropper-custom-styles .cropper-point.point-e, .cropper-custom-styles .cropper-point.point-w {
             width: 30px; height: 30px;
           }
           .cropper-custom-styles .cropper-point::before {
-             content: '';
-             position: absolute;
-             background: transparent;
-             border: 0 solid #FFD700;
+             content: ''; position: absolute; background: transparent; border: 0 solid #FFD700;
           }
           .cropper-custom-styles .cropper-point.point-nw::before {
              width: 16px; height: 16px; border-top-width: 3px; border-left-width: 3px; top: 0; left: 0;
@@ -446,20 +396,62 @@ export const ImageCropModal = memo(function ImageCropModal({
       </div>
 
       <div className="shrink-0 bg-[#0a0a0a] border-t border-white/5 pb-6 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] z-[150]">
-        <div className="h-[100px] flex items-center justify-center border-b border-white/5 relative">
+        
+        {/* Rotation Dial permanently above the tabs when Crop is active */}
+        {activeTab === "crop" && (
+           <div className="flex flex-col items-center w-full px-6 pt-4 pb-2 animate-in fade-in slide-in-from-bottom-2">
+             <span className="text-[10px] text-[#FFD700] font-mono mb-1">{rotation}°</span>
+             <div className="flex-1 relative flex items-center w-full max-w-sm">
+                <div className="absolute inset-0 flex justify-between px-2 items-center pointer-events-none opacity-20">
+                   {[...Array(15)].map((_, i) => (
+                     <div key={i} className={`w-0.5 bg-white ${i === 7 ? 'h-3' : 'h-1.5'}`} />
+                   ))}
+                </div>
+                <input 
+                  type="range" min="-45" max="45" value={rotation}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    setRotation(val);
+                    cropperRef.current?.cropper.rotateTo(val);
+                    hapticFeedback();
+                  }}
+                  onDoubleClick={() => {
+                     setRotation(0);
+                     cropperRef.current?.cropper.rotateTo(0);
+                     hapticFeedback();
+                  }}
+                  className="w-full accent-[#FFD700] touch-none h-8 opacity-0 z-10"
+                />
+                <div 
+                   className="absolute w-1 h-4 bg-[#FFD700] pointer-events-none rounded-full"
+                   style={{ left: `calc(${((rotation + 45) / 90) * 100}% - 2px)` }}
+                />
+             </div>
+           </div>
+        )}
+
+        <div className="h-[90px] flex items-center justify-center border-b border-white/5 relative">
           {activeTab === "crop" && (
-            <div className="flex items-center gap-3 px-4 w-full overflow-x-auto no-scrollbar animate-in fade-in slide-in-from-left-4 py-2 absolute inset-0">
+            <div className="flex items-center gap-3 px-4 w-full overflow-x-auto no-scrollbar animate-in fade-in py-2 absolute inset-0">
               <button
                 onClick={() => { setAspect("free"); hapticFeedback(); }}
-                className={`flex flex-col items-center justify-center gap-2 w-16 h-[72px] rounded-2xl shrink-0 transition-all ${aspect === "free" ? "bg-white/10 text-[#FFD700] shadow-sm shadow-[#FFD700]/10" : "hover:bg-white/5 text-white/60 hover:text-white"}`}
+                className={`flex flex-col items-center justify-center gap-2 w-[72px] h-[72px] rounded-2xl shrink-0 transition-all ${aspect === "free" ? "bg-white/10 text-[#FFD700] shadow-sm shadow-[#FFD700]/10" : "hover:bg-white/5 text-white/60 hover:text-white"}`}
               >
                 <div className="w-7 h-7 border-2 border-current rounded border-dashed" />
                 <span className="text-[10px] font-semibold">Custom</span>
               </button>
 
               <button
+                onClick={toggleAspectLock}
+                className={`flex flex-col items-center justify-center gap-2 w-[72px] h-[72px] rounded-2xl shrink-0 transition-all ${aspect === "locked" ? "bg-white/10 text-[#FFD700] shadow-sm shadow-[#FFD700]/10" : "hover:bg-white/5 text-white/60 hover:text-white"}`}
+              >
+                {aspect === "locked" ? <Lock className="w-5 h-5 mb-1" /> : <Unlock className="w-5 h-5 mb-1 opacity-50" />}
+                <span className="text-[10px] font-semibold">{aspect === "locked" ? "Locked" : "Lock Ratio"}</span>
+              </button>
+
+              <button
                 onClick={() => { setAspect("original"); hapticFeedback(); }}
-                className={`flex flex-col items-center justify-center gap-2 w-16 h-[72px] rounded-2xl shrink-0 transition-all ${aspect === "original" ? "bg-white/10 text-[#FFD700] shadow-sm shadow-[#FFD700]/10" : "hover:bg-white/5 text-white/60 hover:text-white"}`}
+                className={`flex flex-col items-center justify-center gap-2 w-[72px] h-[72px] rounded-2xl shrink-0 transition-all ${aspect === "original" ? "bg-white/10 text-[#FFD700] shadow-sm shadow-[#FFD700]/10" : "hover:bg-white/5 text-white/60 hover:text-white"}`}
               >
                 <div className="w-7 h-5 border-2 border-current rounded" />
                 <span className="text-[10px] font-semibold">Original</span>
@@ -467,7 +459,7 @@ export const ImageCropModal = memo(function ImageCropModal({
 
               <button
                 onClick={() => { setAspect("4:5"); hapticFeedback(); }}
-                className={`flex flex-col items-center justify-center gap-2 w-16 h-[72px] rounded-2xl shrink-0 transition-all ${aspect === "4:5" ? "bg-white/10 text-[#FFD700] shadow-sm shadow-[#FFD700]/10" : "hover:bg-white/5 text-white/60 hover:text-white"}`}
+                className={`flex flex-col items-center justify-center gap-2 w-[72px] h-[72px] rounded-2xl shrink-0 transition-all ${aspect === "4:5" ? "bg-white/10 text-[#FFD700] shadow-sm shadow-[#FFD700]/10" : "hover:bg-white/5 text-white/60 hover:text-white"}`}
               >
                 <div className="w-6 h-7 border-2 border-current rounded" />
                 <span className="text-[10px] font-semibold">4:5</span>
@@ -475,7 +467,7 @@ export const ImageCropModal = memo(function ImageCropModal({
 
               <button
                 onClick={() => { setAspect("1:1"); hapticFeedback(); }}
-                className={`flex flex-col items-center justify-center gap-2 w-16 h-[72px] rounded-2xl shrink-0 transition-all ${aspect === "1:1" ? "bg-white/10 text-[#FFD700] shadow-sm shadow-[#FFD700]/10" : "hover:bg-white/5 text-white/60 hover:text-white"}`}
+                className={`flex flex-col items-center justify-center gap-2 w-[72px] h-[72px] rounded-2xl shrink-0 transition-all ${aspect === "1:1" ? "bg-white/10 text-[#FFD700] shadow-sm shadow-[#FFD700]/10" : "hover:bg-white/5 text-white/60 hover:text-white"}`}
               >
                 <div className="w-6 h-6 border-2 border-current rounded" />
                 <span className="text-[10px] font-semibold">1:1</span>
@@ -483,7 +475,7 @@ export const ImageCropModal = memo(function ImageCropModal({
               
               <button
                 onClick={() => { setAspect("16:9"); hapticFeedback(); }}
-                className={`flex flex-col items-center justify-center gap-2 w-16 h-[72px] rounded-2xl shrink-0 transition-all ${aspect === "16:9" ? "bg-white/10 text-[#FFD700] shadow-sm shadow-[#FFD700]/10" : "hover:bg-white/5 text-white/60 hover:text-white"}`}
+                className={`flex flex-col items-center justify-center gap-2 w-[72px] h-[72px] rounded-2xl shrink-0 transition-all ${aspect === "16:9" ? "bg-white/10 text-[#FFD700] shadow-sm shadow-[#FFD700]/10" : "hover:bg-white/5 text-white/60 hover:text-white"}`}
               >
                 <div className="w-8 h-5 border-2 border-current rounded" />
                 <span className="text-[10px] font-semibold">16:9</span>
@@ -494,9 +486,8 @@ export const ImageCropModal = memo(function ImageCropModal({
           {activeTab === "edit" && (
             <div className="absolute inset-0 flex items-center justify-center">
               {activeTool ? renderToolSlider() : (
-                <div className="flex items-center gap-4 px-6 w-full overflow-x-auto no-scrollbar animate-in fade-in slide-in-from-left-4 h-full">
+                <div className="flex items-center gap-4 px-6 w-full overflow-x-auto no-scrollbar animate-in fade-in h-full">
                   {[
-                    { id: "rotate", icon: RotateCw, label: "Rotate" },
                     { id: "brightness", icon: Sun, label: "Brightness" },
                     { id: "contrast", icon: Sliders, label: "Contrast" },
                     { id: "saturation", icon: Droplet, label: "Saturation" },
@@ -524,7 +515,7 @@ export const ImageCropModal = memo(function ImageCropModal({
           )}
 
           {activeTab === "filter" && (
-            <div className="flex items-center gap-3 px-4 w-full overflow-x-auto no-scrollbar animate-in fade-in slide-in-from-left-4 py-2 absolute inset-0">
+            <div className="flex items-center gap-3 px-4 w-full overflow-x-auto no-scrollbar animate-in fade-in py-2 absolute inset-0">
               {FILTERS.map((f) => (
                 <div key={f.name} className="flex flex-col items-center gap-1.5 shrink-0">
                   <button
