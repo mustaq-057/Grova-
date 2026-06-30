@@ -268,16 +268,37 @@ export const ImageCropModal = memo(function ImageCropModal({
                    pixels[idx * 4] = r / count;
                    pixels[idx * 4 + 1] = g / count;
                    pixels[idx * 4 + 2] = b / count;
-                   
-                   // Enhanced texture grain injection in final passes
-                   if (iter > iterations - 5) {
-                     const noise = (Math.random() - 0.5) * 16; 
-                     pixels[idx * 4] = Math.min(255, Math.max(0, pixels[idx * 4] + noise));
-                     pixels[idx * 4 + 1] = Math.min(255, Math.max(0, pixels[idx * 4 + 1] + noise));
-                     pixels[idx * 4 + 2] = Math.min(255, Math.max(0, pixels[idx * 4 + 2] + noise));
-                   }
                  }
                }
+             }
+
+             // 4.5 Fast Local Texture Synthesis (Content-Aware Approximation)
+             // Steals actual photographic texture from the immediate unmasked surroundings 
+             // and blends it into our smooth mathematical gradient.
+             const searchRadius = Math.max(10, Math.floor(brushR));
+             for (let i = 0; i < maskedIndices.length; i++) {
+                const idx = maskedIndices[i];
+                const x = idx % boxW; const y = Math.floor(idx / boxW);
+                
+                let sampleIdx = -1;
+                // Randomly search nearby for a valid unmasked pixel
+                for(let attempts = 0; attempts < 10; attempts++) {
+                   const sx = Math.min(boxW - 1, Math.max(0, x + Math.floor((Math.random() - 0.5) * searchRadius * 2)));
+                   const sy = Math.min(boxH - 1, Math.max(0, y + Math.floor((Math.random() - 0.5) * searchRadius * 2)));
+                   const sIdx = sy * boxW + sx;
+                   if (maskBoxData[sIdx * 4 + 3] <= 128) { // If it's a real photograph pixel
+                      sampleIdx = sIdx;
+                      break;
+                   }
+                }
+
+                if (sampleIdx !== -1) {
+                   // Blend 35% of the real nearby texture into our smooth diffusion 
+                   // This preserves the lighting gradient but injects real details (grass, sand, skin pores)
+                   pixels[idx*4] = pixels[idx*4] * 0.65 + pixels[sampleIdx*4] * 0.35;
+                   pixels[idx*4+1] = pixels[idx*4+1] * 0.65 + pixels[sampleIdx*4+1] * 0.35;
+                   pixels[idx*4+2] = pixels[idx*4+2] * 0.65 + pixels[sampleIdx*4+2] * 0.35;
+                }
              }
 
              // 5. Apply the completed high-quality patch back to the source canvas
