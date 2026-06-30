@@ -295,7 +295,7 @@ export function StickerzPicker({ onSelect, onClose }: StickerzPickerProps) {
                 <div className="w-full aspect-square rounded-lg flex items-center justify-center">
                   <Plus className="w-8 h-8 text-white/50 group-hover:text-white/80" />
                 </div>
-                <span className="text-[9px] text-center text-white/50 w-full leading-tight">Add Custom</span>
+                <span className="text-[9px] text-center text-white/50 w-full pb-1">Add Custom</span>
               </label>
               {filteredStickers.map((sticker) => (
                 <button
@@ -314,7 +314,7 @@ export function StickerzPicker({ onSelect, onClose }: StickerzPickerProps) {
                       fetchPriority="high"
                     />
                   </div>
-                  <span className="text-[9px] text-center text-white/70 line-clamp-1 w-full px-0.5 leading-tight group-hover:text-white">
+                  <span className="text-[9px] text-center text-white/70 break-words w-full px-1 pb-1 group-hover:text-white">
                     {sticker.caption}
                   </span>
                 </button>
