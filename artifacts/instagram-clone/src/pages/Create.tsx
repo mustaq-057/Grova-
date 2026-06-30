@@ -228,9 +228,9 @@ export default memo(function Create() {
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
           <div className="grid grid-cols-3 gap-3">
             {queue.map((photo) => (
-              <div key={photo.id} className="relative aspect-square rounded-xl overflow-hidden bg-secondary/30 group">
+              <div key={photo.id} className="relative aspect-square rounded-xl overflow-hidden bg-black group">
                 <button type="button" className="absolute inset-0" onClick={() => setCropId(photo.id)}>
-                  <img src={photo.dataUrl} alt="" className="w-full h-full object-cover" />
+                  <img src={photo.dataUrl} alt="" className="w-full h-full object-contain" />
                 </button>
                 <button
                   type="button"
