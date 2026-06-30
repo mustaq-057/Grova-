@@ -16,8 +16,9 @@ type Props = {
   imageSrc: string;
   title?: string;
   initialAspect?: CropAspect;
+  initialState?: any;
   onCancel: () => void;
-  onApply: (croppedDataUrl: string) => void;
+  onApply: (croppedDataUrl: string, state: any) => void;
 };
 
 // --- PRESETS & FILTERS ---
@@ -82,21 +83,22 @@ export const ImageCropModal = memo(function ImageCropModal({
   imageSrc,
   title = 'Aesthetic Studio',
   initialAspect = 'free',
+  initialState,
   onCancel,
   onApply,
 }: Props) {
   const [currentImageSrc, setCurrentImageSrc] = useState(imageSrc);
   const [editHistory, setEditHistory] = useState<string[]>([]);
-  const [aspect, setAspect] = useState<CropAspect>(initialAspect);
-  const [lockedAspect, setLockedAspect] = useState<number | null>(null);
-  const [rotation, setRotation] = useState(0);
+  const [aspect, setAspect] = useState<CropAspect>(initialState?.aspect ?? initialAspect);
+  const [lockedAspect, setLockedAspect] = useState<number | null>(initialState?.lockedAspect ?? null);
+  const [rotation, setRotation] = useState(initialState?.rotation ?? 0);
   const [naturalAspect, setNaturalAspect] = useState(1);
   
-  const [presetFilter, setPresetFilter] = useState(FILTERS[0].value);
-  const [adjustments, setAdjustments] = useState({
+  const [presetFilter, setPresetFilter] = useState(initialState?.presetFilter ?? FILTERS[0].value);
+  const [adjustments, setAdjustments] = useState(initialState?.adjustments ?? {
     brightness: 100, contrast: 100, saturation: 100, warmth: 0, tint: 0,
   });
-  const [effects, setEffects] = useState({
+  const [effects, setEffects] = useState(initialState?.effects ?? {
     fade: 0, vignette: 0, bgBlur: 30, grain: 0, dust: 0, lightLeak: 0,
   });
 
@@ -106,10 +108,10 @@ export const ImageCropModal = memo(function ImageCropModal({
   const [processing, setProcessing] = useState(false);
 
   // Frame State
-  const [frame, setFrame] = useState<FrameType>('none');
+  const [frame, setFrame] = useState<FrameType>(initialState?.frame ?? 'none');
 
   // Text Overlay State
-  const [texts, setTexts] = useState<TextOverlay[]>([]);
+  const [texts, setTexts] = useState<TextOverlay[]>(initialState?.texts ?? []);
   const [activeTextId, setActiveTextId] = useState<string | null>(null);
   const [draggingText, setDraggingText] = useState<string | null>(null);
 
@@ -125,11 +127,18 @@ export const ImageCropModal = memo(function ImageCropModal({
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setAspect(initialAspect);
+    if (!initialState) setAspect(initialAspect);
     const img = new Image();
     img.src = currentImageSrc;
-    img.onload = () => setNaturalAspect(img.width / img.height);
-  }, [initialAspect, currentImageSrc]);
+    img.onload = () => {
+      setNaturalAspect(img.width / img.height);
+      if (initialState?.cropData && cropperRef.current) {
+        setTimeout(() => {
+          cropperRef.current?.cropper.setData(initialState.cropData);
+        }, 100);
+      }
+    };
+  }, [initialAspect, currentImageSrc, initialState]);
 
   // Sync Cropper layout and disable interactions when not in Crop mode
   useEffect(() => {
@@ -504,7 +513,10 @@ export const ImageCropModal = memo(function ImageCropModal({
           });
         }
 
-        onApply(finalCanvas.toDataURL("image/jpeg", 1.0));
+        const currentCropData = cropper.getData();
+        onApply(finalCanvas.toDataURL("image/jpeg", 1.0), {
+          aspect, lockedAspect, rotation, presetFilter, adjustments, effects, frame, texts, cropData: currentCropData
+        });
       } catch (e) {
         console.error("Crop Export Failed:", e);
         alert("Failed to process high-fidelity export. Please try again.");
@@ -526,7 +538,7 @@ export const ImageCropModal = memo(function ImageCropModal({
 
   const autoEnhance = () => {
     setAdjustments({ brightness: 110, contrast: 115, saturation: 110, warmth: 5, tint: 0 });
-    setEffects(prev => ({ ...prev, vignette: 15, fade: 5, grain: 20 }));
+    setEffects((prev: any) => ({ ...prev, vignette: 15, fade: 5, grain: 20 }));
     setPresetFilter('none');
     hapticFeedback();
   };
@@ -754,7 +766,7 @@ export const ImageCropModal = memo(function ImageCropModal({
 
         {/* MAIN CROPPER */}
         <div 
-          className={`w-full h-full relative z-10 ${(frame !== 'none' && activeTab === 'crop') ? 'p-8' : ''} ${activeTab === 'heal' ? 'opacity-80' : ''}`} 
+          className={`w-full h-full relative z-10 ${activeTab === 'crop' ? 'p-6 pb-12' : ''} ${activeTab === 'heal' ? 'opacity-80' : ''}`} 
           style={{ filter: isComparing ? 'none' : combinedFilter, transition: 'filter 0.3s ease' }}
         >
           <Cropper

@@ -15,6 +15,8 @@ const MAX_PHOTOS_PER_POST = 10;
 type QueuedPhoto = {
   id: string;
   dataUrl: string;
+  originalDataUrl: string;
+  modalState?: any;
 };
 
 export default memo(function Create() {
@@ -79,7 +81,7 @@ export default memo(function Create() {
       reader.onloadend = () => {
         const dataUrl = reader.result as string;
         if (!dataUrl) return;
-        setQueue((prev) => [...prev, { id: crypto.randomUUID(), dataUrl }]);
+        setQueue((prev) => [...prev, { id: crypto.randomUUID(), dataUrl, originalDataUrl: dataUrl }]);
         added += 1;
         if (added === 1) setStep("review");
       };
@@ -101,9 +103,9 @@ export default memo(function Create() {
     });
   };
 
-  const applyCrop = (cropped: string) => {
+  const applyCrop = (cropped: string, state: any) => {
     if (!cropId) return;
-    setQueue((prev) => prev.map((p) => (p.id === cropId ? { ...p, dataUrl: cropped } : p)));
+    setQueue((prev) => prev.map((p) => (p.id === cropId ? { ...p, dataUrl: cropped, modalState: state } : p)));
     setCropId(null);
   };
 
@@ -322,9 +324,10 @@ export default memo(function Create() {
         </motion.div>
       )}
 
-      {cropTarget && (
+      {cropId && (
         <ImageCropModal
-          imageSrc={cropTarget.dataUrl}
+          imageSrc={queue.find((p) => p.id === cropId)?.originalDataUrl || queue.find((p) => p.id === cropId)?.dataUrl || ""}
+          initialState={queue.find((p) => p.id === cropId)?.modalState}
           title="Crop photo"
           onCancel={() => setCropId(null)}
           onApply={applyCrop}
