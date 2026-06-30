@@ -107,70 +107,148 @@ export const ImageCropModal = memo(function ImageCropModal({
     if (pathRef.current.length === 0 || !canvasRect) return;
     
     setProcessing(true);
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.src = currentImageSrc;
-    img.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-        ctx.drawImage(img, 0, 0);
+    // Defer to next tick so React can update the 'Saving...' state before blocking the main thread
+    setTimeout(() => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.src = currentImageSrc;
+      img.onload = () => {
+          const W = img.width;
+          const H = img.height;
 
-        const scaleX = img.width / canvasRect.width;
-        const scaleY = img.height / canvasRect.height;
-        
-        const maskCanvas = document.createElement('canvas');
-        maskCanvas.width = img.width;
-        maskCanvas.height = img.height;
-        const mCtx = maskCanvas.getContext('2d');
-        if (!mCtx) return;
-        
-        mCtx.lineCap = "round";
-        mCtx.lineJoin = "round";
-        mCtx.lineWidth = brushSize * scaleX;
-        mCtx.strokeStyle = "white";
-        mCtx.beginPath();
-        mCtx.moveTo(pathRef.current[0].x * scaleX, pathRef.current[0].y * scaleY);
-        for (let i = 1; i < pathRef.current.length; i++) {
-            mCtx.lineTo(pathRef.current[i].x * scaleX, pathRef.current[i].y * scaleY);
-        }
-        mCtx.stroke();
+          const scaleX = W / canvasRect.width;
+          const scaleY = H / canvasRect.height;
+          const brushR = Math.round((brushSize * (scaleX + scaleY)) / 2);
 
-        // Algorithmic Inpaint Simulation (Blur & Smudge clone)
-        const blurCanvas = document.createElement('canvas');
-        blurCanvas.width = img.width;
-        blurCanvas.height = img.height;
-        const bCtx = blurCanvas.getContext('2d');
-        if (!bCtx) return;
-        
-        // Heavy blur to smudge surrounding colors into the erased area
-        bCtx.filter = `blur(${brushSize * scaleX * 0.8}px)`;
-        bCtx.drawImage(img, 0, 0);
-        
-        bCtx.filter = "none";
-        bCtx.globalCompositeOperation = "destination-in";
-        bCtx.drawImage(maskCanvas, 0, 0);
+          // --- Step 1: Rasterize user path into a binary mask ---
+          const maskCanvas = document.createElement('canvas');
+          maskCanvas.width = W;
+          maskCanvas.height = H;
+          const mCtx = maskCanvas.getContext('2d')!;
+          mCtx.lineCap = "round";
+          mCtx.lineJoin = "round";
+          mCtx.lineWidth = brushR * 2;
+          mCtx.strokeStyle = "white";
+          mCtx.beginPath();
+          mCtx.moveTo(pathRef.current[0].x * scaleX, pathRef.current[0].y * scaleY);
+          for (let i = 1; i < pathRef.current.length; i++) {
+              mCtx.lineTo(pathRef.current[i].x * scaleX, pathRef.current[i].y * scaleY);
+          }
+          mCtx.stroke();
+          const maskData = mCtx.getImageData(0, 0, W, H).data;
 
-        // Draw the smudge patch back over the original image
-        ctx.drawImage(blurCanvas, 0, 0);
+          // --- Step 2: Read original image pixels ---
+          const srcCanvas = document.createElement('canvas');
+          srcCanvas.width = W;
+          srcCanvas.height = H;
+          const sCtx = srcCanvas.getContext('2d')!;
+          sCtx.drawImage(img, 0, 0);
+          const srcData = sCtx.getImageData(0, 0, W, H);
+          const pixels = srcData.data;
 
-        const newDataUrl = canvas.toDataURL("image/jpeg", 1.0);
-        setCurrentImageSrc(newDataUrl);
-        if (cropperRef.current?.cropper) {
-           cropperRef.current.cropper.replace(newDataUrl);
-        }
-        
-        const overlayCtx = retouchCanvasRef.current?.getContext('2d');
-        if (overlayCtx) overlayCtx.clearRect(0, 0, canvasRect.width, canvasRect.height);
-        pathRef.current = [];
+          // --- Step 3: Multi-pass content-aware inpainting ---
+          // For each masked pixel, sample from the 'source ring' (pixels just
+          // outside the mask) and compute a distance-weighted average.
+          const sourceRingWidth = Math.max(4, Math.round(brushR * 0.4));
+          const featherRadius = Math.max(2, Math.round(brushR * 0.15));
+
+          // Build a list of masked pixel positions for efficient iteration
+          const maskedPixels: number[] = [];
+          for (let y = 0; y < H; y++) {
+            for (let x = 0; x < W; x++) {
+              if (maskData[(y * W + x) * 4 + 3] > 128) {
+                maskedPixels.push(y * W + x);
+              }
+            }
+          }
+
+          // Run 2 passes: coarse then fine, for smoother results
+          for (let pass = 0; pass < 2; pass++) {
+            for (const idx of maskedPixels) {
+              const px = idx % W;
+              const py = Math.floor(idx / W);
+
+              // Sample an annular ring of pixels just outside the masked region
+              let rAcc = 0, gAcc = 0, bAcc = 0, wTotal = 0;
+              const innerR = brushR + pass * 2;
+              const outerR = innerR + sourceRingWidth;
+
+              for (let dy = -outerR; dy <= outerR; dy++) {
+                for (let dx = -outerR; dx <= outerR; dx++) {
+                  const nx = px + dx;
+                  const ny = py + dy;
+                  if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+                  const dist2 = dx * dx + dy * dy;
+                  if (dist2 > outerR * outerR) continue;
+
+                  const ni = ny * W + nx;
+                  // Only sample from NON-masked pixels
+                  if (maskData[ni * 4 + 3] > 64) continue;
+
+                  const dist = Math.sqrt(dist2);
+                  // Prefer pixels closer to the mask boundary
+                  const weight = 1.0 / (dist + 1.0);
+
+                  rAcc += pixels[ni * 4]     * weight;
+                  gAcc += pixels[ni * 4 + 1] * weight;
+                  bAcc += pixels[ni * 4 + 2] * weight;
+                  wTotal += weight;
+                }
+              }
+
+              if (wTotal > 0) {
+                pixels[idx * 4]     = Math.round(rAcc / wTotal);
+                pixels[idx * 4 + 1] = Math.round(gAcc / wTotal);
+                pixels[idx * 4 + 2] = Math.round(bAcc / wTotal);
+              }
+            }
+          }
+
+          // --- Step 4: Feather / soften the mask edges using a small blur ---
+          // We composite the inpainted result with a tiny Gaussian-blurred
+          // version at the boundary so edges are invisible.
+          const healCanvas = document.createElement('canvas');
+          healCanvas.width = W;
+          healCanvas.height = H;
+          const hCtx = healCanvas.getContext('2d')!;
+          hCtx.putImageData(srcData, 0, 0);
+
+          // Draw a feathered blur border on top of the hard-edge inpaint
+          const blendCanvas = document.createElement('canvas');
+          blendCanvas.width = W;
+          blendCanvas.height = H;
+          const blCtx = blendCanvas.getContext('2d')!;
+          blCtx.filter = `blur(${featherRadius}px)`;
+          blCtx.drawImage(img, 0, 0);
+          blCtx.filter = 'none';
+          blCtx.globalCompositeOperation = 'destination-in';
+          blCtx.drawImage(maskCanvas, 0, 0);
+
+          // Final composite: original -> healed pixels -> blurred edge feather
+          const finalCanvas = document.createElement('canvas');
+          finalCanvas.width = W;
+          finalCanvas.height = H;
+          const fCtx = finalCanvas.getContext('2d')!;
+          fCtx.drawImage(img, 0, 0);
+          fCtx.drawImage(healCanvas, 0, 0);
+          fCtx.drawImage(blendCanvas, 0, 0);
+
+          const newDataUrl = finalCanvas.toDataURL("image/jpeg", 0.98);
+          setCurrentImageSrc(newDataUrl);
+          if (cropperRef.current?.cropper) {
+             cropperRef.current.cropper.replace(newDataUrl);
+          }
+          
+          const overlayCtx = retouchCanvasRef.current?.getContext('2d');
+          if (overlayCtx) overlayCtx.clearRect(0, 0, canvasRect.width, canvasRect.height);
+          pathRef.current = [];
+          setProcessing(false);
+      };
+      img.onerror = () => {
         setProcessing(false);
-    };
-    img.onerror = () => {
-      setProcessing(false);
-      pathRef.current = [];
-    };
+        pathRef.current = [];
+      };
+    }, 30);
   };
 
   const combinedFilter = [
