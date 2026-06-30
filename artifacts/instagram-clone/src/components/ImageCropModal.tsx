@@ -620,18 +620,6 @@ export const ImageCropModal = memo(function ImageCropModal({
         <div className="flex items-center gap-1">
           <button 
             type="button" 
-            onPointerDown={() => setIsComparing(true)}
-            onPointerUp={() => setIsComparing(false)}
-            onPointerLeave={() => setIsComparing(false)}
-            className="p-2 text-white/80 hover:text-white transition-opacity active:opacity-50"
-          >
-            <Eye className="w-5 h-5" />
-          </button>
-          <button type="button" onClick={autoEnhance} className="p-2 text-white/80 hover:text-[#FFD700] transition-colors active:scale-90">
-            <Wand2 className="w-5 h-5" />
-          </button>
-          <button 
-            type="button" 
             onClick={applyCrop} 
             disabled={processing}
             className="p-2 px-4 ml-2 bg-gradient-to-r from-[#FFD700] to-[#FDB931] text-black font-extrabold text-sm rounded-full flex items-center gap-1 shadow-[0_0_15px_rgba(255,215,0,0.3)] disabled:opacity-50 active:scale-95 transition-all"
@@ -766,7 +754,7 @@ export const ImageCropModal = memo(function ImageCropModal({
 
         {/* MAIN CROPPER */}
         <div 
-          className={`w-full h-full relative z-10 ${activeTab === 'crop' ? 'p-6 pb-12' : ''} ${activeTab === 'heal' ? 'opacity-80' : ''}`} 
+          className={`w-full h-full relative z-10 p-6 pb-12 ${activeTab === 'heal' ? 'opacity-80' : ''}`} 
           style={{ filter: isComparing ? 'none' : combinedFilter, transition: 'filter 0.3s ease' }}
         >
           <Cropper
