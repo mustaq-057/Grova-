@@ -2,7 +2,8 @@ import { memo, useCallback, useEffect, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { 
   Check, X, RotateCw, Settings2, 
-  Image as ImageIcon, Crop, Sun, Sliders, Droplet, Thermometer, ChevronLeft, Wand2, Eye, Aperture
+  Image as ImageIcon, Crop, Sun, Sliders, Droplet, Thermometer, ChevronLeft, Wand2, Eye, Aperture,
+  Focus, FlipHorizontal, FlipVertical, RotateCcw
 } from "lucide-react";
 import Cropper, { ReactCropperElement } from "react-cropper";
 import "cropperjs/dist/cropper.css";
@@ -32,7 +33,7 @@ const FILTERS = [
   { name: "Perpetua", value: "contrast(1.1) brightness(1.25) saturate(1.1)" },
 ];
 
-type EditTool = "rotate" | "brightness" | "contrast" | "saturation" | "warmth" | "bgBlur";
+type EditTool = "rotate" | "brightness" | "contrast" | "saturation" | "warmth" | "bgBlur" | "vignette";
 
 export const ImageCropModal = memo(function ImageCropModal({
   imageSrc,
@@ -52,6 +53,7 @@ export const ImageCropModal = memo(function ImageCropModal({
     saturation: 100,
     warmth: 0,
     bgBlur: 30,
+    vignette: 0,
   });
 
   const [activeTab, setActiveTab] = useState<"crop" | "edit" | "filter">("crop");
@@ -107,15 +109,28 @@ export const ImageCropModal = memo(function ImageCropModal({
 
         ctx.filter = combinedFilter;
         ctx.drawImage(sourceCanvas, 0, 0);
+
+        if (adjustments.vignette > 0) {
+          const v = adjustments.vignette / 100;
+          const gradient = ctx.createRadialGradient(
+            finalCanvas.width / 2, finalCanvas.height / 2, 0,
+            finalCanvas.width / 2, finalCanvas.height / 2, Math.max(finalCanvas.width, finalCanvas.height) / 1.5
+          );
+          gradient.addColorStop(0, 'rgba(0,0,0,0)');
+          gradient.addColorStop(1, `rgba(0,0,0,${v})`);
+          ctx.filter = "none";
+          ctx.fillStyle = gradient;
+          ctx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
+        }
       }
 
-      onApply(finalCanvas.toDataURL("image/jpeg", 0.92));
+      onApply(finalCanvas.toDataURL("image/jpeg", 0.95));
     } catch (e) {
       console.error("Crop Export Failed:", e);
       alert("Failed to crop image. Please try again.");
       setProcessing(false);
     }
-  }, [combinedFilter, adjustments.bgBlur, onApply, processing]);
+  }, [combinedFilter, adjustments.bgBlur, adjustments.vignette, onApply, processing]);
 
   const hapticFeedback = () => {
     if (typeof navigator !== "undefined" && navigator.vibrate) {
@@ -143,6 +158,7 @@ export const ImageCropModal = memo(function ImageCropModal({
       contrast: 115,
       saturation: 110,
       warmth: 0,
+      vignette: 10,
     }));
     setPresetFilter("none");
     hapticFeedback();
@@ -210,6 +226,7 @@ export const ImageCropModal = memo(function ImageCropModal({
       saturation: { min: 0, max: 200, val: adjustments.saturation, label: "Saturation" },
       warmth: { min: 0, max: 100, val: adjustments.warmth, label: "Warmth" },
       bgBlur: { min: 0, max: 100, val: adjustments.bgBlur, label: "Bg Blur" },
+      vignette: { min: 0, max: 100, val: adjustments.vignette, label: "Vignette" },
     }[activeTool as keyof typeof adjustments];
 
     return (
@@ -221,11 +238,11 @@ export const ImageCropModal = memo(function ImageCropModal({
           </button>
           <span className="text-xs text-[#FFD700] font-mono">{Math.round(config.val)}</span>
         </div>
-        <div className="flex items-center gap-4 w-full">
+        <div className="flex items-center gap-4 w-full relative">
           <input 
             type="range" min={config.min} max={config.max} value={config.val}
             onChange={(e) => updateAdjustment(activeTool as keyof typeof adjustments, Number(e.target.value))}
-            onDoubleClick={() => updateAdjustment(activeTool as keyof typeof adjustments, activeTool === 'warmth' ? 0 : activeTool === 'bgBlur' ? 30 : 100)}
+            onDoubleClick={() => updateAdjustment(activeTool as keyof typeof adjustments, activeTool === 'warmth' ? 0 : activeTool === 'bgBlur' ? 30 : activeTool === 'vignette' ? 0 : 100)}
             className="flex-1 accent-[#FFD700] touch-none h-2"
           />
         </div>
@@ -234,9 +251,9 @@ export const ImageCropModal = memo(function ImageCropModal({
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-[130] bg-[#0a0a0a] flex flex-col safe-area-top safe-area-bottom select-none touch-none">
+    <div className="fixed inset-0 z-[130] bg-[#0a0a0a] flex flex-col safe-area-top safe-area-bottom select-none touch-none animate-in fade-in duration-200">
       <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 shrink-0">
-        <button type="button" onClick={onCancel} className="p-2 text-white/80 hover:text-white bg-white/5 rounded-full" aria-label="Cancel">
+        <button type="button" onClick={onCancel} className="p-2 text-white/80 hover:text-white bg-white/5 rounded-full transition-transform active:scale-95" aria-label="Cancel">
           <X className="w-5 h-5" />
         </button>
         <p className="text-sm font-semibold text-white/90">{title}</p>
@@ -265,34 +282,69 @@ export const ImageCropModal = memo(function ImageCropModal({
             type="button" 
             onClick={applyCrop} 
             disabled={processing}
-            className="p-2 px-4 ml-1 bg-[#FFD700] text-black font-bold text-sm rounded-full flex items-center gap-1 disabled:opacity-50"
+            className="p-2 px-4 ml-1 bg-[#FFD700] text-black font-bold text-sm rounded-full flex items-center gap-1 disabled:opacity-50 active:scale-95 transition-transform"
           >
             {processing ? "Saving..." : <><Check className="w-4 h-4" /></>}
           </button>
         </div>
       </div>
 
-      <div className="flex-1 relative w-full overflow-hidden min-h-0 py-8 px-4" style={{ filter: isComparing ? "none" : combinedFilter }}>
-        <Cropper
-          src={imageSrc}
-          style={{ height: "100%", width: "100%" }}
-          initialAspectRatio={NaN}
-          aspectRatio={getCropperAspect()}
-          guides={true}
-          ref={cropperRef}
-          background={false}
-          viewMode={0}
-          dragMode="crop"
-          rotatable={true}
-          responsive={true}
-          checkOrientation={false}
-          minCropBoxHeight={20}
-          minCropBoxWidth={20}
-          className="cropper-custom-styles"
-        />
+      <div className="flex-1 relative w-full overflow-hidden min-h-0 py-8 px-4">
+        {/* Real-time Vignette Preview layer */}
+        <div className="absolute inset-0 z-10 pointer-events-none" style={{
+           background: `radial-gradient(circle, rgba(0,0,0,0) 50%, rgba(0,0,0,${adjustments.vignette / 100}) 100%)`,
+           opacity: isComparing ? 0 : 1,
+           transition: "opacity 0.2s"
+        }} />
+
+        {activeTab === "crop" && (
+          <div className="absolute top-10 right-6 flex flex-col gap-3 z-[140] animate-in fade-in slide-in-from-right-4">
+            <button 
+              onClick={() => { cropperRef.current?.cropper.scaleX(cropperRef.current.cropper.getData().scaleX === -1 ? 1 : -1); hapticFeedback(); }}
+              className="w-9 h-9 rounded-full bg-black/60 backdrop-blur-xl flex items-center justify-center text-white/90 hover:text-white border border-white/10 transition-transform active:scale-90"
+              title="Flip Horizontal"
+            >
+              <FlipHorizontal className="w-4 h-4" />
+            </button>
+            <button 
+              onClick={() => { cropperRef.current?.cropper.scaleY(cropperRef.current.cropper.getData().scaleY === -1 ? 1 : -1); hapticFeedback(); }}
+              className="w-9 h-9 rounded-full bg-black/60 backdrop-blur-xl flex items-center justify-center text-white/90 hover:text-white border border-white/10 transition-transform active:scale-90"
+              title="Flip Vertical"
+            >
+              <FlipVertical className="w-4 h-4" />
+            </button>
+            <button 
+              onClick={() => { cropperRef.current?.cropper.reset(); setAspect("free"); hapticFeedback(); }}
+              className="w-9 h-9 rounded-full bg-black/60 backdrop-blur-xl flex items-center justify-center text-[#FFD700] border border-[#FFD700]/30 transition-transform active:scale-90 mt-2"
+              title="Reset Crop"
+            >
+              <RotateCcw className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        <div className="w-full h-full relative" style={{ filter: isComparing ? "none" : combinedFilter }}>
+          <Cropper
+            src={imageSrc}
+            style={{ height: "100%", width: "100%" }}
+            initialAspectRatio={NaN}
+            aspectRatio={getCropperAspect()}
+            guides={true}
+            ref={cropperRef}
+            background={false}
+            viewMode={0}
+            dragMode="crop"
+            rotatable={true}
+            responsive={true}
+            checkOrientation={false}
+            minCropBoxHeight={20}
+            minCropBoxWidth={20}
+            className="cropper-custom-styles"
+          />
+        </div>
         <style>{`
           .cropper-custom-styles .cropper-modal {
-            background-color: rgba(0,0,0,0.85); /* Dark overlay outside crop box */
+            background-color: rgba(0,0,0,0.85);
           }
           .cropper-custom-styles .cropper-view-box {
             outline: 1.5px solid #FFD700;
@@ -302,7 +354,6 @@ export const ImageCropModal = memo(function ImageCropModal({
           .cropper-custom-styles .cropper-line {
             background-color: transparent;
           }
-          /* Grid lines inside */
           .cropper-custom-styles .cropper-dashed {
             border: 0 dashed rgba(255,255,255,0.4);
           }
@@ -319,14 +370,10 @@ export const ImageCropModal = memo(function ImageCropModal({
             width: 33.333%;
           }
           .cropper-custom-styles .cropper-center { display: none; }
-          
-          /* Corner L-Brackets */
           .cropper-custom-styles .cropper-point {
             background-color: transparent !important;
             opacity: 1 !important;
           }
-          
-          /* The touch targets */
           .cropper-custom-styles .cropper-point.point-nw,
           .cropper-custom-styles .cropper-point.point-ne,
           .cropper-custom-styles .cropper-point.point-sw,
@@ -339,8 +386,6 @@ export const ImageCropModal = memo(function ImageCropModal({
           .cropper-custom-styles .cropper-point.point-w {
             width: 30px; height: 30px;
           }
-
-          /* Visual Brackets */
           .cropper-custom-styles .cropper-point::before {
              content: '';
              position: absolute;
@@ -348,53 +393,39 @@ export const ImageCropModal = memo(function ImageCropModal({
              border: 0 solid #FFD700;
           }
           .cropper-custom-styles .cropper-point.point-nw::before {
-             width: 16px; height: 16px;
-             border-top-width: 3px; border-left-width: 3px;
-             top: 0; left: 0;
+             width: 16px; height: 16px; border-top-width: 3px; border-left-width: 3px; top: 0; left: 0;
           }
           .cropper-custom-styles .cropper-point.point-ne::before {
-             width: 16px; height: 16px;
-             border-top-width: 3px; border-right-width: 3px;
-             top: 0; right: 0;
+             width: 16px; height: 16px; border-top-width: 3px; border-right-width: 3px; top: 0; right: 0;
           }
           .cropper-custom-styles .cropper-point.point-sw::before {
-             width: 16px; height: 16px;
-             border-bottom-width: 3px; border-left-width: 3px;
-             bottom: 0; left: 0;
+             width: 16px; height: 16px; border-bottom-width: 3px; border-left-width: 3px; bottom: 0; left: 0;
           }
           .cropper-custom-styles .cropper-point.point-se::before {
-             width: 16px; height: 16px;
-             border-bottom-width: 3px; border-right-width: 3px;
-             bottom: 0; right: 0;
+             width: 16px; height: 16px; border-bottom-width: 3px; border-right-width: 3px; bottom: 0; right: 0;
           }
-          
-          /* Visual Edge lines */
           .cropper-custom-styles .cropper-point.point-n::before {
-             width: 20px; height: 0; border-top-width: 3px;
-             top: 0; left: 5px;
+             width: 20px; height: 0; border-top-width: 3px; top: 0; left: 5px;
           }
           .cropper-custom-styles .cropper-point.point-s::before {
-             width: 20px; height: 0; border-bottom-width: 3px;
-             bottom: 0; left: 5px;
+             width: 20px; height: 0; border-bottom-width: 3px; bottom: 0; left: 5px;
           }
           .cropper-custom-styles .cropper-point.point-e::before {
-             height: 20px; width: 0; border-right-width: 3px;
-             top: 5px; right: 0;
+             height: 20px; width: 0; border-right-width: 3px; top: 5px; right: 0;
           }
           .cropper-custom-styles .cropper-point.point-w::before {
-             height: 20px; width: 0; border-left-width: 3px;
-             top: 5px; left: 0;
+             height: 20px; width: 0; border-left-width: 3px; top: 5px; left: 0;
           }
         `}</style>
       </div>
 
-      <div className="shrink-0 bg-[#0a0a0a] border-t border-white/5 pb-6">
+      <div className="shrink-0 bg-[#0a0a0a] border-t border-white/5 pb-6 shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
         <div className="h-[100px] flex items-center justify-center border-b border-white/5">
           {activeTab === "crop" && (
-            <div className="flex items-center gap-3 px-4 w-full overflow-x-auto no-scrollbar animate-in fade-in py-2">
+            <div className="flex items-center gap-3 px-4 w-full overflow-x-auto no-scrollbar animate-in fade-in slide-in-from-left-4 py-2">
               <button
                 onClick={() => { setAspect("free"); hapticFeedback(); }}
-                className={`flex flex-col items-center justify-center gap-2 w-16 h-[72px] rounded-2xl shrink-0 transition-all ${aspect === "free" ? "bg-white/5 text-[#FFD700]" : "text-white/60"}`}
+                className={`flex flex-col items-center justify-center gap-2 w-16 h-[72px] rounded-2xl shrink-0 transition-all ${aspect === "free" ? "bg-white/10 text-[#FFD700] shadow-sm shadow-[#FFD700]/10" : "hover:bg-white/5 text-white/60 hover:text-white"}`}
               >
                 <div className="w-7 h-7 border-2 border-current rounded border-dashed" />
                 <span className="text-[10px] font-semibold">Custom</span>
@@ -402,7 +433,7 @@ export const ImageCropModal = memo(function ImageCropModal({
 
               <button
                 onClick={() => { setAspect("original"); hapticFeedback(); }}
-                className={`flex flex-col items-center justify-center gap-2 w-16 h-[72px] rounded-2xl shrink-0 transition-all ${aspect === "original" ? "bg-white/5 text-[#FFD700]" : "text-white/60"}`}
+                className={`flex flex-col items-center justify-center gap-2 w-16 h-[72px] rounded-2xl shrink-0 transition-all ${aspect === "original" ? "bg-white/10 text-[#FFD700] shadow-sm shadow-[#FFD700]/10" : "hover:bg-white/5 text-white/60 hover:text-white"}`}
               >
                 <div className="w-7 h-5 border-2 border-current rounded" />
                 <span className="text-[10px] font-semibold">Original</span>
@@ -410,7 +441,7 @@ export const ImageCropModal = memo(function ImageCropModal({
 
               <button
                 onClick={() => { setAspect("4:5"); hapticFeedback(); }}
-                className={`flex flex-col items-center justify-center gap-2 w-16 h-[72px] rounded-2xl shrink-0 transition-all ${aspect === "4:5" ? "bg-white/5 text-[#FFD700]" : "text-white/60"}`}
+                className={`flex flex-col items-center justify-center gap-2 w-16 h-[72px] rounded-2xl shrink-0 transition-all ${aspect === "4:5" ? "bg-white/10 text-[#FFD700] shadow-sm shadow-[#FFD700]/10" : "hover:bg-white/5 text-white/60 hover:text-white"}`}
               >
                 <div className="w-6 h-7 border-2 border-current rounded" />
                 <span className="text-[10px] font-semibold">4:5</span>
@@ -418,7 +449,7 @@ export const ImageCropModal = memo(function ImageCropModal({
 
               <button
                 onClick={() => { setAspect("1:1"); hapticFeedback(); }}
-                className={`flex flex-col items-center justify-center gap-2 w-16 h-[72px] rounded-2xl shrink-0 transition-all ${aspect === "1:1" ? "bg-white/5 text-[#FFD700]" : "text-white/60"}`}
+                className={`flex flex-col items-center justify-center gap-2 w-16 h-[72px] rounded-2xl shrink-0 transition-all ${aspect === "1:1" ? "bg-white/10 text-[#FFD700] shadow-sm shadow-[#FFD700]/10" : "hover:bg-white/5 text-white/60 hover:text-white"}`}
               >
                 <div className="w-6 h-6 border-2 border-current rounded" />
                 <span className="text-[10px] font-semibold">1:1</span>
@@ -426,7 +457,7 @@ export const ImageCropModal = memo(function ImageCropModal({
               
               <button
                 onClick={() => { setAspect("16:9"); hapticFeedback(); }}
-                className={`flex flex-col items-center justify-center gap-2 w-16 h-[72px] rounded-2xl shrink-0 transition-all ${aspect === "16:9" ? "bg-white/5 text-[#FFD700]" : "text-white/60"}`}
+                className={`flex flex-col items-center justify-center gap-2 w-16 h-[72px] rounded-2xl shrink-0 transition-all ${aspect === "16:9" ? "bg-white/10 text-[#FFD700] shadow-sm shadow-[#FFD700]/10" : "hover:bg-white/5 text-white/60 hover:text-white"}`}
               >
                 <div className="w-8 h-5 border-2 border-current rounded" />
                 <span className="text-[10px] font-semibold">16:9</span>
@@ -436,25 +467,26 @@ export const ImageCropModal = memo(function ImageCropModal({
 
           {activeTab === "edit" && (
             activeTool ? renderToolSlider() : (
-              <div className="flex items-center gap-4 px-6 w-full overflow-x-auto no-scrollbar animate-in fade-in">
+              <div className="flex items-center gap-4 px-6 w-full overflow-x-auto no-scrollbar animate-in fade-in slide-in-from-left-4">
                 {[
                   { id: "rotate", icon: RotateCw, label: "Rotate" },
                   { id: "brightness", icon: Sun, label: "Brightness" },
                   { id: "contrast", icon: Sliders, label: "Contrast" },
                   { id: "saturation", icon: Droplet, label: "Saturation" },
                   { id: "warmth", icon: Thermometer, label: "Warmth" },
+                  { id: "vignette", icon: Focus, label: "Vignette" },
                   { id: "bgBlur", icon: Aperture, label: "Bg Blur" },
                 ].map((tool) => (
                   <button
                     key={tool.id}
                     type="button"
                     onClick={() => setActiveTool(tool.id as EditTool)}
-                    className="flex flex-col items-center gap-1.5 shrink-0 text-white/60 hover:text-[#FFD700]"
+                    className="flex flex-col items-center gap-1.5 shrink-0 text-white/60 hover:text-[#FFD700] transition-colors"
                   >
-                    <div className="w-11 h-11 rounded-2xl bg-white/5 flex items-center justify-center transition-colors">
+                    <div className="w-12 h-12 rounded-2xl bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors">
                       <tool.icon className="w-5 h-5" />
                     </div>
-                    <span className="text-[10px] font-semibold">{tool.label}</span>
+                    <span className="text-[10px] font-semibold tracking-wide">{tool.label}</span>
                   </button>
                 ))}
               </div>
@@ -462,7 +494,7 @@ export const ImageCropModal = memo(function ImageCropModal({
           )}
 
           {activeTab === "filter" && (
-            <div className="flex items-center gap-3 px-4 w-full overflow-x-auto no-scrollbar animate-in fade-in py-2">
+            <div className="flex items-center gap-3 px-4 w-full overflow-x-auto no-scrollbar animate-in fade-in slide-in-from-left-4 py-2">
               {FILTERS.map((f) => (
                 <div key={f.name} className="flex flex-col items-center gap-1.5 shrink-0">
                   <button
@@ -471,14 +503,14 @@ export const ImageCropModal = memo(function ImageCropModal({
                       setPresetFilter(f.value);
                       hapticFeedback();
                     }}
-                    className={`w-[60px] h-[60px] rounded-xl shrink-0 transition-all border-2 object-cover overflow-hidden ${
-                      presetFilter === f.value ? "border-[#FFD700] scale-105 shadow-lg shadow-[#FFD700]/20" : "border-transparent opacity-80 hover:opacity-100"
+                    className={`w-[60px] h-[60px] rounded-2xl shrink-0 transition-all border-2 object-cover overflow-hidden ${
+                      presetFilter === f.value ? "border-[#FFD700] scale-110 shadow-lg shadow-[#FFD700]/20" : "border-transparent opacity-70 hover:opacity-100"
                     }`}
                     style={{ filter: f.value !== 'none' ? f.value : 'none' }}
                   >
                     <img src={imageSrc} className="w-full h-full object-cover" alt={f.name} />
                   </button>
-                  <span className={`text-[10px] font-semibold ${presetFilter === f.value ? "text-[#FFD700]" : "text-white/60"}`}>
+                  <span className={`text-[10px] font-semibold mt-1 ${presetFilter === f.value ? "text-[#FFD700]" : "text-white/50"}`}>
                     {f.name}
                   </span>
                 </div>
@@ -487,30 +519,33 @@ export const ImageCropModal = memo(function ImageCropModal({
           )}
         </div>
 
-        <div className="flex justify-around items-center pt-4 px-2">
+        <div className="flex justify-around items-center pt-4 px-4 max-w-sm mx-auto">
           <button
             type="button"
-            onClick={() => { setActiveTab("crop"); setActiveTool(null); }}
-            className={`flex flex-col items-center gap-1.5 p-2 rounded-xl transition-colors ${activeTab === "crop" ? "text-[#FFD700]" : "text-white/50"}`}
+            onClick={() => { setActiveTab("crop"); setActiveTool(null); hapticFeedback(); }}
+            className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all w-16 ${activeTab === "crop" ? "text-[#FFD700] -translate-y-1" : "text-white/40 hover:text-white/80"}`}
           >
-            <Crop className="w-5 h-5" />
-            <span className="text-[10px] font-bold">Crop</span>
+            <Crop className="w-5 h-5 mb-0.5" />
+            <span className="text-[10px] font-bold tracking-wide">Crop</span>
+            {activeTab === "crop" && <div className="w-1 h-1 rounded-full bg-[#FFD700] mt-1 animate-in zoom-in" />}
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab("filter")}
-            className={`flex flex-col items-center gap-1.5 p-2 rounded-xl transition-colors ${activeTab === "filter" ? "text-[#FFD700]" : "text-white/50"}`}
+            onClick={() => { setActiveTab("filter"); hapticFeedback(); }}
+            className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all w-16 ${activeTab === "filter" ? "text-[#FFD700] -translate-y-1" : "text-white/40 hover:text-white/80"}`}
           >
-            <ImageIcon className="w-5 h-5" />
-            <span className="text-[10px] font-bold">Filters</span>
+            <ImageIcon className="w-5 h-5 mb-0.5" />
+            <span className="text-[10px] font-bold tracking-wide">Filters</span>
+            {activeTab === "filter" && <div className="w-1 h-1 rounded-full bg-[#FFD700] mt-1 animate-in zoom-in" />}
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab("edit")}
-            className={`flex flex-col items-center gap-1.5 p-2 rounded-xl transition-colors ${activeTab === "edit" ? "text-[#FFD700]" : "text-white/50"}`}
+            onClick={() => { setActiveTab("edit"); hapticFeedback(); }}
+            className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all w-16 ${activeTab === "edit" ? "text-[#FFD700] -translate-y-1" : "text-white/40 hover:text-white/80"}`}
           >
-            <Settings2 className="w-5 h-5" />
-            <span className="text-[10px] font-bold">Adjust</span>
+            <Settings2 className="w-5 h-5 mb-0.5" />
+            <span className="text-[10px] font-bold tracking-wide">Adjust</span>
+            {activeTab === "edit" && <div className="w-1 h-1 rounded-full bg-[#FFD700] mt-1 animate-in zoom-in" />}
           </button>
         </div>
       </div>
