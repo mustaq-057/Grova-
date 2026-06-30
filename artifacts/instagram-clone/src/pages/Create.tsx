@@ -117,7 +117,27 @@ export default memo(function Create() {
     try {
       clearLegacyLocalMedia(myId);
       const uploadedUrls: string[] = [];
-      for (const photo of queue) {
+      let calculatedRatio = "auto";
+
+      for (let i = 0; i < queue.length; i++) {
+        const photo = queue[i];
+        
+        if (i === 0) {
+          const img = new Image();
+          await new Promise<void>((resolve) => {
+            img.onload = () => {
+              const r = img.width / img.height;
+              if (Math.abs(r - 1) < 0.05) calculatedRatio = "1:1";
+              else if (Math.abs(r - 4/5) < 0.05) calculatedRatio = "4:5";
+              else if (Math.abs(r - 16/9) < 0.05) calculatedRatio = "16:9";
+              else calculatedRatio = "auto";
+              resolve();
+            };
+            img.onerror = () => resolve();
+            img.src = photo.dataUrl;
+          });
+        }
+
         const mime = photo.dataUrl.match(/^data:([^;]+);/)?.[1] ?? "image/jpeg";
         const mediaUrl = await uploadMedia(photo.dataUrl, mime);
         uploadedUrls.push(mediaUrl);
@@ -127,7 +147,7 @@ export default memo(function Create() {
         images: uploadedUrls.length > 1 ? uploadedUrls : undefined,
         caption: caption.trim(),
         location: location.trim(),
-        ratio: "4:5",
+        ratio: calculatedRatio,
         at: new Date().toISOString(),
       });
       setQueue([]);

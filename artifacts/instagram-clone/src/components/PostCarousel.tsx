@@ -40,7 +40,7 @@ export function PostCarousel({ urls, alt, ratioClass }: Props) {
         <img
           src={resolvePostMediaUrl(url) ?? url}
           alt={alt}
-          className="w-full h-full object-cover"
+          className={ratioClass === "aspect-auto" ? "w-full h-auto object-contain" : "w-full h-full object-cover"}
           loading="lazy"
         />
       </div>
@@ -56,7 +56,7 @@ export function PostCarousel({ urls, alt, ratioClass }: Props) {
               <img
                 src={resolvePostMediaUrl(url) ?? url}
                 alt={`${alt} ${i + 1}`}
-                className="w-full h-full object-cover select-none"
+                className={ratioClass === "aspect-auto" ? "w-full h-auto object-contain select-none" : "w-full h-full object-cover select-none"}
                 loading={i === 0 ? "lazy" : "eager"}
                 draggable={false}
               />

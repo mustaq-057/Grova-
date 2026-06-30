@@ -339,7 +339,9 @@ export function PostFeed({
                 ? "aspect-video"
                 : post.aspectRatio === "1:1"
                   ? "aspect-square"
-                  : "aspect-[4/5]";
+                  : post.aspectRatio === "4:5"
+                    ? "aspect-[4/5]"
+                    : "aspect-auto";
 
             return (
               <li key={post.id} data-testid={`post-${post.id}`} className="pb-4">
