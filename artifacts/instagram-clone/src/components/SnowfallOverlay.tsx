@@ -14,13 +14,38 @@ export const SnowflakeDecor = ({ className = "w-full h-full text-blue-200" }: { 
   </svg>
 );
 
-export const SnowyPine = ({ className = "" }: { className?: string }) => (
-  <svg viewBox="0 0 200 300" fill="none" className={className} style={{ filter: "drop-shadow(0px 10px 15px rgba(255,255,255,0.2))" }}>
-    <path d="M90 250 L110 250 L105 300 L95 300 Z" fill="#2d3748" />
-    <path d="M100 20 L40 100 L80 100 L30 180 L80 180 L20 260 L180 260 L120 180 L170 180 L120 100 L160 100 Z" fill="#1a365d" />
-    <path d="M100 20 L50 90 Q 75 95, 80 100 L65 100 L100 50 L135 100 L120 100 Q 125 95, 150 90 Z" fill="#e2e8f0" opacity="0.95"/>
-    <path d="M80 100 L40 170 Q 65 175, 80 180 L65 180 L100 120 L135 180 L120 180 Q 135 175, 160 170 Z" fill="#e2e8f0" opacity="0.95"/>
-    <path d="M80 180 L30 250 Q 75 255, 90 260 L110 260 Q 125 255, 170 250 Z" fill="#e2e8f0" opacity="0.95"/>
+export const FrostBranch = ({ className = "" }: { className?: string }) => (
+  <svg viewBox="0 0 200 300" fill="none" className={className} style={{ filter: "drop-shadow(0 4px 8px rgba(255,255,255,0.5))" }}>
+    {/* Main branch trunk */}
+    <path d="M10,290 Q40,200 120,50 T190,10" stroke="#94a3b8" strokeWidth="6" strokeLinecap="round" fill="none" opacity="0.8"/>
+    {/* Snow on main branch */}
+    <path d="M8,288 Q40,195 120,45 T190,5" stroke="#ffffff" strokeWidth="4" strokeLinecap="round" fill="none" opacity="0.9"/>
+    
+    {/* Secondary branches */}
+    <path d="M50,180 Q100,150 150,130" stroke="#94a3b8" strokeWidth="4" strokeLinecap="round" fill="none" opacity="0.8"/>
+    <path d="M50,177 Q100,147 150,127" stroke="#ffffff" strokeWidth="3" strokeLinecap="round" fill="none" opacity="0.9"/>
+    
+    <path d="M90,110 Q140,80 170,90" stroke="#94a3b8" strokeWidth="3" strokeLinecap="round" fill="none" opacity="0.8"/>
+    <path d="M90,107 Q140,77 170,87" stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round" fill="none" opacity="0.9"/>
+    
+    {/* Tiny twigs */}
+    <path d="M120,140 Q135,160 140,170" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" fill="none"/>
+    <path d="M130,85 Q140,60 150,55" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" fill="none"/>
+    
+    {/* Icicles */}
+    <path d="M50,180 L52,195 L54,180 Z" fill="#e2e8f0" opacity="0.9"/>
+    <path d="M100,110 L101,125 L102,110 Z" fill="#e2e8f0" opacity="0.9"/>
+    <path d="M140,133 L142,150 L144,133 Z" fill="#e2e8f0" opacity="0.9"/>
+    <path d="M150,127 L152,140 L154,127 Z" fill="#e2e8f0" opacity="0.9"/>
+    <path d="M170,90 L171,105 L172,90 Z" fill="#e2e8f0" opacity="0.9"/>
+    <path d="M120,50 L122,65 L124,50 Z" fill="#e2e8f0" opacity="0.9"/>
+    <path d="M80,135 L81,148 L82,135 Z" fill="#e2e8f0" opacity="0.9"/>
+    
+    {/* Glowing frost sparks */}
+    <circle cx="160" cy="40" r="2.5" fill="#ffffff" opacity="0.9" style={{ filter: "blur(1px)" }}/>
+    <circle cx="110" cy="150" r="2" fill="#ffffff" opacity="0.8" style={{ filter: "blur(1px)" }}/>
+    <circle cx="60" cy="90" r="2.5" fill="#ffffff" opacity="0.9" style={{ filter: "blur(1px)" }}/>
+    <circle cx="180" cy="110" r="2" fill="#ffffff" opacity="0.8" style={{ filter: "blur(1px)" }}/>
   </svg>
 );
 
@@ -111,12 +136,12 @@ export const SnowfallOverlay = memo(function SnowfallOverlay() {
       {/* Background illumination */}
       <div className="absolute inset-0 snowfall-gradient-bg opacity-70" />
 
-      {/* Decorative Snowy Pines */}
-      <div className="absolute bottom-[-20px] left-[-20px] w-40 h-60 opacity-60">
-        <SnowyPine />
+      {/* Decorative Frost Branches */}
+      <div className="absolute bottom-[-10px] left-[-20px] w-48 h-64 opacity-70">
+        <FrostBranch />
       </div>
-      <div className="absolute bottom-[-10px] right-[-10px] w-32 h-48 opacity-50 rotate-[-5deg]">
-        <SnowyPine />
+      <div className="absolute bottom-[-20px] right-[-30px] w-56 h-72 opacity-60 transform scale-x-[-1] rotate-12">
+        <FrostBranch />
       </div>
 
       {/* Frost Vignette (Glassmorphism edges) */}
