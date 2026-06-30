@@ -203,31 +203,46 @@ export const ImageCropModal = memo(function ImageCropModal({
                }
              }
 
-             // Iterative Edge Fill Algorithm (Diffusion)
-             // Rapidly diffuses surrounding colors into the masked area
-             const iterations = Math.min(100, Math.max(30, Math.floor(brushR * 1.5)));
+             // Advanced Multi-Pass 8-Way Texture Diffusion
+             // Rapidly diffuses surrounding colors into the masked area without smudging
+             const iterations = Math.min(80, Math.max(40, Math.floor(brushR * 2)));
              
              for (let iter = 0; iter < iterations; iter++) {
-               for (let i = 0; i < maskedIndices.length; i++) {
+               // Alternate direction to prevent directional drag/smudging
+               const start = iter % 2 === 0 ? 0 : maskedIndices.length - 1;
+               const end = iter % 2 === 0 ? maskedIndices.length : -1;
+               const step = iter % 2 === 0 ? 1 : -1;
+
+               // Dynamic distance sampling: start wide to fill center, narrow down for detail
+               const d = Math.max(1, Math.floor((iterations - iter) / 15));
+
+               for (let i = start; i !== end; i += step) {
                  const idx = maskedIndices[i];
                  const x = idx % W;
                  const y = Math.floor(idx / W);
                  
                  let r = 0, g = 0, b = 0, count = 0;
 
-                 // Check 4 neighbors
-                 if (x > 0) { const ni = idx - 1; r += pixels[ni*4]; g += pixels[ni*4+1]; b += pixels[ni*4+2]; count++; }
-                 if (x < W - 1) { const ni = idx + 1; r += pixels[ni*4]; g += pixels[ni*4+1]; b += pixels[ni*4+2]; count++; }
-                 if (y > 0) { const ni = idx - W; r += pixels[ni*4]; g += pixels[ni*4+1]; b += pixels[ni*4+2]; count++; }
-                 if (y < H - 1) { const ni = idx + W; r += pixels[ni*4]; g += pixels[ni*4+1]; b += pixels[ni*4+2]; count++; }
+                 // 8-way neighbor sampling with distance 'd'
+                 if (x >= d) { const ni = idx - d; r += pixels[ni*4]; g += pixels[ni*4+1]; b += pixels[ni*4+2]; count++; }
+                 if (x < W - d) { const ni = idx + d; r += pixels[ni*4]; g += pixels[ni*4+1]; b += pixels[ni*4+2]; count++; }
+                 if (y >= d) { const ni = idx - W * d; r += pixels[ni*4]; g += pixels[ni*4+1]; b += pixels[ni*4+2]; count++; }
+                 if (y < H - d) { const ni = idx + W * d; r += pixels[ni*4]; g += pixels[ni*4+1]; b += pixels[ni*4+2]; count++; }
+                 
+                 // Diagonals
+                 if (x >= d && y >= d) { const ni = idx - W * d - d; r += pixels[ni*4]; g += pixels[ni*4+1]; b += pixels[ni*4+2]; count++; }
+                 if (x < W - d && y >= d) { const ni = idx - W * d + d; r += pixels[ni*4]; g += pixels[ni*4+1]; b += pixels[ni*4+2]; count++; }
+                 if (x >= d && y < H - d) { const ni = idx + W * d - d; r += pixels[ni*4]; g += pixels[ni*4+1]; b += pixels[ni*4+2]; count++; }
+                 if (x < W - d && y < H - d) { const ni = idx + W * d + d; r += pixels[ni*4]; g += pixels[ni*4+1]; b += pixels[ni*4+2]; count++; }
 
                  if (count > 0) {
                    pixels[idx * 4] = r / count;
                    pixels[idx * 4 + 1] = g / count;
                    pixels[idx * 4 + 2] = b / count;
-                   // Add tiny noise to avoid plastic look
-                   if (iter === iterations - 1) {
-                     const noise = (Math.random() - 0.5) * 8;
+                   
+                   // Enhanced texture grain injection in final passes
+                   if (iter > iterations - 4) {
+                     const noise = (Math.random() - 0.5) * 14; 
                      pixels[idx * 4] = Math.min(255, Math.max(0, pixels[idx * 4] + noise));
                      pixels[idx * 4 + 1] = Math.min(255, Math.max(0, pixels[idx * 4 + 1] + noise));
                      pixels[idx * 4 + 2] = Math.min(255, Math.max(0, pixels[idx * 4 + 2] + noise));
