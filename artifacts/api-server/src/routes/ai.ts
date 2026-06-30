@@ -7,37 +7,44 @@ router.post("/ai/inpaint", async (req, res) => {
   try {
     const { image, mask, prompt } = req.body;
 
-    if (!process.env.FAL_KEY) {
-      return res.status(500).json({ error: "FAL_KEY is missing in .env. Please add it to use AI features." });
+    if (!process.env.HF_TOKEN) {
+      return res.status(500).json({ error: "HF_TOKEN is missing in .env. Please add it to use AI features." });
     }
 
-    logger.info("Sending inpainting request to Fal.ai...");
+    logger.info("Sending inpainting request to Hugging Face...");
 
-    // Using fal-ai/fast-sdxl/inpainting or similar model
-    const response = await fetch("https://fal.run/fal-ai/fast-sdxl/inpainting", {
-      method: "POST",
-      headers: {
-        "Authorization": `Key ${process.env.FAL_KEY}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        image_url: image,
-        mask_url: mask,
-        prompt: prompt || "clean background, seamless, high quality",
-        negative_prompt: "artifacts, blurry, ugly, badly drawn, distorted",
-        strength: 0.95,
-        num_inference_steps: 20
-      })
-    });
+    // Hugging Face Inference API expects base64 without the data URI prefix for the payload
+    const imageB64 = image.replace(/^data:image\/\w+;base64,/, "");
+    const maskB64 = mask.replace(/^data:image\/\w+;base64,/, "");
+
+    const response = await fetch(
+      "https://api-inference.huggingface.co/models/runwayml/stable-diffusion-inpainting",
+      {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${process.env.HF_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          inputs: prompt || "clean background, seamless, high quality, background removal",
+          image: imageB64,
+          mask_image: maskB64,
+        }),
+      }
+    );
 
     if (!response.ok) {
-      const text = await response.text();
-      logger.error({ error: text }, "Fal.ai inpainting error");
-      return res.status(500).json({ error: `AI error: ${response.statusText}` });
+      const errorText = await response.text();
+      logger.error({ error: errorText, status: response.status }, "Hugging Face inpainting error");
+      return res.status(500).json({ error: `Hugging Face AI error: ${response.statusText}. Ensure HF_TOKEN is valid.` });
     }
 
-    const data = await response.json();
-    return res.json({ resultUrl: data.images[0].url });
+    // Hugging Face returns raw image bytes
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    const resultUrl = `data:image/jpeg;base64,${buffer.toString("base64")}`;
+
+    return res.json({ resultUrl });
   } catch (error) {
     logger.error({ err: error }, 'AI Inpaint failed');
     return res.status(500).json({ error: 'AI Inpainting failed internally' });

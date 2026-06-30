@@ -615,8 +615,8 @@ export const ImageCropModal = memo(function ImageCropModal({
                 const ctx = retouchCanvasRef.current?.getContext('2d');
                 if (!ctx) return;
                 ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.lineWidth = brushSize;
-                ctx.strokeStyle = "rgba(255, 215, 0, 0.8)"; 
-                ctx.shadowColor = "#FFD700"; ctx.shadowBlur = 10;
+                ctx.strokeStyle = "rgba(255, 255, 255, 0.8)"; 
+                ctx.shadowColor = "#FFFFFF"; ctx.shadowBlur = 10;
                 ctx.beginPath(); ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
                 pathRef.current = [{x: e.clientX - rect.left, y: e.clientY - rect.top}];
              }}
@@ -672,7 +672,7 @@ export const ImageCropModal = memo(function ImageCropModal({
             src={currentImageSrc}
             style={{ height: '100%', width: '100%' }}
             initialAspectRatio={NaN} aspectRatio={aspect === 'locked' && lockedAspect ? lockedAspect : aspect === '1:1' ? 1 : aspect === '4:5' ? 4/5 : aspect === '16:9' ? 16/9 : aspect === 'original' ? naturalAspect : NaN}
-            guides={true} ref={cropperRef} background={false} viewMode={0} dragMode={activeTab === 'text' ? 'none' : 'crop'} rotatable={true} responsive={true}
+            guides={true} ref={cropperRef} background={false} viewMode={1} dragMode={activeTab === 'text' ? 'none' : 'crop'} rotatable={true} responsive={true}
             checkOrientation={false} minCropBoxHeight={20} minCropBoxWidth={20} className="cropper-custom-styles"
           />
         </div>
