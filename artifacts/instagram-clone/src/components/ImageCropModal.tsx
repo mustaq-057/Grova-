@@ -172,33 +172,55 @@ export const ImageCropModal = memo(function ImageCropModal({
       const scaleY = H / canvasRect.height;
       const brushR = Math.round((brushSize * (scaleX + scaleY)) / 2);
 
+      // Resize original image to max 1024x1024 for the AI API
+      const MAX_DIM = 1024;
+      let targetW = W;
+      let targetH = H;
+      if (W > MAX_DIM || H > MAX_DIM) {
+        if (W > H) {
+          targetH = Math.round((H * MAX_DIM) / W);
+          targetW = MAX_DIM;
+        } else {
+          targetW = Math.round((W * MAX_DIM) / H);
+          targetH = MAX_DIM;
+        }
+      }
+
+      const resizedImageCanvas = document.createElement('canvas');
+      resizedImageCanvas.width = targetW; resizedImageCanvas.height = targetH;
+      const resizedCtx = resizedImageCanvas.getContext('2d')!;
+      resizedCtx.drawImage(img, 0, 0, targetW, targetH);
+      const optimizedImageSrc = resizedImageCanvas.toDataURL("image/jpeg", 0.9);
+
+      // Create mask at the resized resolution
       const maskCanvas = document.createElement('canvas');
-      maskCanvas.width = W; maskCanvas.height = H;
+      maskCanvas.width = targetW; maskCanvas.height = targetH;
       const mCtx = maskCanvas.getContext('2d')!;
-      
-      // Fill mask with black (unmasked)
       mCtx.fillStyle = 'black';
-      mCtx.fillRect(0, 0, W, H);
+      mCtx.fillRect(0, 0, targetW, targetH);
       
-      // Draw white mask
+      const scaleX_resized = targetW / canvasRect.width;
+      const scaleY_resized = targetH / canvasRect.height;
+      const brushR_resized = Math.round((brushSize * (scaleX_resized + scaleY_resized)) / 2);
+
       mCtx.lineCap = "round"; mCtx.lineJoin = "round";
-      mCtx.lineWidth = brushR * 2; mCtx.strokeStyle = "white"; mCtx.fillStyle = "white";
+      mCtx.lineWidth = brushR_resized * 2; mCtx.strokeStyle = "white"; mCtx.fillStyle = "white";
       mCtx.beginPath();
-      mCtx.moveTo(pathRef.current[0].x * scaleX, pathRef.current[0].y * scaleY);
+      mCtx.moveTo(pathRef.current[0].x * scaleX_resized, pathRef.current[0].y * scaleY_resized);
       for (let i = 1; i < pathRef.current.length; i++) {
-          mCtx.lineTo(pathRef.current[i].x * scaleX, pathRef.current[i].y * scaleY);
+          mCtx.lineTo(pathRef.current[i].x * scaleX_resized, pathRef.current[i].y * scaleY_resized);
       }
       mCtx.closePath();
       mCtx.stroke();
-      mCtx.fill(); // Smart Lasso: Fills the drawn loop automatically
+      mCtx.fill();
 
-      const maskDataUrl = maskCanvas.toDataURL("image/jpeg");
+      const maskDataUrl = maskCanvas.toDataURL("image/jpeg", 0.9);
 
       const response = await fetch('/api/ai/inpaint', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          image: currentImageSrc,
+          image: optimizedImageSrc,
           mask: maskDataUrl,
           prompt: aiPrompt || "clean background, seamless, high quality"
         })

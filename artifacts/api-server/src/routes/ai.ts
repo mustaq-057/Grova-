@@ -17,26 +17,47 @@ router.post("/ai/inpaint", async (req, res) => {
     const imageB64 = image.replace(/^data:image\/\w+;base64,/, "");
     const maskB64 = mask.replace(/^data:image\/\w+;base64,/, "");
 
-    const response = await fetch(
-      "https://api-inference.huggingface.co/models/runwayml/stable-diffusion-inpainting",
-      {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${process.env.HF_TOKEN}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          inputs: prompt || "clean background, seamless, high quality, background removal",
-          image: imageB64,
-          mask_image: maskB64,
-        }),
-      }
-    );
+    let response;
+    let retries = 3;
+    let delay = 10000;
 
-    if (!response.ok) {
+    for (let i = 0; i < retries; i++) {
+      response = await fetch(
+        "https://api-inference.huggingface.co/models/runwayml/stable-diffusion-inpainting",
+        {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${process.env.HF_TOKEN}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            inputs: prompt || "clean background, seamless, high quality, background removal",
+            image: imageB64,
+            mask_image: maskB64,
+          }),
+        }
+      );
+
+      if (response.ok) break;
+
       const errorText = await response.text();
-      logger.error({ error: errorText, status: response.status }, "Hugging Face inpainting error");
-      return res.status(500).json({ error: `Hugging Face AI error: ${response.statusText}. Ensure HF_TOKEN is valid.` });
+      let errorJson: any = {};
+      try { errorJson = JSON.parse(errorText); } catch(e) {}
+
+      if (errorJson.error && errorJson.error.includes("currently loading")) {
+         logger.info(`Model loading, retrying in ${delay/1000}s...`);
+         if (i === retries - 1) {
+            return res.status(503).json({ error: "The AI model is waking up (cold start). Please try clicking generate again in 20 seconds!" });
+         }
+         await new Promise(r => setTimeout(r, delay));
+      } else {
+         logger.error({ error: errorText, status: response.status }, "Hugging Face inpainting error");
+         return res.status(500).json({ error: `Hugging Face AI error: ${errorJson.error || response.statusText}.` });
+      }
+    }
+
+    if (!response || !response.ok) {
+      return res.status(500).json({ error: "AI failed to process request after retries." });
     }
 
     // Hugging Face returns raw image bytes
