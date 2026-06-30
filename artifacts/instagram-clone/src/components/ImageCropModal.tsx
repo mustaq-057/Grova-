@@ -841,6 +841,14 @@ export const ImageCropModal = memo(function ImageCropModal({
                       <span className={`text-[10px] font-bold tracking-wider uppercase ${tool.val ? 'text-[#FFD700]' : 'text-white/50'}`}>{tool.label}</span>
                     </button>
                   ))}
+                  
+                  <button onClick={() => hapticFeedback()} className="flex flex-col items-center gap-2 shrink-0 group relative opacity-50 cursor-not-allowed">
+                    <div className="w-12 h-12 rounded-full flex items-center justify-center bg-white/5 text-white/50 border border-white/10 border-dashed">
+                      <Plus className="w-5 h-5" />
+                    </div>
+                    <span className="text-[10px] font-bold tracking-wider uppercase text-white/50">More</span>
+                    <div className="absolute -top-2 bg-primary text-black text-[8px] font-bold px-1.5 py-0.5 rounded-sm whitespace-nowrap">Coming Soon</div>
+                  </button>
                 </div>
               )}
             </div>
