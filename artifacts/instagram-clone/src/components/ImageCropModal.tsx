@@ -372,6 +372,8 @@ export const ImageCropModal = memo(function ImageCropModal({
           fillColor: "transparent",
           imageSmoothingEnabled: true,
           imageSmoothingQuality: "high",
+          maxWidth: 2048,
+          maxHeight: 2048,
         });
 
         if (!sourceCanvas) throw new Error("Could not get cropped canvas");

@@ -119,7 +119,6 @@ import {
 } from "@/lib/chat-scroll-anchor";
 import { resolveChatImageUrl, resolveChatVideoUrl, registerLocalBlobUrl } from "@/lib/media-url";
 import DoodleCanvas, { type DoodleData } from "@/components/DoodleCanvas";
-import { ImageCropModal } from "@/components/ImageCropModal";
 import { partnerTypingLine } from "@/lib/partner-words";
 import { toast } from "sonner";
 
@@ -228,11 +227,9 @@ export default function Messages() {
   const [editText, setEditText] = useState("");
   const [editSaving, setEditSaving] = useState(false);
   const [sharingLocation, setSharingLocation] = useState(false);
-  const [imageToCrop, setImageToCrop] = useState<string | null>(null);
   const [doodleOpen, setDoodleOpen] = useState(false);
   const [doodleLiveMode, setDoodleLiveMode] = useState(false);
   const [scheduledMessages, setScheduledMessages] = useState<ScheduledMessage[]>([]);
-  const [pendingImageType, setPendingImageType] = useState("image/jpeg");
   const [mediaViewMode, setMediaViewMode] = useState<"keep" | "once" | "twice">("keep");
   const [mediaViewer, setMediaViewer] = useState<{
     messageId: string;
@@ -2606,18 +2603,14 @@ export default function Messages() {
       const { clipboardItemType, kind, normalized } = pendingMediaPreview;
       setPendingMediaPreview(null);
       const isEphemeral = viewMode === "once" || viewMode === "twice";
-      const toastId = `media-send-${Date.now()}`;
 
       try {
         if (kind === "image") {
           const prepared = await prepareImageForUpload(normalized, clipboardItemType);
           if (isEphemeral) {
             await uploadAndSendEphemeralMedia(prepared, "image", viewMode);
-          } else if (!clipboardItemType) {
-            await uploadAndSendGalleryImage(prepared);
           } else {
-            setPendingImageType(prepared.type || "image/jpeg");
-            setImageToCrop(URL.createObjectURL(prepared));
+            await uploadAndSendGalleryImage(prepared);
           }
         } else if (kind === "video") {
           const mime = guessVideoMime(normalized, clipboardItemType);
@@ -2690,10 +2683,6 @@ export default function Messages() {
         }
       } catch (error) {
         console.error("Failed to process media:", error);
-        finishToast(toastId, {
-          type: "error",
-          message: error instanceof Error ? error.message : "Failed to send media. Check your connection.",
-        });
       } finally {
         filePickInFlightRef.current = false;
       }
@@ -2773,55 +2762,6 @@ export default function Messages() {
     };
   }, [mediaViewer?.timed, mediaViewer?.messageId]);
 
-  const dismissImageCrop = useCallback(() => {
-    setImageToCrop((prev) => {
-      if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
-      return null;
-    });
-  }, []);
-
-  const handleCroppedImage = useCallback(async (croppedDataUrl: string) => {
-    if (cropSendInFlightRef.current || !user) return;
-    cropSendInFlightRef.current = true;
-    dismissImageCrop();
-
-    const tempId = crypto.randomUUID();
-    const sticker = mediaModeSticker(mediaViewMode);
-    pendingOutgoingRef.current.add(tempId);
-    const optimistic = buildOptimisticMessage(
-      {
-        senderId: user.id,
-        type: "image",
-        imageUrl: croppedDataUrl,
-        companionSticker: sticker,
-      },
-      tempId,
-    );
-    setMessages((prev) => [...prev, optimistic]);
-    requestStickToBottom();
-
-    try {
-      const url = await uploadMediaToB2(croppedDataUrl, pendingImageType);
-      const outgoing = await prepareOutgoingMessage({
-        senderId: user.id,
-        type: "image",
-        imageUrl: url,
-        companionSticker: sticker,
-      });
-      const saved = await api.sendMessage(outgoing);
-      const [display] = await normalizeMessages([saved]);
-      pendingOutgoingRef.current.delete(tempId);
-      setMessages((prev) => replaceOptimisticMessage(prev, tempId, display, user.id));
-      requestStickToBottom();
-    } catch (uploadError) {
-      console.error("Failed to upload image:", uploadError);
-      pendingOutgoingRef.current.delete(tempId);
-      setMessages((prev) => prev.filter((m) => m.id !== tempId));
-      toast.error(uploadError instanceof Error ? uploadError.message : "Image upload failed.");
-    } finally {
-      cropSendInFlightRef.current = false;
-    }
-  }, [pendingImageType, user, mediaModeSticker, mediaViewMode, dismissImageCrop, requestStickToBottom]);
 
   // Voice recording
   const startRecording = useCallback(async () => {
@@ -3664,15 +3604,6 @@ export default function Messages() {
                 : undefined
             }
             onDownloadChat={contextMenu.msg.type !== "audio" ? downloadChatImages : undefined}
-          />
-        )}
-
-        {imageToCrop && (
-          <ImageCropModal
-            imageSrc={imageToCrop}
-            title="Crop before sending"
-            onCancel={dismissImageCrop}
-            onApply={handleCroppedImage}
           />
         )}
 
