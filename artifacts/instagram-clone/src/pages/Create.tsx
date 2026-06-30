@@ -217,6 +217,7 @@ export default memo(function Create() {
             accept="image/*"
             multiple
             className="hidden"
+            onClick={(e) => e.stopPropagation()}
             onChange={(e) => {
               if (e.target.files?.length) addFiles(e.target.files);
               e.target.value = "";
@@ -259,6 +260,7 @@ export default memo(function Create() {
             accept="image/*"
             multiple
             className="hidden"
+            onClick={(e) => e.stopPropagation()}
             onChange={(e) => {
               if (e.target.files?.length) addFiles(e.target.files);
               e.target.value = "";
