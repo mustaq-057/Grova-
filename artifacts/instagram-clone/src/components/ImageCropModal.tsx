@@ -762,7 +762,7 @@ export const ImageCropModal = memo(function ImageCropModal({
             style={{ height: '100%', width: '100%' }}
             initialAspectRatio={NaN} aspectRatio={aspect === 'locked' && lockedAspect ? lockedAspect : aspect === '1:1' ? 1 : aspect === '4:5' ? 4/5 : aspect === '16:9' ? 16/9 : aspect === 'original' ? naturalAspect : NaN}
             guides={true} ref={cropperRef} background={false} viewMode={1} dragMode={activeTab === 'text' ? 'none' : 'crop'} rotatable={true} responsive={true}
-            movable={false} zoomable={false}
+            movable={true} zoomable={true}
             checkOrientation={true} minCropBoxHeight={20} minCropBoxWidth={20} className="cropper-custom-styles"
           />
         </div>

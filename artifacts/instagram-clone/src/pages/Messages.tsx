@@ -215,32 +215,7 @@ export default function Messages() {
   });
   const [isTyping, setIsTyping] = useState(false);
   const [isPartnerDoodling, setIsPartnerDoodling] = useState(false);
-  const [isVanishMode, setIsVanishMode] = useState(false);
-  const isVanishModeRef = useRef(false);
-  const vanishMessageIdsRef = useRef<Set<string>>(new Set());
 
-  const sendMessageWithVanish = useCallback(async (outgoing: Partial<ApiMessage>) => {
-    if (isVanishModeRef.current) {
-      outgoing.companionSticker = outgoing.companionSticker ? `${outgoing.companionSticker},__vanish__` : "__vanish__";
-    }
-    const saved = await api.sendMessage(outgoing);
-    if (isVanishModeRef.current) {
-      vanishMessageIdsRef.current.add(saved.id);
-    }
-    return saved;
-  }, []);
-
-  useEffect(() => {
-    isVanishModeRef.current = isVanishMode;
-    if (!isVanishMode && vanishMessageIdsRef.current.size > 0) {
-      const ids = Array.from(vanishMessageIdsRef.current);
-      vanishMessageIdsRef.current.clear();
-      ids.forEach((id) => {
-        api.deleteMessage(id).catch(console.error);
-        setMessages(prev => prev.filter(m => m.id !== id));
-      });
-    }
-  }, [isVanishMode]);
   const [appThemeId, setAppThemeId] = useState<AppThemeId>(() => getStoredAppTheme());
   const searchParams = useAppSearchParams();
   const highlightParam = searchParams.get("highlight");
@@ -484,7 +459,7 @@ export default function Messages() {
           imageUrl: url,
           text: posText,
         });
-        const saved = await sendMessageWithVanish(outgoing);
+        const saved = await api.sendMessage(outgoing);
         const [display] = await normalizeMessages([saved]);
 
         setMessages((prev) => {
@@ -1863,7 +1838,7 @@ export default function Messages() {
       requestStickToBottom();
 
       const outgoing = await prepareOutgoingMessage({ senderId: user.id, ...partial });
-      const saved = await sendMessageWithVanish(outgoing);
+      const saved = await api.sendMessage(outgoing);
       const [display] = await normalizeMessages([saved]);
       setMessages((prev) => {
         const next = replaceOptimisticMessage(prev, tempId!, display, user.id);
@@ -1913,7 +1888,7 @@ export default function Messages() {
           imageUrl: url,
           ...(sticker ? { companionSticker: sticker } : {}),
         });
-        const saved = await sendMessageWithVanish(outgoing);
+        const saved = await api.sendMessage(outgoing);
         const [display] = await normalizeMessages([saved]);
         setMessages((prev) => {
           const next = replaceOptimisticMessage(prev, tempId, display, user.id);
@@ -1984,7 +1959,7 @@ export default function Messages() {
               companionSticker: sticker,
             }),
         });
-        const saved = await sendMessageWithVanish(outgoing);
+        const saved = await api.sendMessage(outgoing);
         const [display] = await normalizeMessages([saved]);
         pendingOutgoingRef.current.delete(tempId);
         setMessages((prev) => {
@@ -2475,7 +2450,7 @@ export default function Messages() {
           fileType: file.type,
           fileSize: file.size,
         });
-        const saved = await sendMessageWithVanish(outgoing);
+        const saved = await api.sendMessage(outgoing);
         const [display] = await normalizeMessages([saved]);
         pendingOutgoingRef.current.delete(tempId);
         setMessages((prev) => replaceOptimisticMessage(prev, tempId, display, user.id));
@@ -2693,7 +2668,7 @@ export default function Messages() {
               fileSize: normalized.size,
               ...(sticker ? { companionSticker: sticker } : {}),
             });
-            const saved = await sendMessageWithVanish(outgoing);
+            const saved = await api.sendMessage(outgoing);
             const [display] = await normalizeMessages([saved]);
             pendingOutgoingRef.current.delete(tempId);
             setMessages((prev) => {
@@ -2833,7 +2808,7 @@ export default function Messages() {
         imageUrl: url,
         companionSticker: sticker,
       });
-      const saved = await sendMessageWithVanish(outgoing);
+      const saved = await api.sendMessage(outgoing);
       const [display] = await normalizeMessages([saved]);
       pendingOutgoingRef.current.delete(tempId);
       setMessages((prev) => replaceOptimisticMessage(prev, tempId, display, user.id));
@@ -2902,7 +2877,7 @@ export default function Messages() {
               }),
             ]);
             outgoing.audioData = url;
-            const saved = await sendMessageWithVanish(outgoing);
+            const saved = await api.sendMessage(outgoing);
             const [display] = await normalizeMessages([saved]);
             pendingOutgoingRef.current.delete(tempId);
             setMessages((prev) => replaceOptimisticMessage(prev, tempId, display, senderId));
@@ -3217,7 +3192,7 @@ export default function Messages() {
         />
       )}
       <div
-        className={`chat-panel flex-1 min-w-0 h-full min-h-0 relative ${premiumChatClass} transition-colors duration-500 ${isVanishMode ? 'bg-zinc-950' : ''}`}
+        className={`chat-panel flex-1 min-w-0 h-full min-h-0 relative ${premiumChatClass} transition-colors duration-500`}
       >
         {showChatAurora && <ChatAuroraLayer />}
 
@@ -3253,14 +3228,6 @@ export default function Messages() {
               </div>
 
 
-              <button
-                onClick={() => setIsVanishMode(s => !s)}
-                className={`p-1.5 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 active:scale-95 ${isVanishMode ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground hover:bg-secondary"}`}
-                aria-label="Vanish Mode"
-                title="Vanish Mode"
-              >
-                <Ghost className="w-4 h-4" strokeWidth={1.5} />
-              </button>
               {appThemeId !== "mint" && (
                 <button
                   onClick={() => setShowBubbleColors(true)}
