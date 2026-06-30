@@ -224,8 +224,8 @@ export default memo(function Create() {
           />
         </motion.div>
       ) : (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
-          <div className="grid grid-cols-3 gap-2">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+          <div className="grid grid-cols-3 gap-3">
             {queue.map((photo) => (
               <div key={photo.id} className="relative aspect-square rounded-xl overflow-hidden bg-secondary/30 group">
                 <button type="button" className="absolute inset-0" onClick={() => setCropId(photo.id)}>
@@ -245,11 +245,11 @@ export default memo(function Create() {
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="aspect-square rounded-xl border-2 border-dashed border-primary/50 flex flex-col items-center justify-center gap-1 text-primary hover:bg-primary/10 transition-colors"
+                className="aspect-square rounded-xl border-2 border-dashed border-primary/40 bg-primary/5 flex flex-col items-center justify-center gap-2 text-primary hover:bg-primary/10 transition-colors shadow-inner"
                 aria-label="Add more photos"
               >
                 <Plus className="w-8 h-8" />
-                <span className="text-[10px] font-semibold">Add more</span>
+                <span className="text-xs font-semibold tracking-wide">Add more</span>
               </button>
             )}
           </div>
@@ -265,25 +265,25 @@ export default memo(function Create() {
             }}
           />
 
-          <div className="border border-border rounded-xl p-3 focus-within:ring-2 focus-within:ring-primary/30">
+          <div className="border border-border/60 bg-secondary/10 rounded-2xl p-4 focus-within:ring-2 focus-within:ring-primary/40 focus-within:bg-secondary/20 transition-all shadow-sm">
             <textarea
-              placeholder="Caption for all photos (optional)..."
+              placeholder="Write a caption for your post (optional)..."
               value={caption}
               onChange={(e) => setCaption(e.target.value)}
               rows={3}
-              className="w-full bg-transparent text-sm outline-none resize-none"
+              className="w-full bg-transparent text-[15px] outline-none resize-none placeholder:text-muted-foreground/70 leading-relaxed"
               maxLength={2200}
             />
           </div>
 
-          <div className="flex items-center gap-2 border border-border rounded-xl px-4 py-3">
-            <MapPin className="w-4 h-4 text-muted-foreground shrink-0" />
+          <div className="flex items-center gap-3 border border-border/60 bg-secondary/10 rounded-2xl px-5 py-4 focus-within:ring-2 focus-within:ring-primary/40 focus-within:bg-secondary/20 transition-all shadow-sm">
+            <MapPin className="w-5 h-5 text-primary/70 shrink-0" />
             <input
               type="text"
-              placeholder="Location (optional)"
+              placeholder="Add Location (optional)"
               value={location}
               onChange={(e) => setLocationLabel(e.target.value)}
-              className="flex-1 bg-transparent text-sm outline-none"
+              className="flex-1 bg-transparent text-[15px] outline-none placeholder:text-muted-foreground/70"
             />
           </div>
 
@@ -292,10 +292,10 @@ export default memo(function Create() {
             type="button"
             disabled={sharing || queue.length === 0}
             onClick={shareAll}
-            className="w-full py-3.5 bg-primary text-primary-foreground font-semibold rounded-xl flex items-center justify-center gap-2 disabled:opacity-60"
+            className="w-full py-4 bg-primary text-primary-foreground font-bold text-[15px] rounded-2xl flex items-center justify-center gap-2 disabled:opacity-50 shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all mt-4"
           >
             <Check className="w-5 h-5" />
-            {sharing ? "Uploading…" : queue.length === 1 ? "Share photo" : `Share ${queue.length} photos as one post`}
+            {sharing ? "Uploading to feed…" : queue.length === 1 ? "Share to feed" : `Share ${queue.length} photos as one post`}
           </motion.button>
         </motion.div>
       )}

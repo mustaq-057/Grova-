@@ -113,7 +113,9 @@ export const ImageCropModal = memo(function ImageCropModal({
   const [draggingText, setDraggingText] = useState<string | null>(null);
 
   // Retouching (Healing Brush) State
-  const [brushSize, setBrushSize] = useState(25);
+  const [brushSize, setBrushSize] = useState(20);
+  const [healMode, setHealMode] = useState<'local' | 'ai'>('local');
+  const [aiPrompt, setAiPrompt] = useState('');
   const retouchCanvasRef = useRef<HTMLCanvasElement>(null);
   const [canvasRect, setCanvasRect] = useState<{ left: number, top: number, width: number, height: number } | null>(null);
   const isDrawing = useRef(false);
@@ -150,6 +152,76 @@ export const ImageCropModal = memo(function ImageCropModal({
       return undefined;
     }
   }, [activeTab]);
+
+  // AI Retouch Processing
+  const processAiRetouch = async () => {
+    if (pathRef.current.length === 0 || !canvasRect || !currentImageSrc) return;
+    setProcessing(true);
+    try {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.src = currentImageSrc;
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+      });
+
+      const W = img.width;
+      const H = img.height;
+      const scaleX = W / canvasRect.width;
+      const scaleY = H / canvasRect.height;
+      const brushR = Math.round((brushSize * (scaleX + scaleY)) / 2);
+
+      const maskCanvas = document.createElement('canvas');
+      maskCanvas.width = W; maskCanvas.height = H;
+      const mCtx = maskCanvas.getContext('2d')!;
+      
+      // Fill mask with black (unmasked)
+      mCtx.fillStyle = 'black';
+      mCtx.fillRect(0, 0, W, H);
+      
+      // Draw white mask
+      mCtx.lineCap = "round"; mCtx.lineJoin = "round";
+      mCtx.lineWidth = brushR * 2; mCtx.strokeStyle = "white";
+      mCtx.beginPath();
+      mCtx.moveTo(pathRef.current[0].x * scaleX, pathRef.current[0].y * scaleY);
+      for (let i = 1; i < pathRef.current.length; i++) {
+          mCtx.lineTo(pathRef.current[i].x * scaleX, pathRef.current[i].y * scaleY);
+      }
+      mCtx.stroke();
+
+      const maskDataUrl = maskCanvas.toDataURL("image/jpeg");
+
+      const response = await fetch('/api/ai/inpaint', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          image: currentImageSrc,
+          mask: maskDataUrl,
+          prompt: aiPrompt || "clean background, seamless, high quality"
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to process AI request');
+      }
+
+      setCurrentImageSrc(data.resultUrl);
+      if (cropperRef.current?.cropper) {
+         cropperRef.current.cropper.replace(data.resultUrl);
+      }
+      
+      const overlayCtx = retouchCanvasRef.current?.getContext('2d');
+      if (overlayCtx) overlayCtx.clearRect(0, 0, canvasRect.width, canvasRect.height);
+      pathRef.current = [];
+
+    } catch (e: any) {
+      alert(e.message || 'AI Processing failed.');
+    } finally {
+      setProcessing(false);
+    }
+  };
 
   // Advanced Multi-pass Content-Aware Healing
   const processRetouch = () => {
@@ -629,12 +701,16 @@ export const ImageCropModal = memo(function ImageCropModal({
                 ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top); ctx.stroke();
                 pathRef.current.push({x: e.clientX - rect.left, y: e.clientY - rect.top});
              }}
-             onPointerUp={() => { isDrawing.current = false; processRetouch(); }}
-             onPointerCancel={() => {
-                isDrawing.current = false; pathRef.current = [];
-                retouchCanvasRef.current?.getContext('2d')?.clearRect(0, 0, canvasRect.width, canvasRect.height);
+             onPointerUp={() => { 
+                isDrawing.current = false; 
+                if (healMode === 'local') processRetouch(); 
              }}
-             onPointerOut={() => { if (isDrawing.current) { isDrawing.current = false; processRetouch(); } }}
+             onPointerOut={() => { 
+                if (isDrawing.current) { 
+                  isDrawing.current = false; 
+                  if (healMode === 'local') processRetouch(); 
+                } 
+             }}
           />
         )}
 
@@ -854,12 +930,25 @@ export const ImageCropModal = memo(function ImageCropModal({
 
           {/* HEAL TAB */}
           {activeTab === 'heal' && (
-            <div className="flex flex-col items-center justify-center w-full px-6 gap-3 animate-in fade-in h-full">
-               <div className="flex items-center justify-between w-full max-w-sm">
-                  <span className="text-xs font-bold text-white/70 uppercase tracking-widest">Magic Brush Size</span>
-                  <span className="text-xs text-[#FFD700] font-mono bg-[#FFD700]/10 px-2 py-0.5 rounded">{brushSize}px</span>
+            <div className="flex flex-col items-center justify-center w-full px-6 gap-2 animate-in fade-in h-full">
+               
+               <div className="flex items-center gap-2 mb-1 w-full max-w-sm bg-white/5 rounded-full p-1 border border-white/10">
+                 <button onClick={() => setHealMode('local')} className={`flex-1 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest ${healMode === 'local' ? 'bg-white text-black shadow-sm' : 'text-white/50 hover:text-white/80'}`}>Local Fast</button>
+                 <button onClick={() => setHealMode('ai')} className={`flex-1 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-1.5 ${healMode === 'ai' ? 'bg-[#FFD700] text-black shadow-[0_0_15px_rgba(255,215,0,0.4)]' : 'text-[#FFD700]/50 hover:text-[#FFD700]/80'}`}><Sparkles className="w-3 h-3" /> Cloud AI</button>
                </div>
-               <input type="range" min="5" max="100" value={brushSize} onChange={(e) => { setBrushSize(Number(e.target.value)); hapticFeedback(); }} className="w-full max-w-sm accent-[#FFD700] touch-none h-1.5 bg-white/20 rounded-full appearance-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:bg-[#FFD700] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-[0_0_10px_rgba(255,215,0,0.5)]" />
+
+               {healMode === 'ai' && (
+                 <div className="flex items-center gap-2 w-full max-w-sm">
+                   <input type="text" placeholder="Prompt (e.g. remove object)" value={aiPrompt} onChange={e => setAiPrompt(e.target.value)} className="flex-1 bg-white/10 border border-white/20 rounded-xl px-3 py-1.5 text-xs text-white outline-none focus:border-[#FFD700] transition-colors" />
+                   <button onClick={processAiRetouch} disabled={processing || pathRef.current.length === 0} className="bg-[#FFD700] text-black px-4 py-1.5 rounded-xl text-xs font-bold disabled:opacity-50 hover:bg-[#FFF055] transition-colors">Generate</button>
+                 </div>
+               )}
+
+               <div className="flex items-center justify-between w-full max-w-sm mt-1">
+                  <span className="text-[10px] font-bold text-white/70 uppercase tracking-widest">Brush Size</span>
+                  <span className="text-[10px] text-[#FFD700] font-mono">{brushSize}px</span>
+               </div>
+               <input type="range" min="5" max="100" value={brushSize} onChange={(e) => { setBrushSize(Number(e.target.value)); hapticFeedback(); }} className="w-full max-w-sm accent-[#FFD700] touch-none h-1.5 bg-white/20 rounded-full appearance-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:bg-[#FFD700] [&::-webkit-slider-thumb]:rounded-full shadow-inner" />
             </div>
           )}
         </div>
