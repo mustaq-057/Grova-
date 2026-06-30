@@ -1,10 +1,11 @@
-import { memo, useCallback, useEffect, useState } from "react";
+import { memo, useCallback, useEffect, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { 
-  Check, X, ZoomIn, ZoomOut, RotateCw, Maximize, Settings2, 
-  Image as ImageIcon, Crop, Sun, Sliders, Droplet, Thermometer, ChevronLeft, Wand2, Eye, Aperture 
+  Check, X, RotateCw, Settings2, 
+  Image as ImageIcon, Crop, Sun, Sliders, Droplet, Thermometer, ChevronLeft, Wand2, Eye, Aperture, Fullscreen 
 } from "lucide-react";
-import Cropper, { Area } from "react-easy-crop";
+import Cropper, { ReactCropperElement } from "react-cropper";
+import "cropperjs/dist/cropper.css";
 
 export type CropAspect = "free" | "1:1" | "4:5";
 
@@ -31,75 +32,16 @@ const FILTERS = [
   { name: "Perpetua", value: "contrast(1.1) brightness(1.25) saturate(1.1)" },
 ];
 
-const getRadianAngle = (degreeValue: number) => {
-  return (degreeValue * Math.PI) / 180;
-};
-
-const getCroppedImg = async (
-  imageSrc: string,
-  pixelCrop: Area,
-  rotation: number = 0,
-  filter: string = "none",
-  bgBlur: number = 30
-): Promise<string> => {
-  const image = await new Promise<HTMLImageElement>((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => resolve(img);
-    img.onerror = (e) => reject(e);
-    img.src = imageSrc;
-  });
-
-  const canvas = document.createElement("canvas");
-  const ctx = canvas.getContext("2d")!;
-
-  const safeArea = Math.max(image.width, image.height) * 2;
-
-  const offscreen = document.createElement("canvas");
-  offscreen.width = safeArea;
-  offscreen.height = safeArea;
-  const offCtx = offscreen.getContext("2d")!;
-
-  offCtx.translate(safeArea / 2, safeArea / 2);
-  offCtx.rotate(getRadianAngle(rotation));
-  offCtx.translate(-safeArea / 2, -safeArea / 2);
-
-  offCtx.drawImage(
-    image,
-    safeArea / 2 - image.width * 0.5,
-    safeArea / 2 - image.height * 0.5
-  );
-
-  canvas.width = pixelCrop.width;
-  canvas.height = pixelCrop.height;
-
-  const dx = Math.round(0 - safeArea / 2 + image.width * 0.5 - pixelCrop.x);
-  const dy = Math.round(0 - safeArea / 2 + image.height * 0.5 - pixelCrop.y);
-
-  ctx.filter = `blur(${bgBlur}px) brightness(0.6) ${filter}`;
-  const scale = Math.max(canvas.width / image.width, canvas.height / image.height);
-  const bgW = image.width * scale;
-  const bgH = image.height * scale;
-  ctx.drawImage(image, (canvas.width - bgW) / 2, (canvas.height - bgH) / 2, bgW, bgH);
-
-  ctx.filter = filter;
-  ctx.drawImage(offscreen, dx, dy);
-
-  return canvas.toDataURL("image/jpeg", 0.92);
-};
-
 type EditTool = "rotate" | "brightness" | "contrast" | "saturation" | "warmth" | "bgBlur";
 
 export const ImageCropModal = memo(function ImageCropModal({
   imageSrc,
   title = "Edit photo",
-  initialAspect = "4:5",
+  initialAspect = "free",
   onCancel,
   onApply,
 }: Props) {
   const [aspect, setAspect] = useState<CropAspect>(initialAspect);
-  const [crop, setCrop] = useState({ x: 0, y: 0 });
-  const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
   
   const [presetFilter, setPresetFilter] = useState(FILTERS[0].value);
@@ -111,26 +53,16 @@ export const ImageCropModal = memo(function ImageCropModal({
     bgBlur: 30,
   });
 
-  const [objectFit, setObjectFit] = useState<"cover" | "contain">("cover");
-  const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
-  const [imageAspect, setImageAspect] = useState<number>(4 / 3);
-  const [isInteracting, setIsInteracting] = useState(false);
   const [activeTab, setActiveTab] = useState<"crop" | "edit" | "filter">("crop");
   const [activeTool, setActiveTool] = useState<EditTool | null>(null);
   const [isComparing, setIsComparing] = useState(false);
   const [processing, setProcessing] = useState(false);
 
+  const cropperRef = useRef<ReactCropperElement>(null);
+
   useEffect(() => {
     setAspect(initialAspect);
   }, [initialAspect]);
-
-  const onCropComplete = useCallback((_croppedArea: Area, croppedAreaPixels: Area) => {
-    setCroppedAreaPixels(croppedAreaPixels);
-  }, []);
-
-  const onMediaLoaded = useCallback((mediaSize: { width: number; height: number }) => {
-    setImageAspect(mediaSize.width / mediaSize.height);
-  }, []);
 
   const combinedFilter = [
     presetFilter !== "none" ? presetFilter : "",
@@ -141,17 +73,50 @@ export const ImageCropModal = memo(function ImageCropModal({
   ].filter(Boolean).join(" ") || "none";
 
   const applyCrop = useCallback(async () => {
-    if (!croppedAreaPixels || processing) return;
+    if (processing) return;
     setProcessing(true);
     try {
-      const croppedImage = await getCroppedImg(imageSrc, croppedAreaPixels, rotation, combinedFilter, adjustments.bgBlur);
-      onApply(croppedImage);
+      const cropper = cropperRef.current?.cropper;
+      if (!cropper) throw new Error("Cropper not ready");
+
+      // Cropper JS gives us the exact cropped canvas, natively handling rotation & bounds
+      const sourceCanvas = cropper.getCroppedCanvas({
+        fillColor: "transparent",
+        imageSmoothingEnabled: true,
+        imageSmoothingQuality: "high",
+      });
+
+      if (!sourceCanvas) throw new Error("Could not get cropped canvas");
+
+      // We need to apply our CSS filters to this canvas manually before exporting
+      const finalCanvas = document.createElement("canvas");
+      finalCanvas.width = sourceCanvas.width;
+      finalCanvas.height = sourceCanvas.height;
+      const ctx = finalCanvas.getContext("2d");
+      
+      if (ctx) {
+        // If the crop box went outside the image (transparent padding), we blur the background
+        if (adjustments.bgBlur > 0) {
+           ctx.filter = `blur(${adjustments.bgBlur}px) brightness(0.6) ${combinedFilter}`;
+           // Stretch the source onto the background
+           const scale = Math.max(finalCanvas.width / sourceCanvas.width, finalCanvas.height / sourceCanvas.height);
+           const bgW = sourceCanvas.width * scale;
+           const bgH = sourceCanvas.height * scale;
+           ctx.drawImage(sourceCanvas, (finalCanvas.width - bgW) / 2, (finalCanvas.height - bgH) / 2, bgW, bgH);
+        }
+
+        // Draw the main image with just filters
+        ctx.filter = combinedFilter;
+        ctx.drawImage(sourceCanvas, 0, 0);
+      }
+
+      onApply(finalCanvas.toDataURL("image/jpeg", 0.92));
     } catch (e) {
       console.error("Crop Export Failed:", e);
       alert("Failed to crop image. Please try again.");
       setProcessing(false);
     }
-  }, [croppedAreaPixels, imageSrc, rotation, combinedFilter, adjustments.bgBlur, onApply, processing]);
+  }, [combinedFilter, adjustments.bgBlur, onApply, processing]);
 
   const hapticFeedback = () => {
     if (typeof navigator !== "undefined" && navigator.vibrate) {
@@ -159,8 +124,11 @@ export const ImageCropModal = memo(function ImageCropModal({
     }
   };
 
-  const currentAspectValue =
-    aspect === "1:1" ? 1 : aspect === "4:5" ? 4 / 5 : imageAspect;
+  const getCropperAspect = () => {
+    if (aspect === "1:1") return 1;
+    if (aspect === "4:5") return 4 / 5;
+    return NaN; // Free crop
+  };
 
   const updateAdjustment = (key: keyof typeof adjustments, value: number) => {
     setAdjustments((prev) => ({ ...prev, [key]: value }));
@@ -192,15 +160,24 @@ export const ImageCropModal = memo(function ImageCropModal({
           <input 
             type="range" min="-45" max="45" value={rotation}
             onChange={(e) => {
-              setRotation(Number(e.target.value));
+              const val = Number(e.target.value);
+              setRotation(val);
+              cropperRef.current?.cropper.rotateTo(val);
               hapticFeedback();
+            }}
+            onDoubleClick={() => {
+               setRotation(0);
+               cropperRef.current?.cropper.rotateTo(0);
+               hapticFeedback();
             }}
             className="flex-1 accent-primary touch-none h-2"
           />
           <button
             type="button"
             onClick={() => {
-              setRotation((r) => (r + 90) % 360);
+              const r = (rotation + 90) % 360;
+              setRotation(r);
+              cropperRef.current?.cropper.rotateTo(r);
               hapticFeedback();
             }}
             className="p-2 bg-white/10 rounded-full text-white shrink-0"
@@ -232,7 +209,7 @@ export const ImageCropModal = memo(function ImageCropModal({
           <input 
             type="range" min={config.min} max={config.max} value={config.val}
             onChange={(e) => updateAdjustment(activeTool as keyof typeof adjustments, Number(e.target.value))}
-            onDoubleClick={() => updateAdjustment(activeTool as keyof typeof adjustments, activeTool === 'warmth' ? 0 : 100)}
+            onDoubleClick={() => updateAdjustment(activeTool as keyof typeof adjustments, activeTool === 'warmth' ? 0 : activeTool === 'bgBlur' ? 30 : 100)}
             className="flex-1 accent-primary touch-none h-2"
           />
         </div>
@@ -241,7 +218,7 @@ export const ImageCropModal = memo(function ImageCropModal({
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-[130] bg-black/95 flex flex-col safe-area-top safe-area-bottom select-none">
+    <div className="fixed inset-0 z-[130] bg-black/95 flex flex-col safe-area-top safe-area-bottom select-none touch-none">
       <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 shrink-0">
         <button type="button" onClick={onCancel} className="p-2 text-white/80 hover:text-white" aria-label="Cancel">
           <X className="w-6 h-6" />
@@ -281,28 +258,47 @@ export const ImageCropModal = memo(function ImageCropModal({
 
       <div className="flex-1 relative w-full overflow-hidden bg-black min-h-0" style={{ filter: isComparing ? "none" : combinedFilter }}>
         <Cropper
-          image={imageSrc}
-          crop={crop}
-          zoom={zoom}
-          rotation={rotation}
-          aspect={currentAspectValue}
-          objectFit={objectFit}
-          onCropChange={(c) => { setCrop(c); hapticFeedback(); }}
-          onRotationChange={(r) => { setRotation(r); hapticFeedback(); }}
-          onCropComplete={onCropComplete}
-          onZoomChange={(z) => { setZoom(z); hapticFeedback(); }}
-          onMediaLoaded={onMediaLoaded}
-          onInteractionStart={() => setIsInteracting(true)}
-          onInteractionEnd={() => setIsInteracting(false)}
-          showGrid={isInteracting}
-          style={{
-            containerStyle: { backgroundColor: "transparent" },
-            cropAreaStyle: { 
-              border: "1px solid rgba(255, 255, 255, 0.4)",
-              boxShadow: "0 0 0 9999px rgba(0, 0, 0, 0.7)" 
-            },
-          }}
+          src={imageSrc}
+          style={{ height: "100%", width: "100%" }}
+          initialAspectRatio={NaN}
+          aspectRatio={getCropperAspect()}
+          guides={true}
+          ref={cropperRef}
+          background={false}
+          viewMode={0} // ViewMode 0 allows crop box to exceed canvas for padded background
+          dragMode="crop"
+          rotatable={true}
+          responsive={true}
+          checkOrientation={false} // Avoids issues with EXIF orienting double
+          minCropBoxHeight={20}
+          minCropBoxWidth={20}
+          className="cropper-custom-styles"
         />
+        <style>{`
+          .cropper-custom-styles .cropper-view-box,
+          .cropper-custom-styles .cropper-face {
+            border-radius: 0;
+          }
+          .cropper-custom-styles .cropper-line {
+            background-color: rgba(255, 255, 255, 0.5);
+          }
+          .cropper-custom-styles .cropper-point {
+            background-color: #ffd700;
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            opacity: 0.9;
+          }
+          .cropper-custom-styles .cropper-center {
+             display: none;
+          }
+          .cropper-custom-styles .cropper-point.point-e,
+          .cropper-custom-styles .cropper-point.point-n,
+          .cropper-custom-styles .cropper-point.point-w,
+          .cropper-custom-styles .cropper-point.point-s {
+            display: none; /* Hide edge points, keep corner points */
+          }
+        `}</style>
       </div>
 
       <div className="shrink-0 bg-black/90 backdrop-blur-xl border-t border-white/10 pb-6">
@@ -312,15 +308,17 @@ export const ImageCropModal = memo(function ImageCropModal({
               <button
                 type="button"
                 onClick={() => {
-                  setObjectFit(objectFit === "cover" ? "contain" : "cover");
+                  setAspect("free");
                   hapticFeedback();
                 }}
-                className="px-4 py-2 rounded-full text-xs font-semibold bg-white/10 text-white flex items-center gap-1.5 shrink-0 mr-2"
+                className={`px-4 py-2 rounded-full text-xs font-semibold flex items-center gap-1.5 shrink-0 transition-colors ${
+                    aspect === "free" ? "bg-primary text-primary-foreground" : "bg-white/10 text-white"
+                }`}
               >
-                <Maximize className="w-3.5 h-3.5" />
-                {objectFit === "cover" ? "Fit" : "Fill"}
+                <Fullscreen className="w-3.5 h-3.5" />
+                Free
               </button>
-              {(["free", "1:1", "4:5"] as CropAspect[]).map((a) => (
+              {(["1:1", "4:5"] as CropAspect[]).map((a) => (
                 <button
                   key={a}
                   type="button"
@@ -332,7 +330,7 @@ export const ImageCropModal = memo(function ImageCropModal({
                     aspect === a ? "bg-primary text-primary-foreground" : "bg-white/15 text-white"
                   }`}
                 >
-                  {a === "free" ? "Original" : a}
+                  {a}
                 </button>
               ))}
             </div>

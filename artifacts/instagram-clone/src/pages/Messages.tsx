@@ -3397,7 +3397,7 @@ export default function Messages() {
                 <p className="text-center text-[11px] text-muted-foreground/70 my-4 font-medium">{group.label}</p>
               ) : null}
               {(() => {
-                const arr = group.msgs.filter((msg: ApiMessage) => !msg.pinned);
+                const arr = group.msgs;
                 const nodes: ReactElement[] = [];
                 let i = 0;
                 while (i < arr.length) {
