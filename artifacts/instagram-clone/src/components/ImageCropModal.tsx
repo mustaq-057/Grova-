@@ -18,10 +18,17 @@ type Props = {
 
 const FILTERS = [
   { name: "Normal", value: "none" },
-  { name: "Vintage", value: "sepia(0.5) contrast(1.1) brightness(0.9) saturate(1.2)" },
-  { name: "Vibrant", value: "saturate(1.5) contrast(1.1)" },
-  { name: "Noir", value: "grayscale(1) contrast(1.2)" },
-  { name: "Fade", value: "contrast(0.8) brightness(1.1) saturate(0.8)" },
+  { name: "Clarendon", value: "contrast(1.2) saturate(1.35)" },
+  { name: "Gingham", value: "brightness(1.05) hue-rotate(-10deg)" },
+  { name: "Moon", value: "grayscale(1) contrast(1.1) brightness(1.1)" },
+  { name: "Lark", value: "contrast(0.9) saturate(1.1) brightness(1.1)" },
+  { name: "Reyes", value: "sepia(0.22) brightness(1.1) contrast(0.85) saturate(0.75)" },
+  { name: "Juno", value: "saturate(1.3) contrast(1.15) hue-rotate(-5deg)" },
+  { name: "Slumber", value: "saturate(0.66) brightness(1.05) sepia(0.2)" },
+  { name: "Crema", value: "sepia(0.5) contrast(1.25) brightness(1.15) saturate(0.9)" },
+  { name: "Ludwig", value: "sepia(0.25) contrast(1.05) saturate(1.5)" },
+  { name: "Aden", value: "sepia(0.2) brightness(1.2) saturate(0.85)" },
+  { name: "Perpetua", value: "contrast(1.1) brightness(1.25) saturate(1.1)" },
 ];
 
 const getRadianAngle = (degreeValue: number) => {
@@ -37,73 +44,46 @@ const getCroppedImg = async (
 ): Promise<string> => {
   const image = await new Promise<HTMLImageElement>((resolve, reject) => {
     const img = new Image();
+    img.crossOrigin = "anonymous";
     img.onload = () => resolve(img);
     img.onerror = (e) => reject(e);
     img.src = imageSrc;
   });
 
-  const offscreen = document.createElement("canvas");
-  const offCtx = offscreen.getContext("2d")!;
-  const maxSize = Math.max(image.width, image.height);
-  const safeArea = 2 * ((maxSize / 2) * Math.sqrt(2));
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d")!;
 
+  const safeArea = Math.max(image.width, image.height) * 2;
+
+  const offscreen = document.createElement("canvas");
   offscreen.width = safeArea;
   offscreen.height = safeArea;
+  const offCtx = offscreen.getContext("2d")!;
 
   offCtx.translate(safeArea / 2, safeArea / 2);
   offCtx.rotate(getRadianAngle(rotation));
   offCtx.translate(-safeArea / 2, -safeArea / 2);
+
   offCtx.drawImage(
     image,
     safeArea / 2 - image.width * 0.5,
     safeArea / 2 - image.height * 0.5
   );
 
-  const canvas = document.createElement("canvas");
   canvas.width = pixelCrop.width;
   canvas.height = pixelCrop.height;
-  const ctx = canvas.getContext("2d")!;
+
+  const dx = Math.round(0 - safeArea / 2 + image.width * 0.5 - pixelCrop.x);
+  const dy = Math.round(0 - safeArea / 2 + image.height * 0.5 - pixelCrop.y);
 
   ctx.filter = `blur(${bgBlur}px) brightness(0.6) ${filter}`;
-  ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+  const scale = Math.max(canvas.width / image.width, canvas.height / image.height);
+  const bgW = image.width * scale;
+  const bgH = image.height * scale;
+  ctx.drawImage(image, (canvas.width - bgW) / 2, (canvas.height - bgH) / 2, bgW, bgH);
 
   ctx.filter = filter;
-
-  let sx = pixelCrop.x + safeArea / 2 - image.width * 0.5;
-  let sy = pixelCrop.y + safeArea / 2 - image.height * 0.5;
-  let sw = pixelCrop.width;
-  let sh = pixelCrop.height;
-  let dx = 0;
-  let dy = 0;
-  let dw = pixelCrop.width;
-  let dh = pixelCrop.height;
-
-  if (sx < 0) {
-    dx = -sx;
-    sw += sx;
-    dw += sx;
-    sx = 0;
-  }
-  if (sy < 0) {
-    dy = -sy;
-    sh += sy;
-    dh += sy;
-    sy = 0;
-  }
-  if (sx + sw > offscreen.width) {
-    const diff = sx + sw - offscreen.width;
-    sw -= diff;
-    dw -= diff;
-  }
-  if (sy + sh > offscreen.height) {
-    const diff = sy + sh - offscreen.height;
-    sh -= diff;
-    dh -= diff;
-  }
-
-  if (sw > 0 && sh > 0) {
-    ctx.drawImage(offscreen, sx, sy, sw, sh, dx, dy, dw, dh);
-  }
+  ctx.drawImage(offscreen, dx, dy);
 
   return canvas.toDataURL("image/jpeg", 0.92);
 };
@@ -167,7 +147,8 @@ export const ImageCropModal = memo(function ImageCropModal({
       const croppedImage = await getCroppedImg(imageSrc, croppedAreaPixels, rotation, combinedFilter, adjustments.bgBlur);
       onApply(croppedImage);
     } catch (e) {
-      console.error(e);
+      console.error("Crop Export Failed:", e);
+      alert("Failed to crop image. Please try again.");
       setProcessing(false);
     }
   }, [croppedAreaPixels, imageSrc, rotation, combinedFilter, adjustments.bgBlur, onApply, processing]);
@@ -207,7 +188,7 @@ export const ImageCropModal = memo(function ImageCropModal({
           <button onClick={() => setActiveTool(null)} className="p-2 -ml-2 text-white/70 hover:text-white">
             <ChevronLeft className="w-5 h-5" />
           </button>
-          <span className="text-xs text-white/50 w-8">{rotation}Â°</span>
+          <span className="text-xs text-white/50 w-8">{rotation}°</span>
           <input 
             type="range" min="-45" max="45" value={rotation}
             onChange={(e) => {
@@ -269,9 +250,11 @@ export const ImageCropModal = memo(function ImageCropModal({
         <div className="flex items-center gap-1">
           <button 
             type="button" 
-            onPointerDown={() => setIsComparing(true)}
-            onPointerUp={() => setIsComparing(false)}
-            onPointerLeave={() => setIsComparing(false)}
+            onTouchStart={() => setIsComparing(true)}
+            onTouchEnd={() => setIsComparing(false)}
+            onMouseDown={() => setIsComparing(true)}
+            onMouseUp={() => setIsComparing(false)}
+            onMouseLeave={() => setIsComparing(false)}
             className="p-2 text-white/80 hover:text-white transition-opacity active:opacity-50"
             aria-label="Compare"
           >
@@ -280,7 +263,7 @@ export const ImageCropModal = memo(function ImageCropModal({
           <button 
             type="button" 
             onClick={autoEnhance} 
-            className="p-2 text-white/80 hover:text-white"
+            className="p-2 text-white/80 hover:text-white transition-opacity active:opacity-50"
             aria-label="Auto Enhance"
           >
             <Wand2 className="w-5 h-5" />
@@ -323,7 +306,7 @@ export const ImageCropModal = memo(function ImageCropModal({
       </div>
 
       <div className="shrink-0 bg-black/90 backdrop-blur-xl border-t border-white/10 pb-6">
-        <div className="h-[72px] flex items-center justify-center border-b border-white/5">
+        <div className="h-[90px] flex items-center justify-center border-b border-white/5">
           {activeTab === "crop" && (
             <div className="flex items-center gap-2 px-4 w-full overflow-x-auto no-scrollbar animate-in fade-in">
               <button
@@ -383,21 +366,26 @@ export const ImageCropModal = memo(function ImageCropModal({
           )}
 
           {activeTab === "filter" && (
-            <div className="flex items-center gap-3 px-4 w-full overflow-x-auto no-scrollbar animate-in fade-in">
+            <div className="flex items-center gap-3 px-4 w-full overflow-x-auto no-scrollbar animate-in fade-in py-2">
               {FILTERS.map((f) => (
-                <button
-                  key={f.name}
-                  type="button"
-                  onClick={() => {
-                    setPresetFilter(f.value);
-                    hapticFeedback();
-                  }}
-                  className={`px-5 py-2 rounded-full text-xs font-semibold shrink-0 transition-all ${
-                    presetFilter === f.value ? "bg-primary text-primary-foreground scale-105 shadow-lg shadow-primary/20" : "bg-white/10 text-white hover:bg-white/20"
-                  }`}
-                >
-                  {f.name}
-                </button>
+                <div key={f.name} className="flex flex-col items-center gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPresetFilter(f.value);
+                      hapticFeedback();
+                    }}
+                    className={`w-14 h-14 rounded-xl shrink-0 transition-all border-2 object-cover overflow-hidden ${
+                      presetFilter === f.value ? "border-primary scale-105 shadow-lg shadow-primary/20" : "border-transparent opacity-80 hover:opacity-100"
+                    }`}
+                    style={{ filter: f.value !== 'none' ? f.value : 'none' }}
+                  >
+                    <img src={imageSrc} className="w-full h-full object-cover" alt={f.name} />
+                  </button>
+                  <span className={`text-[10px] font-semibold ${presetFilter === f.value ? "text-primary" : "text-white/70"}`}>
+                    {f.name}
+                  </span>
+                </div>
               ))}
             </div>
           )}
