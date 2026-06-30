@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { 
   Check, X, RotateCw, Settings2, 
   Image as ImageIcon, Crop, Sun, Sliders, Droplet, Thermometer, ChevronLeft, Wand2, Eye, Aperture,
-  Focus, FlipHorizontal, FlipVertical, RotateCcw
+  Focus, FlipHorizontal, FlipVertical, RotateCcw, Palette, CloudFog
 } from "lucide-react";
 import Cropper, { ReactCropperElement } from "react-cropper";
 import "cropperjs/dist/cropper.css";
@@ -33,7 +33,7 @@ const FILTERS = [
   { name: "Perpetua", value: "contrast(1.1) brightness(1.25) saturate(1.1)" },
 ];
 
-type EditTool = "rotate" | "brightness" | "contrast" | "saturation" | "warmth" | "bgBlur" | "vignette";
+type EditTool = "rotate" | "brightness" | "contrast" | "saturation" | "warmth" | "tint" | "fade" | "vignette" | "bgBlur";
 
 export const ImageCropModal = memo(function ImageCropModal({
   imageSrc,
@@ -52,8 +52,10 @@ export const ImageCropModal = memo(function ImageCropModal({
     contrast: 100,
     saturation: 100,
     warmth: 0,
-    bgBlur: 30,
+    tint: 0,
+    fade: 0,
     vignette: 0,
+    bgBlur: 30,
   });
 
   const [activeTab, setActiveTab] = useState<"crop" | "edit" | "filter">("crop");
@@ -76,6 +78,7 @@ export const ImageCropModal = memo(function ImageCropModal({
     adjustments.contrast !== 100 ? `contrast(${adjustments.contrast}%)` : "",
     adjustments.saturation !== 100 ? `saturate(${adjustments.saturation}%)` : "",
     adjustments.warmth > 0 ? `sepia(${adjustments.warmth}%)` : "",
+    adjustments.tint !== 0 ? `hue-rotate(${adjustments.tint}deg)` : "",
   ].filter(Boolean).join(" ") || "none";
 
   const applyCrop = useCallback(async () => {
@@ -99,6 +102,7 @@ export const ImageCropModal = memo(function ImageCropModal({
       const ctx = finalCanvas.getContext("2d");
       
       if (ctx) {
+        // 1. Background Blur (if padded)
         if (adjustments.bgBlur > 0) {
            ctx.filter = `blur(${adjustments.bgBlur}px) brightness(0.6) ${combinedFilter}`;
            const scale = Math.max(finalCanvas.width / sourceCanvas.width, finalCanvas.height / sourceCanvas.height);
@@ -107,17 +111,29 @@ export const ImageCropModal = memo(function ImageCropModal({
            ctx.drawImage(sourceCanvas, (finalCanvas.width - bgW) / 2, (finalCanvas.height - bgH) / 2, bgW, bgH);
         }
 
+        // 2. Draw Main Image with CSS Filters
         ctx.filter = combinedFilter;
         ctx.drawImage(sourceCanvas, 0, 0);
 
+        // 3. Apply Film Fade (Lighten blend mode with grey overlay)
+        if (adjustments.fade > 0) {
+          ctx.filter = "none";
+          ctx.globalCompositeOperation = "screen";
+          ctx.fillStyle = `rgba(50, 45, 45, ${adjustments.fade / 100})`;
+          ctx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
+          ctx.globalCompositeOperation = "source-over"; // Reset
+        }
+
+        // 4. Apply Vignette (Radial Gradient)
         if (adjustments.vignette > 0) {
           const v = adjustments.vignette / 100;
           const gradient = ctx.createRadialGradient(
             finalCanvas.width / 2, finalCanvas.height / 2, 0,
-            finalCanvas.width / 2, finalCanvas.height / 2, Math.max(finalCanvas.width, finalCanvas.height) / 1.5
+            finalCanvas.width / 2, finalCanvas.height / 2, Math.max(finalCanvas.width, finalCanvas.height) / 1.4
           );
           gradient.addColorStop(0, 'rgba(0,0,0,0)');
-          gradient.addColorStop(1, `rgba(0,0,0,${v})`);
+          gradient.addColorStop(0.5, 'rgba(0,0,0,0)');
+          gradient.addColorStop(1, `rgba(0,0,0,${v * 1.5})`);
           ctx.filter = "none";
           ctx.fillStyle = gradient;
           ctx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
@@ -130,7 +146,7 @@ export const ImageCropModal = memo(function ImageCropModal({
       alert("Failed to crop image. Please try again.");
       setProcessing(false);
     }
-  }, [combinedFilter, adjustments.bgBlur, adjustments.vignette, onApply, processing]);
+  }, [combinedFilter, adjustments.bgBlur, adjustments.vignette, adjustments.fade, onApply, processing]);
 
   const hapticFeedback = () => {
     if (typeof navigator !== "undefined" && navigator.vibrate) {
@@ -159,6 +175,8 @@ export const ImageCropModal = memo(function ImageCropModal({
       saturation: 110,
       warmth: 0,
       vignette: 10,
+      fade: 0,
+      tint: 0,
     }));
     setPresetFilter("none");
     hapticFeedback();
@@ -176,7 +194,6 @@ export const ImageCropModal = memo(function ImageCropModal({
           <span className="text-xs text-[#FFD700] w-8 font-mono">{rotation}°</span>
           
           <div className="flex-1 relative flex items-center">
-            {/* Custom dial background ticks */}
             <div className="absolute inset-0 flex justify-between px-2 items-center pointer-events-none opacity-20">
                {[...Array(11)].map((_, i) => (
                  <div key={i} className={`w-0.5 bg-white ${i === 5 ? 'h-3' : 'h-1.5'}`} />
@@ -195,9 +212,8 @@ export const ImageCropModal = memo(function ImageCropModal({
                  cropperRef.current?.cropper.rotateTo(0);
                  hapticFeedback();
               }}
-              className="w-full accent-[#FFD700] touch-none h-8 opacity-0 z-10" // Hidden native slider taking touch
+              className="w-full accent-[#FFD700] touch-none h-8 opacity-0 z-10"
             />
-            {/* Custom thumb */}
             <div 
                className="absolute w-1 h-4 bg-[#FFD700] pointer-events-none rounded-full"
                style={{ left: `calc(${((rotation + 45) / 90) * 100}% - 2px)` }}
@@ -221,12 +237,14 @@ export const ImageCropModal = memo(function ImageCropModal({
     }
 
     const config = {
-      brightness: { min: 0, max: 200, val: adjustments.brightness, label: "Brightness" },
-      contrast: { min: 0, max: 200, val: adjustments.contrast, label: "Contrast" },
-      saturation: { min: 0, max: 200, val: adjustments.saturation, label: "Saturation" },
-      warmth: { min: 0, max: 100, val: adjustments.warmth, label: "Warmth" },
-      bgBlur: { min: 0, max: 100, val: adjustments.bgBlur, label: "Bg Blur" },
-      vignette: { min: 0, max: 100, val: adjustments.vignette, label: "Vignette" },
+      brightness: { min: 0, max: 200, val: adjustments.brightness, label: "Brightness", default: 100 },
+      contrast: { min: 0, max: 200, val: adjustments.contrast, label: "Contrast", default: 100 },
+      saturation: { min: 0, max: 200, val: adjustments.saturation, label: "Saturation", default: 100 },
+      warmth: { min: 0, max: 100, val: adjustments.warmth, label: "Warmth", default: 0 },
+      tint: { min: -100, max: 100, val: adjustments.tint, label: "Tint", default: 0 },
+      fade: { min: 0, max: 100, val: adjustments.fade, label: "Fade", default: 0 },
+      vignette: { min: 0, max: 100, val: adjustments.vignette, label: "Vignette", default: 0 },
+      bgBlur: { min: 0, max: 100, val: adjustments.bgBlur, label: "Bg Blur", default: 30 },
     }[activeTool as keyof typeof adjustments];
 
     return (
@@ -242,7 +260,7 @@ export const ImageCropModal = memo(function ImageCropModal({
           <input 
             type="range" min={config.min} max={config.max} value={config.val}
             onChange={(e) => updateAdjustment(activeTool as keyof typeof adjustments, Number(e.target.value))}
-            onDoubleClick={() => updateAdjustment(activeTool as keyof typeof adjustments, activeTool === 'warmth' ? 0 : activeTool === 'bgBlur' ? 30 : activeTool === 'vignette' ? 0 : 100)}
+            onDoubleClick={() => updateAdjustment(activeTool as keyof typeof adjustments, config.default)}
             className="flex-1 accent-[#FFD700] touch-none h-2"
           />
         </div>
@@ -290,9 +308,17 @@ export const ImageCropModal = memo(function ImageCropModal({
       </div>
 
       <div className="flex-1 relative w-full overflow-hidden min-h-0 py-8 px-4">
+        
+        {/* Real-time Film Fade Preview layer */}
+        <div className="absolute inset-0 z-[5] pointer-events-none mix-blend-screen" style={{
+           backgroundColor: `rgba(50, 45, 45, ${adjustments.fade / 100})`,
+           opacity: isComparing ? 0 : 1,
+           transition: "opacity 0.2s"
+        }} />
+
         {/* Real-time Vignette Preview layer */}
-        <div className="absolute inset-0 z-10 pointer-events-none" style={{
-           background: `radial-gradient(circle, rgba(0,0,0,0) 50%, rgba(0,0,0,${adjustments.vignette / 100}) 100%)`,
+        <div className="absolute inset-0 z-[10] pointer-events-none" style={{
+           background: `radial-gradient(circle, rgba(0,0,0,0) 50%, rgba(0,0,0,${(adjustments.vignette / 100) * 1.5}) 100%)`,
            opacity: isComparing ? 0 : 1,
            transition: "opacity 0.2s"
         }} />
@@ -301,21 +327,21 @@ export const ImageCropModal = memo(function ImageCropModal({
           <div className="absolute top-10 right-6 flex flex-col gap-3 z-[140] animate-in fade-in slide-in-from-right-4">
             <button 
               onClick={() => { cropperRef.current?.cropper.scaleX(cropperRef.current.cropper.getData().scaleX === -1 ? 1 : -1); hapticFeedback(); }}
-              className="w-9 h-9 rounded-full bg-black/60 backdrop-blur-xl flex items-center justify-center text-white/90 hover:text-white border border-white/10 transition-transform active:scale-90"
+              className="w-9 h-9 rounded-full bg-black/60 backdrop-blur-xl flex items-center justify-center text-white/90 hover:text-white border border-white/10 transition-transform active:scale-90 shadow-lg shadow-black/20"
               title="Flip Horizontal"
             >
               <FlipHorizontal className="w-4 h-4" />
             </button>
             <button 
               onClick={() => { cropperRef.current?.cropper.scaleY(cropperRef.current.cropper.getData().scaleY === -1 ? 1 : -1); hapticFeedback(); }}
-              className="w-9 h-9 rounded-full bg-black/60 backdrop-blur-xl flex items-center justify-center text-white/90 hover:text-white border border-white/10 transition-transform active:scale-90"
+              className="w-9 h-9 rounded-full bg-black/60 backdrop-blur-xl flex items-center justify-center text-white/90 hover:text-white border border-white/10 transition-transform active:scale-90 shadow-lg shadow-black/20"
               title="Flip Vertical"
             >
               <FlipVertical className="w-4 h-4" />
             </button>
             <button 
               onClick={() => { cropperRef.current?.cropper.reset(); setAspect("free"); hapticFeedback(); }}
-              className="w-9 h-9 rounded-full bg-black/60 backdrop-blur-xl flex items-center justify-center text-[#FFD700] border border-[#FFD700]/30 transition-transform active:scale-90 mt-2"
+              className="w-9 h-9 rounded-full bg-[#FFD700]/10 backdrop-blur-xl flex items-center justify-center text-[#FFD700] border border-[#FFD700]/30 transition-transform active:scale-90 mt-2 shadow-lg shadow-black/20"
               title="Reset Crop"
             >
               <RotateCcw className="w-4 h-4" />
@@ -323,7 +349,7 @@ export const ImageCropModal = memo(function ImageCropModal({
           </div>
         )}
 
-        <div className="w-full h-full relative" style={{ filter: isComparing ? "none" : combinedFilter }}>
+        <div className="w-full h-full relative" style={{ filter: isComparing ? "none" : combinedFilter, transition: "filter 0.2s" }}>
           <Cropper
             src={imageSrc}
             style={{ height: "100%", width: "100%" }}
@@ -419,10 +445,10 @@ export const ImageCropModal = memo(function ImageCropModal({
         `}</style>
       </div>
 
-      <div className="shrink-0 bg-[#0a0a0a] border-t border-white/5 pb-6 shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
-        <div className="h-[100px] flex items-center justify-center border-b border-white/5">
+      <div className="shrink-0 bg-[#0a0a0a] border-t border-white/5 pb-6 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] z-[150]">
+        <div className="h-[100px] flex items-center justify-center border-b border-white/5 relative">
           {activeTab === "crop" && (
-            <div className="flex items-center gap-3 px-4 w-full overflow-x-auto no-scrollbar animate-in fade-in slide-in-from-left-4 py-2">
+            <div className="flex items-center gap-3 px-4 w-full overflow-x-auto no-scrollbar animate-in fade-in slide-in-from-left-4 py-2 absolute inset-0">
               <button
                 onClick={() => { setAspect("free"); hapticFeedback(); }}
                 className={`flex flex-col items-center justify-center gap-2 w-16 h-[72px] rounded-2xl shrink-0 transition-all ${aspect === "free" ? "bg-white/10 text-[#FFD700] shadow-sm shadow-[#FFD700]/10" : "hover:bg-white/5 text-white/60 hover:text-white"}`}
@@ -466,35 +492,39 @@ export const ImageCropModal = memo(function ImageCropModal({
           )}
 
           {activeTab === "edit" && (
-            activeTool ? renderToolSlider() : (
-              <div className="flex items-center gap-4 px-6 w-full overflow-x-auto no-scrollbar animate-in fade-in slide-in-from-left-4">
-                {[
-                  { id: "rotate", icon: RotateCw, label: "Rotate" },
-                  { id: "brightness", icon: Sun, label: "Brightness" },
-                  { id: "contrast", icon: Sliders, label: "Contrast" },
-                  { id: "saturation", icon: Droplet, label: "Saturation" },
-                  { id: "warmth", icon: Thermometer, label: "Warmth" },
-                  { id: "vignette", icon: Focus, label: "Vignette" },
-                  { id: "bgBlur", icon: Aperture, label: "Bg Blur" },
-                ].map((tool) => (
-                  <button
-                    key={tool.id}
-                    type="button"
-                    onClick={() => setActiveTool(tool.id as EditTool)}
-                    className="flex flex-col items-center gap-1.5 shrink-0 text-white/60 hover:text-[#FFD700] transition-colors"
-                  >
-                    <div className="w-12 h-12 rounded-2xl bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors">
-                      <tool.icon className="w-5 h-5" />
-                    </div>
-                    <span className="text-[10px] font-semibold tracking-wide">{tool.label}</span>
-                  </button>
-                ))}
-              </div>
-            )
+            <div className="absolute inset-0 flex items-center justify-center">
+              {activeTool ? renderToolSlider() : (
+                <div className="flex items-center gap-4 px-6 w-full overflow-x-auto no-scrollbar animate-in fade-in slide-in-from-left-4 h-full">
+                  {[
+                    { id: "rotate", icon: RotateCw, label: "Rotate" },
+                    { id: "brightness", icon: Sun, label: "Brightness" },
+                    { id: "contrast", icon: Sliders, label: "Contrast" },
+                    { id: "saturation", icon: Droplet, label: "Saturation" },
+                    { id: "warmth", icon: Thermometer, label: "Warmth" },
+                    { id: "tint", icon: Palette, label: "Tint" },
+                    { id: "fade", icon: CloudFog, label: "Fade" },
+                    { id: "vignette", icon: Focus, label: "Vignette" },
+                    { id: "bgBlur", icon: Aperture, label: "Bg Blur" },
+                  ].map((tool) => (
+                    <button
+                      key={tool.id}
+                      type="button"
+                      onClick={() => setActiveTool(tool.id as EditTool)}
+                      className="flex flex-col items-center gap-1.5 shrink-0 text-white/60 hover:text-[#FFD700] transition-colors"
+                    >
+                      <div className="w-12 h-12 rounded-2xl bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors">
+                        <tool.icon className="w-5 h-5" />
+                      </div>
+                      <span className="text-[10px] font-semibold tracking-wide">{tool.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
 
           {activeTab === "filter" && (
-            <div className="flex items-center gap-3 px-4 w-full overflow-x-auto no-scrollbar animate-in fade-in slide-in-from-left-4 py-2">
+            <div className="flex items-center gap-3 px-4 w-full overflow-x-auto no-scrollbar animate-in fade-in slide-in-from-left-4 py-2 absolute inset-0">
               {FILTERS.map((f) => (
                 <div key={f.name} className="flex flex-col items-center gap-1.5 shrink-0">
                   <button
