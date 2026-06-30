@@ -16,9 +16,10 @@ import { USER_TIMEZONES } from "@/lib/timezones";
 import { CameraOverlay } from "@/components/CameraOverlay";
 import { StoryViewer } from "@/components/StoryViewer";
 import { AvatarNoteModal } from "@/components/AvatarNoteModal";
-import { isAutumnAmberTheme, isPetrichorTheme } from "@/lib/app-theme";
+import { isAutumnAmberTheme, isPetrichorTheme, isSnowfallTheme } from "@/lib/app-theme";
 import { AutumnHomeDecor, AutumnBranch } from "@/components/AutumnHomeDecor";
 import { PetrichorHomeDecor } from "@/components/PetrichorHomeDecor";
+import { SnowflakeDecor } from "@/components/SnowfallOverlay";
 
 
 export default memo(function Home() {
@@ -201,6 +202,7 @@ export default memo(function Home() {
 
   const isAutumnAmber = isAutumnAmberTheme(appTheme);
   const isPetrichor = isPetrichorTheme(appTheme);
+  const isSnowfall = isSnowfallTheme(appTheme);
 
   return (
     <div className="max-w-[470px] mx-auto pb-20 md:pb-6 relative min-h-[100dvh]">
@@ -398,6 +400,11 @@ export default memo(function Home() {
                 {isAutumnAmber && (
                   <div className="absolute -top-4 -right-4 w-20 h-20 opacity-30 pointer-events-none rotate-12">
                     <AutumnBranch />
+                  </div>
+                )}
+                {isSnowfall && (
+                  <div className="absolute top-2 right-2 w-12 h-12 opacity-20 pointer-events-none">
+                    <SnowflakeDecor className="w-full h-full text-blue-100" />
                   </div>
                 )}
               </motion.div>

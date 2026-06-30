@@ -8,6 +8,22 @@ const SNOWFLAKE_SVGS = [
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"><path d="m10 20-3-3 3-3"/><path d="M12 22V2"/><path d="m14 20 3-3-3-3"/><path d="m5 17-3-3 3-3"/><path d="M2 12h20"/><path d="m19 17 3-3-3-3"/><path d="m10 4-3 3 3 3"/><path d="m14 4 3 3-3 3"/></svg>
 ];
 
+export const SnowflakeDecor = ({ className = "w-full h-full text-blue-200" }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" className={className} style={{ filter: "drop-shadow(0px 2px 4px rgba(255,255,255,0.8))" }}>
+    <path d="M12 2v20"/><path d="M4 12h16"/><path d="m19.07 4.93-14.14 14.14"/><path d="M4.93 4.93l14.14 14.14"/><path d="m7.76 7.76 2.12-2.12"/><path d="m16.24 16.24-2.12 2.12"/><path d="m7.76 16.24 2.12 2.12"/><path d="m16.24 7.76-2.12-2.12"/>
+  </svg>
+);
+
+export const SnowyPine = ({ className = "" }: { className?: string }) => (
+  <svg viewBox="0 0 200 300" fill="none" className={className} style={{ filter: "drop-shadow(0px 10px 15px rgba(255,255,255,0.2))" }}>
+    <path d="M90 250 L110 250 L105 300 L95 300 Z" fill="#2d3748" />
+    <path d="M100 20 L40 100 L80 100 L30 180 L80 180 L20 260 L180 260 L120 180 L170 180 L120 100 L160 100 Z" fill="#1a365d" />
+    <path d="M100 20 L50 90 Q 75 95, 80 100 L65 100 L100 50 L135 100 L120 100 Q 125 95, 150 90 Z" fill="#e2e8f0" opacity="0.95"/>
+    <path d="M80 100 L40 170 Q 65 175, 80 180 L65 180 L100 120 L135 180 L120 180 Q 135 175, 160 170 Z" fill="#e2e8f0" opacity="0.95"/>
+    <path d="M80 180 L30 250 Q 75 255, 90 260 L110 260 Q 125 255, 170 250 Z" fill="#e2e8f0" opacity="0.95"/>
+  </svg>
+);
+
 type Snowflake = {
   id: number;
   shapeIndex: number;
@@ -95,12 +111,12 @@ export const SnowfallOverlay = memo(function SnowfallOverlay() {
       {/* Background illumination */}
       <div className="absolute inset-0 snowfall-gradient-bg opacity-70" />
 
-      {/* Decorative Snowman and Penguin */}
-      <div className="absolute bottom-[80px] left-8 text-5xl opacity-30 drop-shadow-[0_0_15px_rgba(255,255,255,0.6)] animate-pulse" style={{ animationDuration: '4s' }}>
-        ⛄
+      {/* Decorative Snowy Pines */}
+      <div className="absolute bottom-[-20px] left-[-20px] w-40 h-60 opacity-60">
+        <SnowyPine />
       </div>
-      <div className="absolute bottom-[80px] right-8 text-4xl opacity-30 drop-shadow-[0_0_15px_rgba(255,255,255,0.6)] animate-pulse" style={{ animationDuration: '5s' }}>
-        🐧
+      <div className="absolute bottom-[-10px] right-[-10px] w-32 h-48 opacity-50 rotate-[-5deg]">
+        <SnowyPine />
       </div>
 
       {/* Frost Vignette (Glassmorphism edges) */}
