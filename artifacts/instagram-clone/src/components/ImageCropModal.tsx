@@ -1,208 +1,436 @@
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { Check, X, ZoomIn, ZoomOut } from "lucide-react";
+import { 
+  Check, X, ZoomIn, ZoomOut, RotateCw, Maximize, Settings2, 
+  Image as ImageIcon, Crop, Sun, Sliders, Droplet, Thermometer, ChevronLeft, Wand2, Eye, Aperture 
+} from "lucide-react";
+import Cropper, { Area } from "react-easy-crop";
 
 export type CropAspect = "free" | "1:1" | "4:5";
 
 type Props = {
   imageSrc: string;
   title?: string;
-  /** Default crop frame — use 1:1 for profile photos */
   initialAspect?: CropAspect;
   onCancel: () => void;
   onApply: (croppedDataUrl: string) => void;
 };
 
-const ASPECT: Record<CropAspect, number | null> = {
-  free: null,
-  "1:1": 1,
-  "4:5": 4 / 5,
+const FILTERS = [
+  { name: "Normal", value: "none" },
+  { name: "Vintage", value: "sepia(0.5) contrast(1.1) brightness(0.9) saturate(1.2)" },
+  { name: "Vibrant", value: "saturate(1.5) contrast(1.1)" },
+  { name: "Noir", value: "grayscale(1) contrast(1.2)" },
+  { name: "Fade", value: "contrast(0.8) brightness(1.1) saturate(0.8)" },
+];
+
+const getRadianAngle = (degreeValue: number) => {
+  return (degreeValue * Math.PI) / 180;
 };
+
+const getCroppedImg = async (
+  imageSrc: string,
+  pixelCrop: Area,
+  rotation: number = 0,
+  filter: string = "none",
+  bgBlur: number = 30
+): Promise<string> => {
+  const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = (e) => reject(e);
+    img.src = imageSrc;
+  });
+
+  const offscreen = document.createElement("canvas");
+  const offCtx = offscreen.getContext("2d")!;
+  const maxSize = Math.max(image.width, image.height);
+  const safeArea = 2 * ((maxSize / 2) * Math.sqrt(2));
+
+  offscreen.width = safeArea;
+  offscreen.height = safeArea;
+
+  offCtx.translate(safeArea / 2, safeArea / 2);
+  offCtx.rotate(getRadianAngle(rotation));
+  offCtx.translate(-safeArea / 2, -safeArea / 2);
+  offCtx.drawImage(
+    image,
+    safeArea / 2 - image.width * 0.5,
+    safeArea / 2 - image.height * 0.5
+  );
+
+  const canvas = document.createElement("canvas");
+  canvas.width = pixelCrop.width;
+  canvas.height = pixelCrop.height;
+  const ctx = canvas.getContext("2d")!;
+
+  ctx.filter = `blur(${bgBlur}px) brightness(0.6) ${filter}`;
+  ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+  ctx.filter = filter;
+
+  let sx = pixelCrop.x + safeArea / 2 - image.width * 0.5;
+  let sy = pixelCrop.y + safeArea / 2 - image.height * 0.5;
+  let sw = pixelCrop.width;
+  let sh = pixelCrop.height;
+  let dx = 0;
+  let dy = 0;
+  let dw = pixelCrop.width;
+  let dh = pixelCrop.height;
+
+  if (sx < 0) {
+    dx = -sx;
+    sw += sx;
+    dw += sx;
+    sx = 0;
+  }
+  if (sy < 0) {
+    dy = -sy;
+    sh += sy;
+    dh += sy;
+    sy = 0;
+  }
+  if (sx + sw > offscreen.width) {
+    const diff = sx + sw - offscreen.width;
+    sw -= diff;
+    dw -= diff;
+  }
+  if (sy + sh > offscreen.height) {
+    const diff = sy + sh - offscreen.height;
+    sh -= diff;
+    dh -= diff;
+  }
+
+  if (sw > 0 && sh > 0) {
+    ctx.drawImage(offscreen, sx, sy, sw, sh, dx, dy, dw, dh);
+  }
+
+  return canvas.toDataURL("image/jpeg", 0.92);
+};
+
+type EditTool = "rotate" | "brightness" | "contrast" | "saturation" | "warmth" | "bgBlur";
 
 export const ImageCropModal = memo(function ImageCropModal({
   imageSrc,
-  title = "Crop photo",
+  title = "Edit photo",
   initialAspect = "4:5",
   onCancel,
   onApply,
 }: Props) {
   const [aspect, setAspect] = useState<CropAspect>(initialAspect);
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
-  const [baseScale, setBaseScale] = useState(1);
-  const [natural, setNatural] = useState({ w: 0, h: 0 });
-  const [offset, setOffset] = useState({ x: 0, y: 0 });
-  const [dragging, setDragging] = useState(false);
-  const dragStart = useRef({ x: 0, y: 0, ox: 0, oy: 0 });
-  const imgRef = useRef<HTMLImageElement>(null);
-  const frameRef = useRef<HTMLDivElement>(null);
+  const [rotation, setRotation] = useState(0);
+  
+  const [presetFilter, setPresetFilter] = useState(FILTERS[0].value);
+  const [adjustments, setAdjustments] = useState({
+    brightness: 100,
+    contrast: 100,
+    saturation: 100,
+    warmth: 0,
+    bgBlur: 30,
+  });
 
-  const totalScale = baseScale * zoom;
-
-  const fitImage = useCallback(() => {
-    const img = imgRef.current;
-    const frame = frameRef.current;
-    if (!img?.naturalWidth || !frame) return;
-    setNatural({ w: img.naturalWidth, h: img.naturalHeight });
-    const fit = Math.max(frame.clientWidth / img.naturalWidth, frame.clientHeight / img.naturalHeight);
-    setBaseScale(fit);
-    setZoom(1);
-    setOffset({ x: 0, y: 0 });
-  }, []);
+  const [objectFit, setObjectFit] = useState<"cover" | "contain">("cover");
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
+  const [imageAspect, setImageAspect] = useState<number>(4 / 3);
+  const [isInteracting, setIsInteracting] = useState(false);
+  const [activeTab, setActiveTab] = useState<"crop" | "edit" | "filter">("crop");
+  const [activeTool, setActiveTool] = useState<EditTool | null>(null);
+  const [isComparing, setIsComparing] = useState(false);
+  const [processing, setProcessing] = useState(false);
 
   useEffect(() => {
     setAspect(initialAspect);
-  }, [imageSrc, initialAspect]);
+  }, [initialAspect]);
 
-  useEffect(() => {
-    setZoom(1);
-    setOffset({ x: 0, y: 0 });
-    const id = requestAnimationFrame(() => fitImage());
-    return () => cancelAnimationFrame(id);
-  }, [imageSrc, aspect, fitImage]);
+  const onCropComplete = useCallback((_croppedArea: Area, croppedAreaPixels: Area) => {
+    setCroppedAreaPixels(croppedAreaPixels);
+  }, []);
 
-  const onPointerDown = (e: React.PointerEvent) => {
-    setDragging(true);
-    dragStart.current = { x: e.clientX, y: e.clientY, ox: offset.x, oy: offset.y };
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  const onMediaLoaded = useCallback((mediaSize: { width: number; height: number }) => {
+    setImageAspect(mediaSize.width / mediaSize.height);
+  }, []);
+
+  const combinedFilter = [
+    presetFilter !== "none" ? presetFilter : "",
+    adjustments.brightness !== 100 ? `brightness(${adjustments.brightness}%)` : "",
+    adjustments.contrast !== 100 ? `contrast(${adjustments.contrast}%)` : "",
+    adjustments.saturation !== 100 ? `saturate(${adjustments.saturation}%)` : "",
+    adjustments.warmth > 0 ? `sepia(${adjustments.warmth}%)` : "",
+  ].filter(Boolean).join(" ") || "none";
+
+  const applyCrop = useCallback(async () => {
+    if (!croppedAreaPixels || processing) return;
+    setProcessing(true);
+    try {
+      const croppedImage = await getCroppedImg(imageSrc, croppedAreaPixels, rotation, combinedFilter, adjustments.bgBlur);
+      onApply(croppedImage);
+    } catch (e) {
+      console.error(e);
+      setProcessing(false);
+    }
+  }, [croppedAreaPixels, imageSrc, rotation, combinedFilter, adjustments.bgBlur, onApply, processing]);
+
+  const hapticFeedback = () => {
+    if (typeof navigator !== "undefined" && navigator.vibrate) {
+      navigator.vibrate(20);
+    }
   };
 
-  const onPointerMove = (e: React.PointerEvent) => {
-    if (!dragging) return;
-    setOffset({
-      x: dragStart.current.ox + (e.clientX - dragStart.current.x),
-      y: dragStart.current.oy + (e.clientY - dragStart.current.y),
-    });
+  const currentAspectValue =
+    aspect === "1:1" ? 1 : aspect === "4:5" ? 4 / 5 : imageAspect;
+
+  const updateAdjustment = (key: keyof typeof adjustments, value: number) => {
+    setAdjustments((prev) => ({ ...prev, [key]: value }));
+    hapticFeedback();
   };
 
-  const onPointerUp = () => setDragging(false);
+  const autoEnhance = () => {
+    setAdjustments((prev) => ({
+      ...prev,
+      brightness: 110,
+      contrast: 115,
+      saturation: 110,
+      warmth: 0,
+    }));
+    setPresetFilter("none");
+    hapticFeedback();
+  };
 
-  const applyCrop = useCallback(() => {
-    const img = imgRef.current;
-    const frame = frameRef.current;
-    if (!img || !img.complete || !frame) return;
+  const renderToolSlider = () => {
+    if (!activeTool) return null;
 
-    const frameW = frame.clientWidth;
-    const frameH = frame.clientHeight;
-    const ratio = ASPECT[aspect];
-    let cropW = frameW;
-    let cropH = frameH;
-    if (ratio) {
-      if (frameW / frameH > ratio) {
-        cropH = frameH;
-        cropW = frameH * ratio;
-      } else {
-        cropW = frameW;
-        cropH = frameW / ratio;
-      }
+    if (activeTool === "rotate") {
+      return (
+        <div className="flex items-center gap-4 w-full px-6 animate-in fade-in slide-in-from-right-4 duration-200">
+          <button onClick={() => setActiveTool(null)} className="p-2 -ml-2 text-white/70 hover:text-white">
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <span className="text-xs text-white/50 w-8">{rotation}°</span>
+          <input 
+            type="range" min="-45" max="45" value={rotation}
+            onChange={(e) => {
+              setRotation(Number(e.target.value));
+              hapticFeedback();
+            }}
+            className="flex-1 accent-primary touch-none h-2"
+          />
+          <button
+            type="button"
+            onClick={() => {
+              setRotation((r) => (r + 90) % 360);
+              hapticFeedback();
+            }}
+            className="p-2 bg-white/10 rounded-full text-white shrink-0"
+          >
+            <RotateCw className="w-4 h-4" />
+          </button>
+        </div>
+      );
     }
 
-    const canvas = document.createElement("canvas");
-    const outW = Math.min(1600, Math.round(cropW * 2));
-    const outH = Math.round(outW * (cropH / cropW));
-    canvas.width = outW;
-    canvas.height = outH;
+    const config = {
+      brightness: { min: 0, max: 200, val: adjustments.brightness, label: "Brightness" },
+      contrast: { min: 0, max: 200, val: adjustments.contrast, label: "Contrast" },
+      saturation: { min: 0, max: 200, val: adjustments.saturation, label: "Saturation" },
+      warmth: { min: 0, max: 100, val: adjustments.warmth, label: "Warmth" },
+      bgBlur: { min: 0, max: 100, val: adjustments.bgBlur, label: "Bg Blur" },
+    }[activeTool as keyof typeof adjustments];
 
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const displayedW = img.naturalWidth * totalScale;
-    const displayedH = img.naturalHeight * totalScale;
-    const imgLeft = (frameW - displayedW) / 2 + offset.x;
-    const imgTop = (frameH - displayedH) / 2 + offset.y;
-    const cropLeft = (frameW - cropW) / 2;
-    const cropTop = (frameH - cropH) / 2;
-
-    const sx = ((cropLeft - imgLeft) / displayedW) * img.naturalWidth;
-    const sy = ((cropTop - imgTop) / displayedH) * img.naturalHeight;
-    const sw = (cropW / displayedW) * img.naturalWidth;
-    const sh = (cropH / displayedH) * img.naturalHeight;
-
-    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, outW, outH);
-    onApply(canvas.toDataURL("image/jpeg", 0.92));
-  }, [aspect, offset, totalScale, onApply]);
-
-  const frameAspectClass =
-    aspect === "1:1"
-      ? "aspect-square max-h-[min(55vh,400px)]"
-      : aspect === "4:5"
-        ? "aspect-[4/5] max-h-[min(55vh,500px)]"
-        : "aspect-[3/4] max-h-[min(55vh,480px)]";
+    return (
+      <div className="flex flex-col w-full px-6 gap-2 animate-in fade-in slide-in-from-right-4 duration-200">
+        <div className="flex items-center justify-between">
+          <button onClick={() => setActiveTool(null)} className="p-1 -ml-1 text-white/70 hover:text-white flex items-center gap-1">
+            <ChevronLeft className="w-4 h-4" />
+            <span className="text-xs font-semibold">{config.label}</span>
+          </button>
+          <span className="text-xs text-white/50">{Math.round(config.val)}</span>
+        </div>
+        <div className="flex items-center gap-4 w-full">
+          <input 
+            type="range" min={config.min} max={config.max} value={config.val}
+            onChange={(e) => updateAdjustment(activeTool as keyof typeof adjustments, Number(e.target.value))}
+            onDoubleClick={() => updateAdjustment(activeTool as keyof typeof adjustments, activeTool === 'warmth' ? 0 : 100)}
+            className="flex-1 accent-primary touch-none h-2"
+          />
+        </div>
+      </div>
+    );
+  };
 
   return createPortal(
-    <div className="fixed inset-0 z-[130] bg-black/95 flex flex-col safe-area-top safe-area-bottom">
+    <div className="fixed inset-0 z-[130] bg-black/95 flex flex-col safe-area-top safe-area-bottom select-none">
       <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 shrink-0">
         <button type="button" onClick={onCancel} className="p-2 text-white/80 hover:text-white" aria-label="Cancel">
           <X className="w-6 h-6" />
         </button>
         <p className="text-sm font-semibold text-white">{title}</p>
-        <button type="button" onClick={applyCrop} className="p-2 text-primary font-semibold text-sm flex items-center gap-1">
-          <Check className="w-5 h-5" />
-          Done
-        </button>
-      </div>
-
-      <div className="flex gap-2 justify-center py-3 px-4 shrink-0">
-        {(["free", "1:1", "4:5"] as CropAspect[]).map((a) => (
-          <button
-            key={a}
-            type="button"
-            onClick={() => setAspect(a)}
-            className={`px-4 py-1.5 rounded-full text-xs font-semibold ${
-              aspect === a ? "bg-primary text-primary-foreground" : "bg-white/15 text-white"
-            }`}
+        <div className="flex items-center gap-1">
+          <button 
+            type="button" 
+            onPointerDown={() => setIsComparing(true)}
+            onPointerUp={() => setIsComparing(false)}
+            onPointerLeave={() => setIsComparing(false)}
+            className="p-2 text-white/80 hover:text-white transition-opacity active:opacity-50"
+            aria-label="Compare"
           >
-            {a === "free" ? "Free" : a}
+            <Eye className="w-5 h-5" />
           </button>
-        ))}
-      </div>
-
-      <div className="flex-1 flex items-center justify-center px-4 min-h-0">
-        <div
-          ref={frameRef}
-          className={`relative w-full max-w-md mx-auto overflow-hidden rounded-xl bg-black ${frameAspectClass}`}
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerLeave={onPointerUp}
-        >
-          <img
-            ref={imgRef}
-            src={imageSrc}
-            alt=""
-            className="absolute left-1/2 top-1/2 max-w-none select-none touch-none origin-center"
-            style={{
-              width: natural.w || undefined,
-              height: natural.h || undefined,
-              transform: `translate(calc(-50% + ${offset.x}px), calc(-50% + ${offset.y}px)) scale(${totalScale})`,
-            }}
-            draggable={false}
-            onLoad={fitImage}
-          />
-          <div className="absolute inset-0 pointer-events-none ring-2 ring-white/40 ring-inset" />
+          <button 
+            type="button" 
+            onClick={autoEnhance} 
+            className="p-2 text-white/80 hover:text-white"
+            aria-label="Auto Enhance"
+          >
+            <Wand2 className="w-5 h-5" />
+          </button>
+          <button 
+            type="button" 
+            onClick={applyCrop} 
+            disabled={processing}
+            className="p-2 text-primary font-semibold text-sm flex items-center gap-1 disabled:opacity-50"
+          >
+            {processing ? "Saving..." : <><Check className="w-5 h-5" /> Done</>}
+          </button>
         </div>
       </div>
 
-      <p className="text-center text-xs text-white/60 px-4 pb-2 shrink-0">Drag to reposition · pinch or use zoom</p>
+      <div className="flex-1 relative w-full overflow-hidden bg-black min-h-0" style={{ filter: isComparing ? "none" : combinedFilter }}>
+        <Cropper
+          image={imageSrc}
+          crop={crop}
+          zoom={zoom}
+          rotation={rotation}
+          aspect={currentAspectValue}
+          objectFit={objectFit}
+          onCropChange={(c) => { setCrop(c); hapticFeedback(); }}
+          onRotationChange={(r) => { setRotation(r); hapticFeedback(); }}
+          onCropComplete={onCropComplete}
+          onZoomChange={(z) => { setZoom(z); hapticFeedback(); }}
+          onMediaLoaded={onMediaLoaded}
+          onInteractionStart={() => setIsInteracting(true)}
+          onInteractionEnd={() => setIsInteracting(false)}
+          showGrid={isInteracting}
+          style={{
+            containerStyle: { backgroundColor: "transparent" },
+            cropAreaStyle: { 
+              border: "1px solid rgba(255, 255, 255, 0.4)",
+              boxShadow: "0 0 0 9999px rgba(0, 0, 0, 0.7)" 
+            },
+          }}
+        />
+      </div>
 
-      <div className="flex justify-center gap-4 pb-6 shrink-0">
-        <button
-          type="button"
-          onClick={() => setZoom((s) => Math.max(0.5, s - 0.15))}
-          className="p-3 rounded-full bg-white/15 text-white"
-          aria-label="Zoom out"
-        >
-          <ZoomOut className="w-5 h-5" />
-        </button>
-        <button
-          type="button"
-          onClick={() => setZoom((s) => Math.min(3, s + 0.15))}
-          className="p-3 rounded-full bg-white/15 text-white"
-          aria-label="Zoom in"
-        >
-          <ZoomIn className="w-5 h-5" />
-        </button>
+      <div className="shrink-0 bg-black/90 backdrop-blur-xl border-t border-white/10 pb-6">
+        <div className="h-[72px] flex items-center justify-center border-b border-white/5">
+          {activeTab === "crop" && (
+            <div className="flex items-center gap-2 px-4 w-full overflow-x-auto no-scrollbar animate-in fade-in">
+              <button
+                type="button"
+                onClick={() => {
+                  setObjectFit(objectFit === "cover" ? "contain" : "cover");
+                  hapticFeedback();
+                }}
+                className="px-4 py-2 rounded-full text-xs font-semibold bg-white/10 text-white flex items-center gap-1.5 shrink-0 mr-2"
+              >
+                <Maximize className="w-3.5 h-3.5" />
+                {objectFit === "cover" ? "Fit" : "Fill"}
+              </button>
+              {(["free", "1:1", "4:5"] as CropAspect[]).map((a) => (
+                <button
+                  key={a}
+                  type="button"
+                  onClick={() => {
+                    setAspect(a);
+                    hapticFeedback();
+                  }}
+                  className={`px-4 py-2 rounded-full text-xs font-semibold shrink-0 transition-colors ${
+                    aspect === a ? "bg-primary text-primary-foreground" : "bg-white/15 text-white"
+                  }`}
+                >
+                  {a === "free" ? "Original" : a}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {activeTab === "edit" && (
+            activeTool ? renderToolSlider() : (
+              <div className="flex items-center gap-6 px-6 w-full overflow-x-auto no-scrollbar animate-in fade-in">
+                {[
+                  { id: "rotate", icon: RotateCw, label: "Rotate" },
+                  { id: "brightness", icon: Sun, label: "Brightness" },
+                  { id: "contrast", icon: Sliders, label: "Contrast" },
+                  { id: "saturation", icon: Droplet, label: "Saturation" },
+                  { id: "warmth", icon: Thermometer, label: "Warmth" },
+                  { id: "bgBlur", icon: Aperture, label: "Bg Blur" },
+                ].map((tool) => (
+                  <button
+                    key={tool.id}
+                    type="button"
+                    onClick={() => setActiveTool(tool.id as EditTool)}
+                    className="flex flex-col items-center gap-1.5 shrink-0 text-white/70 hover:text-white"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center">
+                      <tool.icon className="w-5 h-5" />
+                    </div>
+                    <span className="text-[10px] font-medium">{tool.label}</span>
+                  </button>
+                ))}
+              </div>
+            )
+          )}
+
+          {activeTab === "filter" && (
+            <div className="flex items-center gap-3 px-4 w-full overflow-x-auto no-scrollbar animate-in fade-in">
+              {FILTERS.map((f) => (
+                <button
+                  key={f.name}
+                  type="button"
+                  onClick={() => {
+                    setPresetFilter(f.value);
+                    hapticFeedback();
+                  }}
+                  className={`px-5 py-2 rounded-full text-xs font-semibold shrink-0 transition-all ${
+                    presetFilter === f.value ? "bg-primary text-primary-foreground scale-105 shadow-lg shadow-primary/20" : "bg-white/10 text-white hover:bg-white/20"
+                  }`}
+                >
+                  {f.name}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="flex justify-around items-center pt-3 px-2">
+          <button
+            type="button"
+            onClick={() => { setActiveTab("crop"); setActiveTool(null); }}
+            className={`flex flex-col items-center gap-1.5 p-2 rounded-xl transition-colors ${activeTab === "crop" ? "text-primary" : "text-white/50"}`}
+          >
+            <Crop className="w-5 h-5" />
+            <span className="text-[10px] font-medium">Crop</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("filter")}
+            className={`flex flex-col items-center gap-1.5 p-2 rounded-xl transition-colors ${activeTab === "filter" ? "text-primary" : "text-white/50"}`}
+          >
+            <ImageIcon className="w-5 h-5" />
+            <span className="text-[10px] font-medium">Filter</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("edit")}
+            className={`flex flex-col items-center gap-1.5 p-2 rounded-xl transition-colors ${activeTab === "edit" ? "text-primary" : "text-white/50"}`}
+          >
+            <Settings2 className="w-5 h-5" />
+            <span className="text-[10px] font-medium">Edit</span>
+          </button>
+        </div>
       </div>
     </div>,
-    document.body,
+    document.body
   );
 });
