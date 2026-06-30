@@ -152,124 +152,93 @@ export const ImageCropModal = memo(function ImageCropModal({
     }
   }, [activeTab]);
 
-  // AI Retouch Processing
   const processAiRetouch = async () => {
     if (pathRef.current.length === 0 || !canvasRect || !currentImageSrc) return;
     setProcessing(true);
-      // Super-fast Local Inpainting (Iterative Edge Fill)
-      // Bypasses Hugging Face completely for instant, free results
-      setTimeout(() => {
-        try {
-          const img = new Image();
-          img.crossOrigin = "anonymous";
-          img.src = currentImageSrc;
-          img.onload = () => {
-             const W = img.width;
-             const H = img.height;
+    
+    try {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.src = currentImageSrc;
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+      });
 
-             // Scale coordinates to image resolution
-             const scaleX = W / canvasRect.width;
-             const scaleY = H / canvasRect.height;
-             const brushR = Math.round((brushSize * (scaleX + scaleY)) / 2);
+      const W = img.width;
+      const H = img.height;
+      const scaleX = W / canvasRect.width;
+      const scaleY = H / canvasRect.height;
+      const brushR = Math.round((brushSize * (scaleX + scaleY)) / 2);
 
-             const maskCanvas = document.createElement('canvas');
-             maskCanvas.width = W; maskCanvas.height = H;
-             const mCtx = maskCanvas.getContext('2d')!;
-             mCtx.lineCap = "round"; mCtx.lineJoin = "round";
-             mCtx.lineWidth = brushR * 2; mCtx.strokeStyle = "white"; mCtx.fillStyle = "white";
-             mCtx.beginPath();
-             mCtx.moveTo(pathRef.current[0].x * scaleX, pathRef.current[0].y * scaleY);
-             for (let i = 1; i < pathRef.current.length; i++) {
-                 mCtx.lineTo(pathRef.current[i].x * scaleX, pathRef.current[i].y * scaleY);
-             }
-             mCtx.closePath();
-             mCtx.stroke();
-             mCtx.fill(); 
-             const maskData = mCtx.getImageData(0, 0, W, H).data;
-
-             const srcCanvas = document.createElement('canvas');
-             srcCanvas.width = W; srcCanvas.height = H;
-             const sCtx = srcCanvas.getContext('2d')!;
-             sCtx.drawImage(img, 0, 0);
-             const srcData = sCtx.getImageData(0, 0, W, H);
-             const pixels = srcData.data;
-
-             // Find all masked pixels and boundaries
-             const maskedIndices: number[] = [];
-             const maskAlpha = new Uint8Array(W * H);
-             
-             for (let i = 0; i < W * H; i++) {
-               if (maskData[i * 4 + 3] > 128) { // If pixel is masked
-                 maskedIndices.push(i);
-                 maskAlpha[i] = 1;
-               }
-             }
-
-             // Iterative Edge Fill Algorithm (Diffusion)
-             // Rapidly diffuses surrounding colors into the masked area
-             const iterations = Math.min(100, Math.max(30, Math.floor(brushR * 1.5)));
-             
-             for (let iter = 0; iter < iterations; iter++) {
-               for (let i = 0; i < maskedIndices.length; i++) {
-                 const idx = maskedIndices[i];
-                 const x = idx % W;
-                 const y = Math.floor(idx / W);
-                 
-                 let r = 0, g = 0, b = 0, count = 0;
-
-                 // Check 4 neighbors
-                 if (x > 0) { const ni = idx - 1; r += pixels[ni*4]; g += pixels[ni*4+1]; b += pixels[ni*4+2]; count++; }
-                 if (x < W - 1) { const ni = idx + 1; r += pixels[ni*4]; g += pixels[ni*4+1]; b += pixels[ni*4+2]; count++; }
-                 if (y > 0) { const ni = idx - W; r += pixels[ni*4]; g += pixels[ni*4+1]; b += pixels[ni*4+2]; count++; }
-                 if (y < H - 1) { const ni = idx + W; r += pixels[ni*4]; g += pixels[ni*4+1]; b += pixels[ni*4+2]; count++; }
-
-                 if (count > 0) {
-                   pixels[idx * 4] = r / count;
-                   pixels[idx * 4 + 1] = g / count;
-                   pixels[idx * 4 + 2] = b / count;
-                   // Add tiny noise to avoid plastic look
-                   if (iter === iterations - 1) {
-                     const noise = (Math.random() - 0.5) * 8;
-                     pixels[idx * 4] = Math.min(255, Math.max(0, pixels[idx * 4] + noise));
-                     pixels[idx * 4 + 1] = Math.min(255, Math.max(0, pixels[idx * 4 + 1] + noise));
-                     pixels[idx * 4 + 2] = Math.min(255, Math.max(0, pixels[idx * 4 + 2] + noise));
-                   }
-                 }
-               }
-             }
-
-             sCtx.putImageData(srcData, 0, 0);
-             
-             // Soften the edges of the patch slightly
-             const finalCanvas = document.createElement('canvas');
-             finalCanvas.width = W; finalCanvas.height = H;
-             const fCtx = finalCanvas.getContext('2d')!;
-             fCtx.drawImage(img, 0, 0); // Original
-             
-             // Feathered patch overlay
-             fCtx.globalAlpha = 0.95; 
-             fCtx.drawImage(srcCanvas, 0, 0);
-
-             const resultUrl = finalCanvas.toDataURL("image/jpeg", 0.95);
-             setCurrentImageSrc(resultUrl);
-             if (cropperRef.current?.cropper) {
-                cropperRef.current.cropper.replace(resultUrl);
-             }
-             
-             const overlayCtx = retouchCanvasRef.current?.getContext('2d');
-             if (overlayCtx) overlayCtx.clearRect(0, 0, canvasRect.width, canvasRect.height);
-             pathRef.current = [];
-             setProcessing(false);
-          };
-          img.onerror = () => {
-             setProcessing(false);
-             pathRef.current = [];
-          };
-        } catch (err) {
-          setProcessing(false);
-          pathRef.current = [];
+      // Resize original image to max 1024x1024 for faster API upload
+      const MAX_DIM = 1024;
+      let targetW = W;
+      let targetH = H;
+      if (W > MAX_DIM || H > MAX_DIM) {
+        if (W > H) {
+          targetH = Math.round((H * MAX_DIM) / W);
+          targetW = MAX_DIM;
+        } else {
+          targetW = Math.round((W * MAX_DIM) / H);
+          targetH = MAX_DIM;
         }
-      }, 50);
+      }
+
+      const resizedImageCanvas = document.createElement('canvas');
+      resizedImageCanvas.width = targetW; resizedImageCanvas.height = targetH;
+      const resizedCtx = resizedImageCanvas.getContext('2d')!;
+      resizedCtx.drawImage(img, 0, 0, targetW, targetH);
+      const optimizedImageSrc = resizedImageCanvas.toDataURL("image/jpeg", 0.9);
+
+      const maskCanvas = document.createElement('canvas');
+      maskCanvas.width = targetW; maskCanvas.height = targetH;
+      const mCtx = maskCanvas.getContext('2d')!;
+      mCtx.fillStyle = 'black';
+      mCtx.fillRect(0, 0, targetW, targetH);
+      
+      const scaleX_resized = targetW / canvasRect.width;
+      const scaleY_resized = targetH / canvasRect.height;
+      const brushR_resized = Math.round((brushSize * (scaleX_resized + scaleY_resized)) / 2);
+
+      mCtx.lineCap = "round"; mCtx.lineJoin = "round";
+      mCtx.lineWidth = brushR_resized * 2; mCtx.strokeStyle = "white"; mCtx.fillStyle = "white";
+      mCtx.beginPath();
+      mCtx.moveTo(pathRef.current[0].x * scaleX_resized, pathRef.current[0].y * scaleY_resized);
+      for (let i = 1; i < pathRef.current.length; i++) {
+          mCtx.lineTo(pathRef.current[i].x * scaleX_resized, pathRef.current[i].y * scaleY_resized);
+      }
+      mCtx.closePath();
+      mCtx.stroke();
+      mCtx.fill(); 
+
+      const maskDataUrl = maskCanvas.toDataURL("image/jpeg", 0.9);
+      
+      const response = await fetch('/api/ai/inpaint', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          image: optimizedImageSrc,
+          mask: maskDataUrl,
+          prompt: aiPrompt || "clean background, empty, seamless, high quality, pure"
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to process AI request');
+
+      setCurrentImageSrc(data.resultUrl);
+      if (cropperRef.current?.cropper) {
+         cropperRef.current.cropper.replace(data.resultUrl);
+      }
+    } catch (err: any) {
+      alert(err.message || 'AI Processing failed.');
+    } finally {
+      const overlayCtx = retouchCanvasRef.current?.getContext('2d');
+      if (overlayCtx) overlayCtx.clearRect(0, 0, canvasRect.width, canvasRect.height);
+      pathRef.current = [];
+      setProcessing(false);
+    }
   };
 
   const combinedFilter = [
