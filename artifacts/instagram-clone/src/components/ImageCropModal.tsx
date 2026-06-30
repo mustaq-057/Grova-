@@ -86,6 +86,7 @@ export const ImageCropModal = memo(function ImageCropModal({
   onApply,
 }: Props) {
   const [currentImageSrc, setCurrentImageSrc] = useState(imageSrc);
+  const [editHistory, setEditHistory] = useState<string[]>([]);
   const [aspect, setAspect] = useState<CropAspect>(initialAspect);
   const [lockedAspect, setLockedAspect] = useState<number | null>(null);
   const [rotation, setRotation] = useState(0);
@@ -300,6 +301,9 @@ export const ImageCropModal = memo(function ImageCropModal({
                    pixels[idx*4+2] = pixels[idx*4+2] * 0.65 + pixels[sampleIdx*4+2] * 0.35;
                 }
              }
+
+             // Save the current state to history BEFORE applying the edit so we can Undo
+             setEditHistory(prev => [...prev, currentImageSrc]);
 
              // 5. Apply the completed high-quality patch back to the source canvas
              sCtx.putImageData(srcData, minX, minY);
@@ -942,9 +946,30 @@ export const ImageCropModal = memo(function ImageCropModal({
           {activeTab === 'heal' && (
             <div className="flex flex-col items-center justify-center w-full px-6 gap-2 animate-in fade-in h-full">
                
-               <div className="flex flex-col w-full max-w-sm mb-2 mt-1">
-                 <span className="text-[11px] font-bold text-white flex items-center justify-center gap-1.5 uppercase tracking-widest"><Sparkles className="w-4 h-4 text-[#FFD700]" /> AI Magic Eraser</span>
-                 <span className="text-[10px] text-white/50 text-center mt-1 leading-tight">Draw a circle around an object to seamlessly remove it using Generative Fill.</span>
+               <div className="flex items-center justify-between w-full max-w-sm mb-2 mt-1">
+                 <div className="flex flex-col">
+                   <span className="text-[11px] font-bold text-white flex items-center gap-1.5 uppercase tracking-widest"><Sparkles className="w-4 h-4 text-[#FFD700]" /> Magic Eraser</span>
+                   <span className="text-[10px] text-white/50 mt-1 leading-tight">Draw to seamlessly remove objects.</span>
+                 </div>
+                 
+                 <button 
+                   onClick={() => {
+                     if (editHistory.length > 0) {
+                       const previousState = editHistory[editHistory.length - 1];
+                       setCurrentImageSrc(previousState);
+                       setEditHistory(prev => prev.slice(0, -1));
+                       if (cropperRef.current?.cropper) {
+                          cropperRef.current.cropper.replace(previousState);
+                       }
+                       hapticFeedback();
+                     }
+                   }}
+                   disabled={editHistory.length === 0}
+                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-all ${editHistory.length > 0 ? 'bg-[#FFD700]/10 border-[#FFD700]/30 text-[#FFD700] hover:bg-[#FFD700]/20 active:scale-95' : 'bg-transparent border-white/5 text-white/20 cursor-not-allowed'}`}
+                 >
+                   <RotateCcw className="w-3.5 h-3.5" />
+                   <span className="text-[10px] font-bold tracking-widest uppercase">Undo</span>
+                 </button>
                </div>
 
                <div className="flex items-center justify-between w-full max-w-sm mt-1">
