@@ -1,6 +1,18 @@
 import { memo, useEffect, useState, useRef } from "react";
 import { motion } from "framer-motion";
 
+export const PetrichorCloud = ({ className = "" }: { className?: string }) => (
+  <svg viewBox="0 0 100 60" fill="currentColor" className={className} style={{ filter: "drop-shadow(0 8px 16px rgba(0,0,0,0.3))" }}>
+    <path 
+      d="M25 45 Q 15 45, 10 35 Q 5 25, 20 20 Q 30 5, 50 10 Q 75 -5, 85 15 Q 100 20, 95 35 Q 90 45, 80 40 Z" 
+      opacity="0.6"
+    />
+    <path 
+      d="M30 40 Q 20 40, 15 30 Q 10 20, 25 15 Q 35 5, 50 10 Q 70 0, 80 15 Q 95 20, 90 35 Q 85 45, 75 40 Z" 
+      opacity="0.9"
+    />
+  </svg>
+);
 export const PetrichorHomeDecor = memo(function PetrichorHomeDecor() {
   const [wipeCoords, setWipeCoords] = useState<{ x: number, y: number } | null>(null);
   
@@ -39,8 +51,6 @@ export const PetrichorHomeDecor = memo(function PetrichorHomeDecor() {
         className="absolute inset-0 transition-all duration-700 ease-out"
         style={{
           background: "radial-gradient(ellipse at center, transparent 40%, rgba(200, 220, 230, 0.05) 70%, rgba(180, 200, 210, 0.15) 100%)",
-          backdropFilter: "blur(3px)",
-          WebkitBackdropFilter: "blur(3px)",
           // Combine the default oval mask (clear middle, frosted edges) with the dynamic wipe mask
           maskImage: wipeCoords 
             ? `radial-gradient(ellipse at center, transparent 50%, black 100%), radial-gradient(circle 80px at ${wipeCoords.x}px ${wipeCoords.y}px, transparent 100%, black 100%)`
@@ -54,8 +64,15 @@ export const PetrichorHomeDecor = memo(function PetrichorHomeDecor() {
         }}
       />
 
+      <div className="absolute top-[-10px] left-[-20px] w-48 h-32 opacity-40 text-blue-200 pointer-events-none">
+        <PetrichorCloud />
+      </div>
+      <div className="absolute top-[-20px] right-[-30px] w-56 h-40 opacity-30 text-blue-300 pointer-events-none rotate-[10deg]">
+        <PetrichorCloud />
+      </div>
+
       {/* Static Puddles (Bottom) */}
-      <div className="absolute bottom-0 left-0 right-0 h-40 z-0">
+      <div className="absolute bottom-0 left-0 right-0 h-40 z-0 pointer-events-none">
         <motion.div 
           initial={{ opacity: 0 }}
           animate={{ opacity: 0.6 }}

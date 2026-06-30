@@ -18,7 +18,7 @@ import { StoryViewer } from "@/components/StoryViewer";
 import { AvatarNoteModal } from "@/components/AvatarNoteModal";
 import { isAutumnAmberTheme, isPetrichorTheme, isSnowfallTheme } from "@/lib/app-theme";
 import { AutumnHomeDecor, AutumnBranch } from "@/components/AutumnHomeDecor";
-import { PetrichorHomeDecor } from "@/components/PetrichorHomeDecor";
+import { PetrichorHomeDecor, PetrichorCloud } from "@/components/PetrichorHomeDecor";
 import { SnowflakeDecor } from "@/components/SnowfallOverlay";
 
 
@@ -405,6 +405,11 @@ export default memo(function Home() {
                 {isSnowfall && (
                   <div className="absolute top-2 right-2 w-12 h-12 opacity-20 pointer-events-none">
                     <SnowflakeDecor className="w-full h-full text-blue-100" />
+                  </div>
+                )}
+                {isPetrichor && (
+                  <div className="absolute -top-2 -right-4 w-20 h-16 opacity-[0.15] pointer-events-none text-slate-400">
+                    <PetrichorCloud className="w-full h-full" />
                   </div>
                 )}
               </motion.div>
