@@ -3629,7 +3629,7 @@ export default function Messages() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -6, scale: 0.8 }}
               transition={{ type: "spring", stiffness: 420, damping: 26 }}
-              className="fixed bottom-[calc(env(safe-area-inset-bottom,0px)+4.2rem)] left-1/2 -translate-x-1/2 z-[9999] pointer-events-none flex flex-col items-center gap-1"
+              className="fixed bottom-[calc(env(safe-area-inset-bottom,0px)+6.5rem)] left-1/2 -translate-x-1/2 z-[9999] pointer-events-none flex flex-col items-center gap-1"
             >
               <div className="bg-black/75 backdrop-blur-md border border-white/15 rounded-2xl px-4 py-2.5 flex items-center gap-2 shadow-xl">
                 {actionNotif.icon}
@@ -3653,7 +3653,7 @@ export default function Messages() {
                 scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
                 setHasNewMessages(false);
               }}
-              className="absolute right-4 bottom-[calc(env(safe-area-inset-bottom,0px)+4.5rem)] z-40 p-2.5 bg-primary/90 hover:bg-primary text-primary-foreground backdrop-blur-md rounded-full shadow-lg border border-white/10"
+              className="absolute right-4 bottom-[calc(env(safe-area-inset-bottom,0px)+6.5rem)] z-40 p-2.5 bg-primary/90 hover:bg-primary text-primary-foreground backdrop-blur-md rounded-full shadow-lg border border-white/10"
             >
               <ChevronDown className="w-5 h-5" />
             </motion.button>

@@ -651,6 +651,17 @@ export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputPro
         </div>
       )}
 
+      {recording && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="absolute -top-[44px] left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-1.5 bg-destructive/10 backdrop-blur-md text-destructive text-sm font-medium rounded-full z-10 border border-destructive/20"
+        >
+          <div className="w-2.5 h-2.5 bg-destructive rounded-full animate-pulse" />
+          <span>{formatTime(recordingTime)}</span>
+        </motion.div>
+      )}
+
       <div className={`message-input-pill flex items-center gap-[8px] sm:gap-[10px] bg-[#1a1a1a] rounded-[40px] py-[7px] sm:py-[9px] pr-[8px] sm:pr-[14px] pl-[5px] sm:pl-[9px] mx-[4px] md:mx-auto md:w-full md:max-w-[800px] ${scheduledTime ? 'rounded-tl-none rounded-tr-none border border-primary/30 border-t-0' : ''}`}>
         {/* eslint-disable-next-line */}
         <button
@@ -716,16 +727,6 @@ export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputPro
         )}
       </div>
 
-      {recording && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex items-center gap-2 px-4 py-2 mt-2 bg-destructive/10 text-destructive text-sm font-medium rounded-full"
-        >
-          <div className="w-2 h-2 bg-destructive rounded-full animate-pulse" />
-          <span>{formatTime(recordingTime)}</span>
-        </motion.div>
-      )}
 
       {openPicker === "emoji" && (
         <EmojiPicker onSelect={handleEmojiSelect} onClose={() => setOpenPicker(null)} />
