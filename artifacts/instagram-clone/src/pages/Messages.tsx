@@ -625,8 +625,6 @@ export default function Messages() {
     const offset = messages.length;
 
     const container = messagesContainerRef.current;
-    // Store current scroll height before adding messages
-    const scrollHeightBefore = container?.scrollHeight ?? 0;
 
     stickToBottomRef.current = false;
     isNearBottomRef.current = false;
@@ -643,7 +641,12 @@ export default function Messages() {
         return;
       }
 
-      prependScrollHeightRef.current = scrollHeightBefore;
+      // Force scrollTop to 1 to ensure native overflow-anchor engages
+      if (messagesContainerRef.current && messagesContainerRef.current.scrollTop === 0) {
+        messagesContainerRef.current.scrollTop = 1;
+      }
+      
+      prependScrollHeightRef.current = messagesContainerRef.current?.scrollHeight ?? 0;
 
       setMessages((prev) => {
         const existing = new Set(prev.map((m) => m.id));
@@ -1470,29 +1473,15 @@ export default function Messages() {
     previousMessagesLengthRef.current = messages.length;
   }, [messages, user?.id, partnerId, highlightParam]);
 
-  // Restore scroll position after prepending older messages (load more / jump-to-memory)
-  useLayoutEffect(() => {
-    const before = prependScrollHeightRef.current;
-    if (before === null || !isPrependingRef.current) return;
-    prependScrollHeightRef.current = null;
-    const container = messagesContainerRef.current;
-    if (!container) return;
-
-    // The browser has now rendered the prepended messages at the top.
-    // Adjust scrollTop by the height difference so the user stays in place.
-    const diff = container.scrollHeight - before;
-    if (diff > 0) {
-      container.scrollTop += diff;
+  // Native scroll anchoring handles prepended messages.
+  // We just need to clear isPrependingRef so IntersectionObserver can fire again.
+  useEffect(() => {
+    if (isPrependingRef.current) {
+      // Allow browser to perform layout and scroll anchoring
+      requestAnimationFrame(() => {
+        isPrependingRef.current = false;
+      });
     }
-
-    // Double-check after a paint in case images/lazy content shifted things
-    requestAnimationFrame(() => {
-      const lateDiff = container.scrollHeight - before - diff;
-      if (lateDiff > 0) {
-        container.scrollTop += lateDiff;
-      }
-      isPrependingRef.current = false;
-    });
   }, [messages]);
 
   // Jump to pinned memory from /chat?highlight=<messageId>
@@ -3228,7 +3217,6 @@ export default function Messages() {
           ref={messagesContainerRef}
           style={{
             scrollBehavior: "auto",
-            overflowAnchor: "none",
             opacity: chatAnimationsEnabled || messages.length === 0 ? 1 : 0,
             transition: "opacity 0.15s ease-in",
           }}
