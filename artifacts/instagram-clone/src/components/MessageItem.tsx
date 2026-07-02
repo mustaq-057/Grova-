@@ -352,12 +352,8 @@ export const MessageItem = memo(function MessageItem({
               loading="eager"
               fetchPriority="high"
               referrerPolicy="no-referrer"
-              onLoad={(e) => {
+              onLoad={() => {
                 onMediaLoad?.(msg.id);
-                const img = e.currentTarget;
-                if (img.getBoundingClientRect().bottom > window.innerHeight - 300) {
-                  img.scrollIntoView({ behavior: 'smooth', block: 'end' });
-                }
               }}
               onError={() => {
                 if (imageRetry < 2) {

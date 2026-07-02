@@ -625,6 +625,7 @@ export default function Messages() {
     const offset = messages.length;
 
     const container = messagesContainerRef.current;
+    const scrollHeightBefore = container?.scrollHeight ?? 0;
 
     stickToBottomRef.current = false;
     isNearBottomRef.current = false;
@@ -641,12 +642,7 @@ export default function Messages() {
         return;
       }
 
-      // Force scrollTop to 1 to ensure native overflow-anchor engages
-      if (messagesContainerRef.current && messagesContainerRef.current.scrollTop === 0) {
-        messagesContainerRef.current.scrollTop = 1;
-      }
-      
-      prependScrollHeightRef.current = messagesContainerRef.current?.scrollHeight ?? 0;
+      prependScrollHeightRef.current = scrollHeightBefore;
 
       setMessages((prev) => {
         const existing = new Set(prev.map((m) => m.id));
@@ -880,8 +876,10 @@ export default function Messages() {
             }
           });
 
-          if (preview.senderId === partnerId && !isNearBottomRef.current) {
-            setHasNewMessages(true);
+          if (!isNearBottomRef.current && !stickToBottomRef.current) {
+            if (preview.senderId === partnerId) {
+              setHasNewMessages(true);
+            }
           } else {
             stickToBottomRef.current = true;
             requestStickToBottom();
@@ -1473,15 +1471,28 @@ export default function Messages() {
     previousMessagesLengthRef.current = messages.length;
   }, [messages, user?.id, partnerId, highlightParam]);
 
-  // Native scroll anchoring handles prepended messages.
-  // We just need to clear isPrependingRef so IntersectionObserver can fire again.
-  useEffect(() => {
-    if (isPrependingRef.current) {
-      // Allow browser to perform layout and scroll anchoring
-      requestAnimationFrame(() => {
-        isPrependingRef.current = false;
-      });
+  // Restore scroll position after prepending older messages (load more / jump-to-memory)
+  useLayoutEffect(() => {
+    const before = prependScrollHeightRef.current;
+    if (before === null) return;
+    prependScrollHeightRef.current = null;
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
+    let isRestored = false;
+    const diff = container.scrollHeight - before;
+    if (diff > 0) {
+      container.scrollTop += diff;
+      isRestored = true;
     }
+
+    requestAnimationFrame(() => {
+      if (!isRestored) {
+        const nextDiff = container.scrollHeight - before;
+        if (nextDiff > 0) container.scrollTop += nextDiff;
+      }
+      isPrependingRef.current = false;
+    });
   }, [messages]);
 
   // Jump to pinned memory from /chat?highlight=<messageId>
