@@ -1,5 +1,5 @@
 import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, startTransition, type ReactElement } from "react";
-import { Info, Heart, Mic, X, Trash2, Ban, Phone, Video, WifiOff, Wifi, Search, AlertCircle, Palette, MessageCircle, Shield, Ghost } from "lucide-react";
+import { Info, Heart, Mic, X, Trash2, Ban, Phone, Video, WifiOff, Wifi, Search, AlertCircle, Palette, MessageCircle, Shield, Ghost, Pin, PinOff } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { api, type ApiMessage } from "@/lib/api";
 import type { ScheduledMessage } from "@/lib/types";
@@ -249,8 +249,8 @@ export default function Messages() {
   const [showThreadPanel, setShowThreadPanel] = useState(false);
   const [hiddenTick, setHiddenTick] = useState(0);
   const [contextMenu, setContextMenu] = useState<{ msg: ApiMessage; top: number; left: number } | null>(null);
-  const [reactionNotif, setReactionNotif] = useState<{ emoji: string; id: string } | null>(null);
-  const reactionNotifTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [actionNotif, setActionNotif] = useState<{ icon: React.ReactNode; text: string; id: string } | null>(null);
+  const actionNotifTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [notifCount, setNotifCount] = useState(() => unreadCount());
   const [unreadChat, setUnreadChat] = useState(0);
@@ -2942,9 +2942,9 @@ export default function Messages() {
       );
     });
     // Show floating reaction notification above the messages nav icon
-    if (reactionNotifTimerRef.current) clearTimeout(reactionNotifTimerRef.current);
-    setReactionNotif({ emoji, id: crypto.randomUUID() });
-    reactionNotifTimerRef.current = setTimeout(() => setReactionNotif(null), 2200);
+    if (actionNotifTimerRef.current) clearTimeout(actionNotifTimerRef.current);
+    setActionNotif({ icon: <span className="text-2xl leading-none emoji-native">{emoji}</span>, text: "Reaction sent", id: crypto.randomUUID() });
+    actionNotifTimerRef.current = setTimeout(() => setActionNotif(null), 2200);
     try {
       const { reactions } = await api.reactMessage(id, user.id, emoji);
       const list = Array.isArray(reactions) ? reactions : [];
@@ -3040,6 +3040,15 @@ export default function Messages() {
       } else {
         await removeMemory(user.id, id);
       }
+      
+      if (actionNotifTimerRef.current) clearTimeout(actionNotifTimerRef.current);
+      setActionNotif({
+        icon: nextPinned ? <Pin className="w-6 h-6 text-primary" fill="currentColor" /> : <PinOff className="w-6 h-6 text-primary" />,
+        text: nextPinned ? "Pinned to memories" : "Unpinned from memories",
+        id: crypto.randomUUID()
+      });
+      actionNotifTimerRef.current = setTimeout(() => setActionNotif(null), 2200);
+      
     } catch {
       setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, pinned: !nextPinned } : m)));
       window.alert("Could not update pin — check your connection.");
@@ -3611,11 +3620,11 @@ export default function Messages() {
           />
         )}
 
-        {/* ── Reaction Notification (floating above message icon) ── */}
+        {/* ── Action Notification (floating above message icon) ── */}
         <AnimatePresence>
-          {reactionNotif && (
+          {actionNotif && (
             <motion.div
-              key={reactionNotif.id}
+              key={actionNotif.id}
               initial={{ opacity: 0, y: 10, scale: 0.7 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -6, scale: 0.8 }}
@@ -3623,8 +3632,8 @@ export default function Messages() {
               className="fixed bottom-[calc(env(safe-area-inset-bottom,0px)+4.2rem)] left-1/2 -translate-x-1/2 z-[9999] pointer-events-none flex flex-col items-center gap-1"
             >
               <div className="bg-black/75 backdrop-blur-md border border-white/15 rounded-2xl px-4 py-2.5 flex items-center gap-2 shadow-xl">
-                <span className="text-2xl leading-none emoji-native">{reactionNotif.emoji}</span>
-                <span className="text-white text-[13px] font-semibold">Reaction sent</span>
+                {actionNotif.icon}
+                <span className="text-white text-[13px] font-semibold">{actionNotif.text}</span>
               </div>
               <div className="w-1.5 h-1.5 rounded-full bg-white/40" />
             </motion.div>
