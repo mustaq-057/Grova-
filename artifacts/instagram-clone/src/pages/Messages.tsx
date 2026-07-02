@@ -3228,6 +3228,7 @@ export default function Messages() {
           ref={messagesContainerRef}
           style={{
             scrollBehavior: "auto",
+            overflowAnchor: "none",
             opacity: chatAnimationsEnabled || messages.length === 0 ? 1 : 0,
             transition: "opacity 0.15s ease-in",
           }}
