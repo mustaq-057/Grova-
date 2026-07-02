@@ -30,7 +30,46 @@ router.post("/presence/heartbeat", rateLimiters.messages, authenticate, async (r
     /* ignore */
   }
   broadcast("presence", { userId: authenticatedUserId, lastSeen: now, inLibrary: !!inLibrary }, partnerId);
-  res.json({ userId: authenticatedUserId, lastSeen: now, inLibrary: !!inLibrary });
+  
+  // Return the full presence map so the client can use heartbeat to fetch presence
+  const lastSeenMap: Record<string, number> = { ...lastSeen };
+  const typing: Record<string, boolean> = {};
+  
+  let result;
+  try {
+    result = await db.execute(
+      `
+      SELECT user_id, MAX(last_seen) AS last_seen, MAX(typing_until) AS typing_until
+      FROM devices
+      WHERE user_id = ? OR user_id = ?
+      GROUP BY user_id
+      `,
+      [authenticatedUserId, partnerId],
+    );
+  } catch {
+    result = await db.execute(
+      `
+      SELECT user_id, MAX(last_seen) AS last_seen
+      FROM devices
+      WHERE user_id = ? OR user_id = ?
+      GROUP BY user_id
+      `,
+      [authenticatedUserId, partnerId],
+    );
+  }
+
+  for (const row of result.rows as any[]) {
+    const id = row.user_id ? String(row.user_id) : "";
+    if (!id) continue;
+    const persisted = Number(row.last_seen ?? 0);
+    if (Number.isFinite(persisted) && persisted > 0) {
+      lastSeenMap[id] = Math.max(lastSeenMap[id] ?? 0, persisted);
+    }
+    const typingUntil = Number(row.typing_until ?? 0);
+    typing[id] = Number.isFinite(typingUntil) && typingUntil > now;
+  }
+
+  res.json({ lastSeen: lastSeenMap, typing, inLibrary: inLibraryState });
 });
 
 router.get("/presence", rateLimiters.read, authenticate, async (req, res) => {

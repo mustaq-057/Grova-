@@ -504,24 +504,27 @@ export default function Messages() {
 
   useEffect(() => {
     if (!user) return;
-    const refreshPresence = () => {
-      api.getPresence().then((raw) => {
+    const syncPresence = (isHeartbeat: boolean) => {
+      const promise = isHeartbeat 
+        ? api.heartbeat(user.id)
+        : api.getPresence();
+
+      promise.then((raw) => {
         const { lastSeen, typing } = parsePresenceResponse(raw);
         if (lastSeen[partnerId] != null) setPartnerLastSeen(lastSeen[partnerId]);
         setIsTyping(Boolean(typing[partnerId]));
       }).catch(() => { });
     };
-    api.heartbeat(user.id).catch(() => { });
-    refreshPresence();
-    const hb = setInterval(() => {
-      if (document.visibilityState === "visible" && isShowPresenceEnabled()) {
-        api.heartbeat(user.id).catch(() => { });
+
+    const runSync = () => {
+      if (document.visibilityState === "visible") {
+        syncPresence(isShowPresenceEnabled());
       }
-    }, 30_000);
-    const poll = setInterval(() => {
-      if (document.visibilityState === "visible") refreshPresence();
-    }, 30_000);
-    return () => { clearInterval(hb); clearInterval(poll); };
+    };
+
+    runSync();
+    const poll = setInterval(runSync, 30_000);
+    return () => clearInterval(poll);
   }, [user?.id, partnerId]);
 
   const applyMessageBatch = useCallback((raw: ApiMessage[]) => {

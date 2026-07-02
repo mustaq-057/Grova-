@@ -4,7 +4,7 @@ export type LiveChannel =
   | { mode: "sse"; eventSource: EventSource }
   | { mode: "poll"; intervalMs: number; stop: () => void };
 
-export function startPollChannel(onPoll: () => void, intervalMs = 1_000): LiveChannel {
+export function startPollChannel(onPoll: () => void, intervalMs = 4_000): LiveChannel {
   const id = window.setInterval(() => {
     if (document.visibilityState === "visible" && navigator.onLine) {
       onPoll();
@@ -27,7 +27,7 @@ export async function openLiveChannel(
   onPoll: () => void,
   opts?: { forcePoll?: boolean },
 ): Promise<LiveChannel | null> {
-  if (opts?.forcePoll) return startPollChannel(onPoll);
+  if (opts?.forcePoll) return startPollChannel(onPoll, 4_000);
 
   const url = `/api/sse?userId=${encodeURIComponent(userId)}`;
 
@@ -38,7 +38,7 @@ export async function openLiveChannel(
     if (contentType.includes("application/json")) {
       const body = (await probe.json()) as { mode?: string; pollIntervalMs?: number };
       if (body.mode === "poll") {
-        return startPollChannel(onPoll, body.pollIntervalMs ?? 1_000);
+        return startPollChannel(onPoll, body.pollIntervalMs ?? 4_000);
       }
     } else {
       controller.abort();
@@ -56,6 +56,6 @@ export async function openLiveChannel(
     const eventSource = new EventSource(url, { withCredentials: true });
     return { mode: "sse", eventSource };
   } catch {
-    return startPollChannel(onPoll);
+    return startPollChannel(onPoll, 4_000);
   }
 }
