@@ -1,5 +1,5 @@
 import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, startTransition, type ReactElement } from "react";
-import { Info, Heart, Mic, X, Trash2, Ban, Phone, Video, WifiOff, Wifi, Search, AlertCircle, Palette, MessageCircle, Shield, Ghost, Pin, PinOff } from "lucide-react";
+import { Info, Heart, Mic, X, Trash2, Ban, Phone, Video, WifiOff, Wifi, Search, AlertCircle, Palette, MessageCircle, Shield, Ghost, Pin, PinOff, ChevronDown } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { api, type ApiMessage } from "@/lib/api";
 import type { ScheduledMessage } from "@/lib/types";
@@ -3637,6 +3637,26 @@ export default function Messages() {
               </div>
               <div className="w-1.5 h-1.5 rounded-full bg-white/40" />
             </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ── Scroll to Bottom Button ── */}
+        <AnimatePresence>
+          {!isNearBottom && messages.length > 0 && (
+            <motion.button
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              transition={{ type: "spring", stiffness: 400, damping: 25 }}
+              onClick={() => {
+                initialUnreadHandledRef.current = false;
+                scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
+                setHasNewMessages(false);
+              }}
+              className="absolute right-4 bottom-[calc(env(safe-area-inset-bottom,0px)+4.5rem)] z-40 p-2.5 bg-primary/90 hover:bg-primary text-primary-foreground backdrop-blur-md rounded-full shadow-lg border border-white/10"
+            >
+              <ChevronDown className="w-5 h-5" />
+            </motion.button>
           )}
         </AnimatePresence>
 
