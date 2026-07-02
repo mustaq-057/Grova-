@@ -43,6 +43,7 @@ export const ImageStackBubble = memo(function ImageStackBubble({
           <button
             key={layer.msg.id}
             type="button"
+            data-testid={`message-${layer.msg.id}`}
             onClick={() => onOpenMedia?.(layer.msg, messages)}
             className="absolute rounded-2xl overflow-hidden shadow-2xl border border-white/15 bg-[#1a1a1a] transition-transform active:scale-[0.98]"
             style={{
@@ -81,6 +82,9 @@ export const ImageStackBubble = memo(function ImageStackBubble({
             {messages.length} photos
           </span>
         )}
+        {messages.slice(4).map((msg) => (
+          <div key={msg.id} data-testid={`message-${msg.id}`} className="hidden" aria-hidden />
+        ))}
       </div>
   );
 });

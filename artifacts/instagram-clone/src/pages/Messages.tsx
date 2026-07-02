@@ -373,14 +373,14 @@ export default function Messages() {
       if (!el) return false;
 
       const container = messagesContainerRef.current;
-      scrollMessageIntoCenter(container, el, "auto");
+      el.scrollIntoView({ behavior: "auto", block: "center" });
       flash(el);
       
       // Ensure it stays centered after any immediate layout shifts (images loading)
       let frames = 0;
       const keepCentered = () => {
         if (!el || !messagesContainerRef.current) return;
-        scrollMessageIntoCenter(messagesContainerRef.current, el, "auto");
+        el.scrollIntoView({ behavior: "auto", block: "center" });
         frames++;
         if (frames < 30) requestAnimationFrame(keepCentered); // Half a second of adjustment
       };
@@ -2368,7 +2368,11 @@ export default function Messages() {
     }
   }, [messages, user?.id]);
 
-  const sendHeart = useCallback(() => sendMsg({ text: "♥", type: "heart" }), [sendMsg]);
+  const handleOpenContextMenu = useCallback((m: ApiMessage, rect: DOMRect) => {
+    setContextMenu({ msg: m, top: rect.bottom + 4, left: rect.left });
+  }, []);
+
+  const sendHeart = useCallback(() => sendMsg({ text: " ", type: "heart" }), [sendMsg]);
 
   const sendSticker = useCallback(
     (s: string) => {
@@ -3334,7 +3338,7 @@ export default function Messages() {
                           onPin={handlePin}
                           onReply={startReply}
                           onEdit={handleEdit}
-                          onOpenMenu={(m: ApiMessage, rect: DOMRect) => setContextMenu({ msg: m, top: rect.bottom + 4, left: rect.left })}
+                          onOpenMenu={handleOpenContextMenu}
                           onOpenMedia={openMediaMessage}
                           prevMsg={prevMsg}
                           seenLabel={buildSeenLabel(msg, isMe, lastSeenOutgoingId, partnerId)}
@@ -3367,7 +3371,7 @@ export default function Messages() {
                           onUnsend={handleUnsend}
                           onPin={handlePin}
                           onReply={startReply}
-                          onOpenMenu={(m: ApiMessage, rect: DOMRect) => setContextMenu({ msg: m, top: rect.bottom + 4, left: rect.left })}
+                          onOpenMenu={handleOpenContextMenu}
                           onOpenMedia={openMediaMessage}
                           prevMsg={prevMsg}
                           seenLabel={buildSeenLabel(msg, isMe, lastSeenOutgoingId, partnerId)}

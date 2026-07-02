@@ -1,7 +1,7 @@
 import { useState, memo, useCallback, useMemo, useRef, useLayoutEffect } from "react";
 import { useLocation } from "wouter";
 import { createPortal } from "react-dom";
-import { Smile, MoreHorizontal, Trash2, Download } from "lucide-react";
+import { Smile, MoreHorizontal, Trash2, Download, Pin } from "lucide-react";
 import { motion } from "framer-motion";
 import { AudioMessage } from "@/components/AudioMessage";
 import { cn } from "@/lib/utils";
@@ -732,6 +732,12 @@ export const MessageItem = memo(function MessageItem({
           >
             {msg.reaction}
           </button>
+        )}
+
+        {msg.pinned && (
+          <div className={`flex items-center justify-center p-1 z-10 ${isMe ? "mr-1" : "ml-1"}`}>
+            <Pin className="w-3 h-3 text-primary rotate-45" fill="currentColor" />
+          </div>
         )}
 
         <div

@@ -60,6 +60,7 @@ export interface Message {
   fontStyle?: "default" | "edo" | "italian" | "allura";
   replyToFontStyle?: "default" | "edo" | "italian" | "allura";
   replyToImageUrl?: string;
+  pinned?: boolean;
 }
 
 const router = Router();
@@ -146,6 +147,7 @@ function rowToMessage(
     fontStyle: row.font_style ? (row.font_style as Message["fontStyle"]) : undefined,
     replyToFontStyle: row.reply_to_font_style ? (row.reply_to_font_style as Message["replyToFontStyle"]) : undefined,
     replyToImageUrl: row.reply_to_image_url ? String(row.reply_to_image_url) : undefined,
+    pinned: Boolean(row.is_pinned),
   };
 }
 
@@ -166,13 +168,16 @@ router.get("/messages", optionalAuth, async (req, res) => {
              (SELECT emoji FROM message_reactions WHERE message_id = m.id AND user_id = ? ORDER BY timestamp DESC LIMIT 1) as partner_reaction,
              (SELECT read_at FROM message_read_receipts WHERE message_id = m.id AND user_id = ? LIMIT 1) as partner_read_at,
              (SELECT COUNT(*) FROM message_media_opens WHERE message_id = m.id AND user_id = ?) as viewer_media_open_count,
-             (SELECT MAX(opened_at) FROM message_media_opens WHERE message_id = m.id AND user_id = ?) as partner_media_opened_at
+             (SELECT MAX(opened_at) FROM message_media_opens WHERE message_id = m.id AND user_id = ?) as partner_media_opened_at,
+             EXISTS(SELECT 1 FROM pinned_messages WHERE message_id = m.id AND user_id = ?) as is_pinned
       FROM messages m
       WHERE (m.sender_id = ? OR m.sender_id = ?)
     `;
     const params: unknown[] = [
       authenticatedUserId,
       partnerId,
+      partnerId,
+      authenticatedUserId,
       partnerId,
       authenticatedUserId,
       partnerId,
@@ -264,13 +269,16 @@ router.get("/messages/context/:messageId", optionalAuth, async (req, res) => {
              (SELECT emoji FROM message_reactions WHERE message_id = m.id AND user_id = ? ORDER BY timestamp DESC LIMIT 1) as partner_reaction,
              (SELECT read_at FROM message_read_receipts WHERE message_id = m.id AND user_id = ? LIMIT 1) as partner_read_at,
              (SELECT COUNT(*) FROM message_media_opens WHERE message_id = m.id AND user_id = ?) as viewer_media_open_count,
-             (SELECT MAX(opened_at) FROM message_media_opens WHERE message_id = m.id AND user_id = ?) as partner_media_opened_at
+             (SELECT MAX(opened_at) FROM message_media_opens WHERE message_id = m.id AND user_id = ?) as partner_media_opened_at,
+             EXISTS(SELECT 1 FROM pinned_messages WHERE message_id = m.id AND user_id = ?) as is_pinned
       FROM messages m
       WHERE (m.sender_id = ? OR m.sender_id = ?)
     `;
     const baseParams: unknown[] = [
       authenticatedUserId,
       partnerId,
+      partnerId,
+      authenticatedUserId,
       partnerId,
       authenticatedUserId,
       partnerId,

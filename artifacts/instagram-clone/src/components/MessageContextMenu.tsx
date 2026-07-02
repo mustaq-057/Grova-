@@ -104,7 +104,7 @@ export const MessageContextMenu = memo(function MessageContextMenu({
           <>
             {onReply && item("Reply", <CornerUpLeft className="w-4 h-4" />, onReply)}
             {msg.text && onCopy && item("Copy", <Copy className="w-4 h-4" />, onCopy)}
-            {item("Pin to Memories", <Pin className="w-4 h-4" />, onPin)}
+            {item(msg.pinned ? "Unpin from Memories" : "Pin to Memories", <Pin className="w-4 h-4" />, onPin)}
             {removeReactionLabel && onRemoveReaction &&
               item(`Remove ${removeReactionLabel}`, <Undo2 className="w-4 h-4" />, onRemoveReaction)}
             {onDownloadChat &&
