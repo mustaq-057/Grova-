@@ -547,7 +547,7 @@ export const api = {
     apiFetch<{ iceServers: RTCIceServer[] }>("/call/rtc-config"),
 
   heartbeat: (userId: string, opts?: { inLibrary?: boolean }) =>
-    apiFetch<PresenceResponse>("/presence/heartbeat", { method: "POST", body: JSON.stringify({ userId, inLibrary: opts?.inLibrary }) }),
+    apiFetch<{ success: boolean }>("/presence/heartbeat", { method: "POST", body: JSON.stringify({ userId, inLibrary: opts?.inLibrary }) }),
 
   getPresence: () => apiFetch<PresenceResponse>("/presence"),
 
