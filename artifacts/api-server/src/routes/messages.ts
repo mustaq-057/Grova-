@@ -180,7 +180,6 @@ router.get("/messages", optionalAuth, async (req, res) => {
       authenticatedUserId,
       partnerId,
       authenticatedUserId,
-      partnerId,
       authenticatedUserId,
       partnerId,
     ];
@@ -281,7 +280,6 @@ router.get("/messages/context/:messageId", optionalAuth, async (req, res) => {
       authenticatedUserId,
       partnerId,
       authenticatedUserId,
-      partnerId,
       authenticatedUserId,
       partnerId,
     ];
