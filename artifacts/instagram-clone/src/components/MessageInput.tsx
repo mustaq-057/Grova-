@@ -42,6 +42,7 @@ interface MessageInputProps {
   onSendRecording: () => void;
   recording: boolean;
   recordingTime: number;
+  recordingStream?: MediaStream | null;
   disabled: boolean;
   replyPreview?: React.ReactNode;
 }
@@ -142,6 +143,83 @@ const SchedulePicker = ({ onClose, onSchedule }: { onClose: () => void, onSchedu
   );
 };
 
+const LiveWaveform = ({ stream }: { stream: MediaStream | null }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const animationRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!stream || !canvasRef.current) return;
+
+    try {
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      audioContextRef.current = audioCtx;
+      const analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 64;
+      analyserRef.current = analyser;
+
+      const source = audioCtx.createMediaStreamSource(stream);
+      source.connect(analyser);
+      sourceRef.current = source;
+
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+
+      const draw = () => {
+        const width = canvas.width;
+        const height = canvas.height;
+        const bufferLength = analyser.frequencyBinCount;
+        const dataArray = new Uint8Array(bufferLength);
+        analyser.getByteFrequencyData(dataArray);
+
+        ctx.clearRect(0, 0, width, height);
+
+        const barWidth = (width / bufferLength) * 2.5;
+        let x = 0;
+
+        for (let i = 0; i < bufferLength; i++) {
+          const rawVal = dataArray[i];
+          const val = rawVal! / 255.0; // 0 to 1
+          const barHeight = Math.max(4, val * height);
+
+          // Aesthetic styling
+          ctx.fillStyle = val > 0.5 ? "rgba(255, 60, 60, 0.9)" : "rgba(255, 100, 100, 0.6)";
+          ctx.beginPath();
+          ctx.roundRect(x, (height - barHeight) / 2, barWidth - 1, barHeight, 4);
+          ctx.fill();
+
+          x += barWidth;
+        }
+
+        animationRef.current = requestAnimationFrame(draw);
+      };
+
+      draw();
+    } catch (e) {
+      console.error("LiveWaveform setup failed", e);
+    }
+
+    return () => {
+      if (animationRef.current) cancelAnimationFrame(animationRef.current);
+      sourceRef.current?.disconnect();
+      audioContextRef.current?.close().catch(() => {});
+    };
+  }, [stream]);
+
+  return (
+    <canvas 
+      ref={canvasRef} 
+      width={120} 
+      height={32} 
+      className="w-[120px] h-[32px]"
+      aria-hidden="true"
+    />
+  );
+};
+
 export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputProps>(function MessageInput({
   onSendMessage,
   onInputActivity,
@@ -162,6 +240,7 @@ export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputPro
   onSendRecording,
   recording,
   recordingTime,
+  recordingStream,
   disabled,
   replyPreview,
   draftKey,
@@ -653,12 +732,17 @@ export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputPro
 
       {recording && (
         <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="absolute -top-[44px] left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-1.5 bg-destructive/10 backdrop-blur-md text-destructive text-sm font-medium rounded-full z-10 border border-destructive/20"
+          initial={{ opacity: 0, y: 10, scale: 0.9 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 10, scale: 0.9 }}
+          className="absolute -top-[52px] left-1/2 -translate-x-1/2 flex items-center gap-3 px-4 py-1.5 bg-destructive/15 backdrop-blur-xl text-destructive text-sm font-medium rounded-[20px] z-10 border border-destructive/20 shadow-lg"
         >
-          <div className="w-2.5 h-2.5 bg-destructive rounded-full animate-pulse" />
-          <span>{formatTime(recordingTime)}</span>
+          {recordingStream ? (
+            <LiveWaveform stream={recordingStream} />
+          ) : (
+            <div className="w-2.5 h-2.5 bg-destructive rounded-full animate-pulse" />
+          )}
+          <span className="tabular-nums min-w-[36px] text-center font-bold tracking-wide">{formatTime(recordingTime)}</span>
         </motion.div>
       )}
 

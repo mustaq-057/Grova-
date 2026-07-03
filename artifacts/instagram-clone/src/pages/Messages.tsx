@@ -3498,6 +3498,7 @@ export default function Messages() {
               onSendRecording={sendVoiceRecording}
               recording={recording}
               recordingTime={recordingTime}
+              recordingStream={streamRef.current}
               disabled={!online || blocked || editingMessage !== null}
             />
           )}

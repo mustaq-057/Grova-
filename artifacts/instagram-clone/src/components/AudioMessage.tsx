@@ -83,6 +83,24 @@ export function AudioMessage({
 
   const generateWaveform = useCallback(async () => {
     if (waveform.length > 0) return;
+    
+    // Memory optimization: Do not decode audio data for long recordings (e.g., > 60 seconds)
+    if (duration > 60) {
+      const samples = 24;
+      const seedStr = audioData;
+      let hash = 0;
+      for (let i = 0; i < seedStr.length; i++) {
+        hash = (hash << 5) - hash + seedStr.charCodeAt(i);
+        hash |= 0;
+      }
+      const pseudoRandomBars = Array.from({ length: samples }).map((_, i) => {
+        const val = Math.abs(Math.sin(hash + i * 1.3)) * 0.7 + 0.2;
+        return val;
+      });
+      setWaveform(pseudoRandomBars);
+      return;
+    }
+
     try {
       if (!audioContextRef.current) {
         audioContextRef.current = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
@@ -106,7 +124,7 @@ export function AudioMessage({
       setWaveform(waveformBars);
       if (!duration && Number.isFinite(audioBuffer.duration)) setDuration(audioBuffer.duration);
     } catch {
-      setWaveform(STATIC_BARS.map(() => 0.35 + Math.random() * 0.35));
+      setWaveform(STATIC_BARS.map((v) => Math.min(1, (v / 10) + Math.random() * 0.2)));
     }
   }, [audioData, duration, waveform.length]);
 
