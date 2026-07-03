@@ -268,6 +268,8 @@ export default function Messages() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
+  const originalStreamRef = useRef<MediaStream | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -2771,15 +2773,56 @@ export default function Messages() {
   const startRecording = useCallback(async () => {
     if (voiceSendInFlightRef.current || recording) return;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
+      const originalStream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
-          autoGainControl: false, // Disable to prevent muffled/pumping voice
+          autoGainControl: false,
           sampleRate: 48000,
           channelCount: 1,
         }
       });
+      
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 48000 });
+      const source = audioCtx.createMediaStreamSource(originalStream);
+      
+      // High-pass filter (remove rumble)
+      const highpass = audioCtx.createBiquadFilter();
+      highpass.type = "highpass";
+      highpass.frequency.value = 85;
+
+      // Warmth EQ (Low-shelf)
+      const lowshelf = audioCtx.createBiquadFilter();
+      lowshelf.type = "lowshelf";
+      lowshelf.frequency.value = 150;
+      lowshelf.gain.value = 2; // +2dB
+
+      // Presence EQ (High-shelf)
+      const highshelf = audioCtx.createBiquadFilter();
+      highshelf.type = "highshelf";
+      highshelf.frequency.value = 5000;
+      highshelf.gain.value = 2; // +2dB
+
+      // Compressor
+      const compressor = audioCtx.createDynamicsCompressor();
+      compressor.threshold.value = -24;
+      compressor.knee.value = 30;
+      compressor.ratio.value = 4;
+      compressor.attack.value = 0.003;
+      compressor.release.value = 0.25;
+
+      // Destination
+      const destination = audioCtx.createMediaStreamDestination();
+
+      source.connect(highpass);
+      highpass.connect(lowshelf);
+      lowshelf.connect(highshelf);
+      highshelf.connect(compressor);
+      compressor.connect(destination);
+
+      const stream = destination.stream;
+      originalStreamRef.current = originalStream;
+      audioContextRef.current = audioCtx;
       streamRef.current = stream;
       const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
         ? "audio/webm;codecs=opus"
@@ -2798,6 +2841,10 @@ export default function Messages() {
         const blob = new Blob(chunksRef.current, { type: actualMime });
         stream.getTracks().forEach((t) => t.stop());
         streamRef.current = null;
+        originalStreamRef.current?.getTracks().forEach((t) => t.stop());
+        originalStreamRef.current = null;
+        audioContextRef.current?.close().catch(() => {});
+        audioContextRef.current = null;
         chunksRef.current = [];
         mediaRecorderRef.current = null;
 
@@ -2905,6 +2952,10 @@ export default function Messages() {
     }
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
+    originalStreamRef.current?.getTracks().forEach((t) => t.stop());
+    originalStreamRef.current = null;
+    audioContextRef.current?.close().catch(() => {});
+    audioContextRef.current = null;
     mediaRecorderRef.current = null;
     chunksRef.current = [];
   }, []);

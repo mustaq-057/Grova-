@@ -33,6 +33,8 @@ export default function SecretNotes() {
   const noteRecorderRef = useRef<MediaRecorder | null>(null);
   const noteChunksRef = useRef<Blob[]>([]);
   const noteStreamRef = useRef<MediaStream | null>(null);
+  const originalNoteStreamRef = useRef<MediaStream | null>(null);
+  const noteAudioContextRef = useRef<AudioContext | null>(null);
 
   const loadNotes = useCallback(async () => {
     try {
@@ -103,6 +105,10 @@ export default function SecretNotes() {
     }
     noteStreamRef.current?.getTracks().forEach((t) => t.stop());
     noteStreamRef.current = null;
+    originalNoteStreamRef.current?.getTracks().forEach((t) => t.stop());
+    originalNoteStreamRef.current = null;
+    noteAudioContextRef.current?.close().catch(() => {});
+    noteAudioContextRef.current = null;
     setRecordingNote(false);
   }, []);
 
@@ -112,7 +118,7 @@ export default function SecretNotes() {
       return;
     }
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
+      const originalStream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
@@ -121,6 +127,42 @@ export default function SecretNotes() {
           channelCount: 1,
         }
       });
+      
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 48000 });
+      const source = audioCtx.createMediaStreamSource(originalStream);
+      
+      const highpass = audioCtx.createBiquadFilter();
+      highpass.type = "highpass";
+      highpass.frequency.value = 85;
+
+      const lowshelf = audioCtx.createBiquadFilter();
+      lowshelf.type = "lowshelf";
+      lowshelf.frequency.value = 150;
+      lowshelf.gain.value = 2;
+
+      const highshelf = audioCtx.createBiquadFilter();
+      highshelf.type = "highshelf";
+      highshelf.frequency.value = 5000;
+      highshelf.gain.value = 2;
+
+      const compressor = audioCtx.createDynamicsCompressor();
+      compressor.threshold.value = -24;
+      compressor.knee.value = 30;
+      compressor.ratio.value = 4;
+      compressor.attack.value = 0.003;
+      compressor.release.value = 0.25;
+
+      const destination = audioCtx.createMediaStreamDestination();
+
+      source.connect(highpass);
+      highpass.connect(lowshelf);
+      lowshelf.connect(highshelf);
+      highshelf.connect(compressor);
+      compressor.connect(destination);
+
+      const stream = destination.stream;
+      originalNoteStreamRef.current = originalStream;
+      noteAudioContextRef.current = audioCtx;
       noteStreamRef.current = stream;
       const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
         ? "audio/webm;codecs=opus"
@@ -141,6 +183,10 @@ export default function SecretNotes() {
         noteRecorderRef.current = null;
         stream.getTracks().forEach((t) => t.stop());
         noteStreamRef.current = null;
+        originalNoteStreamRef.current?.getTracks().forEach((t) => t.stop());
+        originalNoteStreamRef.current = null;
+        noteAudioContextRef.current?.close().catch(() => {});
+        noteAudioContextRef.current = null;
         setRecordingNote(false);
         if (blob.size > 0) {
           if (voiceNoteUrl?.startsWith("blob:")) URL.revokeObjectURL(voiceNoteUrl);
