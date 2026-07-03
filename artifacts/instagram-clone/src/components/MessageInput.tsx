@@ -1,6 +1,6 @@
 import { memo, useRef, useState, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
 import { createPortal } from "react-dom";
-import { Smile, Mic, Send, Sticker, Paperclip, X, MessageCircle, MapPin, PenTool, Zap, Plus, Image as ImageIcon, PlusCircle, Sparkles, FileText, Palette, File as FileIcon, AlertCircle, Camera, MessageSquarePlus, Type, Clock } from "lucide-react";
+import { Smile, Mic, Send, Sticker, Paperclip, X, MessageCircle, MapPin, PenTool, Zap, Plus, Image as ImageIcon, PlusCircle, Sparkles, FileText, Palette, File as FileIcon, AlertCircle, Camera, MessageSquarePlus, Type, Clock, Pause } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import EmojiPicker from "@/components/EmojiPicker";
 import StickerPicker from "@/components/StickerPicker";
@@ -40,9 +40,13 @@ interface MessageInputProps {
   onStartRecording: () => void;
   onCancelRecording: () => void;
   onSendRecording: () => void;
+  onPauseRecording?: () => void;
+  onResumeRecording?: () => void;
   recording: boolean;
+  recordingPaused?: boolean;
   recordingTime: number;
   recordingStream?: MediaStream | null;
+  recordingPreviewUrl?: string | null;
   disabled: boolean;
   replyPreview?: React.ReactNode;
 }
@@ -143,7 +147,7 @@ const SchedulePicker = ({ onClose, onSchedule }: { onClose: () => void, onSchedu
   );
 };
 
-const LiveWaveform = ({ stream }: { stream: MediaStream | null }) => {
+const LiveWaveform = ({ stream, paused }: { stream: MediaStream | null; paused?: boolean }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -151,7 +155,10 @@ const LiveWaveform = ({ stream }: { stream: MediaStream | null }) => {
   const animationRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (!stream || !canvasRef.current) return;
+    if (!stream || !canvasRef.current || paused) {
+      if (animationRef.current) cancelAnimationFrame(animationRef.current);
+      return;
+    }
 
     try {
       const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -238,9 +245,13 @@ export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputPro
   onStartRecording,
   onCancelRecording,
   onSendRecording,
+  onPauseRecording,
+  onResumeRecording,
   recording,
+  recordingPaused,
   recordingTime,
   recordingStream,
+  recordingPreviewUrl,
   disabled,
   replyPreview,
   draftKey,
@@ -517,6 +528,14 @@ export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputPro
       </button>
       <button
         type="button"
+        onClick={recordingPaused ? onResumeRecording : onPauseRecording}
+        className="p-2.5 rounded-full text-primary hover:text-primary-foreground hover:bg-primary/90 transition-all"
+        aria-label={recordingPaused ? "Resume recording" : "Pause recording"}
+      >
+        {recordingPaused ? <Mic className="w-5 h-5" /> : <Pause className="w-5 h-5" />}
+      </button>
+      <button
+        type="button"
         onClick={onSendRecording}
         className="send-btn p-2.5 bg-primary text-primary-foreground rounded-full hover:bg-primary/90 transition-all"
         aria-label="Send voice message"
@@ -737,8 +756,10 @@ export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputPro
           exit={{ opacity: 0, y: 10, scale: 0.9 }}
           className="absolute -top-[52px] left-1/2 -translate-x-1/2 flex items-center gap-3 px-4 py-1.5 bg-destructive/15 backdrop-blur-xl text-destructive text-sm font-medium rounded-[20px] z-10 border border-destructive/20 shadow-lg"
         >
-          {recordingStream ? (
-            <LiveWaveform stream={recordingStream} />
+          {recordingPaused && recordingPreviewUrl ? (
+            <audio src={recordingPreviewUrl} controls className="h-8 max-w-[200px]" />
+          ) : recordingStream ? (
+            <LiveWaveform stream={recordingStream} paused={recordingPaused} />
           ) : (
             <div className="w-2.5 h-2.5 bg-destructive rounded-full animate-pulse" />
           )}

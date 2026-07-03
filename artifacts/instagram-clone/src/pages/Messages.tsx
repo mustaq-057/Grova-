@@ -179,7 +179,9 @@ export default function Messages() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [blocked, setBlocked] = useState(() => isChatBlocked());
   const [recording, setRecording] = useState(false);
+  const [recordingPaused, setRecordingPaused] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
+  const [recordingPreviewUrl, setRecordingPreviewUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
@@ -2814,11 +2816,17 @@ export default function Messages() {
       // Destination
       const destination = audioCtx.createMediaStreamDestination();
 
+      // Low-pass filter (smoothness / remove harsh highs / hiss)
+      const lowpass = audioCtx.createBiquadFilter();
+      lowpass.type = "lowpass";
+      lowpass.frequency.value = 8000;
+
       source.connect(highpass);
       highpass.connect(lowshelf);
       lowshelf.connect(highshelf);
       highshelf.connect(compressor);
-      compressor.connect(destination);
+      compressor.connect(lowpass);
+      lowpass.connect(destination);
 
       const stream = destination.stream;
       originalStreamRef.current = originalStream;
@@ -2834,7 +2842,18 @@ export default function Messages() {
       const recorder = new MediaRecorder(stream, mimeType ? { mimeType, audioBitsPerSecond: 128000 } : { audioBitsPerSecond: 128000 });
       chunksRef.current = [];
       recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data);
+        if (e.data.size > 0) {
+          chunksRef.current.push(e.data);
+          
+          if (mediaRecorderRef.current?.state === "paused") {
+            const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+            const url = URL.createObjectURL(blob);
+            setRecordingPreviewUrl((prev) => {
+              if (prev) URL.revokeObjectURL(prev);
+              return url;
+            });
+          }
+        }
       };
       recorder.onstop = () => {
         const actualMime = recorder.mimeType || mimeType || "audio/mp4";
@@ -2897,8 +2916,11 @@ export default function Messages() {
       mediaRecorderRef.current = recorder;
       recorder.start(250);
       setRecording(true);
+      setRecordingPaused(false);
       setRecordingTime(0);
-      timerRef.current = setInterval(() => setRecordingTime((t) => t + 1), 1000);
+      timerRef.current = setInterval(() => {
+        setRecordingTime((t) => t + 1);
+      }, 1000);
     } catch (err) {
       console.error("Microphone error:", err);
       if (err instanceof Error) {
@@ -2917,13 +2939,45 @@ export default function Messages() {
     }
   }, [recording]);
 
+  const pauseRecording = useCallback(() => {
+    if (!mediaRecorderRef.current || mediaRecorderRef.current.state !== "recording") return;
+    try {
+      mediaRecorderRef.current.pause();
+      mediaRecorderRef.current.requestData(); // Trigger ondataavailable for preview
+      setRecordingPaused(true);
+      if (timerRef.current) clearInterval(timerRef.current);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const resumeRecording = useCallback(() => {
+    if (!mediaRecorderRef.current || mediaRecorderRef.current.state !== "paused") return;
+    try {
+      mediaRecorderRef.current.resume();
+      setRecordingPaused(false);
+      setRecordingPreviewUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return null;
+      });
+      timerRef.current = setInterval(() => setRecordingTime((t) => t + 1), 1000);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   const sendVoiceRecording = useCallback(() => {
     const recorder = mediaRecorderRef.current;
     
     // Always clear the UI state to prevent the recording indicator from getting stuck
     if (timerRef.current) clearInterval(timerRef.current);
     setRecording(false);
+    setRecordingPaused(false);
     setRecordingTime(0);
+    setRecordingPreviewUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
 
     if (!recorder || !recording || recorder.state === "inactive") return;
     shouldSendVoiceRef.current = true;
@@ -2939,7 +2993,12 @@ export default function Messages() {
     // Always clear UI state unconditionally
     if (timerRef.current) clearInterval(timerRef.current);
     setRecording(false);
+    setRecordingPaused(false);
     setRecordingTime(0);
+    setRecordingPreviewUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
     shouldSendVoiceRef.current = false;
     
     const recorder = mediaRecorderRef.current;
@@ -3560,9 +3619,13 @@ export default function Messages() {
               onStartRecording={startRecording}
               onCancelRecording={cancelRecording}
               onSendRecording={sendVoiceRecording}
+              onPauseRecording={pauseRecording}
+              onResumeRecording={resumeRecording}
               recording={recording}
+              recordingPaused={recordingPaused}
               recordingTime={recordingTime}
               recordingStream={streamRef.current}
+              recordingPreviewUrl={recordingPreviewUrl}
               disabled={!online || blocked || editingMessage !== null}
             />
           )}

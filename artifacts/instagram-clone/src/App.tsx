@@ -7,6 +7,7 @@ import { Layout } from "@/components/Layout";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthProvider, useAuth, PROFILE_INACTIVITY_MS } from "@/lib/auth";
 import { CallProvider } from "@/lib/call-context";
+import { AudioPlayerProvider } from "@/lib/audio-player-context";
 import Login from "@/pages/Login";
 import Home from "@/pages/Home";
 import { toast } from "sonner";
@@ -160,9 +161,11 @@ function App() {
         <TooltipProvider>
           <AuthProvider>
             <CallProvider>
-              <WouterRouter base={(import.meta.env.BASE_URL ?? "/").replace(/\/$/, "") || ""}>
-                <ProtectedRouter />
-              </WouterRouter>
+              <AudioPlayerProvider>
+                <WouterRouter base={(import.meta.env.BASE_URL ?? "/").replace(/\/$/, "") || ""}>
+                  <ProtectedRouter />
+                </WouterRouter>
+              </AudioPlayerProvider>
             </CallProvider>
             <Toaster />
             <SonnerToaster />

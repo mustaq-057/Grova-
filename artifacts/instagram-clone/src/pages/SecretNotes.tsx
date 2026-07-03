@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useFeatureLoading } from "@/hooks/useFeatureLoading";
-import { Plus, Trash2, Lock, X, Shield, Mic } from "lucide-react";
+import { Plus, Trash2, Lock, X, Shield, Mic, Pause } from "lucide-react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { api, type ApiSecretNote } from "@/lib/api";
@@ -30,6 +30,7 @@ export default function SecretNotes() {
   const [deleting, setDeleting] = useState(false);
   const [voiceNoteUrl, setVoiceNoteUrl] = useState<string | null>(null);
   const [recordingNote, setRecordingNote] = useState(false);
+  const [recordingPaused, setRecordingPaused] = useState(false);
   const noteRecorderRef = useRef<MediaRecorder | null>(null);
   const noteChunksRef = useRef<Blob[]>([]);
   const noteStreamRef = useRef<MediaStream | null>(null);
@@ -110,11 +111,22 @@ export default function SecretNotes() {
     noteAudioContextRef.current?.close().catch(() => {});
     noteAudioContextRef.current = null;
     setRecordingNote(false);
+    setRecordingPaused(false);
   }, []);
 
   const startNoteRecording = async () => {
     if (recordingNote) {
-      stopNoteRecording();
+      if (recordingPaused) {
+        noteRecorderRef.current?.resume();
+        setRecordingPaused(false);
+        setVoiceNoteUrl(prev => {
+          if (prev && prev.startsWith("blob:")) URL.revokeObjectURL(prev);
+          return null;
+        });
+        toast.message("Recording resumed");
+      } else {
+        stopNoteRecording();
+      }
       return;
     }
     try {
@@ -154,11 +166,17 @@ export default function SecretNotes() {
 
       const destination = audioCtx.createMediaStreamDestination();
 
+      // Low-pass filter (smoothness / remove harsh highs / hiss)
+      const lowpass = audioCtx.createBiquadFilter();
+      lowpass.type = "lowpass";
+      lowpass.frequency.value = 8000;
+
       source.connect(highpass);
       highpass.connect(lowshelf);
       lowshelf.connect(highshelf);
       highshelf.connect(compressor);
-      compressor.connect(destination);
+      compressor.connect(lowpass);
+      lowpass.connect(destination);
 
       const stream = destination.stream;
       originalNoteStreamRef.current = originalStream;
@@ -174,7 +192,17 @@ export default function SecretNotes() {
       const recorder = new MediaRecorder(stream, mimeType ? { mimeType, audioBitsPerSecond: 128000 } : { audioBitsPerSecond: 128000 });
       noteChunksRef.current = [];
       recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) noteChunksRef.current.push(e.data);
+        if (e.data.size > 0) {
+          noteChunksRef.current.push(e.data);
+          if (noteRecorderRef.current?.state === "paused") {
+            const blob = new Blob(noteChunksRef.current, { type: "audio/webm" });
+            const url = URL.createObjectURL(blob);
+            setVoiceNoteUrl(prev => {
+              if (prev && prev.startsWith("blob:")) URL.revokeObjectURL(prev);
+              return url;
+            });
+          }
+        }
       };
       recorder.onstop = () => {
         const actualMime = recorder.mimeType || mimeType || "audio/mp4";
@@ -188,6 +216,7 @@ export default function SecretNotes() {
         noteAudioContextRef.current?.close().catch(() => {});
         noteAudioContextRef.current = null;
         setRecordingNote(false);
+        setRecordingPaused(false);
         if (blob.size > 0) {
           if (voiceNoteUrl?.startsWith("blob:")) URL.revokeObjectURL(voiceNoteUrl);
           setVoiceNoteUrl(URL.createObjectURL(blob));
@@ -344,18 +373,44 @@ export default function SecretNotes() {
                 className="w-full bg-secondary border border-border rounded-xl px-4 py-3 text-sm outline-none focus:border-primary transition-colors resize-none"
                 data-testid="input-secret-note-content"
               />
-              <button
-                type="button"
-                onClick={() => void startNoteRecording()}
-                className={`flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-sm font-medium border transition-colors ${
-                  recordingNote
-                    ? "bg-destructive/10 border-destructive/30 text-destructive"
-                    : "bg-secondary border-border hover:border-primary/40"
-                }`}
-              >
-                <Mic className="w-4 h-4" />
-                {recordingNote ? "Stop & save voice note" : voiceNoteUrl ? "Re-record voice note" : "Record voice note"}
-              </button>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => void startNoteRecording()}
+                  className={`flex items-center justify-center gap-2 flex-1 py-2.5 rounded-xl text-sm font-medium border transition-colors ${
+                    recordingNote && !recordingPaused
+                      ? "bg-destructive/10 border-destructive/30 text-destructive"
+                      : recordingNote && recordingPaused
+                        ? "bg-primary/10 border-primary/30 text-primary"
+                        : "bg-secondary border-border hover:border-primary/40"
+                  }`}
+                >
+                  <Mic className="w-4 h-4" />
+                  {recordingNote && !recordingPaused ? "Stop & save" : recordingNote && recordingPaused ? "Resume" : voiceNoteUrl ? "Re-record voice note" : "Record voice note"}
+                </button>
+                {recordingNote && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!recordingPaused) {
+                        noteRecorderRef.current?.pause();
+                        noteRecorderRef.current?.requestData();
+                        setRecordingPaused(true);
+                        toast.message("Recording paused");
+                      }
+                    }}
+                    disabled={recordingPaused}
+                    className={`flex items-center justify-center w-11 shrink-0 rounded-xl border transition-colors ${
+                      recordingPaused
+                        ? "bg-secondary/50 border-border/50 text-muted-foreground/50 cursor-not-allowed"
+                        : "bg-secondary border-border hover:border-primary/40 text-muted-foreground"
+                    }`}
+                    aria-label="Pause recording"
+                  >
+                    <Pause className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
               {voiceNoteUrl ? (
                 <div className="rounded-xl border border-border bg-secondary/30 p-3">
                   <p className="text-xs text-muted-foreground mb-2">Voice preview — saved with your passcode</p>

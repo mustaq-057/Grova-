@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Play, Pause, Mic } from "lucide-react";
+import { Play, Pause, Mic, Zap } from "lucide-react";
 import { toast } from "sonner";
+import { useAudioPlayer } from "@/lib/audio-player-context";
 import {
   isTranscriptionSupported,
   transcribeFromAudioUrl,
@@ -25,60 +26,30 @@ export function AudioMessage({
   isMe: boolean;
   hideTranscribe?: boolean;
 }) {
-  const [playing, setPlaying] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [currentTime, setCurrentTime] = useState(0);
+  const player = useAudioPlayer();
   const [duration, setDuration] = useState(0);
   const [transcribing, setTranscribing] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [segments, setSegments] = useState<TranscriptSegment[]>([]);
   const [waveform, setWaveform] = useState<number[]>([]);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
 
-  const ensureAudio = async (): Promise<HTMLAudioElement> => {
-    if (audioRef.current) return audioRef.current;
-    const audio = new Audio(audioData);
-    audioRef.current = audio;
-    audio.onended = () => {
-      setPlaying(false);
-      setProgress(0);
-      setCurrentTime(0);
-    };
-    audio.onloadedmetadata = () => {
-      if (Number.isFinite(audio.duration)) setDuration(audio.duration);
-    };
-    audio.ontimeupdate = () => {
-      if (audio.duration) {
-        setProgress(audio.currentTime / audio.duration);
-        setCurrentTime(audio.currentTime);
-        if (!duration && Number.isFinite(audio.duration)) setDuration(audio.duration);
-      }
-    };
-    return audio;
+  const isPlayingHere = player.currentUrl === audioData && player.playing;
+  const progress = isPlayingHere && player.duration ? player.currentTime / player.duration : 0;
+  const currentTime = isPlayingHere ? player.currentTime : 0;
+  const playing = isPlayingHere;
+  const displayDuration = isPlayingHere && player.duration ? player.duration : duration;
+
+  const toggle = () => {
+    if (waveform.length === 0) void generateWaveform();
+    player.toggle(audioData, { title: isMe ? "Your Voice Note" : "Voice Note" });
   };
 
-  const seekTo = useCallback(async (seconds: number) => {
-    const audio = await ensureAudio();
-    const t = Math.max(0, Math.min(seconds, audio.duration || seconds));
-    audio.currentTime = t;
-    setCurrentTime(t);
-    if (audio.duration) setProgress(t / audio.duration);
-    if (!playing) {
-      void audio.play().then(() => setPlaying(true)).catch(() => {});
+  const seekTo = (seconds: number) => {
+    if (player.currentUrl !== audioData) {
+      player.play(audioData, { title: isMe ? "Your Voice Note" : "Voice Note" });
     }
-  }, [playing]);
-
-  const toggle = async () => {
-    const audio = await ensureAudio();
-    if (playing) {
-      audio.pause();
-      setPlaying(false);
-    } else {
-      if (waveform.length === 0) void generateWaveform();
-      audio.play().catch((err) => console.error("Audio playback failed:", err));
-      setPlaying(true);
-    }
+    player.seekTo(seconds);
   };
 
   const generateWaveform = useCallback(async () => {
@@ -161,17 +132,7 @@ export function AudioMessage({
   };
 
   useEffect(() => {
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.onended = null;
-        audioRef.current.ontimeupdate = null;
-        audioRef.current = null;
-      }
-    };
-  }, []);
-
-  useEffect(() => {
+    if (duration > 0) return;
     const audio = new Audio(audioData);
     audio.preload = "metadata";
     audio.onloadedmetadata = () => {
@@ -186,7 +147,7 @@ export function AudioMessage({
         setDuration(audio.duration);
       }
     };
-  }, [audioData]);
+  }, [audioData, duration]);
 
   const containerRef = useRef<HTMLDivElement>(null);
   
@@ -212,7 +173,7 @@ export function AudioMessage({
 
   const bars = waveform.length > 0 ? waveform : STATIC_BARS;
   const barHeights = bars.map((a) => Math.max(3, Math.min(16, (typeof a === "number" ? a : 0.5) * 16)));
-  const timeLabel = `${formatAudioTime(currentTime)} / ${formatAudioTime(duration)}`;
+  const timeLabel = `${formatAudioTime(currentTime)} / ${formatAudioTime(displayDuration)}`;
 
   return (
     <div ref={containerRef} className="flex flex-col gap-1.5 max-w-[min(280px,88vw)]">
@@ -235,11 +196,11 @@ export function AudioMessage({
         <div 
           className="flex-1 min-w-0 flex items-center gap-0.5 h-5 overflow-hidden cursor-pointer"
           onClick={(e) => {
-            if (!duration) return;
+            if (!displayDuration) return;
             const rect = e.currentTarget.getBoundingClientRect();
             const clickX = e.clientX - rect.left;
             const percentage = Math.max(0, Math.min(1, clickX / rect.width));
-            void seekTo(percentage * duration);
+            seekTo(percentage * displayDuration);
           }}
         >
           {barHeights.map((h, i) => {
@@ -266,9 +227,25 @@ export function AudioMessage({
           })}
         </div>
 
-        <span className={`text-[10px] tabular-nums shrink-0 ${isMe ? "text-white/70" : "text-muted-foreground"}`}>
-          {timeLabel}
-        </span>
+        <div className="flex flex-col items-end shrink-0 gap-0.5">
+          <span className={`text-[10px] tabular-nums ${isMe ? "text-white/70" : "text-muted-foreground"}`}>
+            {timeLabel}
+          </span>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              player.setPlaybackRate(player.playbackRate === 1 ? 1.5 : player.playbackRate === 1.5 ? 2 : 1);
+            }}
+            className={`text-[9px] font-bold px-1 py-0.5 rounded transition-colors ${
+              isMe 
+                ? "bg-white/10 hover:bg-white/20 text-white/80" 
+                : "bg-black/5 hover:bg-black/10 text-muted-foreground"
+            }`}
+          >
+            {player.playbackRate}x
+          </button>
+        </div>
       </div>
 
       {!hideTranscribe ? (
