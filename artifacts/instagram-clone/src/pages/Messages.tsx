@@ -2864,6 +2864,12 @@ export default function Messages() {
 
   const sendVoiceRecording = useCallback(() => {
     const recorder = mediaRecorderRef.current;
+    
+    // Always clear the UI state to prevent the recording indicator from getting stuck
+    if (timerRef.current) clearInterval(timerRef.current);
+    setRecording(false);
+    setRecordingTime(0);
+
     if (!recorder || !recording || recorder.state === "inactive") return;
     shouldSendVoiceRef.current = true;
     try {
@@ -2872,13 +2878,15 @@ export default function Messages() {
     } catch {
       /* ignore */
     }
-    if (timerRef.current) clearInterval(timerRef.current);
-    setRecording(false);
-    setRecordingTime(0);
   }, [recording]);
 
   const cancelRecording = useCallback(() => {
+    // Always clear UI state unconditionally
+    if (timerRef.current) clearInterval(timerRef.current);
+    setRecording(false);
+    setRecordingTime(0);
     shouldSendVoiceRef.current = false;
+    
     const recorder = mediaRecorderRef.current;
     if (recorder && recorder.state !== "inactive") {
       try {
@@ -2890,9 +2898,6 @@ export default function Messages() {
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
     mediaRecorderRef.current = null;
-    if (timerRef.current) clearInterval(timerRef.current);
-    setRecording(false);
-    setRecordingTime(0);
     chunksRef.current = [];
   }, []);
 
