@@ -2771,7 +2771,15 @@ export default function Messages() {
   const startRecording = useCallback(async () => {
     if (voiceSendInFlightRef.current || recording) return;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: false, // Disable to prevent muffled/pumping voice
+          sampleRate: 48000,
+          channelCount: 1,
+        }
+      });
       streamRef.current = stream;
       const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
         ? "audio/webm;codecs=opus"
@@ -2780,7 +2788,7 @@ export default function Messages() {
           : MediaRecorder.isTypeSupported("audio/mp4")
             ? "audio/mp4"
             : undefined;
-      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType, audioBitsPerSecond: 128000 } : { audioBitsPerSecond: 128000 });
       chunksRef.current = [];
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data);

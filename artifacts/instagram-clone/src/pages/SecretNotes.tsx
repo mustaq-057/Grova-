@@ -112,7 +112,15 @@ export default function SecretNotes() {
       return;
     }
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: false,
+          sampleRate: 48000,
+          channelCount: 1,
+        }
+      });
       noteStreamRef.current = stream;
       const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
         ? "audio/webm;codecs=opus"
@@ -121,7 +129,7 @@ export default function SecretNotes() {
           : MediaRecorder.isTypeSupported("audio/mp4")
             ? "audio/mp4"
             : undefined;
-      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType, audioBitsPerSecond: 128000 } : { audioBitsPerSecond: 128000 });
       noteChunksRef.current = [];
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) noteChunksRef.current.push(e.data);
