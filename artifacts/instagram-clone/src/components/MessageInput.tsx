@@ -1,6 +1,6 @@
 import { memo, useRef, useState, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
 import { createPortal } from "react-dom";
-import { Smile, Mic, Send, Sticker, Paperclip, X, MessageCircle, MapPin, PenTool, Zap, Plus, Image as ImageIcon, PlusCircle, Sparkles, FileText, Palette, File as FileIcon, AlertCircle, Camera, MessageSquarePlus, Type, Clock, Pause } from "lucide-react";
+import { Smile, Mic, Send, Sticker, Paperclip, X, MessageCircle, MapPin, PenTool, Zap, Plus, Image as ImageIcon, PlusCircle, Sparkles, FileText, Palette, File as FileIcon, AlertCircle, Camera, MessageSquarePlus, Type, Clock, Pause, Play } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import EmojiPicker from "@/components/EmojiPicker";
 import StickerPicker from "@/components/StickerPicker";
@@ -226,6 +226,58 @@ const LiveWaveform = ({ stream, paused }: { stream: MediaStream | null; paused?:
     />
   );
 };
+
+function AudioPreview({ url }: { url: string }) {
+  const [playing, setPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement>(null);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    
+    const handleEnded = () => setPlaying(false);
+    const handlePause = () => setPlaying(false);
+    const handlePlay = () => setPlaying(true);
+    
+    audio.addEventListener("ended", handleEnded);
+    audio.addEventListener("pause", handlePause);
+    audio.addEventListener("play", handlePlay);
+    
+    return () => {
+      audio.removeEventListener("ended", handleEnded);
+      audio.removeEventListener("pause", handlePause);
+      audio.removeEventListener("play", handlePlay);
+    };
+  }, []);
+
+  const toggle = () => {
+    if (!audioRef.current) return;
+    if (playing) {
+      audioRef.current.pause();
+    } else {
+      audioRef.current.currentTime = 0;
+      audioRef.current.play().catch(() => {});
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-2 bg-destructive/10 rounded-full pr-3 pl-1 py-1 border border-destructive/20">
+      <audio ref={audioRef} src={url} className="hidden" />
+      <button
+        type="button"
+        onClick={toggle}
+        className="w-7 h-7 rounded-full bg-destructive text-white flex items-center justify-center hover:bg-destructive/90 transition-colors"
+      >
+        {playing ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 ml-0.5" />}
+      </button>
+      <div className="flex items-center gap-0.5 opacity-60">
+        {[...Array(6)].map((_, i) => (
+          <div key={i} className={`w-1 rounded-full bg-destructive ${playing ? 'animate-pulse' : ''}`} style={{ height: playing ? `${Math.random() * 12 + 4}px` : '4px', transition: 'height 0.2s' }} />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputProps>(function MessageInput({
   onSendMessage,
@@ -757,7 +809,7 @@ export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputPro
           className="absolute -top-[52px] left-1/2 -translate-x-1/2 flex items-center gap-3 px-4 py-1.5 bg-destructive/15 backdrop-blur-xl text-destructive text-sm font-medium rounded-[20px] z-10 border border-destructive/20 shadow-lg"
         >
           {recordingPaused && recordingPreviewUrl ? (
-            <audio src={recordingPreviewUrl} controls className="h-8 max-w-[200px]" />
+            <AudioPreview url={recordingPreviewUrl} />
           ) : recordingStream ? (
             <LiveWaveform stream={recordingStream} paused={recordingPaused} />
           ) : (

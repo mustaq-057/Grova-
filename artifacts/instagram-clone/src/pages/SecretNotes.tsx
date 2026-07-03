@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useFeatureLoading } from "@/hooks/useFeatureLoading";
-import { Plus, Trash2, Lock, X, Shield, Mic, Pause } from "lucide-react";
+import { Plus, Trash2, Lock, X, Shield, Mic, Pause, Play } from "lucide-react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { api, type ApiSecretNote } from "@/lib/api";
@@ -11,6 +11,58 @@ import { partnerPossessiveNote } from "@/lib/partner-words";
 import { SecretNoteReader } from "@/components/SecretNoteReader";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { openLiveChannel } from "@/lib/sse-client";
+
+function AudioPreview({ url }: { url: string }) {
+  const [playing, setPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement>(null);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    
+    const handleEnded = () => setPlaying(false);
+    const handlePause = () => setPlaying(false);
+    const handlePlay = () => setPlaying(true);
+    
+    audio.addEventListener("ended", handleEnded);
+    audio.addEventListener("pause", handlePause);
+    audio.addEventListener("play", handlePlay);
+    
+    return () => {
+      audio.removeEventListener("ended", handleEnded);
+      audio.removeEventListener("pause", handlePause);
+      audio.removeEventListener("play", handlePlay);
+    };
+  }, []);
+
+  const toggle = () => {
+    if (!audioRef.current) return;
+    if (playing) {
+      audioRef.current.pause();
+    } else {
+      audioRef.current.currentTime = 0;
+      audioRef.current.play().catch(() => {});
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-3 bg-secondary/50 rounded-xl px-3 py-2 border border-border">
+      <audio ref={audioRef} src={url} className="hidden" />
+      <button
+        type="button"
+        onClick={toggle}
+        className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center hover:bg-primary/90 transition-colors shrink-0"
+      >
+        {playing ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
+      </button>
+      <div className="flex items-center gap-1 opacity-80 flex-1 overflow-hidden h-6">
+        {[...Array(24)].map((_, i) => (
+          <div key={i} className={`w-1.5 rounded-full bg-primary ${playing ? 'animate-pulse' : ''}`} style={{ height: playing ? `${Math.random() * 20 + 4}px` : '4px', transition: 'height 0.2s' }} />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function SecretNotes() {
   const { user } = useAuth();
@@ -414,7 +466,7 @@ export default function SecretNotes() {
               {voiceNoteUrl ? (
                 <div className="rounded-xl border border-border bg-secondary/30 p-3">
                   <p className="text-xs text-muted-foreground mb-2">Voice preview — saved with your passcode</p>
-                  <audio src={voiceNoteUrl} controls className="w-full" playsInline />
+                  <AudioPreview url={voiceNoteUrl} />
                 </div>
               ) : null}
               <input
