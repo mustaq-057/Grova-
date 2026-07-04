@@ -1728,8 +1728,7 @@ html[data-theme-id="tangled"] .tangled-shortcut-card:hover {
     inset 0 0 0 1px rgba(201, 162, 39, 0.25) !important;
 }
 
-/* Chat Card (Deep Blue) */
-html[data-theme-id="tangled"] a[href="/chat"] .tangled-shortcut-card {}
+
 
 /* Duas Card (Golden Amber) */
 html[data-theme-id="tangled"] a[href="/dua"] .tangled-shortcut-card {
@@ -1741,11 +1740,7 @@ html[data-theme-id="tangled"] a[href="/dua"] .tangled-shortcut-card .text-primar
   /* Dark brown icon for contrast on gold */
 }
 
-/* Memories Card (Soft Lavender) */
-html[data-theme-id="tangled"] a[href="/memories"] .tangled-shortcut-card {}
 
-/* Library Card (Medium Blue) */
-html[data-theme-id="tangled"] a[href="/library"] .tangled-shortcut-card {}
 
 /* Message input — warm parchment / forest */
 html[data-theme-id="tangled"] .message-input-pill {
@@ -1908,24 +1903,4 @@ html[data-theme-id="tangled"] .tangled-avatar-frame {
 html[data-theme-id="tangled"] .tangled-avatar-frame--partner {
   background-position: 100% 50%;
 }
-
-html[data-theme-id="tangled"] .tangled-chameleon {
-  position: absolute;
-  width: 22%;
-  height: auto;
-  z-index: 10;
-  pointer-events: none;
-  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.3));
-}
-
-html[data-theme-id="tangled"] .tangled-chameleon--self {
-  top: 62%;
-  left: 14%;
-  transform: rotate(-25deg);
-}
-
-html[data-theme-id="tangled"] .tangled-chameleon--partner {
-  top: 62%;
-  right: 14%;
-  transform: scaleX(-1) rotate(-25deg);
-}
+
