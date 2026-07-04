@@ -104,6 +104,76 @@ export const MustaqDecor = ({ className = "" }: { className?: string }) => (
   </svg>
 );
 
+// Tangled: Golden sun medallion with Rapunzel braid tendrils + purple flowers + chameleon
+export const TangledDecor = ({ className = "" }: { className?: string }) => (
+  <svg viewBox="0 0 200 200" fill="none" className={className}>
+    <defs>
+      <radialGradient id="tangledSunGlow" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stopColor="#fde68a" />
+        <stop offset="60%" stopColor="#f59e0b" />
+        <stop offset="100%" stopColor="#d97706" />
+      </radialGradient>
+      <radialGradient id="tangledInnerGlow" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stopColor="#fef9c3" />
+        <stop offset="100%" stopColor="#fbbf24" />
+      </radialGradient>
+    </defs>
+    {/* Braid tendrils top-left */}
+    <path d="M10,10 C30,40 20,70 40,90 C55,105 65,95 75,110" stroke="#c9a227" strokeWidth="3.5" strokeLinecap="round" fill="none" opacity="0.7"/>
+    <path d="M5,15 C25,50 15,80 35,100 C48,112 60,100 70,118" stroke="#fbbf24" strokeWidth="2" strokeLinecap="round" fill="none" opacity="0.5"/>
+    <path d="M15,5 C35,35 25,65 45,85 C60,98 70,90 80,102" stroke="#92400e" strokeWidth="1.5" strokeLinecap="round" fill="none" opacity="0.4"/>
+    {/* Sun rays */}
+    <line x1="100" y1="55" x2="100" y2="72" stroke="#fbbf24" strokeWidth="2.5" strokeLinecap="round" opacity="0.9"/>
+    <line x1="124" y1="62" x2="116" y2="77" stroke="#fbbf24" strokeWidth="2.5" strokeLinecap="round" opacity="0.9"/>
+    <line x1="140" y1="80" x2="127" y2="87" stroke="#fbbf24" strokeWidth="2.5" strokeLinecap="round" opacity="0.9"/>
+    <line x1="145" y1="100" x2="128" y2="100" stroke="#fbbf24" strokeWidth="2.5" strokeLinecap="round" opacity="0.9"/>
+    <line x1="140" y1="120" x2="127" y2="113" stroke="#fbbf24" strokeWidth="2.5" strokeLinecap="round" opacity="0.9"/>
+    <line x1="124" y1="138" x2="116" y2="123" stroke="#fbbf24" strokeWidth="2.5" strokeLinecap="round" opacity="0.9"/>
+    <line x1="100" y1="145" x2="100" y2="128" stroke="#fbbf24" strokeWidth="2.5" strokeLinecap="round" opacity="0.9"/>
+    <line x1="76" y1="138" x2="84" y2="123" stroke="#fbbf24" strokeWidth="2.5" strokeLinecap="round" opacity="0.9"/>
+    <line x1="60" y1="120" x2="73" y2="113" stroke="#fbbf24" strokeWidth="2.5" strokeLinecap="round" opacity="0.9"/>
+    <line x1="55" y1="100" x2="72" y2="100" stroke="#fbbf24" strokeWidth="2.5" strokeLinecap="round" opacity="0.9"/>
+    <line x1="60" y1="80" x2="73" y2="87" stroke="#fbbf24" strokeWidth="2.5" strokeLinecap="round" opacity="0.9"/>
+    <line x1="76" y1="62" x2="84" y2="77" stroke="#fbbf24" strokeWidth="2.5" strokeLinecap="round" opacity="0.9"/>
+    {/* Sun body */}
+    <circle cx="100" cy="100" r="26" fill="url(#tangledSunGlow)" opacity="0.95"/>
+    <circle cx="100" cy="100" r="18" fill="url(#tangledInnerGlow)" opacity="1"/>
+    <circle cx="100" cy="100" r="10" fill="#fef3c7" opacity="0.95"/>
+    {/* Purple flowers top-right */}
+    <g transform="translate(155, 35)">
+      <ellipse cx="0" cy="-10" rx="5" ry="9" fill="#c084fc" opacity="0.9"/>
+      <ellipse cx="7" cy="-7" rx="5" ry="9" transform="rotate(30 7 -7)" fill="#a855f7" opacity="0.85"/>
+      <ellipse cx="9" cy="2" rx="5" ry="9" transform="rotate(60 9 2)" fill="#c084fc" opacity="0.9"/>
+      <ellipse cx="5" cy="10" rx="5" ry="9" transform="rotate(90 5 10)" fill="#d8b4fe" opacity="0.85"/>
+      <ellipse cx="-4" cy="10" rx="5" ry="9" transform="rotate(120 -4 10)" fill="#a855f7" opacity="0.9"/>
+      <ellipse cx="-9" cy="2" rx="5" ry="9" transform="rotate(150 -9 2)" fill="#c084fc" opacity="0.8"/>
+      <circle cx="0" cy="0" r="4" fill="#fde68a"/>
+    </g>
+    {/* Small flower bottom-left */}
+    <g transform="translate(38, 160) scale(0.7)">
+      <ellipse cx="0" cy="-8" rx="4" ry="7" fill="#e9d5ff" opacity="0.8"/>
+      <ellipse cx="6" cy="-4" rx="4" ry="7" transform="rotate(45 6 -4)" fill="#c084fc" opacity="0.8"/>
+      <ellipse cx="6" cy="4" rx="4" ry="7" transform="rotate(90 6 4)" fill="#e9d5ff" opacity="0.8"/>
+      <ellipse cx="0" cy="8" rx="4" ry="7" transform="rotate(135 0 8)" fill="#c084fc" opacity="0.7"/>
+      <ellipse cx="-6" cy="4" rx="4" ry="7" transform="rotate(180 -6 4)" fill="#e9d5ff" opacity="0.8"/>
+      <ellipse cx="-6" cy="-4" rx="4" ry="7" transform="rotate(225 -6 -4)" fill="#c084fc" opacity="0.7"/>
+      <circle cx="0" cy="0" r="3.5" fill="#fde68a"/>
+    </g>
+    {/* Pascal the chameleon */}
+    <g transform="translate(158, 155) scale(0.85)" opacity="0.75">
+      <ellipse cx="0" cy="0" rx="12" ry="7" fill="#16a34a"/>
+      <ellipse cx="14" cy="-2" rx="7" ry="5" fill="#15803d"/>
+      <circle cx="20" cy="-4" r="3.5" fill="#16a34a"/>
+      <circle cx="22" cy="-5.5" r="1.2" fill="#fff"/>
+      <path d="M-10,4 C-14,8 -16,14 -13,18" stroke="#15803d" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
+    </g>
+    {/* Glint dots */}
+    <circle cx="60" cy="25" r="2" fill="#fde68a" opacity="0.7"/>
+    <circle cx="170" cy="80" r="1.5" fill="#fbbf24" opacity="0.8"/>
+    <circle cx="25" cy="130" r="1.5" fill="#fde68a" opacity="0.6"/>
+  </svg>
+);
+
 export const ThemeCornerDecor = memo(({ theme }: { theme: AppThemeId }) => {
   if (theme === "floura") return (
     <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
@@ -145,6 +215,16 @@ export const ThemeCornerDecor = memo(({ theme }: { theme: AppThemeId }) => {
       </div>
     </div>
   );
+  if (theme === "tangled") return (
+    <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
+      <div className="absolute top-[-15px] left-[-15px] w-52 h-52 opacity-50 pointer-events-none">
+        <TangledDecor className="w-full h-full drop-shadow-lg" />
+      </div>
+      <div className="absolute top-[-10px] right-[-20px] w-40 h-40 opacity-35 pointer-events-none scale-x-[-1]">
+        <TangledDecor className="w-full h-full drop-shadow-md" />
+      </div>
+    </div>
+  );
   return null;
 });
 
@@ -153,5 +233,6 @@ export const ThemeShortcutDecor = memo(({ theme }: { theme: AppThemeId }) => {
   if (theme === "mint") return <div className="absolute -top-4 -right-4 w-20 h-20 opacity-25 pointer-events-none text-emerald-400 -rotate-12"><MintDecor className="w-full h-full" /></div>;
   if (theme === "sara-lavender") return <div className="absolute -top-4 -right-4 w-16 h-16 opacity-25 pointer-events-none text-purple-400 rotate-45"><SaraDecor className="w-full h-full" /></div>;
   if (theme === "mustaq") return <div className="absolute -top-2 -right-2 w-16 h-16 opacity-20 pointer-events-none"><MustaqDecor className="w-full h-full" /></div>;
+  if (theme === "tangled") return <div className="absolute -top-3 -right-3 w-20 h-20 opacity-35 pointer-events-none"><TangledDecor className="w-full h-full" /></div>;
   return null;
 });

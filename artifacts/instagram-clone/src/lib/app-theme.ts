@@ -12,7 +12,8 @@ export type AppThemeId =
   | "mustaq"
   | "autumn-amber"
   | "petrichor"
-  | "snowfall";
+  | "snowfall"
+  | "tangled";
 
 const PREMIUM_ANIMATED_THEMES: AppThemeId[] = ["moonlight-saga"];
 
@@ -35,6 +36,7 @@ const THEME_BACKGROUNDS: Partial<Record<AppThemeId, string>> = {
   "autumn-amber": "/themes/autumn-amber-bg.png",
   "petrichor": "/themes/petrichor-bg.png",
   "snowfall": "/themes/snowfall-bg.png",
+  "tangled": "/themes/tangled1.png",
 };
 
 export const APP_THEME_CHANGED = "grova-app-theme-changed";
@@ -268,6 +270,28 @@ export const APP_THEMES: {
         "--app-border": "210 10% 88%",
       },
     },
+    {
+      id: "tangled",
+      name: "Tangled",
+      description: "Rapunzel's enchanted forest 🌿✨",
+      swatch: "bg-gradient-to-br from-[#1a3d2b] via-[#2d5a3d] to-[#c9a227]",
+      dark: {
+        "--app-background": "150 35% 8%",   // Deep forest green
+        "--app-foreground": "45 30% 93%",   // Warm parchment white
+        "--app-primary": "42 75% 52%",      // Rapunzel gold
+        "--app-card": "150 30% 11%",
+        "--app-secondary": "150 25% 15%",
+        "--app-border": "150 20% 20%",
+      },
+      light: {
+        "--app-background": "45 25% 96%",
+        "--app-foreground": "150 35% 12%",
+        "--app-primary": "38 80% 42%",      // Deeper gold for light
+        "--app-card": "0 0% 100%",
+        "--app-secondary": "150 20% 92%",
+        "--app-border": "150 15% 86%",
+      },
+    },
   ];
 
 let currentAppTheme: AppThemeId = "sara-lavender";
@@ -373,6 +397,10 @@ export function isSnowfallTheme(themeId?: AppThemeId): boolean {
   return (themeId ?? getStoredAppTheme()) === "snowfall";
 }
 
+export function isTangledTheme(themeId?: AppThemeId): boolean {
+  return (themeId ?? getStoredAppTheme()) === "tangled";
+}
+
 export function getThemeBackgroundUrl(themeId?: AppThemeId): string | null {
   const id = themeId ?? getStoredAppTheme();
   return THEME_BACKGROUNDS[id] ?? null;
@@ -393,6 +421,7 @@ export function getThemeBackgroundOpacity(themeId?: AppThemeId): number {
   if (id === "autumn-amber") return 1.0;
   if (id === "petrichor") return 1.0;
   if (id === "snowfall") return 1.0;
+  if (id === "tangled") return 1.0;
   return 0.28;
 }
 
@@ -436,6 +465,12 @@ export function getPhotoScrimGradient(themeId: AppThemeId, dark: boolean): strin
     return dark
       ? "linear-gradient(180deg, rgba(20,25,30,0.4) 0%, rgba(15,20,25,0.8) 100%)"
       : "linear-gradient(180deg, rgba(230,235,240,0.3) 0%, rgba(220,225,230,0.6) 100%)";
+  }
+
+  if (themeId === "tangled") {
+    return dark
+      ? "linear-gradient(180deg, rgba(10,28,18,0.35) 0%, rgba(8,22,14,0.75) 100%)"
+      : "linear-gradient(180deg, rgba(240,245,235,0.3) 0%, rgba(230,240,225,0.65) 100%)";
   }
 
   return dark
