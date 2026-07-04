@@ -45,7 +45,7 @@ import { EditMessageBar } from "@/components/EditMessageBar";
 import { defaultAvatar } from "@/lib/avatars";
 import { AvatarImage } from "@/components/AvatarImage";
 import { saveMemoryFromMessage, removeMemory } from "@/lib/memories";
-import { APP_THEME_CHANGED, getStoredAppTheme, isMoonlightSagaTheme, getPremiumChatThemeClass, isPremiumAnimatedTheme, type AppThemeId } from "@/lib/app-theme";
+import { APP_THEME_CHANGED, getStoredAppTheme, isMoonlightSagaTheme, getPremiumChatThemeClass, isPremiumAnimatedTheme, isTangledTheme, type AppThemeId } from "@/lib/app-theme";
 import { useAppSearchParams } from "@/lib/app-search";
 import { ChatAuroraLayer } from "@/components/ChatAuroraLayer";
 
@@ -3277,6 +3277,9 @@ export default function Messages() {
           {/* ── Header ── */}
           <div className="chat-panel-header flex items-center gap-1.5 sm:gap-2 px-1.5 sm:px-3 py-1 sm:py-1.5 border-b shrink-0 text-foreground">
             <div className="relative shrink-0">
+              {isTangledTheme(appThemeId) && (
+                <img src="/themes/camelon_final.png?v=3" alt="" className="absolute -top-3 -right-3 w-6 h-6 z-30 drop-shadow-sm object-contain -rotate-12 pointer-events-none" />
+              )}
               <AvatarImage src={pAvatar} userId={partnerId} alt={pName} className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover" />
               {presence.online && (
                 <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-background" />
