@@ -250,9 +250,6 @@ export default memo(function Home() {
               className={`relative flex items-center justify-center gap-5 sm:gap-7 mt-8 mb-3 w-full max-w-[340px] mx-auto ${appTheme === 'library' ? 'library-locket-container' : ''} ${appTheme === 'mint' ? 'home-avatar-mint-glow' : ''}`}
             >
               <div className="relative">
-                {isTangled && (
-                  <img src="/themes/camelon_final.png?v=3" alt="" className="absolute top-[10%] -left-[28px] sm:-left-[36px] w-[72px] h-[72px] sm:w-[86px] sm:h-[86px] z-30 drop-shadow-[0_4px_8px_rgba(0,0,0,0.3)] object-contain rotate-[35deg]" />
-                )}
                 {/* My avatar — tap to view/add story */}
                 <button
                   type="button"
@@ -265,7 +262,7 @@ export default memo(function Home() {
                   alt=""
                   className={`w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-[3px] bg-background ${isTangled ? "border-transparent shadow-none relative z-10" : `shadow-[0_0_20px_rgba(var(--primary),0.25)] ${myStories.length > 0 ? "border-background" : "border-primary/40"}`} ${appTheme === 'library' ? 'library-locket' : ''}`}
                 />
-                {isTangled && <TangledAvatarFrame className="absolute inset-[-15%] w-[130%] h-[130%] z-20 pointer-events-none drop-shadow-md" />}
+                {isTangled && <img src="/themes/profile.png" alt="" className="absolute inset-[-16%] w-[132%] h-[132%] z-20 pointer-events-none drop-shadow-md object-contain" />}
                 {!loadingStories && myStories.length === 0 ? (
                   <div className="absolute bottom-0 right-0 w-6 h-6 sm:w-7 sm:h-7 bg-blue-500 rounded-full border-[3px] border-background flex items-center justify-center z-20">
                     <Plus className="w-3 h-3 sm:w-4 sm:h-4 text-white" strokeWidth={3} />
@@ -306,9 +303,6 @@ export default memo(function Home() {
               </Link>
 
               <div className="relative">
-                {isTangled && (
-                  <img src="/themes/camelon_final.png?v=3" alt="" className="absolute top-[10%] -right-[28px] sm:-right-[36px] w-[72px] h-[72px] sm:w-[86px] sm:h-[86px] z-30 drop-shadow-[0_4px_8px_rgba(0,0,0,0.3)] object-contain scale-x-[-1] -rotate-[35deg]" />
-                )}
                 {/* Partner avatar — tap to view story if they have one, else do nothing */}
                 <button
                   type="button"
@@ -331,7 +325,7 @@ export default memo(function Home() {
                   alt=""
                   className={`w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-[3px] bg-background ${isTangled ? "border-transparent shadow-none relative z-10" : `shadow-[0_0_20px_rgba(var(--primary),0.25)] ${partnerStories.length > 0 ? "border-background" : "border-primary/40"}`} ${appTheme === 'library' ? 'library-locket' : ''}`}
                 />
-                {isTangled && <TangledAvatarFrame className="absolute inset-[-15%] w-[130%] h-[130%] z-20 pointer-events-none drop-shadow-md scale-x-[-1]" />}
+                {isTangled && <img src="/themes/profile.png" alt="" className="absolute inset-[-16%] w-[132%] h-[132%] z-20 pointer-events-none drop-shadow-md object-contain scale-x-[-1]" />}
                 <div
                   className={`absolute bottom-0 right-0 w-5 h-5 sm:w-6 sm:h-6 rounded-full border-[3px] border-background z-20 shadow-sm ${partnerOnline ? "bg-green-500" : "bg-gray-400"}`}
                   aria-label={partnerOnline ? "Partner is online" : "Partner is offline"}
@@ -399,7 +393,7 @@ export default memo(function Home() {
                 tabIndex={0}
                 aria-label={`Navigate to ${s.label}: ${s.desc}`}
               >
-                {isTangled && <TangledCardDecor className="absolute inset-0 w-full h-full pointer-events-none" />}
+                {isTangled && <img src="/themes/template.png" alt="" className="absolute inset-0 w-full h-full object-cover pointer-events-none z-0" />}
 
                 <div className={`w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mb-3 group-hover:bg-primary/20 transition-colors ${appTheme === 'library' ? 'library-shortcut-icon-wrapper' : ''} ${isTangled ? 'bg-black/30 group-hover:bg-black/40 backdrop-blur-sm z-10 relative mb-0' : ''}`}>
                   <Icon className={`w-5 h-5 text-primary ${appTheme === 'library' ? 'library-shortcut-icon' : ''} ${isTangled ? '!text-amber-300 drop-shadow-sm' : ''}`} aria-hidden="true" />
@@ -427,9 +421,6 @@ export default memo(function Home() {
                 )}
                 
                 {!isTangled && <ThemeShortcutDecor theme={appTheme} />}
-                {isTangled && s.href === '/chat' && (
-                  <img src="/themes/camelon_final.png?v=3" alt="" className="absolute -top-4 -right-4 w-16 h-16 z-20 drop-shadow-lg object-contain -rotate-12" />
-                )}
               </motion.div>
             </Link>
           );

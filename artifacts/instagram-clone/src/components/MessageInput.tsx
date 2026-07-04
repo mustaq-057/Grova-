@@ -823,7 +823,7 @@ export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputPro
 
       <div className={`message-input-pill flex items-center gap-[8px] sm:gap-[10px] py-[7px] sm:py-[9px] pr-[8px] sm:pr-[14px] pl-[5px] sm:pl-[9px] mx-[4px] md:mx-auto md:w-full md:max-w-[800px] ${
         isTangled 
-          ? 'bg-[#1f2227] rounded-[40px] border-2 border-[#fcd34d] shadow-[0_0_25px_rgba(252,211,77,0.9)]' 
+          ? 'bg-[#1f2227] rounded-[40px] border-2 border-[#fcd34d] shadow-[0_0_30px_#fcd34d]' 
           : 'bg-[#1a1a1a] rounded-[40px]'
       } ${scheduledTime ? 'rounded-tl-none rounded-tr-none border-t-0 border-primary/30' : ''}`}>
         {/* eslint-disable-next-line */}

@@ -220,9 +220,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
                       {showTangled && item.label === 'Home' ? (
                         <img src="/themes/prince.png?v=2" alt="Home" className={`w-[56px] h-[56px] object-contain scale-[1.2] drop-shadow-[0_0_12px_rgba(252,211,77,0.6)] ${!isActive && 'opacity-70 group-hover:opacity-100 transition-opacity'}`} />
                       ) : showTangled && item.label === 'Chat' ? (
-                        <img src="/themes/chat.png?v=2" alt="Chat" className={`w-[68px] h-[68px] object-contain scale-[1.6] drop-shadow-[0_0_20px_rgba(252,211,77,1)] ${!isActive && 'opacity-70 group-hover:opacity-100 transition-opacity'}`} />
+                        <img src="/themes/chat.png?v=2" alt="Chat" className={`w-[68px] h-[68px] object-contain scale-[1.6] drop-shadow-[0_0_20px_rgba(252,211,77,1)]`} />
                       ) : (
-                        <Icon className={`w-6 h-6 ${isActive && !showTangled ? "text-primary" : ""} ${showTangled && ['Photos', 'Notifications'].includes(item.label) ? "drop-shadow-[0_0_12px_rgba(252,211,77,0.8)] text-[#fcd34d]" : ""}`} strokeWidth={isActive ? 2.5 : 1.5} />
+                        <Icon className={`w-6 h-6 ${isActive && !showTangled ? "text-primary" : ""} ${showTangled && ['Photos', 'Notifications', 'Settings'].includes(item.label) ? "drop-shadow-[0_0_12px_rgba(252,211,77,0.8)] text-[#fcd34d]" : ""}`} strokeWidth={isActive ? 2.5 : 1.5} />
                       )}
                       {badge > 0 && (
                         <span className={`absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 bg-red-600 text-[10px] text-white rounded-full flex items-center justify-center font-bold shadow-md ring-2 ring-background z-30 ${appTheme === 'library' ? 'wax-seal' : ''}`}>
@@ -278,9 +278,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   {showTangled && item.label === 'Home' ? (
                     <img src="/themes/prince.png?v=2" alt="Home" className={`w-[52px] h-[52px] sm:w-[58px] sm:h-[58px] object-contain drop-shadow-[0_0_12px_rgba(252,211,77,0.6)] scale-[1.1] ${!isActive && 'opacity-70 group-hover:opacity-100 transition-opacity'}`} />
                   ) : showTangled && item.label === 'Chat' ? (
-                    <img src="/themes/chat.png?v=2" alt="Chat" className={`w-[60px] h-[60px] sm:w-[68px] sm:h-[68px] object-contain drop-shadow-[0_0_20px_rgba(252,211,77,1)] scale-[1.7] ${!isActive && 'opacity-70 group-hover:opacity-100 transition-opacity'}`} />
+                    <img src="/themes/chat.png?v=2" alt="Chat" className={`w-[60px] h-[60px] sm:w-[68px] sm:h-[68px] object-contain drop-shadow-[0_0_20px_rgba(252,211,77,1)] scale-[1.7]`} />
                   ) : (
-                    <Icon className={`w-5 h-5 sm:w-5 sm:h-5 ${showTangled && ['Photos', 'Notifications'].includes(item.label) ? "drop-shadow-[0_0_12px_rgba(252,211,77,0.8)] text-[#fcd34d]" : ""}`} strokeWidth={isActive ? 2.5 : 1.5} />
+                    <Icon className={`w-5 h-5 sm:w-5 sm:h-5 ${showTangled && ['Photos', 'Notifications', 'Settings'].includes(item.label) ? "drop-shadow-[0_0_12px_rgba(252,211,77,0.8)] text-[#fcd34d]" : ""}`} strokeWidth={isActive ? 2.5 : 1.5} />
                   )}
                   {badge > 0 && (
                     <span className={`absolute -top-1.5 -right-1.5 z-30 min-w-[20px] h-5 px-1 bg-red-600 text-[11px] text-white rounded-full flex items-center justify-center font-bold shadow-lg ring-2 ring-background ${appTheme === 'library' ? 'wax-seal' : ''}`}>
@@ -300,7 +300,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           aria-label="All features"
         >
           <div className="p-2 sm:p-1.5 rounded-xl hover:bg-secondary/50">
-            <Menu className="w-5 h-5" strokeWidth={1.5} />
+            <Menu className={`w-5 h-5 ${showTangled ? "drop-shadow-[0_0_12px_rgba(252,211,77,0.8)] text-[#fcd34d]" : ""}`} strokeWidth={1.5} />
           </div>
         </button>
       </nav>
