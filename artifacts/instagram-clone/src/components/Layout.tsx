@@ -22,21 +22,7 @@ import { SnowfallOverlay } from "@/components/SnowfallOverlay";
 import { FallingTangledOverlay } from "@/components/FallingTangledOverlay";
 import { PremiumThemeOverlay } from "@/components/PremiumThemeOverlay";
 import { ThemeBackgroundOverlay } from "@/components/ThemeBackgroundOverlay";
-import {
-  APP_THEME_CHANGED,
-  getStoredAppTheme,
-  isSakuraFallTheme,
-  isMoonlightSagaTheme,
-  isSaraLavenderTheme,
-  isPremiumAnimatedTheme,
-  isMustaqTheme,
-  isAutumnAmberTheme,
-  isPetrichorTheme,
-  isSnowfallTheme,
-  isTangledTheme,
-  themeUsesPhotoBackground,
-  type AppThemeId,
-} from "@/lib/app-theme";
+import { getStoredAppTheme, isTangledTheme } from "@/lib/app-theme";
 import { MobileMenuGrid } from "./MobileMenuGrid";
 import { api } from "@/lib/api";
 import { writeChatCache } from "@/lib/chat-cache";
@@ -62,11 +48,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const showSakura = isSakuraFallTheme(appTheme);
   const showAurora = isMoonlightSagaTheme(appTheme);
   const showSaraLavender = isSaraLavenderTheme(appTheme);
-  const showMustaqNames = isMustaqTheme(appTheme);
-  const showAutumnLeaves = isAutumnAmberTheme(appTheme);
+    const showAutumnLeaves = isAutumnAmberTheme(appTheme);
   const showRainstorm = isPetrichorTheme(appTheme);
-  const showSnowfall = isSnowfallTheme(appTheme);
-  const showTangled = isTangledTheme(appTheme);
+    const showTangled = isTangledTheme(appTheme);
   const showPremiumScene = isPremiumAnimatedTheme(appTheme) && !isChat;
   const showThemeBg = themeUsesPhotoBackground(appTheme);
   const isLibrary = location.startsWith("/library") || location.startsWith("/read");
@@ -174,11 +158,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
       {showAurora && !showPremiumScene && <></>}
       {showSakura && <FallingFlowersOverlay />}
       {showSaraLavender && <FallingNamesOverlay />}
-      {showMustaqNames && <FallingMustaqOverlay />}
-      {showAutumnLeaves && <FallingAutumnOverlay />}
+            {showAutumnLeaves && <FallingAutumnOverlay />}
       {showRainstorm && <RainstormOverlay />}
-      {showSnowfall && <SnowfallOverlay />}
-      {showTangled && <FallingTangledOverlay />}
+            {showTangled && <FallingTangledOverlay />}
       {/* Desktop Sidebar */}
       {!libraryMode && (
         <nav

@@ -3,17 +3,15 @@
 import { loadPersistedDarkMode, persistDarkMode } from "./couple-prefs-persist";
 
 export type AppThemeId =
+  | "tangled"
   | "sakura-fall"
   | "sara-lavender"
   | "moonlight-saga"
   | "floura"
   | "mint"
   | "library"
-  | "mustaq"
   | "autumn-amber"
-  | "petrichor"
-  | "snowfall"
-  | "tangled";
+  | "petrichor";
 
 const PREMIUM_ANIMATED_THEMES: AppThemeId[] = ["moonlight-saga"];
 
@@ -28,15 +26,13 @@ const RETIRED_THEME_ALIASES: Record<string, AppThemeId> = {
 };
 
 const THEME_BACKGROUNDS: Partial<Record<AppThemeId, string>> = {
+  "tangled": "/themes/tangled1.png",
   "sara-lavender": "/themes/sara-lilies.jpg",
   "floura": "/themes/saralikedtheme.png",
   "mint": "/mint-home.png",
   "library": "/themes/library-bg.png",
-  "mustaq": "/themes/mustaq-bg.png",
   "autumn-amber": "/themes/autumn-amber-bg.png",
   "petrichor": "/themes/petrichor-bg.png",
-  "snowfall": "/themes/snowfall-bg.png",
-  "tangled": "/themes/tangled1.png",
 };
 
 export const APP_THEME_CHANGED = "grova-app-theme-changed";
@@ -49,6 +45,28 @@ export const APP_THEMES: {
   dark: Record<string, string>;
   light: Record<string, string>;
 }[] = [
+    {
+      id: "tangled",
+      name: "Tangled",
+      description: "Rapunzel's enchanted forest 🌿✨",
+      swatch: "bg-gradient-to-br from-[#1a3d2b] via-[#2d5a3d] to-[#c9a227]",
+      dark: {
+        "--app-background": "150 35% 8%",   // Deep forest green
+        "--app-foreground": "45 30% 93%",   // Warm parchment white
+        "--app-primary": "42 75% 52%",      // Rapunzel gold
+        "--app-card": "150 30% 11%",
+        "--app-secondary": "150 25% 15%",
+        "--app-border": "150 20% 20%",
+      },
+      light: {
+        "--app-background": "45 25% 96%",
+        "--app-foreground": "150 35% 12%",
+        "--app-primary": "38 80% 42%",      // Deeper gold for light
+        "--app-card": "0 0% 100%",
+        "--app-secondary": "150 20% 92%",
+        "--app-border": "150 15% 86%",
+      },
+    },
     {
       id: "floura",
       name: "Floura",
@@ -182,115 +200,6 @@ export const APP_THEMES: {
         "--app-border": "210 18% 85%",
       },
     },
-    {
-      id: "mustaq",
-      name: "Mustaq",
-      description: "Dark, sleek, and premium obsidian vibes ✦",
-      swatch: "bg-gradient-to-br from-neutral-900 via-zinc-900 to-amber-900/50",
-      dark: {
-        "--app-background": "240 10% 4%",
-        "--app-foreground": "45 20% 90%",
-        "--app-primary": "40 80% 60%", // Gold/Amber accent
-        "--app-card": "240 8% 8%",
-        "--app-secondary": "240 6% 12%",
-        "--app-border": "240 5% 18%",
-      },
-      light: {
-        "--app-background": "240 5% 96%",
-        "--app-foreground": "240 20% 10%",
-        "--app-primary": "35 90% 40%", // Darker gold for light mode
-        "--app-card": "0 0% 100%",
-        "--app-secondary": "240 5% 90%",
-        "--app-border": "240 5% 85%",
-      },
-    },
-    {
-      id: "autumn-amber",
-      name: "Autumn Amber",
-      description: "Warm, cozy golden canopy 🍂",
-      swatch: "bg-gradient-to-br from-amber-600 via-orange-500 to-yellow-600",
-      dark: {
-        "--app-background": "25 25% 10%",
-        "--app-foreground": "35 30% 95%",
-        "--app-primary": "25 80% 60%", // Warm amber/orange
-        "--app-card": "25 20% 12%",
-        "--app-secondary": "25 15% 18%",
-        "--app-border": "25 15% 24%",
-      },
-      light: {
-        "--app-background": "35 20% 96%",
-        "--app-foreground": "25 30% 15%",
-        "--app-primary": "25 85% 50%", // Darker amber for light mode
-        "--app-card": "0 0% 100%",
-        "--app-secondary": "35 15% 92%",
-        "--app-border": "35 10% 88%",
-      },
-    },
-    {
-      id: "petrichor",
-      name: "Petrichor",
-      description: "Calm, rainy forest window 🌧️",
-      swatch: "bg-gradient-to-br from-slate-700 via-zinc-600 to-gray-700",
-      dark: {
-        "--app-background": "200 15% 12%",
-        "--app-foreground": "200 10% 95%",
-        "--app-primary": "180 30% 60%", // Muted teal/silver
-        "--app-card": "200 12% 16%",
-        "--app-secondary": "200 10% 20%",
-        "--app-border": "200 8% 28%",
-      },
-      light: {
-        "--app-background": "200 10% 94%",
-        "--app-foreground": "200 15% 15%",
-        "--app-primary": "180 35% 45%", // Muted teal for light mode
-        "--app-card": "0 0% 100%",
-        "--app-secondary": "200 12% 88%",
-        "--app-border": "200 10% 82%",
-      },
-    },
-    {
-      id: "snowfall",
-      name: "Snowfall",
-      description: "Deep winter parallax snow ❄️",
-      swatch: "bg-gradient-to-br from-slate-300 via-blue-100 to-white",
-      dark: {
-        "--app-background": "220 30% 10%",
-        "--app-foreground": "210 20% 95%",
-        "--app-primary": "210 80% 80%", // Frosty blue
-        "--app-card": "220 25% 14%",
-        "--app-secondary": "220 20% 18%",
-        "--app-border": "220 15% 24%",
-      },
-      light: {
-        "--app-background": "210 20% 96%",
-        "--app-foreground": "220 30% 15%",
-        "--app-primary": "210 70% 50%", // Deep icy blue
-        "--app-card": "0 0% 100%",
-        "--app-secondary": "210 15% 92%",
-        "--app-border": "210 10% 88%",
-      },
-    },
-    {
-      id: "tangled",
-      name: "Tangled",
-      description: "Rapunzel's enchanted forest 🌿✨",
-      swatch: "bg-gradient-to-br from-[#1a3d2b] via-[#2d5a3d] to-[#c9a227]",
-      dark: {
-        "--app-background": "150 35% 8%",   // Deep forest green
-        "--app-foreground": "45 30% 93%",   // Warm parchment white
-        "--app-primary": "42 75% 52%",      // Rapunzel gold
-        "--app-card": "150 30% 11%",
-        "--app-secondary": "150 25% 15%",
-        "--app-border": "150 20% 20%",
-      },
-      light: {
-        "--app-background": "45 25% 96%",
-        "--app-foreground": "150 35% 12%",
-        "--app-primary": "38 80% 42%",      // Deeper gold for light
-        "--app-card": "0 0% 100%",
-        "--app-secondary": "150 20% 92%",
-        "--app-border": "150 15% 86%",
-      },
     },
   ];
 
@@ -381,9 +290,6 @@ export function isSaraLavenderTheme(themeId?: AppThemeId): boolean {
   return (themeId ?? getStoredAppTheme()) === "sara-lavender";
 }
 
-export function isMustaqTheme(themeId?: AppThemeId): boolean {
-  return (themeId ?? getStoredAppTheme()) === "mustaq";
-}
 
 export function isAutumnAmberTheme(themeId?: AppThemeId): boolean {
   return (themeId ?? getStoredAppTheme()) === "autumn-amber";
@@ -393,9 +299,6 @@ export function isPetrichorTheme(themeId?: AppThemeId): boolean {
   return (themeId ?? getStoredAppTheme()) === "petrichor";
 }
 
-export function isSnowfallTheme(themeId?: AppThemeId): boolean {
-  return (themeId ?? getStoredAppTheme()) === "snowfall";
-}
 
 export function isTangledTheme(themeId?: AppThemeId): boolean {
   return (themeId ?? getStoredAppTheme()) === "tangled";
@@ -417,10 +320,8 @@ export function getThemeBackgroundOpacity(themeId?: AppThemeId): number {
   if (id === "floura") return 1.0;
   if (id === "mint") return 1.0;
   if (id === "library") return 1.0;
-  if (id === "mustaq") return 1.0;
   if (id === "autumn-amber") return 1.0;
   if (id === "petrichor") return 1.0;
-  if (id === "snowfall") return 1.0;
   if (id === "tangled") return 1.0;
   return 0.28;
 }
@@ -452,11 +353,6 @@ export function getPhotoScrimGradient(themeId: AppThemeId, dark: boolean): strin
     return dark
       ? "linear-gradient(180deg, rgba(30,20,15,0.5) 0%, rgba(20,10,5,0.85) 100%)"
       : "linear-gradient(180deg, rgba(250,240,230,0.4) 0%, rgba(240,230,215,0.7) 100%)";
-  }
-  if (themeId === "mustaq") {
-    return dark
-      ? "linear-gradient(180deg, rgba(10,10,12,0.4) 0%, rgba(5,5,8,0.85) 100%)"
-      : "linear-gradient(180deg, rgba(250,250,252,0.3) 0%, rgba(240,240,245,0.6) 100%)";
   }
   if (themeId === "autumn-amber") {
     return dark

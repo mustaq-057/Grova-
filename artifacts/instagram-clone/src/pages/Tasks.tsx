@@ -86,10 +86,7 @@ function CustomSelect({
 export default function Tasks() {
   const { user, partner } = useAuth();
   const partnerId = user?.id === "me" ? "wife" : "me";
-  const mustaqLabel =
-    user?.id === "me"
-      ? (user.name?.split(" ")[0] ?? "Mustaq")
-      : (partner?.name?.split(" ")[0] ?? "Mustaq");
+  const mustaqLabel = "Hubby";
   const saraLabel =
     user?.id === "wife"
       ? (user.name?.split(" ")[0] ?? "Sara")

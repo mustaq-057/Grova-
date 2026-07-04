@@ -16,7 +16,7 @@ import { USER_TIMEZONES } from "@/lib/timezones";
 import { CameraOverlay } from "@/components/CameraOverlay";
 import { StoryViewer } from "@/components/StoryViewer";
 import { AvatarNoteModal } from "@/components/AvatarNoteModal";
-import { isAutumnAmberTheme, isPetrichorTheme, isSnowfallTheme, isTangledTheme } from "@/lib/app-theme";
+import { isAutumnAmberTheme, isPetrichorTheme, isTangledTheme } from "@/lib/app-theme";
 import { AutumnHomeDecor, AutumnBranch } from "@/components/AutumnHomeDecor";
 import { PetrichorHomeDecor, PetrichorCloud } from "@/components/PetrichorHomeDecor";
 import { SnowflakeDecor } from "@/components/SnowfallOverlay";
@@ -203,8 +203,7 @@ export default memo(function Home() {
 
   const isAutumnAmber = isAutumnAmberTheme(appTheme);
   const isPetrichor = isPetrichorTheme(appTheme);
-  const isSnowfall = isSnowfallTheme(appTheme);
-  const isTangled = isTangledTheme(appTheme);
+    const isTangled = isTangledTheme(appTheme);
 
   return (
     <div className="max-w-[470px] mx-auto pb-20 md:pb-6 relative min-h-[100dvh]">

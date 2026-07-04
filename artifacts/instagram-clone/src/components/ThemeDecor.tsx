@@ -78,13 +78,8 @@ export const SaraDecor = ({ className = "" }: { className?: string }) => (
 // Mustaq: Premium 3D geometric gold starburst
 export const MustaqDecor = ({ className = "" }: { className?: string }) => (
   <svg viewBox="0 0 200 200" fill="none" className={className}>
-    <circle cx="100" cy="100" r="80" fill="url(#mustaqGlow)" opacity="0.15"/>
-    <defs>
-      <radialGradient id="mustaqGlow" cx="50%" cy="50%" r="50%">
-        <stop offset="0%" stopColor="#fbbf24" />
-        <stop offset="100%" stopColor="transparent" />
-      </radialGradient>
-    </defs>
+        <defs>
+          </defs>
     <g transform="translate(100, 100)">
       <path d="M0,-90 L5,-20 L90,0 L5,20 L0,90 L-5,20 L-90,0 L-5,-20 Z" fill="#fcd34d" opacity="0.4"/>
       <path d="M0,-90 L0,90 M-90,0 L90,0" stroke="#fef3c7" strokeWidth="1" opacity="0.5"/>
@@ -199,35 +194,12 @@ export const ThemeCornerDecor = memo(({ theme }: { theme: AppThemeId }) => {
       </div>
     </div>
   );
-  if (theme === "mustaq") return (
-    <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
-      <div className="absolute top-[10px] left-[10px] w-24 h-24 opacity-30 pointer-events-none rotate-45">
-        <MustaqDecor className="w-full h-full drop-shadow-md" />
-      </div>
-      <div className="absolute top-[20px] right-[20px] w-16 h-16 opacity-20 pointer-events-none -rotate-12">
-        <MustaqDecor className="w-full h-full drop-shadow-lg" />
-      </div>
-    </div>
-  );
-  if (theme === "tangled") return (
-    <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
-      <div className="absolute top-[-15px] left-[-15px] w-52 h-52 opacity-50 pointer-events-none">
-        <TangledDecor className="w-full h-full drop-shadow-lg" />
-      </div>
-      <div className="absolute top-[-10px] right-[-20px] w-40 h-40 opacity-35 pointer-events-none scale-x-[-1]">
-        <TangledDecor className="w-full h-full drop-shadow-md" />
-      </div>
-    </div>
-  );
-  return null;
-});
-
+  
 export const ThemeShortcutDecor = memo(({ theme }: { theme: AppThemeId }) => {
   if (theme === "floura") return <div className="absolute -top-4 -right-4 w-20 h-20 opacity-25 pointer-events-none text-pink-400 rotate-12"><FlouraDecor className="w-full h-full" /></div>;
   if (theme === "mint") return <div className="absolute -top-4 -right-4 w-20 h-20 opacity-25 pointer-events-none text-emerald-400 -rotate-12"><MintDecor className="w-full h-full" /></div>;
   if (theme === "sara-lavender") return <div className="absolute -top-4 -right-4 w-16 h-16 opacity-25 pointer-events-none text-purple-400 rotate-45"><SaraDecor className="w-full h-full" /></div>;
-  if (theme === "mustaq") return <div className="absolute -top-2 -right-2 w-16 h-16 opacity-20 pointer-events-none"><MustaqDecor className="w-full h-full" /></div>;
-  if (theme === "tangled") return <div className="absolute -top-3 -right-3 w-20 h-20 opacity-35 pointer-events-none"><TangledDecor className="w-full h-full" /></div>;
+    if (theme === "tangled") return <div className="absolute -top-3 -right-3 w-20 h-20 opacity-35 pointer-events-none"><TangledDecor className="w-full h-full" /></div>;
   return null;
 });
 
