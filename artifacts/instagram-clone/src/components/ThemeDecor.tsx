@@ -242,75 +242,92 @@ export const ThemeShortcutDecor = memo(({ theme }: { theme: AppThemeId }) => {
 // ============================================================================
 
 export const TangledAvatarFrame = ({ className = "" }: { className?: string }) => (
-  <svg viewBox="0 0 100 100" fill="none" className={className} overflow="visible">
+  <svg viewBox="-20 -20 140 140" fill="none" className={className} overflow="visible">
     <defs>
-      <radialGradient id="tangledAvatarGlow" cx="50%" cy="50%" r="50%">
-        <stop offset="0%" stopColor="#f59e0b" />
+      <linearGradient id="hairGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stopColor="#eab308" />
+        <stop offset="100%" stopColor="#b45309" />
+      </linearGradient>
+      <linearGradient id="frameGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stopColor="#fde047" />
         <stop offset="100%" stopColor="#d97706" />
-      </radialGradient>
+      </linearGradient>
     </defs>
-    {/* Thick golden braid around circle */}
-    <circle cx="50" cy="50" r="46" stroke="url(#tangledAvatarGlow)" strokeWidth="6" opacity="0.9" filter="drop-shadow(0 4px 6px rgba(0,0,0,0.5))" />
-    <path d="M50,4 C75,4 96,25 96,50 C96,75 75,96 50,96 C25,96 4,75 4,50 C4,25 25,4 50,4 Z" stroke="#fcd34d" strokeWidth="2" strokeDasharray="8 6" opacity="0.8" />
-    <path d="M50,8 C73,8 92,27 92,50 C92,73 73,92 50,92 C27,92 8,73 8,50 C8,27 27,8 50,8 Z" stroke="#92400e" strokeWidth="1" strokeDasharray="4 8" opacity="0.6" />
-    {/* Braid overlap detail */}
-    <path d="M10,75 C-5,100 30,110 50,96" stroke="url(#tangledAvatarGlow)" strokeWidth="8" strokeLinecap="round" fill="none" />
-    <path d="M12,77 C0,98 30,105 48,94" stroke="#fcd34d" strokeWidth="2" strokeLinecap="round" fill="none" />
-    <path d="M100,50 C110,65 100,90 85,95 C75,98 80,85 85,75" stroke="url(#tangledAvatarGlow)" strokeWidth="6" strokeLinecap="round" fill="none" />
-    <path d="M98,52 C108,65 98,88 85,93" stroke="#fcd34d" strokeWidth="1.5" strokeLinecap="round" fill="none" />
-    {/* Purple flowers */}
-    <g transform="translate(85, 20) scale(0.7)">
-      <ellipse cx="0" cy="-8" rx="4" ry="7" fill="#e9d5ff" />
-      <ellipse cx="6" cy="-4" rx="4" ry="7" transform="rotate(45 6 -4)" fill="#c084fc" />
-      <ellipse cx="6" cy="4" rx="4" ry="7" transform="rotate(90 6 4)" fill="#e9d5ff" />
-      <ellipse cx="0" cy="8" rx="4" ry="7" transform="rotate(135 0 8)" fill="#c084fc" />
-      <ellipse cx="-6" cy="4" rx="4" ry="7" transform="rotate(180 -6 4)" fill="#e9d5ff" />
-      <ellipse cx="-6" cy="-4" rx="4" ry="7" transform="rotate(225 -6 -4)" fill="#c084fc" />
-      <circle cx="0" cy="0" r="3.5" fill="#fde68a"/>
-    </g>
-    <g transform="translate(15, 80) scale(0.9)">
-      <ellipse cx="0" cy="-8" rx="4" ry="7" fill="#e9d5ff" />
-      <ellipse cx="6" cy="-4" rx="4" ry="7" transform="rotate(45 6 -4)" fill="#c084fc" />
-      <ellipse cx="6" cy="4" rx="4" ry="7" transform="rotate(90 6 4)" fill="#e9d5ff" />
-      <ellipse cx="0" cy="8" rx="4" ry="7" transform="rotate(135 0 8)" fill="#c084fc" />
-      <ellipse cx="-6" cy="4" rx="4" ry="7" transform="rotate(180 -6 4)" fill="#e9d5ff" />
-      <ellipse cx="-6" cy="-4" rx="4" ry="7" transform="rotate(225 -6 -4)" fill="#c084fc" />
-      <circle cx="0" cy="0" r="3.5" fill="#fde68a"/>
-    </g>
-    <g transform="translate(25, 15) scale(0.5)">
-      <ellipse cx="0" cy="-8" rx="4" ry="7" fill="#e9d5ff" />
-      <ellipse cx="6" cy="-4" rx="4" ry="7" transform="rotate(45 6 -4)" fill="#c084fc" />
-      <ellipse cx="6" cy="4" rx="4" ry="7" transform="rotate(90 6 4)" fill="#e9d5ff" />
-      <ellipse cx="0" cy="8" rx="4" ry="7" transform="rotate(135 0 8)" fill="#c084fc" />
-      <ellipse cx="-6" cy="4" rx="4" ry="7" transform="rotate(180 -6 4)" fill="#e9d5ff" />
-      <ellipse cx="-6" cy="-4" rx="4" ry="7" transform="rotate(225 -6 -4)" fill="#c084fc" />
-      <circle cx="0" cy="0" r="3.5" fill="#fde68a"/>
+    
+    {/* Left Hair Drop */}
+    <path d="M 8 45 C -15 70 -15 110 5 125 L 25 125 C 10 100 15 70 30 55 Z" fill="url(#hairGradient)" />
+    {/* Right Hair Drop */}
+    <path d="M 92 45 C 115 70 115 110 95 125 L 75 125 C 90 100 85 70 70 55 Z" fill="url(#hairGradient)" />
+    
+    {/* Main Frame Circle */}
+    <circle cx="50" cy="50" r="48" stroke="#78350f" strokeWidth="6" />
+    <circle cx="50" cy="50" r="48" stroke="url(#frameGradient)" strokeWidth="4" />
+    
+    {/* Flower Cluster Top Left */}
+    <g transform="translate(10, -5)">
+      {/* 5 purple circles overlapping exactly as in reference */}
+      <circle cx="15" cy="15" r="9" fill="#9333ea" />
+      <circle cx="5" cy="25" r="7" fill="#a855f7" />
+      <circle cx="12" cy="32" r="6" fill="#c084fc" />
+      <circle cx="28" cy="22" r="6" fill="#c084fc" />
+      <circle cx="2" cy="15" r="5" fill="#c084fc" />
+      {/* Inner dots */}
+      <circle cx="15" cy="15" r="3" fill="#d8b4fe" />
+      <circle cx="5" cy="25" r="2.5" fill="#e9d5ff" />
     </g>
   </svg>
 );
 
 export const TangledCardDecor = ({ className = "" }: { className?: string }) => (
   <svg viewBox="0 0 160 200" fill="none" className={className} preserveAspectRatio="none">
-    {/* Ornate corners */}
+    {/* Ornate corners remain */}
     <path d="M10,40 L10,10 L40,10 M10,160 L10,190 L40,190 M150,40 L150,10 L120,10 M150,160 L150,190 L120,190" stroke="#f59e0b" strokeWidth="1.5" opacity="0.6" fill="none" />
     <path d="M15,35 L15,15 L35,15 M15,165 L15,185 L35,185 M145,35 L145,15 L125,15 M145,165 L145,185 L125,185" stroke="#fcd34d" strokeWidth="1" opacity="0.4" fill="none" />
-    <path d="M20,20 C30,30 20,40 10,30 M140,20 C130,30 140,40 150,30 M20,180 C30,170 20,160 10,170 M140,180 C130,170 140,160 150,170" stroke="#fcd34d" strokeWidth="1" fill="none" opacity="0.5"/>
-    {/* Additional border swirls */}
-    <path d="M45,10 C50,15 60,10 65,15 M95,10 C100,15 110,10 115,15" stroke="#fbbf24" strokeWidth="1" fill="none" opacity="0.4"/>
-    <path d="M45,190 C50,185 60,190 65,185 M95,190 C100,185 110,190 115,185" stroke="#fbbf24" strokeWidth="1" fill="none" opacity="0.4"/>
-    {/* Giant centered Sun */}
-    <g transform="translate(80, 100) scale(1.8)" opacity="0.95">
-      {[0,30,60,90,120,150,180,210,240,270,300,330].map((deg, i) => (
-        <line key={i} x1={20 * Math.cos(deg * Math.PI / 180)} y1={20 * Math.sin(deg * Math.PI / 180)} x2={35 * Math.cos(deg * Math.PI / 180)} y2={35 * Math.sin(deg * Math.PI / 180)} stroke="#fbbf24" strokeWidth="2" strokeLinecap="round" />
+    
+    {/* Exact Reference Sun */}
+    <g transform="translate(80, 100) scale(1.6)">
+      <defs>
+        <radialGradient id="sunCore" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="#fef08a" />
+          <stop offset="40%" stopColor="#fde047" />
+          <stop offset="100%" stopColor="#d97706" />
+        </radialGradient>
+      </defs>
+
+      {/* Thin outer ring */}
+      <circle cx="0" cy="0" r="46" stroke="#b45309" strokeWidth="1" opacity="0.6" />
+
+      {/* 8 Small Rays */}
+      {[22.5, 67.5, 112.5, 157.5, 202.5, 247.5, 292.5, 337.5].map(deg => (
+        <g key={`small-${deg}`} transform={`rotate(${deg})`}>
+          <polygon points="-4,-18 4,-18 0,-34" fill="#d97706" />
+        </g>
       ))}
-      {[15,45,75,105,135,165,195,225,255,285,315,345].map((deg, i) => (
-        <line key={i} x1={20 * Math.cos(deg * Math.PI / 180)} y1={20 * Math.sin(deg * Math.PI / 180)} x2={28 * Math.cos(deg * Math.PI / 180)} y2={28 * Math.sin(deg * Math.PI / 180)} stroke="#fcd34d" strokeWidth="2.5" strokeLinecap="round" opacity="0.8" />
+
+      {/* 8 Large Rays */}
+      {[0, 45, 90, 135, 180, 225, 270, 315].map(deg => (
+        <g key={`large-${deg}`} transform={`rotate(${deg})`}>
+          <polygon points="-6,-18 6,-18 0,-44" fill="#d97706" />
+          {/* Inner line on orthogonal rays (0, 90, 180, 270) */}
+          {deg % 90 === 0 && (
+            <line x1="0" y1="-18" x2="0" y2="-43" stroke="#fef3c7" strokeWidth="0.75" opacity="0.5" />
+          )}
+        </g>
       ))}
-      <circle cx="0" cy="0" r="22" fill="#d97706" opacity="0.6" />
-      <circle cx="0" cy="0" r="20" fill="url(#tangledSunGlow)" />
-      <circle cx="0" cy="0" r="14" fill="url(#tangledInnerGlow)" />
-      <circle cx="0" cy="0" r="8" fill="#fef3c7" opacity="0.9"/>
-      <circle cx="0" cy="0" r="5" fill="#fff" opacity="0.5"/>
+
+      {/* 16 Inner Spikes forming the sawtooth rim */}
+      {[0, 22.5, 45, 67.5, 90, 112.5, 135, 157.5, 180, 202.5, 225, 247.5, 270, 292.5, 315, 337.5].map(deg => (
+        <g key={`spike-${deg}`} transform={`rotate(${deg})`}>
+          <polygon points="-2.5,-16 2.5,-16 0,-21" fill="#b45309" />
+        </g>
+      ))}
+
+      {/* Inner Sun Core */}
+      <circle cx="0" cy="0" r="18" fill="#b45309" />
+      <circle cx="0" cy="0" r="16" fill="url(#sunCore)" />
+      
+      {/* Extra glow ring */}
+      <circle cx="0" cy="0" r="15" fill="none" stroke="#fef08a" strokeWidth="1" opacity="0.6" />
     </g>
   </svg>
 );
