@@ -823,7 +823,7 @@ export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputPro
 
       <div className={`message-input-pill flex items-center gap-[8px] sm:gap-[10px] py-[7px] sm:py-[9px] pr-[8px] sm:pr-[14px] pl-[5px] sm:pl-[9px] mx-[4px] md:mx-auto md:w-full md:max-w-[800px] ${
         isTangled 
-          ? 'bg-[#1f2227] rounded-[40px] border-2 border-[#fcd34d] shadow-[0_0_15px_rgba(252,211,77,0.5)]' 
+          ? 'bg-[#1f2227] rounded-[40px] border-2 border-[#fcd34d] shadow-[0_0_25px_rgba(252,211,77,0.9)]' 
           : 'bg-[#1a1a1a] rounded-[40px]'
       } ${scheduledTime ? 'rounded-tl-none rounded-tr-none border-t-0 border-primary/30' : ''}`}>
         {/* eslint-disable-next-line */}
@@ -888,31 +888,31 @@ export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputPro
                 <button
                   type="button"
                   onClick={handleImageClick}
-                  className={`w-[38px] h-[38px] sm:w-[42px] sm:h-[42px] flex items-center justify-center rounded-full hover:bg-white/10 active:scale-95 transition-all text-[#fcd34d] border-2 border-[#fcd34d] bg-[#fcd34d]/10 ${disabled ? iconBtnDisabled : ""}`}
+                  className={`w-[38px] h-[38px] sm:w-[42px] sm:h-[42px] flex items-center justify-center rounded-full hover:bg-white/10 active:scale-95 transition-all text-[#fcd34d] border-none bg-transparent ${disabled ? iconBtnDisabled : ""}`}
                   disabled={disabled}
                   aria-label="Attach image or video"
                 >
-                  <ImageIcon className="w-[20px] h-[20px] sm:w-[22px] sm:h-[22px]" strokeWidth={1.8} />
+                  <ImageIcon className="w-[26px] h-[26px] sm:w-[28px] sm:h-[28px] drop-shadow-[0_0_8px_rgba(252,211,77,0.8)]" strokeWidth={1.8} />
                 </button>
                 <button
                   type="button"
                   onClick={toggleStickerPicker}
-                  className={`w-[38px] h-[38px] sm:w-[42px] sm:h-[42px] flex items-center justify-center rounded-full hover:bg-white/10 active:scale-95 transition-all text-[#fcd34d] border-2 border-[#fcd34d] bg-[#fcd34d]/10 ${disabled ? iconBtnDisabled : ""}`}
+                  className={`w-[38px] h-[38px] sm:w-[42px] sm:h-[42px] flex items-center justify-center rounded-full hover:bg-white/10 active:scale-95 transition-all text-[#fcd34d] border-none bg-transparent ${disabled ? iconBtnDisabled : ""}`}
                   disabled={disabled}
                   aria-label="Stickers and GIFs"
                 >
-                  <Smile className="w-[20px] h-[20px] sm:w-[22px] sm:h-[22px]" strokeWidth={1.8} />
+                  <Smile className="w-[26px] h-[26px] sm:w-[28px] sm:h-[28px] drop-shadow-[0_0_8px_rgba(252,211,77,0.8)]" strokeWidth={1.8} />
                 </button>
                 
                 <div className="relative shrink-0 flex items-center justify-center">
                   <button
                     type="button"
                     onClick={() => setShowAttachmentMenu((s) => !s)}
-                    className={`w-[38px] h-[38px] sm:w-[42px] sm:h-[42px] flex items-center justify-center rounded-full hover:bg-white/10 active:scale-95 transition-all text-[#fcd34d] border-2 border-[#fcd34d] bg-[#fcd34d]/10 ${disabled ? iconBtnDisabled : ""}`}
+                    className={`w-[38px] h-[38px] sm:w-[42px] sm:h-[42px] flex items-center justify-center rounded-full hover:bg-white/10 active:scale-95 transition-all text-[#fcd34d] border-none bg-transparent ${disabled ? iconBtnDisabled : ""}`}
                     disabled={disabled}
                     aria-label="More attachment options"
                   >
-                    <PlusCircle className={`w-[20px] h-[20px] sm:w-[22px] sm:h-[22px] transition-transform duration-[0.3s] ease-[cubic-bezier(0.34,1.56,0.64,1)] ${showAttachmentMenu ? "rotate-45" : ""}`} strokeWidth={1.8} />
+                    <PlusCircle className={`w-[26px] h-[26px] sm:w-[28px] sm:h-[28px] drop-shadow-[0_0_8px_rgba(252,211,77,0.8)] transition-transform duration-[0.3s] ease-[cubic-bezier(0.34,1.56,0.64,1)] ${showAttachmentMenu ? "rotate-45" : ""}`} strokeWidth={1.8} />
                   </button>
                   {attachmentMenu}
                 </div>
