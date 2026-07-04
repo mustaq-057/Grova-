@@ -20,7 +20,19 @@ import { RainstormOverlay } from "@/components/RainstormOverlay";
 import { FallingTangledOverlay } from "@/components/FallingTangledOverlay";
 import { PremiumThemeOverlay } from "@/components/PremiumThemeOverlay";
 import { ThemeBackgroundOverlay } from "@/components/ThemeBackgroundOverlay";
-import { getStoredAppTheme, isTangledTheme } from "@/lib/app-theme";
+import { 
+  AppThemeId, 
+  getStoredAppTheme, 
+  APP_THEME_CHANGED,
+  isSakuraFallTheme, 
+  isMoonlightSagaTheme, 
+  isSaraLavenderTheme, 
+  isAutumnAmberTheme, 
+  isPetrichorTheme, 
+  isTangledTheme,
+  isPremiumAnimatedTheme,
+  themeUsesPhotoBackground
+} from "@/lib/app-theme";
 import { MobileMenuGrid } from "./MobileMenuGrid";
 import { api } from "@/lib/api";
 import { writeChatCache } from "@/lib/chat-cache";
