@@ -1790,9 +1790,10 @@ html[data-theme-id="tangled"] .tangled-avatar-stage {
 html[data-theme-id="tangled"] .tangled-avatar-photo {
   position: absolute;
   transform: translate(-50%, -50%);
-  /* 72% of stage = inner hole in PNG; with 168% stage photo fills hole edge-to-edge */
-  width: 72%;
-  height: 72%;
+  /* Approx 54% width creates a perfect circle that fits inside the PNG hair hole */
+  width: 54%;
+  aspect-ratio: 1 / 1;
+  height: auto;
   border-radius: 9999px;
   object-fit: cover;
   object-position: center;
