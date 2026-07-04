@@ -1781,14 +1781,16 @@ html[data-theme-id="tangled"] .tangled-avatar-stage {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  /* frame outer ≈ 1.39× photo so inner hole (72%) = full w-20/w-24 photo */
-  width: 139%;
-  height: 139%;
+  /* wider frame so hair fully wraps the photo; height follows PNG half ratio (768×1024) */
+  width: 168%;
+  aspect-ratio: 768 / 1024;
+  height: auto;
 }
 
 html[data-theme-id="tangled"] .tangled-avatar-photo {
   position: absolute;
   transform: translate(-50%, -50%);
+  /* 72% of stage = inner hole in PNG; with 168% stage photo fills hole edge-to-edge */
   width: 72%;
   height: 72%;
   border-radius: 9999px;
@@ -1813,8 +1815,8 @@ html[data-theme-id="tangled"] .tangled-avatar-photo--partner {
 html[data-theme-id="tangled"] .tangled-avatar-frame {
   position: absolute;
   inset: 0;
-  background-image: url(/themes/profile.png?v=14);
-  background-size: 200% auto;
+  background-image: url(/themes/profile.png?v=15);
+  background-size: 200% 100%;
   background-repeat: no-repeat;
   background-position: 0% 50%;
   pointer-events: none;
