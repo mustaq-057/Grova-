@@ -249,7 +249,7 @@ export const TangledAvatarFrame = ({ className = "" }: { className?: string }) =
         const cx = 50 + r * Math.sin(rad);
         const cy = 50 - r * Math.cos(rad);
         return (
-          <g key={angle} transform={`translate(${cx}, ${cy}) rotate(${angle})`}>
+          <g key={angle} transform={`translate(${cx}, ${cy}) rotate(${angle}) scale(0.55)`}>
             {/* 6 petals */}
             <ellipse cx="0" cy="-8" rx="4.5" ry="8" fill="#9333ea" opacity="0.95" />
             <ellipse cx="7" cy="-4" rx="4.5" ry="8" transform="rotate(60 7 -4)" fill="#a855f7" opacity="0.9" />
