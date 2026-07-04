@@ -408,18 +408,22 @@ const PanSVG = ({ className }: { className?: string }) => (
 export const TangledHomeDecor = () => {
   return (
     <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
-      <div className="absolute top-[28%] right-[4%] w-12 h-12 opacity-80 drop-shadow-lg rotate-12 z-10 animate-pulse" style={{ animationDuration: '4s' }}>
+      {/* Top right chameleon */}
+      <div className="absolute top-[28%] right-[4%] w-16 h-16 opacity-90 drop-shadow-md z-10 hover:scale-110 transition-transform">
+        <img src="/themes/camelon.png" alt="" className="w-full h-full object-contain" />
+      </div>
+      
+      {/* Bottom left chameleon (flipped and slowly bouncing) */}
+      <div className="absolute bottom-[20%] left-[5%] w-20 h-20 opacity-90 drop-shadow-lg scale-x-[-1] z-10 hover:scale-110 transition-transform">
+        <img src="/themes/camelon.png" alt="" className="w-full h-full object-contain" />
+      </div>
+
+      {/* Floating lantern */}
+      <div className="absolute bottom-[25%] right-[25%] w-12 h-12 opacity-80 drop-shadow-md rotate-12 z-10 animate-pulse" style={{ animationDuration: '3s' }}>
         <FloatingLanternSVG className="w-full h-full" />
       </div>
-      <div className="absolute top-[45%] left-[2%] w-16 h-16 opacity-90 drop-shadow-xl -rotate-6 z-10 animate-pulse" style={{ animationDuration: '5s' }}>
-        <FloatingLanternSVG className="w-full h-full" />
-      </div>
-      <div className="absolute bottom-[25%] left-[8%] w-10 h-10 opacity-70 drop-shadow-md rotate-12 z-10 animate-pulse" style={{ animationDuration: '3s' }}>
-        <FloatingLanternSVG className="w-full h-full" />
-      </div>
-      <div className="absolute bottom-[5%] right-[25%] w-14 h-14 opacity-85 drop-shadow-lg -rotate-12 z-10 animate-pulse" style={{ animationDuration: '4.5s' }}>
-        <FloatingLanternSVG className="w-full h-full" />
-      </div>
+      
+      {/* Frying pan */}
       <div className="absolute bottom-[10%] right-[8%] w-14 h-14 opacity-95 drop-shadow-lg rotate-12 z-10">
         <PanSVG className="w-full h-full" />
       </div>
