@@ -260,19 +260,19 @@ export default memo(function Home() {
                   src={user?.avatar}
                   userId={user?.id ?? "me"}
                   alt=""
-                  className={`w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-[3px] bg-background ${isTangled ? "scale-[0.75] border-transparent shadow-none relative z-10" : `shadow-[0_0_20px_rgba(var(--primary),0.25)] ${myStories.length > 0 ? "border-background" : "border-primary/40"}`} ${appTheme === 'library' ? 'library-locket' : ''}`}
+                  className={`w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-[3px] bg-background ${isTangled ? "border-transparent shadow-none relative z-10" : `shadow-[0_0_20px_rgba(var(--primary),0.25)] ${myStories.length > 0 ? "border-background" : "border-primary/40"}`} ${appTheme === 'library' ? 'library-locket' : ''}`}
                 />
                 {isTangled && (
                   <div
-                    className="absolute z-20 pointer-events-none w-[170%] h-[170%]"
+                    className="absolute z-20 pointer-events-none w-[145%] h-[145%]"
                     style={{
                       top: '50%',
                       left: '50%',
                       transform: 'translate(-50%, -50%)',
-                      backgroundImage: 'url(/themes/profile.png?v=7)',
-                      backgroundSize: '230% auto',
+                      backgroundImage: 'url(/themes/profile.png?v=8)',
+                      backgroundSize: '235% auto',
                       backgroundRepeat: 'no-repeat',
-                      backgroundPosition: '0% 50%',
+                      backgroundPosition: '6% 50%',
                     }}
                   />
                 )}
@@ -336,19 +336,19 @@ export default memo(function Home() {
                   src={partner.avatar}
                   userId={partner.id}
                   alt=""
-                  className={`w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-[3px] bg-background ${isTangled ? "scale-[0.75] border-transparent shadow-none relative z-10" : `shadow-[0_0_20px_rgba(var(--primary),0.25)] ${partnerStories.length > 0 ? "border-background" : "border-primary/40"}`} ${appTheme === 'library' ? 'library-locket' : ''}`}
+                  className={`w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-[3px] bg-background ${isTangled ? "border-transparent shadow-none relative z-10" : `shadow-[0_0_20px_rgba(var(--primary),0.25)] ${partnerStories.length > 0 ? "border-background" : "border-primary/40"}`} ${appTheme === 'library' ? 'library-locket' : ''}`}
                 />
                 {isTangled && (
                   <div
-                    className="absolute z-20 pointer-events-none w-[170%] h-[170%]"
+                    className="absolute z-20 pointer-events-none w-[145%] h-[145%]"
                     style={{
                       top: '50%',
                       left: '50%',
                       transform: 'translate(-50%, -50%)',
-                      backgroundImage: 'url(/themes/profile.png?v=7)',
-                      backgroundSize: '230% auto',
+                      backgroundImage: 'url(/themes/profile.png?v=8)',
+                      backgroundSize: '235% auto',
                       backgroundRepeat: 'no-repeat',
-                      backgroundPosition: '86% 50%',
+                      backgroundPosition: '94% 50%',
                     }}
                   />
                 )}
