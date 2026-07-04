@@ -195,6 +195,9 @@ export const ThemeCornerDecor = memo(({ theme }: { theme: AppThemeId }) => {
     </div>
   );
   
+  return null;
+});
+
 export const ThemeShortcutDecor = memo(({ theme }: { theme: AppThemeId }) => {
   if (theme === "floura") return <div className="absolute -top-4 -right-4 w-20 h-20 opacity-25 pointer-events-none text-pink-400 rotate-12"><FlouraDecor className="w-full h-full" /></div>;
   if (theme === "mint") return <div className="absolute -top-4 -right-4 w-20 h-20 opacity-25 pointer-events-none text-emerald-400 -rotate-12"><MintDecor className="w-full h-full" /></div>;

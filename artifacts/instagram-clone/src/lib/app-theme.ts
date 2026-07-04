@@ -200,7 +200,6 @@ export const APP_THEMES: {
         "--app-border": "210 18% 85%",
       },
     },
-    },
   ];
 
 let currentAppTheme: AppThemeId = "sara-lavender";
