@@ -426,6 +426,8 @@ export function getThemeBackgroundOpacity(themeId?: AppThemeId): number {
 }
 
 export function themeUsesPhotoScrim(themeId?: AppThemeId): boolean {
+  const id = themeId ?? getStoredAppTheme();
+  if (id === "tangled") return false;
   return themeUsesPhotoBackground(themeId);
 }
 

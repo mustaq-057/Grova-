@@ -52,7 +52,7 @@ export const ThemeBackgroundOverlay = memo(function ThemeBackgroundOverlay({ the
         backgroundSize: themeId === "floura" ? "100% 100%" : "cover",
         backgroundPosition: "center",
         opacity,
-        filter: "brightness(0.9) saturate(1.05)",
+        filter: themeId === "tangled" ? "brightness(1.15) saturate(1.2)" : "brightness(0.9) saturate(1.05)",
       }}
     >
       <img src={url} alt="" className="hidden" onError={() => setHidden(true)} />
