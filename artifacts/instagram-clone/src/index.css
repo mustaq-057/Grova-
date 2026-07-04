@@ -1777,11 +1777,11 @@ html[data-theme-id="tangled"] .tangled-avatar-wrap {
 
 html[data-theme-id="tangled"] .tangled-avatar-photo {
   position: absolute;
-  top: 50%;
-  left: 50%;
+  top: 44.9%;
+  left: 56.4%;
   transform: translate(-50%, -50%);
-  width: 92%;
-  height: 92%;
+  width: 70%;
+  height: 70%;
   border-radius: 9999px;
   object-fit: cover;
   object-position: center;
@@ -1798,18 +1798,18 @@ html[data-theme-id="tangled"] .tangled-avatar-frame {
   transform: translate(-50%, -50%);
   width: 145%;
   height: 145%;
-  background-image: url(/themes/profile.png?v=11);
-  background-size: 235% auto;
+  background-image: url(/themes/profile.png?v=12);
+  background-size: 200% auto;
   background-repeat: no-repeat;
   pointer-events: none;
   z-index: 20;
 }
 
 html[data-theme-id="tangled"] .tangled-avatar-frame--self {
-  background-position: 6% 50%;
+  background-position: 0% 50%;
 }
 
 html[data-theme-id="tangled"] .tangled-avatar-frame--partner {
-  background-position: 94% 50%;
+  background-position: 100% 50%;
 }
 
