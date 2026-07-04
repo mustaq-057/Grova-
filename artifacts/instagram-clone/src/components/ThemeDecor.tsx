@@ -242,49 +242,88 @@ export const ThemeShortcutDecor = memo(({ theme }: { theme: AppThemeId }) => {
 // ============================================================================
 
 export const TangledAvatarFrame = ({ className = "" }: { className?: string }) => (
-  <svg viewBox="0 0 100 100" fill="none" className={className} overflow="visible">
+  <svg viewBox="-20 -20 140 140" fill="none" className={className} overflow="visible">
     <defs>
       <radialGradient id="tangledAvatarGlow" cx="50%" cy="50%" r="50%">
         <stop offset="0%" stopColor="#f59e0b" />
-        <stop offset="100%" stopColor="#d97706" />
+        <stop offset="100%" stopColor="#b45309" />
       </radialGradient>
+      <filter id="lanternGlow">
+        <feGaussianBlur stdDeviation="3" result="blur" />
+        <feComposite in="SourceGraphic" in2="blur" operator="over" />
+      </filter>
     </defs>
-    {/* Thick golden braid around circle */}
-    <circle cx="50" cy="50" r="46" stroke="url(#tangledAvatarGlow)" strokeWidth="6" opacity="0.9" filter="drop-shadow(0 4px 6px rgba(0,0,0,0.5))" />
-    <path d="M50,4 C75,4 96,25 96,50 C96,75 75,96 50,96 C25,96 4,75 4,50 C4,25 25,4 50,4 Z" stroke="#fcd34d" strokeWidth="2" strokeDasharray="8 6" opacity="0.8" />
-    <path d="M50,8 C73,8 92,27 92,50 C92,73 73,92 50,92 C27,92 8,73 8,50 C8,27 27,8 50,8 Z" stroke="#92400e" strokeWidth="1" strokeDasharray="4 8" opacity="0.6" />
-    {/* Braid overlap detail */}
-    <path d="M10,75 C-5,100 30,110 50,96" stroke="url(#tangledAvatarGlow)" strokeWidth="8" strokeLinecap="round" fill="none" />
-    <path d="M12,77 C0,98 30,105 48,94" stroke="#fcd34d" strokeWidth="2" strokeLinecap="round" fill="none" />
-    <path d="M100,50 C110,65 100,90 85,95 C75,98 80,85 85,75" stroke="url(#tangledAvatarGlow)" strokeWidth="6" strokeLinecap="round" fill="none" />
-    <path d="M98,52 C108,65 98,88 85,93" stroke="#fcd34d" strokeWidth="1.5" strokeLinecap="round" fill="none" />
-    {/* Purple flowers */}
-    <g transform="translate(85, 20) scale(0.7)">
-      <ellipse cx="0" cy="-8" rx="4" ry="7" fill="#e9d5ff" />
-      <ellipse cx="6" cy="-4" rx="4" ry="7" transform="rotate(45 6 -4)" fill="#c084fc" />
-      <ellipse cx="6" cy="4" rx="4" ry="7" transform="rotate(90 6 4)" fill="#e9d5ff" />
-      <ellipse cx="0" cy="8" rx="4" ry="7" transform="rotate(135 0 8)" fill="#c084fc" />
-      <ellipse cx="-6" cy="4" rx="4" ry="7" transform="rotate(180 -6 4)" fill="#e9d5ff" />
-      <ellipse cx="-6" cy="-4" rx="4" ry="7" transform="rotate(225 -6 -4)" fill="#c084fc" />
-      <circle cx="0" cy="0" r="3.5" fill="#fde68a"/>
+    
+    {/* Base ambient hair glow */}
+    <circle cx="50" cy="50" r="48" fill="none" stroke="#fcd34d" strokeWidth="8" opacity="0.3" filter="blur(6px)" />
+    
+    {/* The Braid Base */}
+    <circle cx="50" cy="50" r="46" stroke="url(#tangledAvatarGlow)" strokeWidth="6" opacity="0.95" filter="drop-shadow(0 4px 8px rgba(0,0,0,0.6))" />
+    
+    {/* Braid strands looping around */}
+    <path d="M50,4 C75,4 96,25 96,50 C96,75 75,96 50,96 C25,96 4,75 4,50 C4,25 25,4 50,4 Z" stroke="#fcd34d" strokeWidth="2.5" strokeDasharray="9 7" opacity="0.9" />
+    <path d="M50,2 C77,2 98,23 98,50 C98,77 77,98 50,98 C23,98 2,77 2,50 C2,23 23,2 50,2 Z" stroke="#fbbf24" strokeWidth="1.5" strokeDasharray="12 12" opacity="0.7" />
+    <path d="M50,8 C73,8 92,27 92,50 C92,73 73,92 50,92 C27,92 8,73 8,50 C8,27 27,8 50,8 Z" stroke="#92400e" strokeWidth="1.5" strokeDasharray="5 10" opacity="0.8" />
+    
+    {/* Flowing hair locks coming off the main circle */}
+    <path d="M 12,75 Q -5,100 25,115 Q 50,118 45,95" fill="none" stroke="url(#tangledAvatarGlow)" strokeWidth="8" strokeLinecap="round" filter="drop-shadow(0 2px 4px rgba(0,0,0,0.5))" />
+    <path d="M 12,75 Q -5,100 25,115 Q 50,118 45,95" fill="none" stroke="#fcd34d" strokeWidth="2" strokeLinecap="round" strokeDasharray="10 8" />
+    
+    <path d="M 90,20 Q 115,0 75,-15 Q 55,-20 52,4" fill="none" stroke="url(#tangledAvatarGlow)" strokeWidth="7" strokeLinecap="round" filter="drop-shadow(0 2px 4px rgba(0,0,0,0.5))" />
+    <path d="M 90,20 Q 115,0 75,-15 Q 55,-20 52,4" fill="none" stroke="#fcd34d" strokeWidth="1.5" strokeLinecap="round" strokeDasharray="8 6" />
+
+    {/* Elegant Purple Flowers */}
+    <g transform="translate(85, 15) scale(0.9) rotate(25)">
+      {/* Petals */}
+      {[0, 72, 144, 216, 288].map(deg => (
+        <path key={`outer-${deg}`} transform={`rotate(${deg})`} d="M0,0 C-6,-6 -10,-14 0,-18 C10,-14 6,-6 0,0 Z" fill="#c084fc" opacity="0.9" />
+      ))}
+      {[36, 108, 180, 252, 324].map(deg => (
+        <path key={`inner-${deg}`} transform={`rotate(${deg})`} d="M0,0 C-4,-4 -6,-10 0,-12 C6,-10 4,-4 0,0 Z" fill="#e9d5ff" opacity="0.95" />
+      ))}
+      <circle cx="0" cy="0" r="3.5" fill="#fde68a" />
+      <circle cx="0" cy="0" r="1.5" fill="#fff" />
     </g>
-    <g transform="translate(15, 80) scale(0.9)">
-      <ellipse cx="0" cy="-8" rx="4" ry="7" fill="#e9d5ff" />
-      <ellipse cx="6" cy="-4" rx="4" ry="7" transform="rotate(45 6 -4)" fill="#c084fc" />
-      <ellipse cx="6" cy="4" rx="4" ry="7" transform="rotate(90 6 4)" fill="#e9d5ff" />
-      <ellipse cx="0" cy="8" rx="4" ry="7" transform="rotate(135 0 8)" fill="#c084fc" />
-      <ellipse cx="-6" cy="4" rx="4" ry="7" transform="rotate(180 -6 4)" fill="#e9d5ff" />
-      <ellipse cx="-6" cy="-4" rx="4" ry="7" transform="rotate(225 -6 -4)" fill="#c084fc" />
-      <circle cx="0" cy="0" r="3.5" fill="#fde68a"/>
+
+    <g transform="translate(10, 85) scale(1) rotate(-35)">
+      {[0, 72, 144, 216, 288].map(deg => (
+        <path key={`outer-${deg}`} transform={`rotate(${deg})`} d="M0,0 C-6,-6 -10,-14 0,-18 C10,-14 6,-6 0,0 Z" fill="#c084fc" opacity="0.9" />
+      ))}
+      {[36, 108, 180, 252, 324].map(deg => (
+        <path key={`inner-${deg}`} transform={`rotate(${deg})`} d="M0,0 C-4,-4 -6,-10 0,-12 C6,-10 4,-4 0,0 Z" fill="#e9d5ff" opacity="0.95" />
+      ))}
+      <circle cx="0" cy="0" r="3.5" fill="#fde68a" />
+      <circle cx="0" cy="0" r="1.5" fill="#fff" />
     </g>
-    <g transform="translate(25, 15) scale(0.5)">
-      <ellipse cx="0" cy="-8" rx="4" ry="7" fill="#e9d5ff" />
-      <ellipse cx="6" cy="-4" rx="4" ry="7" transform="rotate(45 6 -4)" fill="#c084fc" />
-      <ellipse cx="6" cy="4" rx="4" ry="7" transform="rotate(90 6 4)" fill="#e9d5ff" />
-      <ellipse cx="0" cy="8" rx="4" ry="7" transform="rotate(135 0 8)" fill="#c084fc" />
-      <ellipse cx="-6" cy="4" rx="4" ry="7" transform="rotate(180 -6 4)" fill="#e9d5ff" />
-      <ellipse cx="-6" cy="-4" rx="4" ry="7" transform="rotate(225 -6 -4)" fill="#c084fc" />
-      <circle cx="0" cy="0" r="3.5" fill="#fde68a"/>
+
+    <g transform="translate(75, 95) scale(0.6) rotate(110)">
+      {[0, 72, 144, 216, 288].map(deg => (
+        <path key={`outer-${deg}`} transform={`rotate(${deg})`} d="M0,0 C-6,-6 -10,-14 0,-18 C10,-14 6,-6 0,0 Z" fill="#c084fc" opacity="0.9" />
+      ))}
+      {[36, 108, 180, 252, 324].map(deg => (
+        <path key={`inner-${deg}`} transform={`rotate(${deg})`} d="M0,0 C-4,-4 -6,-10 0,-12 C6,-10 4,-4 0,0 Z" fill="#e9d5ff" opacity="0.95" />
+      ))}
+      <circle cx="0" cy="0" r="3.5" fill="#fde68a" />
+      <circle cx="0" cy="0" r="1.5" fill="#fff" />
+    </g>
+
+    {/* Floating Glowing Lanterns */}
+    <g transform="translate(-10, 25) scale(0.7) rotate(-15)">
+      <polygon points="-6,-9 6,-9 8,9 -8,9" fill="#fde68a" opacity="0.95" filter="url(#lanternGlow)" />
+      <polygon points="-4,-8 4,-8 6,8 -6,8" fill="#fef3c7" />
+      <path d="M-6,-9 C-3,-12 3,-12 6,-9" fill="none" stroke="#b45309" strokeWidth="2" />
+      <path d="M-8,9 C-4,12 4,12 8,9" fill="none" stroke="#b45309" strokeWidth="2" />
+      <circle cx="0" cy="0" r="2.5" fill="#d97706" opacity="0.7"/>
+      <circle cx="0" cy="0" r="1.5" fill="#fff" />
+    </g>
+
+    <g transform="translate(95, 80) scale(0.9) rotate(20)">
+      <polygon points="-6,-9 6,-9 8,9 -8,9" fill="#fde68a" opacity="0.95" filter="url(#lanternGlow)" />
+      <polygon points="-4,-8 4,-8 6,8 -6,8" fill="#fef3c7" />
+      <path d="M-6,-9 C-3,-12 3,-12 6,-9" fill="none" stroke="#b45309" strokeWidth="2" />
+      <path d="M-8,9 C-4,12 4,12 8,9" fill="none" stroke="#b45309" strokeWidth="2" />
+      <circle cx="0" cy="0" r="2.5" fill="#d97706" opacity="0.7"/>
+      <circle cx="0" cy="0" r="1.5" fill="#fff" />
     </g>
   </svg>
 );
