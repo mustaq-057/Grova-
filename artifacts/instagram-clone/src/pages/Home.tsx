@@ -251,7 +251,7 @@ export default memo(function Home() {
             >
               <div className="relative">
                 {isTangled && (
-                  <img src="/themes/pascal_transparent.png?v=2" alt="" className="absolute -top-3 -left-5 sm:-top-5 sm:-left-7 w-12 h-12 sm:w-16 sm:h-16 z-30 drop-shadow-md object-contain -rotate-12" />
+                  <img src="/themes/pascal_perfect.png" alt="" className="absolute -top-3 -left-5 sm:-top-5 sm:-left-7 w-12 h-12 sm:w-16 sm:h-16 z-30 drop-shadow-md object-contain -rotate-12" />
                 )}
                 {/* My avatar — tap to view/add story */}
                 <button
@@ -307,7 +307,7 @@ export default memo(function Home() {
 
               <div className="relative">
                 {isTangled && (
-                  <img src="/themes/pascal_transparent.png?v=2" alt="" className="absolute -top-3 -right-5 sm:-top-5 sm:-right-7 w-12 h-12 sm:w-16 sm:h-16 z-30 drop-shadow-md object-contain scale-x-[-1] rotate-12" />
+                  <img src="/themes/pascal_perfect.png" alt="" className="absolute -top-3 -right-5 sm:-top-5 sm:-right-7 w-12 h-12 sm:w-16 sm:h-16 z-30 drop-shadow-md object-contain scale-x-[-1] rotate-12" />
                 )}
                 {/* Partner avatar — tap to view story if they have one, else do nothing */}
                 <button
@@ -428,7 +428,7 @@ export default memo(function Home() {
                 
                 {!isTangled && <ThemeShortcutDecor theme={appTheme} />}
                 {isTangled && s.href === '/library' && (
-                  <img src="/themes/pascal_transparent.png?v=2" alt="" className="absolute -top-4 -right-4 w-16 h-16 z-20 drop-shadow-lg object-contain -rotate-12" />
+                  <img src="/themes/pascal_perfect.png" alt="" className="absolute -top-4 -right-4 w-16 h-16 z-20 drop-shadow-lg object-contain -rotate-12" />
                 )}
               </motion.div>
             </Link>
