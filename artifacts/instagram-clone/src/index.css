@@ -1635,9 +1635,8 @@ html[data-theme-id="mint"] .home-avatar-mint-glow::before {
 /* Tangled Theme Overrides — Rapunzel's Enchanted Forest 🌿✨             */
 /* ═══════════════════════════════════════════════════════════════════════ */
 
-/* Shortcut Cards — ornate golden bordered cards */
+/* Base styling for all Tangled cards (borders, shadows, hover) */
 html[data-theme-id="tangled"] .relative.overflow-hidden.p-4.bg-gradient-to-br {
-  background: linear-gradient(135deg, rgba(10,28,18,0.85) 0%, rgba(20,48,28,0.9) 100%) !important;
   border: 1.5px solid rgba(201,162,39,0.45) !important;
   box-shadow: 0 4px 20px rgba(0,0,0,0.5),
               inset 0 0 0 1px rgba(201,162,39,0.12),
@@ -1649,6 +1648,34 @@ html[data-theme-id="tangled"] .relative.overflow-hidden.p-4.bg-gradient-to-br:ho
   box-shadow: 0 8px 30px rgba(0,0,0,0.6),
               0 0 20px rgba(201,162,39,0.15),
               inset 0 0 0 1px rgba(201,162,39,0.25) !important;
+}
+
+/* Chat Card (Deep Blue) */
+html[data-theme-id="tangled"] a[href="/chat"] .relative.overflow-hidden.p-4.bg-gradient-to-br {
+  background: linear-gradient(135deg, rgba(43,76,126,0.85) 0%, rgba(33,56,96,0.95) 100%) !important;
+}
+
+/* Duas Card (Golden Amber) */
+html[data-theme-id="tangled"] a[href="/dua"] .relative.overflow-hidden.p-4.bg-gradient-to-br {
+  background: linear-gradient(135deg, rgba(180,134,58,0.85) 0%, rgba(150,104,28,0.95) 100%) !important;
+  border-color: rgba(60,30,10,0.45) !important;
+}
+html[data-theme-id="tangled"] a[href="/dua"] .relative.overflow-hidden.p-4.bg-gradient-to-br .text-primary {
+  color: #3e2723 !important; /* Dark brown icon for contrast on gold */
+}
+html[data-theme-id="tangled"] a[href="/dua"] .relative.overflow-hidden.p-4.bg-gradient-to-br .bg-primary\/10,
+html[data-theme-id="tangled"] a[href="/dua"] .relative.overflow-hidden.p-4.bg-gradient-to-br:hover .bg-primary\/20 {
+  background-color: rgba(62,39,35,0.15) !important;
+}
+
+/* Memories Card (Soft Lavender) */
+html[data-theme-id="tangled"] a[href="/memories"] .relative.overflow-hidden.p-4.bg-gradient-to-br {
+  background: linear-gradient(135deg, rgba(190,163,198,0.85) 0%, rgba(170,143,178,0.95) 100%) !important;
+}
+
+/* Library Card (Medium Blue) */
+html[data-theme-id="tangled"] a[href="/library"] .relative.overflow-hidden.p-4.bg-gradient-to-br {
+  background: linear-gradient(135deg, rgba(89,118,155,0.85) 0%, rgba(69,98,135,0.95) 100%) !important;
 }
 
 /* Message input — warm parchment / forest */

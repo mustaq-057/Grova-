@@ -469,8 +469,8 @@ export function getPhotoScrimGradient(themeId: AppThemeId, dark: boolean): strin
 
   if (themeId === "tangled") {
     return dark
-      ? "linear-gradient(180deg, rgba(10,28,18,0.35) 0%, rgba(8,22,14,0.75) 100%)"
-      : "linear-gradient(180deg, rgba(240,245,235,0.3) 0%, rgba(230,240,225,0.65) 100%)";
+      ? "linear-gradient(180deg, rgba(10,28,18,0.15) 0%, rgba(8,22,14,0.45) 100%)"
+      : "linear-gradient(180deg, rgba(240,245,235,0.15) 0%, rgba(230,240,225,0.4) 100%)";
   }
 
   return dark
