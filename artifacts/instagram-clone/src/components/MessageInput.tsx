@@ -871,14 +871,14 @@ export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputPro
                 <button
                   type="button"
                   onClick={onStartRecording}
-                  className={`w-[44px] h-[44px] sm:w-[50px] sm:h-[50px] flex items-center justify-center rounded-full hover:bg-white/10 active:scale-95 transition-all text-[#fcd34d] border-none bg-transparent ${disabled ? iconBtnDisabled : ""}`}
+                  className={`w-[54px] h-[54px] sm:w-[62px] sm:h-[62px] flex items-center justify-center rounded-full hover:bg-white/10 active:scale-95 transition-all text-[#fcd34d] border-none bg-transparent ${disabled ? iconBtnDisabled : ""}`}
                   disabled={disabled}
                   aria-label="Start voice recording"
                 >
                   <img 
                     src="/themes/pan.png" 
                     alt="Mic" 
-                    className="w-[44px] h-[44px] sm:w-[50px] sm:h-[50px] object-contain drop-shadow-md scale-110" 
+                    className="w-[54px] h-[54px] sm:w-[62px] sm:h-[62px] object-contain drop-shadow-md scale-[1.25]" 
                     onError={(e) => { 
                       e.currentTarget.style.display = 'none'; 
                       e.currentTarget.parentElement!.innerHTML = '<span style="font-size: 20px">🍳</span>'; 
@@ -888,31 +888,31 @@ export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputPro
                 <button
                   type="button"
                   onClick={handleImageClick}
-                  className={`w-[34px] h-[34px] sm:w-[38px] sm:h-[38px] flex items-center justify-center rounded-full hover:bg-white/10 active:scale-95 transition-all text-[#fcd34d] border-none bg-transparent ${disabled ? iconBtnDisabled : ""}`}
+                  className={`w-[38px] h-[38px] sm:w-[42px] sm:h-[42px] flex items-center justify-center rounded-full hover:bg-white/10 active:scale-95 transition-all text-[#fcd34d] border-2 border-[#fcd34d] bg-[#fcd34d]/10 ${disabled ? iconBtnDisabled : ""}`}
                   disabled={disabled}
                   aria-label="Attach image or video"
                 >
-                  <ImageIcon className="w-[22px] h-[22px] sm:w-[24px] sm:h-[24px]" strokeWidth={1.8} />
+                  <ImageIcon className="w-[20px] h-[20px] sm:w-[22px] sm:h-[22px]" strokeWidth={1.8} />
                 </button>
                 <button
                   type="button"
                   onClick={toggleStickerPicker}
-                  className={`w-[34px] h-[34px] sm:w-[38px] sm:h-[38px] flex items-center justify-center rounded-full hover:bg-white/10 active:scale-95 transition-all text-[#fcd34d] border-none bg-transparent ${disabled ? iconBtnDisabled : ""}`}
+                  className={`w-[38px] h-[38px] sm:w-[42px] sm:h-[42px] flex items-center justify-center rounded-full hover:bg-white/10 active:scale-95 transition-all text-[#fcd34d] border-2 border-[#fcd34d] bg-[#fcd34d]/10 ${disabled ? iconBtnDisabled : ""}`}
                   disabled={disabled}
                   aria-label="Stickers and GIFs"
                 >
-                  <Smile className="w-[22px] h-[22px] sm:w-[24px] sm:h-[24px]" strokeWidth={1.8} />
+                  <Smile className="w-[20px] h-[20px] sm:w-[22px] sm:h-[22px]" strokeWidth={1.8} />
                 </button>
                 
                 <div className="relative shrink-0 flex items-center justify-center">
                   <button
                     type="button"
                     onClick={() => setShowAttachmentMenu((s) => !s)}
-                    className={`w-[34px] h-[34px] sm:w-[38px] sm:h-[38px] flex items-center justify-center rounded-full hover:bg-white/10 active:scale-95 transition-all text-[#fcd34d] border-none bg-transparent ${disabled ? iconBtnDisabled : ""}`}
+                    className={`w-[38px] h-[38px] sm:w-[42px] sm:h-[42px] flex items-center justify-center rounded-full hover:bg-white/10 active:scale-95 transition-all text-[#fcd34d] border-2 border-[#fcd34d] bg-[#fcd34d]/10 ${disabled ? iconBtnDisabled : ""}`}
                     disabled={disabled}
                     aria-label="More attachment options"
                   >
-                    <PlusCircle className={`w-[22px] h-[22px] sm:w-[24px] sm:h-[24px] transition-transform duration-[0.3s] ease-[cubic-bezier(0.34,1.56,0.64,1)] ${showAttachmentMenu ? "rotate-45" : ""}`} strokeWidth={1.8} />
+                    <PlusCircle className={`w-[20px] h-[20px] sm:w-[22px] sm:h-[22px] transition-transform duration-[0.3s] ease-[cubic-bezier(0.34,1.56,0.64,1)] ${showAttachmentMenu ? "rotate-45" : ""}`} strokeWidth={1.8} />
                   </button>
                   {attachmentMenu}
                 </div>
