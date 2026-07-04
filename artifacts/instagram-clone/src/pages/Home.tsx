@@ -417,6 +417,7 @@ export default memo(function Home() {
                   backgroundImage: `url('/themes/ttt.png?v=8')`,
                   backgroundSize: '205% 205%',
                   backgroundPosition: i === 0 ? '2% 2%' : i === 1 ? '98% 2%' : i === 2 ? '2% 98%' : '98% 98%',
+                  backgroundColor: i === 0 ? '#1a2a4a' : i === 1 ? '#92400e' : i === 2 ? '#c4a0c4' : '#1a2a4a',
                 } : undefined}
                 role="button"
                 tabIndex={0}
