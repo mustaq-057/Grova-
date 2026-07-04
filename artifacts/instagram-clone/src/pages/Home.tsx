@@ -253,27 +253,25 @@ export default memo(function Home() {
                 {/* My avatar — tap to view/add story */}
                 <button
                   type="button"
-                  className={`relative z-10 p-0.5 rounded-full cursor-pointer transition-transform active:scale-95 ${(!isTangled && myStories.length > 0) ? "bg-gradient-to-tr from-yellow-400 to-primary" : ""}`}
+                  className={`relative z-10 rounded-full cursor-pointer transition-transform active:scale-95 ${isTangled ? "" : "p-0.5"} ${(!isTangled && myStories.length > 0) ? "bg-gradient-to-tr from-yellow-400 to-primary" : ""}`}
                   onClick={() => setShowMyOptions(true)}
                 >
-                <AvatarImage
-                  src={user?.avatar}
-                  userId={user?.id ?? "me"}
-                  alt=""
-                  className={`w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-[3px] bg-background ${isTangled ? "border-transparent shadow-none relative z-10" : `shadow-[0_0_20px_rgba(var(--primary),0.25)] ${myStories.length > 0 ? "border-background" : "border-primary/40"}`} ${appTheme === 'library' ? 'library-locket' : ''}`}
-                />
-                {isTangled && (
-                  <div
-                    className="absolute z-20 pointer-events-none w-[145%] h-[145%]"
-                    style={{
-                      top: '50%',
-                      left: '50%',
-                      transform: 'translate(-50%, -50%)',
-                      backgroundImage: 'url(/themes/profile.png?v=10)',
-                      backgroundSize: '235% auto',
-                      backgroundRepeat: 'no-repeat',
-                      backgroundPosition: '6% 50%',
-                    }}
+                {isTangled ? (
+                  <div className="tangled-avatar-wrap">
+                    <AvatarImage
+                      src={user?.avatar}
+                      userId={user?.id ?? "me"}
+                      alt=""
+                      className="tangled-avatar-photo"
+                    />
+                    <div className="tangled-avatar-frame tangled-avatar-frame--self" aria-hidden />
+                  </div>
+                ) : (
+                  <AvatarImage
+                    src={user?.avatar}
+                    userId={user?.id ?? "me"}
+                    alt=""
+                    className={`w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-[3px] bg-background shadow-[0_0_20px_rgba(var(--primary),0.25)] ${myStories.length > 0 ? "border-background" : "border-primary/40"} ${appTheme === 'library' ? 'library-locket' : ''}`}
                   />
                 )}
                 {!loadingStories && myStories.length === 0 ? (
@@ -319,7 +317,7 @@ export default memo(function Home() {
                 {/* Partner avatar — tap to view story if they have one, else do nothing */}
                 <button
                   type="button"
-                  className={`relative z-10 p-0.5 rounded-full transition-transform ${(partnerStories.length > 0 || partnerNote) ? `cursor-pointer active:scale-95 ${!isTangled ? "bg-gradient-to-tr from-yellow-400 to-primary" : ""}` : "cursor-default"}`}
+                  className={`relative z-10 rounded-full transition-transform ${isTangled ? "" : "p-0.5"} ${(partnerStories.length > 0 || partnerNote) ? `cursor-pointer active:scale-95 ${!isTangled ? "bg-gradient-to-tr from-yellow-400 to-primary" : ""}` : "cursor-default"}`}
                   onClick={() => {
                     if (partnerStories.length > 0 && partnerNote) {
                       setShowPartnerOptions(true);
@@ -332,24 +330,22 @@ export default memo(function Home() {
                   }}
                   disabled={partnerStories.length === 0 && !partnerNote}
                 >
-                <AvatarImage
-                  src={partner.avatar}
-                  userId={partner.id}
-                  alt=""
-                  className={`w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-[3px] bg-background ${isTangled ? "border-transparent shadow-none relative z-10" : `shadow-[0_0_20px_rgba(var(--primary),0.25)] ${partnerStories.length > 0 ? "border-background" : "border-primary/40"}`} ${appTheme === 'library' ? 'library-locket' : ''}`}
-                />
-                {isTangled && (
-                  <div
-                    className="absolute z-20 pointer-events-none w-[145%] h-[145%]"
-                    style={{
-                      top: '50%',
-                      left: '50%',
-                      transform: 'translate(-50%, -50%)',
-                      backgroundImage: 'url(/themes/profile.png?v=10)',
-                      backgroundSize: '235% auto',
-                      backgroundRepeat: 'no-repeat',
-                      backgroundPosition: '94% 50%',
-                    }}
+                {isTangled ? (
+                  <div className="tangled-avatar-wrap">
+                    <AvatarImage
+                      src={partner.avatar}
+                      userId={partner.id}
+                      alt=""
+                      className="tangled-avatar-photo"
+                    />
+                    <div className="tangled-avatar-frame tangled-avatar-frame--partner" aria-hidden />
+                  </div>
+                ) : (
+                  <AvatarImage
+                    src={partner.avatar}
+                    userId={partner.id}
+                    alt=""
+                    className={`w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-[3px] bg-background shadow-[0_0_20px_rgba(var(--primary),0.25)] ${partnerStories.length > 0 ? "border-background" : "border-primary/40"} ${appTheme === 'library' ? 'library-locket' : ''}`}
                   />
                 )}
                 <div

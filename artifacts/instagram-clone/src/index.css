@@ -1760,4 +1760,56 @@ html[data-theme-id="tangled"] .bg-primary\/10 {
   background-color: rgba(201,162,39,0.18) !important;
 }
 
+/* Home profile avatars — photo centered inside profile.png frame */
+html[data-theme-id="tangled"] .tangled-avatar-wrap {
+  position: relative;
+  width: 5rem;
+  height: 5rem;
+  flex-shrink: 0;
+}
+
+@media (min-width: 640px) {
+  html[data-theme-id="tangled"] .tangled-avatar-wrap {
+    width: 6rem;
+    height: 6rem;
+  }
+}
+
+html[data-theme-id="tangled"] .tangled-avatar-photo {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 92%;
+  height: 92%;
+  border-radius: 9999px;
+  object-fit: cover;
+  object-position: center;
+  z-index: 10;
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+html[data-theme-id="tangled"] .tangled-avatar-frame {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 145%;
+  height: 145%;
+  background-image: url(/themes/profile.png?v=11);
+  background-size: 235% auto;
+  background-repeat: no-repeat;
+  pointer-events: none;
+  z-index: 20;
+}
+
+html[data-theme-id="tangled"] .tangled-avatar-frame--self {
+  background-position: 6% 50%;
+}
+
+html[data-theme-id="tangled"] .tangled-avatar-frame--partner {
+  background-position: 94% 50%;
+}
 
