@@ -270,7 +270,7 @@ export const TangledCardDecor = ({ className = "" }: { className?: string }) => 
     <path d="M15,35 L15,15 L35,15 M15,165 L15,185 L35,185 M145,35 L145,15 L125,15 M145,165 L145,185 L125,185" stroke="#fcd34d" strokeWidth="1" opacity="0.4" fill="none" />
     
     {/* Exact Reference Sun */}
-    <g transform="translate(80, 100) scale(1.6)">
+    <g transform="translate(80, 100) scale(2.4)">
       <defs>
         <radialGradient id="sunCore" cx="50%" cy="50%" r="50%">
           <stop offset="0%" stopColor="#fef08a" />

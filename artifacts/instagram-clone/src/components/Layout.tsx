@@ -218,9 +218,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     )}
                     <div className="relative shrink-0 flex items-center justify-center">
                       {showTangled && item.label === 'Home' ? (
-                        <img src="/themes/prince.png?v=2" alt="Home" className={`w-9 h-9 object-contain ${!isActive && 'opacity-70 group-hover:opacity-100 transition-opacity'}`} />
+                        <img src="/themes/prince.png?v=2" alt="Home" className={`w-[48px] h-[48px] object-contain ${!isActive && 'opacity-70 group-hover:opacity-100 transition-opacity'}`} />
                       ) : showTangled && item.label === 'Chat' ? (
-                        <img src="/themes/chat.png?v=2" alt="Chat" className={`w-9 h-9 object-contain ${!isActive && 'opacity-70 group-hover:opacity-100 transition-opacity'}`} />
+                        <img src="/themes/chat.png?v=2" alt="Chat" className={`w-[48px] h-[48px] object-contain ${!isActive && 'opacity-70 group-hover:opacity-100 transition-opacity'}`} />
                       ) : (
                         <Icon className={`w-6 h-6 ${isActive ? "text-primary" : ""}`} strokeWidth={isActive ? 2.5 : 1.5} />
                       )}
@@ -276,9 +276,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 )}
                 <div className={`relative p-2 sm:p-1.5 rounded-xl flex items-center justify-center ${isActive ? "bg-primary/10" : "group-hover:bg-secondary/50"}`}>
                   {showTangled && item.label === 'Home' ? (
-                    <img src="/themes/prince.png?v=2" alt="Home" className={`w-9 h-9 sm:w-9 sm:h-9 object-contain drop-shadow-sm ${!isActive && 'opacity-70 group-hover:opacity-100 transition-opacity'}`} />
+                    <img src="/themes/prince.png?v=2" alt="Home" className={`w-[46px] h-[46px] sm:w-[50px] sm:h-[50px] object-contain drop-shadow-sm ${!isActive && 'opacity-70 group-hover:opacity-100 transition-opacity'}`} />
                   ) : showTangled && item.label === 'Chat' ? (
-                    <img src="/themes/chat.png?v=2" alt="Chat" className={`w-9 h-9 sm:w-9 sm:h-9 object-contain drop-shadow-sm ${!isActive && 'opacity-70 group-hover:opacity-100 transition-opacity'}`} />
+                    <img src="/themes/chat.png?v=2" alt="Chat" className={`w-[46px] h-[46px] sm:w-[50px] sm:h-[50px] object-contain drop-shadow-sm ${!isActive && 'opacity-70 group-hover:opacity-100 transition-opacity'}`} />
                   ) : (
                     <Icon className={`w-5 h-5 sm:w-5 sm:h-5`} strokeWidth={isActive ? 2.5 : 1.5} />
                   )}

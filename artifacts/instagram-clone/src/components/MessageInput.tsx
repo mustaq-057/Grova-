@@ -831,14 +831,14 @@ export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputPro
           <button
             type="button"
             onClick={onOpenCamera}
-            className="w-[44px] h-[44px] sm:w-[50px] sm:h-[50px] rounded-full overflow-hidden shrink-0 active:scale-95 transition-all border-2 border-[#fcd34d] flex items-center justify-center bg-[#fde68a]"
+            className="w-[54px] h-[54px] sm:w-[62px] sm:h-[62px] rounded-full overflow-hidden shrink-0 active:scale-95 transition-all border-2 border-[#fcd34d] flex items-center justify-center bg-[#fde68a]"
             disabled={disabled}
             aria-label="Take photo with camera"
           >
             <img 
               src="/themes/horse.png" 
               alt="Camera" 
-              className="w-full h-full object-cover" 
+              className="w-full h-full object-cover scale-[1.2]" 
               onError={(e) => { 
                 e.currentTarget.style.display = 'none'; 
                 e.currentTarget.parentElement!.innerHTML = '<span style="font-size: 24px">🐴</span>'; 
@@ -871,14 +871,14 @@ export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputPro
                 <button
                   type="button"
                   onClick={onStartRecording}
-                  className={`w-[34px] h-[34px] sm:w-[38px] sm:h-[38px] flex items-center justify-center rounded-full hover:bg-white/10 active:scale-95 transition-all text-[#fcd34d] border-none bg-transparent ${disabled ? iconBtnDisabled : ""}`}
+                  className={`w-[44px] h-[44px] sm:w-[50px] sm:h-[50px] flex items-center justify-center rounded-full hover:bg-white/10 active:scale-95 transition-all text-[#fcd34d] border-none bg-transparent ${disabled ? iconBtnDisabled : ""}`}
                   disabled={disabled}
                   aria-label="Start voice recording"
                 >
                   <img 
                     src="/themes/pan.png" 
                     alt="Mic" 
-                    className="w-[34px] h-[34px] sm:w-[38px] sm:h-[38px] object-contain drop-shadow-md" 
+                    className="w-[44px] h-[44px] sm:w-[50px] sm:h-[50px] object-contain drop-shadow-md scale-110" 
                     onError={(e) => { 
                       e.currentTarget.style.display = 'none'; 
                       e.currentTarget.parentElement!.innerHTML = '<span style="font-size: 20px">🍳</span>'; 
