@@ -298,19 +298,37 @@ export const TangledCardDecor = ({ className = "" }: { className?: string }) => 
     {/* Additional border swirls */}
     <path d="M45,10 C50,15 60,10 65,15 M95,10 C100,15 110,10 115,15" stroke="#fbbf24" strokeWidth="1" fill="none" opacity="0.4"/>
     <path d="M45,190 C50,185 60,190 65,185 M95,190 C100,185 110,190 115,185" stroke="#fbbf24" strokeWidth="1" fill="none" opacity="0.4"/>
-    {/* Giant centered Sun */}
-    <g transform="translate(80, 100) scale(1.8)" opacity="0.95">
-      {[0,30,60,90,120,150,180,210,240,270,300,330].map((deg, i) => (
-        <line key={i} x1={20 * Math.cos(deg * Math.PI / 180)} y1={20 * Math.sin(deg * Math.PI / 180)} x2={35 * Math.cos(deg * Math.PI / 180)} y2={35 * Math.sin(deg * Math.PI / 180)} stroke="#fbbf24" strokeWidth="2" strokeLinecap="round" />
+    {/* Giant centered Sun - Improved Tangled Style */}
+    <g transform="translate(80, 100) scale(1.6)" opacity="0.95">
+      {/* Ambient glow behind the sun */}
+      <circle cx="0" cy="0" r="45" fill="url(#tangledSunGlow)" opacity="0.3" filter="blur(8px)" />
+      <circle cx="0" cy="0" r="25" fill="#d97706" opacity="0.4" filter="blur(4px)" />
+
+      {/* 8 Wavy S-Curve Rays */}
+      {[0, 45, 90, 135, 180, 225, 270, 315].map((deg) => (
+        <g key={`wavy-${deg}`} transform={`rotate(${deg})`}>
+          {/* Thick base stroke */}
+          <path d="M 0,-15 C 12,-26 -12,-40 0,-54" stroke="#fbbf24" strokeWidth="3" strokeLinecap="round" fill="none" opacity="0.9" />
+          {/* Inner highlight */}
+          <path d="M 0,-15 C 12,-26 -12,-40 0,-54" stroke="#fef3c7" strokeWidth="1" strokeLinecap="round" fill="none" opacity="0.7" />
+        </g>
       ))}
-      {[15,45,75,105,135,165,195,225,255,285,315,345].map((deg, i) => (
-        <line key={i} x1={20 * Math.cos(deg * Math.PI / 180)} y1={20 * Math.sin(deg * Math.PI / 180)} x2={28 * Math.cos(deg * Math.PI / 180)} y2={28 * Math.sin(deg * Math.PI / 180)} stroke="#fcd34d" strokeWidth="2.5" strokeLinecap="round" opacity="0.8" />
+
+      {/* 8 Straight Diamond Rays */}
+      {[22.5, 67.5, 112.5, 157.5, 202.5, 247.5, 292.5, 337.5].map((deg) => (
+        <g key={`straight-${deg}`} transform={`rotate(${deg})`}>
+          <path d="M 0,-16 L 3,-30 L 0,-44 L -3,-30 Z" fill="#fbbf24" opacity="0.85" />
+          <path d="M 0,-16 L 1.5,-30 L 0,-44 Z" fill="#fef3c7" opacity="0.5" />
+        </g>
       ))}
-      <circle cx="0" cy="0" r="22" fill="#d97706" opacity="0.6" />
-      <circle cx="0" cy="0" r="20" fill="url(#tangledSunGlow)" />
-      <circle cx="0" cy="0" r="14" fill="url(#tangledInnerGlow)" />
-      <circle cx="0" cy="0" r="8" fill="#fef3c7" opacity="0.9"/>
-      <circle cx="0" cy="0" r="5" fill="#fff" opacity="0.5"/>
+
+      {/* Sun Core */}
+      <circle cx="0" cy="0" r="16" fill="url(#tangledSunGlow)" stroke="#fbbf24" strokeWidth="2" />
+      <circle cx="0" cy="0" r="12" fill="url(#tangledInnerGlow)" opacity="0.8" />
+      
+      {/* Ornate Center Swirl */}
+      <path d="M -4,2 C -7,-3 -2,-8 3,-5 C 8,-1 5,6 0,6 C -3,6 -5,4 -5,4" stroke="#fef3c7" strokeWidth="1.5" fill="none" strokeLinecap="round" opacity="0.9" />
+      <circle cx="3" cy="-5" r="1" fill="#fff" opacity="0.8" />
     </g>
   </svg>
 );
