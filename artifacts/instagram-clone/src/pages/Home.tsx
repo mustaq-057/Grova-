@@ -414,11 +414,11 @@ export default memo(function Home() {
                 transition={{ delay: 0.3 + (i * 0.05) }}
                 whileHover={{ scale: 1.02, y: -2 }}
                 whileTap={{ scale: 0.98 }}
-                className={`relative overflow-hidden p-4 border border-border/50 rounded-2xl hover:border-primary/40 hover:shadow-lg transition-all cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${isTangled ? '' : 'bg-gradient-to-br from-card to-card/50'} ${appTheme === 'library' ? 'library-shortcut-card' : ''} ${isTangled ? 'tangled-shortcut-card flex flex-col justify-between aspect-[2/3]' : ''}`}
+                className={`relative overflow-hidden p-4 border border-border/50 rounded-2xl hover:border-primary/40 hover:shadow-lg transition-all cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${isTangled ? '' : 'bg-gradient-to-br from-card to-card/50'} ${appTheme === 'library' ? 'library-shortcut-card' : ''} ${isTangled ? 'tangled-shortcut-card flex flex-col justify-between aspect-[4/5]' : ''}`}
                 style={isTangled ? {
                   backgroundImage: `url('/themes/template.png?v=4')`,
-                  backgroundSize: '240% 240%',
-                  backgroundPosition: i === 0 ? '7% 7%' : i === 1 ? '93% 7%' : i === 2 ? '7% 93%' : '93% 93%',
+                  backgroundSize: '230% 275%',
+                  backgroundPosition: i === 0 ? '5.8% 10.7%' : i === 1 ? '94.2% 10.7%' : i === 2 ? '5.8% 89.3%' : '94.2% 89.3%',
                 } : undefined}
                 role="button"
                 tabIndex={0}
