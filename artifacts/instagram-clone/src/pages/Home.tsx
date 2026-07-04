@@ -262,7 +262,23 @@ export default memo(function Home() {
                   alt=""
                   className={`w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-[3px] bg-background ${isTangled ? "border-transparent shadow-none relative z-10" : `shadow-[0_0_20px_rgba(var(--primary),0.25)] ${myStories.length > 0 ? "border-background" : "border-primary/40"}`} ${appTheme === 'library' ? 'library-locket' : ''}`}
                 />
-                {isTangled && <img src="/themes/profile.png" alt="" className="absolute inset-[-30%] w-[160%] h-[160%] z-20 pointer-events-none object-contain" />}
+                {isTangled && (
+                  <div
+                    className="absolute z-20 pointer-events-none"
+                    style={{
+                      position: 'absolute',
+                      top: '50%',
+                      left: '50%',
+                      transform: 'translate(-50%, -50%)',
+                      width: '170px',
+                      height: '170px',
+                      backgroundImage: 'url(/themes/profile.png)',
+                      backgroundSize: '600px auto',
+                      backgroundRepeat: 'no-repeat',
+                      backgroundPosition: '-40px -87px',
+                    }}
+                  />
+                )}
                 {!loadingStories && myStories.length === 0 ? (
                   <div className="absolute bottom-0 right-0 w-6 h-6 sm:w-7 sm:h-7 bg-blue-500 rounded-full border-[3px] border-background flex items-center justify-center z-20">
                     <Plus className="w-3 h-3 sm:w-4 sm:h-4 text-white" strokeWidth={3} />
@@ -325,7 +341,23 @@ export default memo(function Home() {
                   alt=""
                   className={`w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-[3px] bg-background ${isTangled ? "border-transparent shadow-none relative z-10" : `shadow-[0_0_20px_rgba(var(--primary),0.25)] ${partnerStories.length > 0 ? "border-background" : "border-primary/40"}`} ${appTheme === 'library' ? 'library-locket' : ''}`}
                 />
-                {isTangled && <img src="/themes/profile.png" alt="" className="absolute inset-[-30%] w-[160%] h-[160%] z-20 pointer-events-none object-contain scale-x-[-1]" />}
+                {isTangled && (
+                  <div
+                    className="absolute z-20 pointer-events-none"
+                    style={{
+                      position: 'absolute',
+                      top: '50%',
+                      left: '50%',
+                      transform: 'translate(-50%, -50%)',
+                      width: '170px',
+                      height: '170px',
+                      backgroundImage: 'url(/themes/profile.png)',
+                      backgroundSize: '600px auto',
+                      backgroundRepeat: 'no-repeat',
+                      backgroundPosition: '-390px -87px',
+                    }}
+                  />
+                )}
                 <div
                   className={`absolute bottom-0 right-0 w-5 h-5 sm:w-6 sm:h-6 rounded-full border-[3px] border-background z-20 shadow-sm ${partnerOnline ? "bg-green-500" : "bg-gray-400"}`}
                   aria-label={partnerOnline ? "Partner is online" : "Partner is offline"}
@@ -391,8 +423,8 @@ export default memo(function Home() {
                 className={`relative overflow-hidden p-4 border border-border/50 rounded-2xl hover:border-primary/40 hover:shadow-lg transition-all cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${isTangled ? '' : 'bg-gradient-to-br from-card to-card/50'} ${appTheme === 'library' ? 'library-shortcut-card' : ''} ${isTangled ? 'tangled-shortcut-card flex flex-col justify-between aspect-[3/4]' : ''}`}
                 style={isTangled ? {
                   backgroundImage: `url('/themes/template.png')`,
-                  backgroundSize: '200% 200%',
-                  backgroundPosition: i === 0 ? '0% 0%' : i === 1 ? '100% 0%' : i === 2 ? '0% 100%' : '100% 100%',
+                  backgroundSize: '212% 220%',
+                  backgroundPosition: i === 0 ? '2% 2%' : i === 1 ? '98% 2%' : i === 2 ? '2% 98%' : '98% 98%',
                 } : undefined}
                 role="button"
                 tabIndex={0}
