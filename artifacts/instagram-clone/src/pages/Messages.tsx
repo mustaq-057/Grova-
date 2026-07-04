@@ -132,13 +132,17 @@ function finishToast(
   else if (result.type === "error") toast.error(result.message, { duration: 4000 });
 }
 
-function TypingDots() {
+function TypingDots({ glow = false }: { glow?: boolean }) {
   return (
     <span className="inline-flex items-center gap-0.5 ml-1" aria-hidden>
       {[0, 1, 2].map((i) => (
         <span
           key={i}
-          className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce"
+          className={`w-1.5 h-1.5 rounded-full animate-bounce ${
+            glow
+              ? "bg-[#fcd34d] shadow-[0_0_6px_2px_rgba(252,211,77,0.9)]"
+              : "bg-primary"
+          }`}
           style={{ animationDelay: `${i * 0.12}s` }}
         />
       ))}
@@ -3542,13 +3546,21 @@ export default function Messages() {
 
         <div className="chat-panel-bottom shrink-0 relative z-50">
           {showPartnerTyping && (
-            <div className="flex items-end gap-2 px-3 py-1.5 shrink-0 border-t border-white/5 bg-background/80 backdrop-blur-sm">
+            <div className={`flex items-end gap-2 px-3 py-1.5 shrink-0 border-t border-white/5 bg-background/80 backdrop-blur-sm ${
+              isTangledTheme(appThemeId) ? "shadow-[0_-2px_20px_rgba(252,211,77,0.15)]" : ""
+            }`}>
               <AvatarImage src={pAvatar} userId={partnerId} alt="" className="w-6 h-6 rounded-full object-cover shrink-0" />
-              <div className="bg-secondary/80 rounded-2xl rounded-bl-md px-3 py-2 flex items-center gap-1.5">
-                <span className="text-xs text-muted-foreground">
+              <div className={`rounded-2xl rounded-bl-md px-3 py-2 flex items-center gap-1.5 ${
+                isTangledTheme(appThemeId)
+                  ? "bg-[#1a3020]/80 border border-[#fcd34d]/20 shadow-[0_0_12px_rgba(252,211,77,0.15)]"
+                  : "bg-secondary/80"
+              }`}>
+                <span className={`text-xs ${
+                  isTangledTheme(appThemeId) ? "text-[#fcd34d]/90" : "text-muted-foreground"
+                }`}>
                   {isPartnerDoodling ? `${partnerName} is drawing a doodle…` : partnerTypingLine(partnerId)}
                 </span>
-                <TypingDots />
+                <TypingDots glow={isTangledTheme(appThemeId)} />
               </div>
             </div>
           )}

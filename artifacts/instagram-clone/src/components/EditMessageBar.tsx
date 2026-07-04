@@ -30,9 +30,8 @@ export const EditMessageBar = memo(function EditMessageBar({
           <X className="w-5 h-5" />
         </button>
       </div>
-      <div className="flex items-center gap-2 p-2">
-        <input
-          type="text"
+      <div className="flex items-end gap-2 p-2">
+        <textarea
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={(e) => {
@@ -44,7 +43,8 @@ export const EditMessageBar = memo(function EditMessageBar({
             }
           }}
           placeholder="Edit message..."
-          className="flex-1 min-w-0 px-4 py-2.5 bg-background/80 border border-white/10 rounded-full text-[15px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+          rows={Math.min(Math.max(value.split("\n").length, 1), 6)}
+          className="flex-1 min-w-0 px-4 py-2.5 bg-background/80 border border-white/10 rounded-2xl text-[15px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none leading-relaxed"
           autoFocus
           disabled={saving}
         />
