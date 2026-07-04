@@ -1699,9 +1699,6 @@ html[data-theme-id="tangled"] .tangled-shortcut-card:hover {
               inset 0 0 0 1px rgba(201,162,39,0.25) !important;
 }
 
-/* Chat Card (Deep Blue) */
-html[data-theme-id="tangled"] a[href="/chat"] .tangled-shortcut-card {
-}
 
 /* Duas Card (Golden Amber) */
 html[data-theme-id="tangled"] a[href="/dua"] .tangled-shortcut-card {
@@ -1711,13 +1708,6 @@ html[data-theme-id="tangled"] a[href="/dua"] .tangled-shortcut-card .text-primar
   color: #3e2723 !important; /* Dark brown icon for contrast on gold */
 }
 
-/* Memories Card (Soft Lavender) */
-html[data-theme-id="tangled"] a[href="/memories"] .tangled-shortcut-card {
-}
-
-/* Library Card (Medium Blue) */
-html[data-theme-id="tangled"] a[href="/library"] .tangled-shortcut-card {
-}
 
 /* Message input — warm parchment / forest */
 html[data-theme-id="tangled"] .message-input-pill {
