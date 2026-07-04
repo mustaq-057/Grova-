@@ -220,7 +220,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                       {showTangled && item.label === 'Home' ? (
                         <img src="/themes/prince.png?v=2" alt="Home" className={`w-[56px] h-[56px] object-contain scale-[1.2] drop-shadow-[0_0_12px_rgba(252,211,77,0.6)] ${!isActive && 'opacity-70 group-hover:opacity-100 transition-opacity'}`} />
                       ) : showTangled && item.label === 'Chat' ? (
-                        <img src="/themes/chat.png?v=2" alt="Chat" className={`w-[68px] h-[68px] object-contain scale-[1.6] drop-shadow-[0_0_20px_rgba(252,211,77,1)]`} />
+                        <img src="/themes/chat.png?v=3" alt="Chat" className={`w-[68px] h-[68px] object-contain scale-[1.6] drop-shadow-[0_0_20px_rgba(252,211,77,1)]`} />
                       ) : (
                         <Icon className={`w-6 h-6 ${isActive && !showTangled ? "text-primary" : ""} ${showTangled && ['Photos', 'Notifications', 'Settings'].includes(item.label) ? "drop-shadow-[0_0_12px_rgba(252,211,77,0.8)] text-[#fcd34d]" : ""}`} strokeWidth={isActive ? 2.5 : 1.5} />
                       )}
@@ -278,7 +278,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   {showTangled && item.label === 'Home' ? (
                     <img src="/themes/prince.png?v=2" alt="Home" className={`w-[52px] h-[52px] sm:w-[58px] sm:h-[58px] object-contain drop-shadow-[0_0_12px_rgba(252,211,77,0.6)] scale-[1.1] ${!isActive && 'opacity-70 group-hover:opacity-100 transition-opacity'}`} />
                   ) : showTangled && item.label === 'Chat' ? (
-                    <img src="/themes/chat.png?v=2" alt="Chat" className={`w-[60px] h-[60px] sm:w-[68px] sm:h-[68px] object-contain drop-shadow-[0_0_20px_rgba(252,211,77,1)] scale-[1.7]`} />
+                    <img src="/themes/chat.png?v=3" alt="Chat" className={`w-[60px] h-[60px] sm:w-[68px] sm:h-[68px] object-contain drop-shadow-[0_0_20px_rgba(252,211,77,1)] scale-[1.7]`} />
                   ) : (
                     <Icon className={`w-5 h-5 sm:w-5 sm:h-5 ${showTangled && ['Photos', 'Notifications', 'Settings'].includes(item.label) ? "drop-shadow-[0_0_12px_rgba(252,211,77,0.8)] text-[#fcd34d]" : ""}`} strokeWidth={isActive ? 2.5 : 1.5} />
                   )}
