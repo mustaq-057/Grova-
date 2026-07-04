@@ -262,7 +262,7 @@ export default memo(function Home() {
                   alt=""
                   className={`w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-[3px] bg-background ${isTangled ? "border-transparent shadow-none relative z-10" : `shadow-[0_0_20px_rgba(var(--primary),0.25)] ${myStories.length > 0 ? "border-background" : "border-primary/40"}`} ${appTheme === 'library' ? 'library-locket' : ''}`}
                 />
-                {isTangled && <img src="/themes/profile.png" alt="" className="absolute inset-[-16%] w-[132%] h-[132%] z-20 pointer-events-none drop-shadow-md object-contain" />}
+                {isTangled && <img src="/themes/profile.png" alt="" className="absolute inset-[-30%] w-[160%] h-[160%] z-20 pointer-events-none object-contain" />}
                 {!loadingStories && myStories.length === 0 ? (
                   <div className="absolute bottom-0 right-0 w-6 h-6 sm:w-7 sm:h-7 bg-blue-500 rounded-full border-[3px] border-background flex items-center justify-center z-20">
                     <Plus className="w-3 h-3 sm:w-4 sm:h-4 text-white" strokeWidth={3} />
@@ -325,7 +325,7 @@ export default memo(function Home() {
                   alt=""
                   className={`w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-[3px] bg-background ${isTangled ? "border-transparent shadow-none relative z-10" : `shadow-[0_0_20px_rgba(var(--primary),0.25)] ${partnerStories.length > 0 ? "border-background" : "border-primary/40"}`} ${appTheme === 'library' ? 'library-locket' : ''}`}
                 />
-                {isTangled && <img src="/themes/profile.png" alt="" className="absolute inset-[-16%] w-[132%] h-[132%] z-20 pointer-events-none drop-shadow-md object-contain scale-x-[-1]" />}
+                {isTangled && <img src="/themes/profile.png" alt="" className="absolute inset-[-30%] w-[160%] h-[160%] z-20 pointer-events-none object-contain scale-x-[-1]" />}
                 <div
                   className={`absolute bottom-0 right-0 w-5 h-5 sm:w-6 sm:h-6 rounded-full border-[3px] border-background z-20 shadow-sm ${partnerOnline ? "bg-green-500" : "bg-gray-400"}`}
                   aria-label={partnerOnline ? "Partner is online" : "Partner is offline"}
