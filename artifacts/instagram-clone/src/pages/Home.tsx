@@ -415,8 +415,8 @@ export default memo(function Home() {
                 className={`relative overflow-hidden p-4 rounded-2xl hover:shadow-lg transition-all cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${isTangled ? '' : 'bg-gradient-to-br from-card to-card/50 border border-border/50 hover:border-primary/40'} ${appTheme === 'library' ? 'library-shortcut-card' : ''} ${isTangled ? 'tangled-shortcut-card flex flex-col justify-between aspect-[4/5]' : ''}`}
                 style={isTangled ? {
                   backgroundImage: `url('/themes/ttt.png?v=8')`,
-                  backgroundSize: '205% 205%',
-                  backgroundPosition: i === 0 ? '2% 2%' : i === 1 ? '98% 2%' : i === 2 ? '2% 98%' : '98% 98%',
+                  backgroundSize: '200% 200%',
+                  backgroundPosition: i === 0 ? '0% 0%' : i === 1 ? '100% 0%' : i === 2 ? '0% 100%' : '100% 100%',
                   backgroundColor: i === 0 ? '#1a2a4a' : i === 1 ? '#92400e' : i === 2 ? '#c4a0c4' : '#1a2a4a',
                 } : undefined}
                 role="button"
