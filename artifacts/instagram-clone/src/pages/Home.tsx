@@ -258,13 +258,15 @@ export default memo(function Home() {
                 >
                 {isTangled ? (
                   <div className="tangled-avatar-wrap">
-                    <AvatarImage
-                      src={user?.avatar}
-                      userId={user?.id ?? "me"}
-                      alt=""
-                      className="tangled-avatar-photo"
-                    />
-                    <div className="tangled-avatar-frame tangled-avatar-frame--self" aria-hidden />
+                    <div className="tangled-avatar-stage">
+                      <AvatarImage
+                        src={user?.avatar}
+                        userId={user?.id ?? "me"}
+                        alt=""
+                        className="tangled-avatar-photo tangled-avatar-photo--self"
+                      />
+                      <div className="tangled-avatar-frame tangled-avatar-frame--self" aria-hidden />
+                    </div>
                   </div>
                 ) : (
                   <AvatarImage
@@ -332,13 +334,15 @@ export default memo(function Home() {
                 >
                 {isTangled ? (
                   <div className="tangled-avatar-wrap">
-                    <AvatarImage
-                      src={partner.avatar}
-                      userId={partner.id}
-                      alt=""
-                      className="tangled-avatar-photo"
-                    />
-                    <div className="tangled-avatar-frame tangled-avatar-frame--partner" aria-hidden />
+                    <div className="tangled-avatar-stage">
+                      <AvatarImage
+                        src={partner.avatar}
+                        userId={partner.id}
+                        alt=""
+                        className="tangled-avatar-photo tangled-avatar-photo--partner"
+                      />
+                      <div className="tangled-avatar-frame tangled-avatar-frame--partner" aria-hidden />
+                    </div>
                   </div>
                 ) : (
                   <AvatarImage

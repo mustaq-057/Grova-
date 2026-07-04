@@ -1760,7 +1760,7 @@ html[data-theme-id="tangled"] .bg-primary\/10 {
   background-color: rgba(201,162,39,0.18) !important;
 }
 
-/* Home profile avatars — photo same size as other themes (w-20/w-24), frame scaled to match inner hole */
+/* Home profile avatars — photo + frame share one stage so the hole aligns exactly */
 html[data-theme-id="tangled"] .tangled-avatar-wrap {
   position: relative;
   width: 5rem;
@@ -1776,42 +1776,52 @@ html[data-theme-id="tangled"] .tangled-avatar-wrap {
   }
 }
 
+html[data-theme-id="tangled"] .tangled-avatar-stage {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  /* frame outer ≈ 1.39× photo so inner hole (72%) = full w-20/w-24 photo */
+  width: 139%;
+  height: 139%;
+}
+
 html[data-theme-id="tangled"] .tangled-avatar-photo {
   position: absolute;
-  top: 45%;
-  left: 56.3%;
   transform: translate(-50%, -50%);
-  width: 100%;
-  height: 100%;
+  width: 72%;
+  height: 72%;
   border-radius: 9999px;
   object-fit: cover;
   object-position: center;
-  z-index: 10;
+  z-index: 1;
   border: none !important;
   box-shadow: none !important;
   background: transparent !important;
 }
 
-html[data-theme-id="tangled"] .tangled-avatar-frame {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  /* inner hole ≈ 72% of frame outer → scale frame so hole diameter = photo (100% wrap) */
-  width: 139%;
-  height: 139%;
-  background-image: url(/themes/profile.png?v=13);
-  background-size: 200% auto;
-  background-repeat: no-repeat;
-  pointer-events: none;
-  z-index: 20;
+html[data-theme-id="tangled"] .tangled-avatar-photo--self {
+  top: 46.4%;
+  left: 54.5%;
 }
 
-html[data-theme-id="tangled"] .tangled-avatar-frame--self {
+html[data-theme-id="tangled"] .tangled-avatar-photo--partner {
+  top: 46.8%;
+  left: 54.4%;
+}
+
+html[data-theme-id="tangled"] .tangled-avatar-frame {
+  position: absolute;
+  inset: 0;
+  background-image: url(/themes/profile.png?v=14);
+  background-size: 200% auto;
+  background-repeat: no-repeat;
   background-position: 0% 50%;
+  pointer-events: none;
+  z-index: 2;
 }
 
 html[data-theme-id="tangled"] .tangled-avatar-frame--partner {
   background-position: 100% 50%;
 }
-
+
