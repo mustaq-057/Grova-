@@ -293,27 +293,31 @@ export default memo(function Home() {
               </div>
 
               {/* Animated heart in the middle — tap to go to chat */}
-              <Link href="/chat">
-                <motion.div
-                  animate={{ scale: [1, 1.18, 1] }}
-                  transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
-                  className="relative z-[7] flex items-center justify-center cursor-pointer"
-                  aria-label="Open chat"
-                >
-                  <div className="absolute w-20 h-20 sm:w-24 sm:h-24 bg-primary/25 rounded-full blur-[28px] animate-pulse" />
-                  <div className="absolute w-14 h-14 sm:w-16 sm:h-16 bg-primary/40 rounded-full blur-[16px]" />
-                  <div
-                    className="absolute w-10 h-10 sm:w-12 sm:h-12 bg-primary/60 rounded-full blur-[8px]"
-                    style={{ boxShadow: "0 0 32px rgba(var(--primary), 0.9), 0 0 64px rgba(var(--primary), 0.5)" }}
-                  />
-                  <Heart
-                    className="relative w-8 h-8 sm:w-10 sm:h-10 text-primary fill-primary"
-                    style={{
-                      filter: "drop-shadow(0 0 8px rgba(var(--primary), 1)) drop-shadow(0 0 20px rgba(var(--primary), 0.85)) drop-shadow(0 0 40px rgba(var(--primary), 0.5))",
-                    }}
-                  />
-                </motion.div>
-              </Link>
+              {!isTangled ? (
+                <Link href="/chat">
+                  <motion.div
+                    animate={{ scale: [1, 1.18, 1] }}
+                    transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
+                    className="relative z-[7] flex items-center justify-center cursor-pointer"
+                    aria-label="Open chat"
+                  >
+                    <div className="absolute w-20 h-20 sm:w-24 sm:h-24 bg-primary/25 rounded-full blur-[28px] animate-pulse" />
+                    <div className="absolute w-14 h-14 sm:w-16 sm:h-16 bg-primary/40 rounded-full blur-[16px]" />
+                    <div
+                      className="absolute w-10 h-10 sm:w-12 sm:h-12 bg-primary/60 rounded-full blur-[8px]"
+                      style={{ boxShadow: "0 0 32px rgba(var(--primary), 0.9), 0 0 64px rgba(var(--primary), 0.5)" }}
+                    />
+                    <Heart
+                      className="relative w-8 h-8 sm:w-10 sm:h-10 text-primary fill-primary"
+                      style={{
+                        filter: "drop-shadow(0 0 8px rgba(var(--primary), 1)) drop-shadow(0 0 20px rgba(var(--primary), 0.85)) drop-shadow(0 0 40px rgba(var(--primary), 0.5))",
+                      }}
+                    />
+                  </motion.div>
+                </Link>
+              ) : (
+                <div className="w-10 sm:w-12" /> /* spacer for tangled theme */
+              )}
 
               <div className="relative">
                 {/* Partner avatar — tap to view story if they have one, else do nothing */}
@@ -366,7 +370,7 @@ export default memo(function Home() {
               </div>
             </motion.div>
         )}
-        {partner && (
+        {partner && !isTangled && (
           <p className={`text-base sm:text-lg font-medium mt-1 drop-shadow-sm flex items-center justify-center gap-1.5 text-foreground/90 ${appTheme === 'library' ? 'library-home-text' : ''}`}>
             You & {partner.name}
             <Heart className={`w-4 h-4 text-primary ${appTheme === 'library' ? 'hidden' : ''}`} strokeWidth={2.5} />
