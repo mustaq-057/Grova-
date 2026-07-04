@@ -1635,6 +1635,33 @@ html[data-theme-id="mint"] .home-avatar-mint-glow::before {
 /* Tangled Theme Overrides — Rapunzel's Enchanted Forest 🌿✨             */
 /* ═══════════════════════════════════════════════════════════════════════ */
 
+/* Make typography match the golden theme color */
+html[data-theme-id="tangled"] body,
+html[data-theme-id="tangled"] h1,
+html[data-theme-id="tangled"] h2,
+html[data-theme-id="tangled"] p,
+html[data-theme-id="tangled"] span,
+html[data-theme-id="tangled"] .text-foreground,
+html[data-theme-id="tangled"] .text-primary {
+  color: #fde68a !important;
+}
+html[data-theme-id="tangled"] .text-muted-foreground {
+  color: rgba(253, 230, 138, 0.75) !important;
+}
+
+/* Revert text color for specific elements that need contrast */
+html[data-theme-id="tangled"] .chat-bubble-text.rounded-br-md,
+html[data-theme-id="tangled"] .chat-bubble-text.rounded-br-md p,
+html[data-theme-id="tangled"] .chat-bubble-text.rounded-br-md span {
+  color: #0a1c12 !important;
+}
+html[data-theme-id="tangled"] .message-input-pill .camera-btn,
+html[data-theme-id="tangled"] .message-input-pill .send-btn,
+html[data-theme-id="tangled"] .message-input-pill .camera-btn svg,
+html[data-theme-id="tangled"] .message-input-pill .send-btn svg {
+  color: #0a1c12 !important;
+}
+
 /* Base styling for all Tangled cards (borders, shadows, hover) */
 html[data-theme-id="tangled"] .tangled-shortcut-card {
   border: none !important;
@@ -1650,19 +1677,19 @@ html[data-theme-id="tangled"] .tangled-shortcut-card::before {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 140px;
-  height: 140px;
-  background: radial-gradient(circle, rgba(255, 235, 120, 0.7) 0%, rgba(251, 191, 36, 0.4) 30%, transparent 70%);
+  width: 220px;
+  height: 220px;
+  background: radial-gradient(circle, rgba(255, 245, 180, 0.95) 0%, rgba(251, 191, 36, 0.7) 40%, transparent 75%);
   border-radius: 50%;
   pointer-events: none;
   z-index: 0;
   mix-blend-mode: hard-light;
-  animation: tangled-sun-pulse 4s ease-in-out infinite alternate;
+  animation: tangled-sun-pulse 3s ease-in-out infinite alternate;
 }
 
 @keyframes tangled-sun-pulse {
-  0% { opacity: 0.6; transform: translate(-50%, -50%) scale(0.9); }
-  100% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
+  0% { opacity: 0.7; transform: translate(-50%, -50%) scale(0.85); filter: brightness(1); }
+  100% { opacity: 1; transform: translate(-50%, -50%) scale(1.25); filter: brightness(1.3); }
 }
 
 html[data-theme-id="tangled"] .tangled-shortcut-card:hover {
