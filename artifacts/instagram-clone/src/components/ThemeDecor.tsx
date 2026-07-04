@@ -318,25 +318,7 @@ export const TangledCardDecor = ({ className = "" }: { className?: string }) => 
 export const TangledHomeDecor = () => {
   return (
     <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
-      {/* Top right chameleon */}
-      <div className="absolute top-[28%] right-[4%] w-16 h-16 opacity-90 drop-shadow-md z-10 hover:scale-110 transition-transform">
-        <img src="/themes/camelon.png" alt="" className="w-full h-full object-contain" />
-      </div>
-      
-      {/* Bottom left chameleon (flipped and slowly bouncing) */}
-      <div className="absolute bottom-[20%] left-[5%] w-20 h-20 opacity-90 drop-shadow-lg scale-x-[-1] z-10 hover:scale-110 transition-transform">
-        <img src="/themes/camelon.png" alt="" className="w-full h-full object-contain" />
-      </div>
-
-      {/* Additional chameleon */}
-      <div className="absolute bottom-[25%] right-[25%] w-14 h-14 opacity-80 drop-shadow-md rotate-12 z-10 hover:scale-110 transition-transform">
-        <img src="/themes/camelon.png" alt="" className="w-full h-full object-contain" />
-      </div>
-      
-      {/* Additional chameleon */}
-      <div className="absolute bottom-[10%] right-[8%] w-16 h-16 opacity-95 drop-shadow-lg z-10 hover:scale-110 transition-transform">
-        <img src="/themes/camelon.png" alt="" className="w-full h-full object-contain" />
-      </div>
+      {/* Decorations temporarily removed to fix overlap issues */}
     </div>
   );
 };
