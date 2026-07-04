@@ -159,14 +159,8 @@ export const TangledDecor = ({ className = "" }: { className?: string }) => (
       <ellipse cx="-6" cy="-4" rx="4" ry="7" transform="rotate(225 -6 -4)" fill="#c084fc" opacity="0.7"/>
       <circle cx="0" cy="0" r="3.5" fill="#fde68a"/>
     </g>
-    {/* Pascal the chameleon */}
-    <g transform="translate(158, 155) scale(0.85)" opacity="0.75">
-      <ellipse cx="0" cy="0" rx="12" ry="7" fill="#16a34a"/>
-      <ellipse cx="14" cy="-2" rx="7" ry="5" fill="#15803d"/>
-      <circle cx="20" cy="-4" r="3.5" fill="#16a34a"/>
-      <circle cx="22" cy="-5.5" r="1.2" fill="#fff"/>
-      <path d="M-10,4 C-14,8 -16,14 -13,18" stroke="#15803d" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
-    </g>
+    {/* Pascal the chameleon removed as requested */}
+
     {/* Glint dots */}
     <circle cx="60" cy="25" r="2" fill="#fde68a" opacity="0.7"/>
     <circle cx="170" cy="80" r="1.5" fill="#fbbf24" opacity="0.8"/>
