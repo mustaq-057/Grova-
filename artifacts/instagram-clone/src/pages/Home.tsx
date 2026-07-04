@@ -19,7 +19,6 @@ import { AvatarNoteModal } from "@/components/AvatarNoteModal";
 import { isAutumnAmberTheme, isPetrichorTheme, isTangledTheme } from "@/lib/app-theme";
 import { AutumnHomeDecor, AutumnBranch } from "@/components/AutumnHomeDecor";
 import { PetrichorHomeDecor, PetrichorCloud } from "@/components/PetrichorHomeDecor";
-import { SnowflakeDecor } from "@/components/SnowfallOverlay";
 import { ThemeCornerDecor, ThemeShortcutDecor, TangledHomeDecor, TangledAvatarFrame, TangledCardDecor } from "@/components/ThemeDecor";
 
 
@@ -435,11 +434,6 @@ export default memo(function Home() {
                 {isAutumnAmber && (
                   <div className="absolute -top-4 -right-4 w-20 h-20 opacity-30 pointer-events-none rotate-12">
                     <AutumnBranch />
-                  </div>
-                )}
-                {isSnowfall && (
-                  <div className="absolute top-2 right-2 w-12 h-12 opacity-20 pointer-events-none">
-                    <SnowflakeDecor className="w-full h-full text-blue-100" />
                   </div>
                 )}
                 {isPetrichor && (
