@@ -1713,11 +1713,23 @@ html[data-theme-id="tangled"] a[href="/dua"] .tangled-shortcut-card .text-primar
 
 
 
-/* Message input — warm parchment / forest */
+/* Message input — warm parchment / forest with magical glow */
 html[data-theme-id="tangled"] .message-input-pill {
   background-color: rgba(10, 28, 18, 0.92) !important;
-  border: 1.5px solid rgba(201, 162, 39, 0.4) !important;
-  box-shadow: 0 -2px 20px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(253, 230, 138, 0.08) !important;
+  border: 1.5px solid rgba(251, 191, 36, 0.7) !important;
+  box-shadow: 0 0 15px rgba(251, 191, 36, 0.4), inset 0 0 10px rgba(201, 162, 39, 0.2) !important;
+  animation: tangled-input-glow 3s ease-in-out infinite alternate;
+}
+
+@keyframes tangled-input-glow {
+  0% {
+    box-shadow: 0 0 10px rgba(251, 191, 36, 0.3), inset 0 0 5px rgba(201, 162, 39, 0.1) !important;
+    border-color: rgba(201, 162, 39, 0.6) !important;
+  }
+  100% {
+    box-shadow: 0 0 25px rgba(251, 191, 36, 0.7), inset 0 0 15px rgba(201, 162, 39, 0.3) !important;
+    border-color: rgba(253, 230, 138, 1) !important;
+  }
 }
 
 html[data-theme-id="tangled"] .message-input-pill textarea {
