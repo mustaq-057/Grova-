@@ -1847,3 +1847,24 @@ html[data-theme-id="tangled"] .tangled-avatar-frame--partner {
   background-position: 100% 50%;
 }
 
+html[data-theme-id="tangled"] .tangled-chameleon {
+  position: absolute;
+  width: 22%;
+  height: auto;
+  z-index: 10;
+  pointer-events: none;
+  filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3));
+}
+
+html[data-theme-id="tangled"] .tangled-chameleon--self {
+  top: 62%;
+  left: 14%;
+  transform: rotate(-25deg);
+}
+
+html[data-theme-id="tangled"] .tangled-chameleon--partner {
+  top: 62%;
+  right: 14%;
+  transform: scaleX(-1) rotate(-25deg);
+}
+

@@ -266,6 +266,7 @@ export default memo(function Home() {
                         className="tangled-avatar-photo tangled-avatar-photo--self"
                       />
                       <div className="tangled-avatar-frame tangled-avatar-frame--self" aria-hidden />
+                      <img src="/themes/camelon.png" alt="" className="tangled-chameleon tangled-chameleon--self" aria-hidden />
                     </div>
                   </div>
                 ) : (
@@ -342,6 +343,7 @@ export default memo(function Home() {
                         className="tangled-avatar-photo tangled-avatar-photo--partner"
                       />
                       <div className="tangled-avatar-frame tangled-avatar-frame--partner" aria-hidden />
+                      <img src="/themes/camelon.png" alt="" className="tangled-chameleon tangled-chameleon--partner" aria-hidden />
                     </div>
                   </div>
                 ) : (
