@@ -360,13 +360,13 @@ export default memo(function Home() {
           transition={{ delay: 0.3, duration: 0.3 }}
           className="flex items-center justify-center gap-4 mt-6"
         >
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-secondary/50 rounded-full">
-            <Clock className="w-3.5 h-3.5 text-primary" />
-            <span className="text-xs font-medium">Morocco: {moroccoTime}</span>
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-secondary/50 rounded-full whitespace-nowrap">
+            <Clock className="w-3 h-3 text-primary shrink-0" />
+            <span className="text-[11px] font-medium">Morocco: {moroccoTime}</span>
           </div>
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-secondary/50 rounded-full">
-            <Clock className="w-3.5 h-3.5 text-primary" />
-            <span className="text-xs font-medium">India: {indiaTime}</span>
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-secondary/50 rounded-full whitespace-nowrap">
+            <Clock className="w-3 h-3 text-primary shrink-0" />
+            <span className="text-[11px] font-medium">India: {indiaTime}</span>
           </div>
         </motion.div>
       </motion.div>
@@ -388,13 +388,16 @@ export default memo(function Home() {
                 transition={{ delay: 0.3 + (i * 0.05) }}
                 whileHover={{ scale: 1.02, y: -2 }}
                 whileTap={{ scale: 0.98 }}
-                className={`relative overflow-hidden p-4 bg-gradient-to-br from-card to-card/50 border border-border/50 rounded-2xl hover:border-primary/40 hover:shadow-lg transition-all cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${appTheme === 'library' ? 'library-shortcut-card' : ''} ${isTangled ? 'tangled-shortcut-card flex flex-col justify-between aspect-[3/4]' : ''}`}
+                className={`relative overflow-hidden p-4 border border-border/50 rounded-2xl hover:border-primary/40 hover:shadow-lg transition-all cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${isTangled ? '' : 'bg-gradient-to-br from-card to-card/50'} ${appTheme === 'library' ? 'library-shortcut-card' : ''} ${isTangled ? 'tangled-shortcut-card flex flex-col justify-between aspect-[3/4]' : ''}`}
+                style={isTangled ? {
+                  backgroundImage: `url('/themes/template.png')`,
+                  backgroundSize: '200% 200%',
+                  backgroundPosition: i === 0 ? '0% 0%' : i === 1 ? '100% 0%' : i === 2 ? '0% 100%' : '100% 100%',
+                } : undefined}
                 role="button"
                 tabIndex={0}
                 aria-label={`Navigate to ${s.label}: ${s.desc}`}
               >
-                {isTangled && <TangledCardDecor className="absolute inset-0 w-full h-full pointer-events-none" />}
-
                 <div className={`w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mb-3 group-hover:bg-primary/20 transition-colors ${appTheme === 'library' ? 'library-shortcut-icon-wrapper' : ''} ${isTangled ? 'bg-black/30 group-hover:bg-black/40 backdrop-blur-sm z-10 relative mb-0' : ''}`}>
                   <Icon className={`w-5 h-5 text-primary ${appTheme === 'library' ? 'library-shortcut-icon' : ''} ${isTangled ? '!text-amber-300 drop-shadow-sm' : ''}`} aria-hidden="true" />
                 </div>
