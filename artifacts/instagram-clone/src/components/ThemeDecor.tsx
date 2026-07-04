@@ -372,16 +372,20 @@ export const TangledCardDecor = ({ className = "" }: { className?: string }) => 
   </svg>
 );
 
-const PascalSVG = ({ className }: { className?: string }) => (
-  <svg viewBox="0 0 40 30" className={className} fill="none">
-    <g transform="translate(20, 15)">
-      <ellipse cx="0" cy="0" rx="14" ry="9" fill="#16a34a"/>
-      <ellipse cx="16" cy="-3" rx="8" ry="6" fill="#15803d"/>
-      <circle cx="22" cy="-6" r="4" fill="#16a34a"/>
-      <circle cx="24" cy="-8" r="1.5" fill="#fff"/>
-      <path d="M-12,5 C-18,10 -20,18 -15,22" stroke="#15803d" strokeWidth="3" strokeLinecap="round" fill="none"/>
-      <path d="M5,8 L3,14 M-5,8 L-7,14" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" />
-    </g>
+const FloatingLanternSVG = ({ className }: { className?: string }) => (
+  <svg viewBox="-20 -20 40 40" className={className} fill="none" overflow="visible">
+    <polygon points="-8,-12 8,-12 10,12 -10,12" fill="#fde68a" opacity="0.95" filter="drop-shadow(0 0 8px rgba(253,230,138,0.8))" />
+    <polygon points="-6,-10 6,-10 8,10 -8,10" fill="#fef3c7" opacity="0.9" />
+    <path d="M-8,-12 C-4,-15 4,-15 8,-12" fill="none" stroke="#b45309" strokeWidth="2" />
+    <path d="M-10,12 C-5,16 5,16 10,12" fill="none" stroke="#b45309" strokeWidth="2.5" />
+    <path d="M-10,12 L-10,15 M10,12 L10,15" stroke="#b45309" strokeWidth="1.5" opacity="0.8" />
+    
+    {/* Sun Emblem */}
+    <circle cx="0" cy="0" r="4" fill="#d97706" opacity="0.8" />
+    <circle cx="0" cy="0" r="2" fill="#fff" />
+    
+    {/* Inner glow */}
+    <circle cx="0" cy="0" r="15" fill="#fde68a" opacity="0.5" filter="blur(6px)" />
   </svg>
 );
 
@@ -404,16 +408,19 @@ const PanSVG = ({ className }: { className?: string }) => (
 export const TangledHomeDecor = () => {
   return (
     <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
-      <div className="absolute top-[32%] right-[2%] w-10 h-10 opacity-90 drop-shadow-md z-10">
-        <PascalSVG className="w-full h-full" />
+      <div className="absolute top-[28%] right-[4%] w-12 h-12 opacity-80 drop-shadow-lg rotate-12 z-10 animate-pulse" style={{ animationDuration: '4s' }}>
+        <FloatingLanternSVG className="w-full h-full" />
       </div>
-      <div className="absolute bottom-[20%] left-[5%] w-14 h-14 opacity-90 drop-shadow-lg scale-x-[-1] z-10">
-        <PascalSVG className="w-full h-full" />
+      <div className="absolute top-[45%] left-[2%] w-16 h-16 opacity-90 drop-shadow-xl -rotate-6 z-10 animate-pulse" style={{ animationDuration: '5s' }}>
+        <FloatingLanternSVG className="w-full h-full" />
       </div>
-      <div className="absolute bottom-[2%] right-[10%] w-8 h-8 opacity-90 drop-shadow-md z-10">
-        <PascalSVG className="w-full h-full" />
+      <div className="absolute bottom-[25%] left-[8%] w-10 h-10 opacity-70 drop-shadow-md rotate-12 z-10 animate-pulse" style={{ animationDuration: '3s' }}>
+        <FloatingLanternSVG className="w-full h-full" />
       </div>
-      <div className="absolute bottom-[10%] right-[15%] w-14 h-14 opacity-95 drop-shadow-lg rotate-12 z-10">
+      <div className="absolute bottom-[5%] right-[25%] w-14 h-14 opacity-85 drop-shadow-lg -rotate-12 z-10 animate-pulse" style={{ animationDuration: '4.5s' }}>
+        <FloatingLanternSVG className="w-full h-full" />
+      </div>
+      <div className="absolute bottom-[10%] right-[8%] w-14 h-14 opacity-95 drop-shadow-lg rotate-12 z-10">
         <PanSVG className="w-full h-full" />
       </div>
     </div>
