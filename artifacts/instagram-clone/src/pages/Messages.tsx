@@ -3271,15 +3271,21 @@ export default function Messages() {
         className={`chat-panel flex-1 min-w-0 h-full min-h-0 relative ${premiumChatClass} transition-colors duration-500`}
       >
         {showChatAurora && <ChatAuroraLayer />}
+        
+        {/* Tangled Background Chameleon */}
+        {isTangledTheme(appThemeId) && (
+          <img 
+            src="/themes/camelon_final.png?v=3" 
+            alt="" 
+            className="absolute bottom-28 right-4 w-20 h-20 sm:w-24 sm:h-24 opacity-60 z-0 drop-shadow-lg object-contain pointer-events-none -scale-x-100 rotate-12" 
+          />
+        )}
 
 
         <div className="chat-panel-top shrink-0 z-20 flex flex-col relative">
           {/* ── Header ── */}
           <div className="chat-panel-header flex items-center gap-1.5 sm:gap-2 px-1.5 sm:px-3 py-1 sm:py-1.5 border-b shrink-0 text-foreground">
             <div className="relative shrink-0">
-              {isTangledTheme(appThemeId) && (
-                <img src="/themes/camelon_final.png?v=3" alt="" className="absolute -top-3 -right-3 w-6 h-6 z-30 drop-shadow-sm object-contain -rotate-12 pointer-events-none" />
-              )}
               <AvatarImage src={pAvatar} userId={partnerId} alt={pName} className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover" />
               {presence.online && (
                 <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-background" />
