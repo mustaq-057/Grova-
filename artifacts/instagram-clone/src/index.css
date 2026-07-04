@@ -1652,12 +1652,10 @@ html[data-theme-id="tangled"] .tangled-shortcut-card:hover {
 
 /* Chat Card (Deep Blue) */
 html[data-theme-id="tangled"] a[href="/chat"] .tangled-shortcut-card {
-  background: linear-gradient(135deg, rgba(43,76,126,0.95) 0%, rgba(33,56,96,0.98) 100%) !important;
 }
 
 /* Duas Card (Golden Amber) */
 html[data-theme-id="tangled"] a[href="/dua"] .tangled-shortcut-card {
-  background: linear-gradient(135deg, rgba(180,134,58,0.95) 0%, rgba(150,104,28,0.98) 100%) !important;
   border-color: rgba(60,30,10,0.45) !important;
 }
 html[data-theme-id="tangled"] a[href="/dua"] .tangled-shortcut-card .text-primary {
@@ -1666,12 +1664,10 @@ html[data-theme-id="tangled"] a[href="/dua"] .tangled-shortcut-card .text-primar
 
 /* Memories Card (Soft Lavender) */
 html[data-theme-id="tangled"] a[href="/memories"] .tangled-shortcut-card {
-  background: linear-gradient(135deg, rgba(190,163,198,0.95) 0%, rgba(170,143,178,0.98) 100%) !important;
 }
 
 /* Library Card (Medium Blue) */
 html[data-theme-id="tangled"] a[href="/library"] .tangled-shortcut-card {
-  background: linear-gradient(135deg, rgba(89,118,155,0.95) 0%, rgba(69,98,135,0.98) 100%) !important;
 }
 
 /* Message input — warm parchment / forest */
