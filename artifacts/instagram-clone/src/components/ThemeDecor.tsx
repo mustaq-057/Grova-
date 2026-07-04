@@ -235,22 +235,36 @@ export const ThemeShortcutDecor = memo(({ theme }: { theme: AppThemeId }) => {
 // Specialized Tangled Home Elements
 // ============================================================================
 
-export const TangledAvatarFrame = ({ className = "" }: { className?: string }) => (
-  <svg viewBox="-20 -20 140 140" fill="none" className={className} overflow="visible">
-    {/* Flower Cluster Top Left */}
-    <g transform="translate(10, -5)">
-      {/* 5 purple circles overlapping exactly as in reference */}
-      <circle cx="15" cy="15" r="9" fill="#9333ea" />
-      <circle cx="5" cy="25" r="7" fill="#a855f7" />
-      <circle cx="12" cy="32" r="6" fill="#c084fc" />
-      <circle cx="28" cy="22" r="6" fill="#c084fc" />
-      <circle cx="2" cy="15" r="5" fill="#c084fc" />
-      {/* Inner dots */}
-      <circle cx="15" cy="15" r="3" fill="#d8b4fe" />
-      <circle cx="5" cy="25" r="2.5" fill="#e9d5ff" />
-    </g>
-  </svg>
-);
+export const TangledAvatarFrame = ({ className = "" }: { className?: string }) => {
+  // 8 flowers evenly spaced around a circle of radius 62 centred at 50,50
+  const flowerPositions = [
+    { angle: 0 }, { angle: 45 }, { angle: 90 }, { angle: 135 },
+    { angle: 180 }, { angle: 225 }, { angle: 270 }, { angle: 315 },
+  ];
+  const r = 62;
+  return (
+    <svg viewBox="-20 -20 140 140" fill="none" className={className} overflow="visible">
+      {flowerPositions.map(({ angle }) => {
+        const rad = (angle * Math.PI) / 180;
+        const cx = 50 + r * Math.sin(rad);
+        const cy = 50 - r * Math.cos(rad);
+        return (
+          <g key={angle} transform={`translate(${cx}, ${cy}) rotate(${angle})`}>
+            {/* 6 petals */}
+            <ellipse cx="0" cy="-8" rx="4.5" ry="8" fill="#9333ea" opacity="0.95" />
+            <ellipse cx="7" cy="-4" rx="4.5" ry="8" transform="rotate(60 7 -4)" fill="#a855f7" opacity="0.9" />
+            <ellipse cx="7" cy="4" rx="4.5" ry="8" transform="rotate(120 7 4)" fill="#c084fc" opacity="0.9" />
+            <ellipse cx="0" cy="8" rx="4.5" ry="8" transform="rotate(180 0 8)" fill="#9333ea" opacity="0.95" />
+            <ellipse cx="-7" cy="4" rx="4.5" ry="8" transform="rotate(240 -7 4)" fill="#a855f7" opacity="0.9" />
+            <ellipse cx="-7" cy="-4" rx="4.5" ry="8" transform="rotate(300 -7 -4)" fill="#c084fc" opacity="0.9" />
+            {/* Centre */}
+            <circle cx="0" cy="0" r="4" fill="#fde68a" />
+          </g>
+        );
+      })}
+    </svg>
+  );
+};
 
 export const TangledCardDecor = ({ className = "" }: { className?: string }) => (
   <svg viewBox="0 0 160 200" fill="none" className={className} preserveAspectRatio="none">
