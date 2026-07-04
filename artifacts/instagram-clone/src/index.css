@@ -1637,14 +1637,36 @@ html[data-theme-id="mint"] .home-avatar-mint-glow::before {
 
 /* Base styling for all Tangled cards (borders, shadows, hover) */
 html[data-theme-id="tangled"] .tangled-shortcut-card {
-  border: 1.5px solid rgba(201,162,39,0.45) !important;
+  border: none !important;
   box-shadow: 0 4px 20px rgba(0,0,0,0.5),
               inset 0 0 0 1px rgba(201,162,39,0.12),
               inset 0 1px 0 rgba(253,230,138,0.1) !important;
 }
 
+/* Magical glow overlay for the sun in the center of the cards */
+html[data-theme-id="tangled"] .tangled-shortcut-card::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 130px;
+  height: 130px;
+  background: radial-gradient(circle, rgba(253, 230, 138, 0.4) 0%, rgba(251, 191, 36, 0.15) 40%, transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 0;
+  mix-blend-mode: screen;
+  animation: tangled-sun-pulse 4s ease-in-out infinite alternate;
+}
+
+@keyframes tangled-sun-pulse {
+  0% { opacity: 0.6; transform: translate(-50%, -50%) scale(0.9); }
+  100% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
+}
+
 html[data-theme-id="tangled"] .tangled-shortcut-card:hover {
-  border-color: rgba(251,191,36,0.7) !important;
+  border: none !important;
   box-shadow: 0 8px 30px rgba(0,0,0,0.6),
               0 0 20px rgba(201,162,39,0.15),
               inset 0 0 0 1px rgba(201,162,39,0.25) !important;
@@ -1818,6 +1840,7 @@ html[data-theme-id="tangled"] .tangled-avatar-frame {
   background-position: 0% 50%;
   pointer-events: none;
   z-index: 2;
+  filter: drop-shadow(0 0 10px rgba(251, 191, 36, 0.6)) drop-shadow(0 0 20px rgba(201, 162, 39, 0.3));
 }
 
 html[data-theme-id="tangled"] .tangled-avatar-frame--partner {
