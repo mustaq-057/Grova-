@@ -269,10 +269,10 @@ export default memo(function Home() {
                       top: '50%',
                       left: '50%',
                       transform: 'translate(-50%, -50%)',
-                      backgroundImage: 'url(/themes/profile.png?v=4)',
+                      backgroundImage: 'url(/themes/profile.png?v=5)',
                       backgroundSize: '230% auto',
                       backgroundRepeat: 'no-repeat',
-                      backgroundPosition: '4% 48%',
+                      backgroundPosition: '0% 45%',
                     }}
                   />
                 )}
@@ -293,31 +293,27 @@ export default memo(function Home() {
               </div>
 
               {/* Animated heart in the middle — tap to go to chat */}
-              {!isTangled ? (
-                <Link href="/chat">
-                  <motion.div
-                    animate={{ scale: [1, 1.18, 1] }}
-                    transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
-                    className="relative z-[7] flex items-center justify-center cursor-pointer"
-                    aria-label="Open chat"
-                  >
-                    <div className="absolute w-20 h-20 sm:w-24 sm:h-24 bg-primary/25 rounded-full blur-[28px] animate-pulse" />
-                    <div className="absolute w-14 h-14 sm:w-16 sm:h-16 bg-primary/40 rounded-full blur-[16px]" />
-                    <div
-                      className="absolute w-10 h-10 sm:w-12 sm:h-12 bg-primary/60 rounded-full blur-[8px]"
-                      style={{ boxShadow: "0 0 32px rgba(var(--primary), 0.9), 0 0 64px rgba(var(--primary), 0.5)" }}
-                    />
-                    <Heart
-                      className="relative w-8 h-8 sm:w-10 sm:h-10 text-primary fill-primary"
-                      style={{
-                        filter: "drop-shadow(0 0 8px rgba(var(--primary), 1)) drop-shadow(0 0 20px rgba(var(--primary), 0.85)) drop-shadow(0 0 40px rgba(var(--primary), 0.5))",
-                      }}
-                    />
-                  </motion.div>
-                </Link>
-              ) : (
-                <div className="w-10 sm:w-12" /> /* spacer for tangled theme */
-              )}
+              <Link href="/chat">
+                <motion.div
+                  animate={{ scale: [1, 1.18, 1] }}
+                  transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
+                  className="relative z-[7] flex items-center justify-center cursor-pointer"
+                  aria-label="Open chat"
+                >
+                  <div className="absolute w-20 h-20 sm:w-24 sm:h-24 bg-primary/25 rounded-full blur-[28px] animate-pulse" />
+                  <div className="absolute w-14 h-14 sm:w-16 sm:h-16 bg-primary/40 rounded-full blur-[16px]" />
+                  <div
+                    className="absolute w-10 h-10 sm:w-12 sm:h-12 bg-primary/60 rounded-full blur-[8px]"
+                    style={{ boxShadow: "0 0 32px rgba(var(--primary), 0.9), 0 0 64px rgba(var(--primary), 0.5)" }}
+                  />
+                  <Heart
+                    className="relative w-8 h-8 sm:w-10 sm:h-10 text-primary fill-primary"
+                    style={{
+                      filter: "drop-shadow(0 0 8px rgba(var(--primary), 1)) drop-shadow(0 0 20px rgba(var(--primary), 0.85)) drop-shadow(0 0 40px rgba(var(--primary), 0.5))",
+                    }}
+                  />
+                </motion.div>
+              </Link>
 
               <div className="relative">
                 {/* Partner avatar — tap to view story if they have one, else do nothing */}
@@ -349,10 +345,10 @@ export default memo(function Home() {
                       top: '50%',
                       left: '50%',
                       transform: 'translate(-50%, -50%)',
-                      backgroundImage: 'url(/themes/profile.png?v=4)',
+                      backgroundImage: 'url(/themes/profile.png?v=5)',
                       backgroundSize: '230% auto',
                       backgroundRepeat: 'no-repeat',
-                      backgroundPosition: '96% 48%',
+                      backgroundPosition: '88% 45%',
                     }}
                   />
                 )}
