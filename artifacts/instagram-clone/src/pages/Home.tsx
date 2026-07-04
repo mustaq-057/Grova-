@@ -251,7 +251,7 @@ export default memo(function Home() {
             >
               <div className="relative">
                 {isTangled && (
-                  <img src="/themes/camelon_final.png?v=3" alt="" className="absolute top-1/4 -translate-y-1/2 -left-6 sm:-left-8 w-12 h-12 sm:w-16 sm:h-16 z-30 drop-shadow-md object-contain rotate-12" />
+                  <img src="/themes/camelon_final.png?v=3" alt="" className="absolute top-[10%] -left-[28px] sm:-left-[36px] w-[72px] h-[72px] sm:w-[86px] sm:h-[86px] z-30 drop-shadow-[0_4px_8px_rgba(0,0,0,0.3)] object-contain rotate-[35deg]" />
                 )}
                 {/* My avatar — tap to view/add story */}
                 <button
@@ -307,7 +307,7 @@ export default memo(function Home() {
 
               <div className="relative">
                 {isTangled && (
-                  <img src="/themes/camelon_final.png?v=3" alt="" className="absolute top-1/4 -translate-y-1/2 -right-6 sm:-right-8 w-12 h-12 sm:w-16 sm:h-16 z-30 drop-shadow-md object-contain scale-x-[-1] -rotate-12" />
+                  <img src="/themes/camelon_final.png?v=3" alt="" className="absolute top-[10%] -right-[28px] sm:-right-[36px] w-[72px] h-[72px] sm:w-[86px] sm:h-[86px] z-30 drop-shadow-[0_4px_8px_rgba(0,0,0,0.3)] object-contain scale-x-[-1] -rotate-[35deg]" />
                 )}
                 {/* Partner avatar — tap to view story if they have one, else do nothing */}
                 <button

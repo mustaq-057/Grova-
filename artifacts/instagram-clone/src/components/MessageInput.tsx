@@ -831,7 +831,7 @@ export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputPro
           <button
             type="button"
             onClick={onOpenCamera}
-            className="w-[38px] h-[38px] sm:w-[44px] sm:h-[44px] rounded-full overflow-hidden shrink-0 active:scale-95 transition-all border-2 border-[#fcd34d] flex items-center justify-center bg-[#fde68a]"
+            className="w-[44px] h-[44px] sm:w-[50px] sm:h-[50px] rounded-full overflow-hidden shrink-0 active:scale-95 transition-all border-2 border-[#fcd34d] flex items-center justify-center bg-[#fde68a]"
             disabled={disabled}
             aria-label="Take photo with camera"
           >
@@ -878,7 +878,7 @@ export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputPro
                   <img 
                     src="/themes/pan.png" 
                     alt="Mic" 
-                    className="w-[26px] h-[26px] object-contain drop-shadow-md" 
+                    className="w-[34px] h-[34px] sm:w-[38px] sm:h-[38px] object-contain drop-shadow-md" 
                     onError={(e) => { 
                       e.currentTarget.style.display = 'none'; 
                       e.currentTarget.parentElement!.innerHTML = '<span style="font-size: 20px">🍳</span>'; 
