@@ -393,7 +393,7 @@ export default memo(function Home() {
                 tabIndex={0}
                 aria-label={`Navigate to ${s.label}: ${s.desc}`}
               >
-                {isTangled && <img src="/themes/template.png" alt="" className="absolute inset-0 w-full h-full object-cover pointer-events-none z-0" />}
+                {isTangled && <TangledCardDecor className="absolute inset-0 w-full h-full pointer-events-none" />}
 
                 <div className={`w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mb-3 group-hover:bg-primary/20 transition-colors ${appTheme === 'library' ? 'library-shortcut-icon-wrapper' : ''} ${isTangled ? 'bg-black/30 group-hover:bg-black/40 backdrop-blur-sm z-10 relative mb-0' : ''}`}>
                   <Icon className={`w-5 h-5 text-primary ${appTheme === 'library' ? 'library-shortcut-icon' : ''} ${isTangled ? '!text-amber-300 drop-shadow-sm' : ''}`} aria-hidden="true" />
