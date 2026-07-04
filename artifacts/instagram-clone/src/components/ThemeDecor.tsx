@@ -236,3 +236,129 @@ export const ThemeShortcutDecor = memo(({ theme }: { theme: AppThemeId }) => {
   if (theme === "tangled") return <div className="absolute -top-3 -right-3 w-20 h-20 opacity-35 pointer-events-none"><TangledDecor className="w-full h-full" /></div>;
   return null;
 });
+
+// ============================================================================
+// Specialized Tangled Home Elements
+// ============================================================================
+
+export const TangledAvatarFrame = ({ className = "" }: { className?: string }) => (
+  <svg viewBox="0 0 100 100" fill="none" className={className} overflow="visible">
+    <defs>
+      <radialGradient id="tangledAvatarGlow" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stopColor="#f59e0b" />
+        <stop offset="100%" stopColor="#d97706" />
+      </radialGradient>
+    </defs>
+    {/* Thick golden braid around circle */}
+    <circle cx="50" cy="50" r="46" stroke="url(#tangledAvatarGlow)" strokeWidth="6" opacity="0.9" filter="drop-shadow(0 4px 6px rgba(0,0,0,0.5))" />
+    <path d="M50,4 C75,4 96,25 96,50 C96,75 75,96 50,96 C25,96 4,75 4,50 C4,25 25,4 50,4 Z" stroke="#fcd34d" strokeWidth="2" strokeDasharray="8 6" opacity="0.8" />
+    <path d="M50,8 C73,8 92,27 92,50 C92,73 73,92 50,92 C27,92 8,73 8,50 C8,27 27,8 50,8 Z" stroke="#92400e" strokeWidth="1" strokeDasharray="4 8" opacity="0.6" />
+    {/* Braid overlap detail */}
+    <path d="M10,75 C-5,100 30,110 50,96" stroke="url(#tangledAvatarGlow)" strokeWidth="8" strokeLinecap="round" fill="none" />
+    <path d="M12,77 C0,98 30,105 48,94" stroke="#fcd34d" strokeWidth="2" strokeLinecap="round" fill="none" />
+    <path d="M100,50 C110,65 100,90 85,95 C75,98 80,85 85,75" stroke="url(#tangledAvatarGlow)" strokeWidth="6" strokeLinecap="round" fill="none" />
+    <path d="M98,52 C108,65 98,88 85,93" stroke="#fcd34d" strokeWidth="1.5" strokeLinecap="round" fill="none" />
+    {/* Purple flowers */}
+    <g transform="translate(85, 20) scale(0.7)">
+      <ellipse cx="0" cy="-8" rx="4" ry="7" fill="#e9d5ff" />
+      <ellipse cx="6" cy="-4" rx="4" ry="7" transform="rotate(45 6 -4)" fill="#c084fc" />
+      <ellipse cx="6" cy="4" rx="4" ry="7" transform="rotate(90 6 4)" fill="#e9d5ff" />
+      <ellipse cx="0" cy="8" rx="4" ry="7" transform="rotate(135 0 8)" fill="#c084fc" />
+      <ellipse cx="-6" cy="4" rx="4" ry="7" transform="rotate(180 -6 4)" fill="#e9d5ff" />
+      <ellipse cx="-6" cy="-4" rx="4" ry="7" transform="rotate(225 -6 -4)" fill="#c084fc" />
+      <circle cx="0" cy="0" r="3.5" fill="#fde68a"/>
+    </g>
+    <g transform="translate(15, 80) scale(0.9)">
+      <ellipse cx="0" cy="-8" rx="4" ry="7" fill="#e9d5ff" />
+      <ellipse cx="6" cy="-4" rx="4" ry="7" transform="rotate(45 6 -4)" fill="#c084fc" />
+      <ellipse cx="6" cy="4" rx="4" ry="7" transform="rotate(90 6 4)" fill="#e9d5ff" />
+      <ellipse cx="0" cy="8" rx="4" ry="7" transform="rotate(135 0 8)" fill="#c084fc" />
+      <ellipse cx="-6" cy="4" rx="4" ry="7" transform="rotate(180 -6 4)" fill="#e9d5ff" />
+      <ellipse cx="-6" cy="-4" rx="4" ry="7" transform="rotate(225 -6 -4)" fill="#c084fc" />
+      <circle cx="0" cy="0" r="3.5" fill="#fde68a"/>
+    </g>
+    <g transform="translate(25, 15) scale(0.5)">
+      <ellipse cx="0" cy="-8" rx="4" ry="7" fill="#e9d5ff" />
+      <ellipse cx="6" cy="-4" rx="4" ry="7" transform="rotate(45 6 -4)" fill="#c084fc" />
+      <ellipse cx="6" cy="4" rx="4" ry="7" transform="rotate(90 6 4)" fill="#e9d5ff" />
+      <ellipse cx="0" cy="8" rx="4" ry="7" transform="rotate(135 0 8)" fill="#c084fc" />
+      <ellipse cx="-6" cy="4" rx="4" ry="7" transform="rotate(180 -6 4)" fill="#e9d5ff" />
+      <ellipse cx="-6" cy="-4" rx="4" ry="7" transform="rotate(225 -6 -4)" fill="#c084fc" />
+      <circle cx="0" cy="0" r="3.5" fill="#fde68a"/>
+    </g>
+  </svg>
+);
+
+export const TangledCardDecor = ({ className = "" }: { className?: string }) => (
+  <svg viewBox="0 0 160 200" fill="none" className={className} preserveAspectRatio="none">
+    {/* Ornate corners */}
+    <path d="M10,40 L10,10 L40,10 M10,160 L10,190 L40,190 M150,40 L150,10 L120,10 M150,160 L150,190 L120,190" stroke="#f59e0b" strokeWidth="1.5" opacity="0.6" fill="none" />
+    <path d="M15,35 L15,15 L35,15 M15,165 L15,185 L35,185 M145,35 L145,15 L125,15 M145,165 L145,185 L125,185" stroke="#fcd34d" strokeWidth="1" opacity="0.4" fill="none" />
+    <path d="M20,20 C30,30 20,40 10,30 M140,20 C130,30 140,40 150,30 M20,180 C30,170 20,160 10,170 M140,180 C130,170 140,160 150,170" stroke="#fcd34d" strokeWidth="1" fill="none" opacity="0.5"/>
+    {/* Additional border swirls */}
+    <path d="M45,10 C50,15 60,10 65,15 M95,10 C100,15 110,10 115,15" stroke="#fbbf24" strokeWidth="1" fill="none" opacity="0.4"/>
+    <path d="M45,190 C50,185 60,190 65,185 M95,190 C100,185 110,190 115,185" stroke="#fbbf24" strokeWidth="1" fill="none" opacity="0.4"/>
+    {/* Giant centered Sun */}
+    <g transform="translate(80, 100) scale(1.8)" opacity="0.95">
+      {[0,30,60,90,120,150,180,210,240,270,300,330].map((deg, i) => (
+        <line key={i} x1={20 * Math.cos(deg * Math.PI / 180)} y1={20 * Math.sin(deg * Math.PI / 180)} x2={35 * Math.cos(deg * Math.PI / 180)} y2={35 * Math.sin(deg * Math.PI / 180)} stroke="#fbbf24" strokeWidth="2" strokeLinecap="round" />
+      ))}
+      {[15,45,75,105,135,165,195,225,255,285,315,345].map((deg, i) => (
+        <line key={i} x1={20 * Math.cos(deg * Math.PI / 180)} y1={20 * Math.sin(deg * Math.PI / 180)} x2={28 * Math.cos(deg * Math.PI / 180)} y2={28 * Math.sin(deg * Math.PI / 180)} stroke="#fcd34d" strokeWidth="2.5" strokeLinecap="round" opacity="0.8" />
+      ))}
+      <circle cx="0" cy="0" r="22" fill="#d97706" opacity="0.6" />
+      <circle cx="0" cy="0" r="20" fill="url(#tangledSunGlow)" />
+      <circle cx="0" cy="0" r="14" fill="url(#tangledInnerGlow)" />
+      <circle cx="0" cy="0" r="8" fill="#fef3c7" opacity="0.9"/>
+      <circle cx="0" cy="0" r="5" fill="#fff" opacity="0.5"/>
+    </g>
+  </svg>
+);
+
+const PascalSVG = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 40 30" className={className} fill="none">
+    <g transform="translate(20, 15)">
+      <ellipse cx="0" cy="0" rx="14" ry="9" fill="#16a34a"/>
+      <ellipse cx="16" cy="-3" rx="8" ry="6" fill="#15803d"/>
+      <circle cx="22" cy="-6" r="4" fill="#16a34a"/>
+      <circle cx="24" cy="-8" r="1.5" fill="#fff"/>
+      <path d="M-12,5 C-18,10 -20,18 -15,22" stroke="#15803d" strokeWidth="3" strokeLinecap="round" fill="none"/>
+      <path d="M5,8 L3,14 M-5,8 L-7,14" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" />
+    </g>
+  </svg>
+);
+
+const PanSVG = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 50 50" className={className} fill="none">
+    <circle cx="20" cy="30" r="15" fill="#292524" stroke="#44403c" strokeWidth="2"/>
+    <circle cx="20" cy="30" r="11" fill="#1c1917"/>
+    <path d="M32,18 L46,4" stroke="#44403c" strokeWidth="4" strokeLinecap="round"/>
+    <circle cx="46" cy="4" r="2" fill="#292524"/>
+    {/* Sun engraved */}
+    <g transform="translate(20, 30) scale(0.35)">
+      {[0,45,90,135,180,225,270,315].map(d => (
+        <line key={d} x1={0} y1={0} x2={15 * Math.cos(d*Math.PI/180)} y2={15 * Math.sin(d*Math.PI/180)} stroke="#fcd34d" strokeWidth="3" opacity="0.7"/>
+      ))}
+      <circle cx="0" cy="0" r="8" fill="#fcd34d" opacity="0.7"/>
+    </g>
+  </svg>
+);
+
+export const TangledHomeDecor = () => {
+  return (
+    <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
+      <div className="absolute top-[32%] right-[2%] w-10 h-10 opacity-90 drop-shadow-md z-10">
+        <PascalSVG className="w-full h-full" />
+      </div>
+      <div className="absolute bottom-[20%] left-[5%] w-14 h-14 opacity-90 drop-shadow-lg scale-x-[-1] z-10">
+        <PascalSVG className="w-full h-full" />
+      </div>
+      <div className="absolute bottom-[2%] right-[10%] w-8 h-8 opacity-90 drop-shadow-md z-10">
+        <PascalSVG className="w-full h-full" />
+      </div>
+      <div className="absolute bottom-[10%] right-[15%] w-14 h-14 opacity-95 drop-shadow-lg rotate-12 z-10">
+        <PanSVG className="w-full h-full" />
+      </div>
+    </div>
+  );
+};

@@ -15,7 +15,10 @@ type Props = { themeId: AppThemeId; isChat?: boolean };
 /** Full-screen themed photo behind app chrome — soft, never hides UI. */
 export const ThemeBackgroundOverlay = memo(function ThemeBackgroundOverlay({ themeId, isChat }: Props) {
   const defaultUrl = getThemeBackgroundUrl(themeId);
-  const url = (themeId === "mint" && isChat) ? "/mint-chat.jpg" : defaultUrl;
+  let url = (themeId === "mint" && isChat) ? "/mint-chat.jpg" : defaultUrl;
+  if (themeId === "tangled" && !isChat) {
+    url = null; // Solid dark green background for Tangled home screen
+  }
   const [hidden, setHidden] = useState(false);
   const [dark, setDark] = useState(() => getStoredDarkMode());
 

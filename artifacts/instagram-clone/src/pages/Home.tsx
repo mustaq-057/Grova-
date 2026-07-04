@@ -20,7 +20,7 @@ import { isAutumnAmberTheme, isPetrichorTheme, isSnowfallTheme, isTangledTheme }
 import { AutumnHomeDecor, AutumnBranch } from "@/components/AutumnHomeDecor";
 import { PetrichorHomeDecor, PetrichorCloud } from "@/components/PetrichorHomeDecor";
 import { SnowflakeDecor } from "@/components/SnowfallOverlay";
-import { ThemeCornerDecor, ThemeShortcutDecor } from "@/components/ThemeDecor";
+import { ThemeCornerDecor, ThemeShortcutDecor, TangledHomeDecor, TangledAvatarFrame, TangledCardDecor } from "@/components/ThemeDecor";
 
 
 export default memo(function Home() {
@@ -210,6 +210,7 @@ export default memo(function Home() {
     <div className="max-w-[470px] mx-auto pb-20 md:pb-6 relative min-h-[100dvh]">
       {isAutumnAmber && <AutumnHomeDecor />}
       {isPetrichor && <PetrichorHomeDecor />}
+      {isTangled && <TangledHomeDecor />}
       <ThemeCornerDecor theme={appTheme} />
       <motion.div 
         initial={{ opacity: 0, y: -10 }}
@@ -261,8 +262,9 @@ export default memo(function Home() {
                   src={user?.avatar}
                   userId={user?.id ?? "me"}
                   alt=""
-                  className={`w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-[3px] shadow-[0_0_20px_rgba(var(--primary),0.25)] bg-background ${myStories.length > 0 ? "border-background" : "border-primary/40"} ${appTheme === 'library' ? 'library-locket' : ''}`}
+                  className={`w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-[3px] shadow-[0_0_20px_rgba(var(--primary),0.25)] bg-background ${myStories.length > 0 ? "border-background" : "border-primary/40"} ${appTheme === 'library' ? 'library-locket' : ''} ${isTangled ? '!border-transparent shadow-none relative z-10' : ''}`}
                 />
+                {isTangled && <TangledAvatarFrame className="absolute inset-[-15%] w-[130%] h-[130%] z-20 pointer-events-none drop-shadow-md" />}
                 {!loadingStories && myStories.length === 0 ? (
                   <div className="absolute bottom-0 right-0 w-6 h-6 sm:w-7 sm:h-7 bg-blue-500 rounded-full border-[3px] border-background flex items-center justify-center z-20">
                     <Plus className="w-3 h-3 sm:w-4 sm:h-4 text-white" strokeWidth={3} />
@@ -325,8 +327,9 @@ export default memo(function Home() {
                   src={partner.avatar}
                   userId={partner.id}
                   alt=""
-                  className={`w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-[3px] shadow-[0_0_20px_rgba(var(--primary),0.25)] bg-background ${partnerStories.length > 0 ? "border-background" : "border-primary/40"} ${appTheme === 'library' ? 'library-locket' : ''}`}
+                  className={`w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover border-[3px] shadow-[0_0_20px_rgba(var(--primary),0.25)] bg-background ${partnerStories.length > 0 ? "border-background" : "border-primary/40"} ${appTheme === 'library' ? 'library-locket' : ''} ${isTangled ? '!border-transparent shadow-none relative z-10' : ''}`}
                 />
+                {isTangled && <TangledAvatarFrame className="absolute inset-[-15%] w-[130%] h-[130%] z-20 pointer-events-none drop-shadow-md scale-x-[-1]" />}
                 <div
                   className={`absolute bottom-0 right-0 w-5 h-5 sm:w-6 sm:h-6 rounded-full border-[3px] border-background z-20 shadow-sm ${partnerOnline ? "bg-green-500" : "bg-gray-400"}`}
                   aria-label={partnerOnline ? "Partner is online" : "Partner is offline"}
@@ -389,16 +392,21 @@ export default memo(function Home() {
                 transition={{ delay: 0.3 + (i * 0.05) }}
                 whileHover={{ scale: 1.02, y: -2 }}
                 whileTap={{ scale: 0.98 }}
-                className={`relative overflow-hidden p-4 bg-gradient-to-br from-card to-card/50 border border-border/50 rounded-2xl hover:border-primary/40 hover:shadow-lg transition-all cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${appTheme === 'library' ? 'library-shortcut-card' : ''}`}
+                className={`relative overflow-hidden p-4 bg-gradient-to-br from-card to-card/50 border border-border/50 rounded-2xl hover:border-primary/40 hover:shadow-lg transition-all cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${appTheme === 'library' ? 'library-shortcut-card' : ''} ${isTangled ? 'tangled-shortcut-card flex flex-col justify-between aspect-[3/4]' : ''}`}
                 role="button"
                 tabIndex={0}
                 aria-label={`Navigate to ${s.label}: ${s.desc}`}
               >
-                <div className={`w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mb-3 group-hover:bg-primary/20 transition-colors ${appTheme === 'library' ? 'library-shortcut-icon-wrapper' : ''}`}>
-                  <Icon className={`w-5 h-5 text-primary ${appTheme === 'library' ? 'library-shortcut-icon' : ''}`} aria-hidden="true" />
+                {isTangled && <TangledCardDecor className="absolute inset-0 w-full h-full pointer-events-none" />}
+
+                <div className={`w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mb-3 group-hover:bg-primary/20 transition-colors ${appTheme === 'library' ? 'library-shortcut-icon-wrapper' : ''} ${isTangled ? 'bg-black/30 group-hover:bg-black/40 backdrop-blur-sm z-10 relative mb-0' : ''}`}>
+                  <Icon className={`w-5 h-5 text-primary ${appTheme === 'library' ? 'library-shortcut-icon' : ''} ${isTangled ? '!text-amber-300 drop-shadow-sm' : ''}`} aria-hidden="true" />
                 </div>
-                <p className={`font-semibold text-sm ${appTheme === 'library' ? 'library-shortcut-title' : ''}`}>{s.label}</p>
-                <p className={`text-xs text-muted-foreground mt-0.5 ${appTheme === 'library' ? 'library-shortcut-desc' : ''}`}>{s.desc}</p>
+                
+                <div className={isTangled ? "mt-auto relative z-10" : ""}>
+                  <p className={`font-semibold text-sm ${appTheme === 'library' ? 'library-shortcut-title' : ''} ${isTangled ? '!text-white font-serif text-lg drop-shadow-md' : ''}`}>{s.label}</p>
+                  <p className={`text-xs text-muted-foreground mt-0.5 ${appTheme === 'library' ? 'library-shortcut-desc' : ''} ${isTangled ? '!text-white/80 drop-shadow-md' : ''}`}>{s.desc}</p>
+                </div>
                 
                 {isAutumnAmber && (
                   <div className="absolute -top-4 -right-4 w-20 h-20 opacity-30 pointer-events-none rotate-12">
@@ -416,7 +424,7 @@ export default memo(function Home() {
                   </div>
                 )}
                 
-                <ThemeShortcutDecor theme={appTheme} />
+                {!isTangled && <ThemeShortcutDecor theme={appTheme} />}
               </motion.div>
             </Link>
           );
