@@ -264,18 +264,15 @@ export default memo(function Home() {
                 />
                 {isTangled && (
                   <div
-                    className="absolute z-20 pointer-events-none"
+                    className="absolute z-20 pointer-events-none w-[170%] h-[170%]"
                     style={{
-                      position: 'absolute',
                       top: '50%',
                       left: '50%',
                       transform: 'translate(-50%, -50%)',
-                      width: '170px',
-                      height: '170px',
                       backgroundImage: 'url(/themes/profile.png)',
-                      backgroundSize: '600px auto',
+                      backgroundSize: '230% auto',
                       backgroundRepeat: 'no-repeat',
-                      backgroundPosition: '-40px -87px',
+                      backgroundPosition: '4% 48%',
                     }}
                   />
                 )}
@@ -343,18 +340,15 @@ export default memo(function Home() {
                 />
                 {isTangled && (
                   <div
-                    className="absolute z-20 pointer-events-none"
+                    className="absolute z-20 pointer-events-none w-[170%] h-[170%]"
                     style={{
-                      position: 'absolute',
                       top: '50%',
                       left: '50%',
                       transform: 'translate(-50%, -50%)',
-                      width: '170px',
-                      height: '170px',
                       backgroundImage: 'url(/themes/profile.png)',
-                      backgroundSize: '600px auto',
+                      backgroundSize: '230% auto',
                       backgroundRepeat: 'no-repeat',
-                      backgroundPosition: '-390px -87px',
+                      backgroundPosition: '96% 48%',
                     }}
                   />
                 )}
