@@ -836,7 +836,7 @@ export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputPro
             aria-label="Take photo with camera"
           >
             <img 
-              src="/themes/horse.png" 
+              src="/themes/horse.png?v=4" 
               alt="Camera" 
               className="w-full h-full object-cover scale-[1.2]" 
               onError={(e) => { 
@@ -876,7 +876,7 @@ export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputPro
                   aria-label="Start voice recording"
                 >
                   <img 
-                    src="/themes/pan.png" 
+                    src="/themes/pan.png?v=4" 
                     alt="Mic" 
                     className="w-[54px] h-[54px] sm:w-[62px] sm:h-[62px] object-contain drop-shadow-md scale-[1.25]" 
                     onError={(e) => { 
