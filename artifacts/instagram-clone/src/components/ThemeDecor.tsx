@@ -237,26 +237,6 @@ export const ThemeShortcutDecor = memo(({ theme }: { theme: AppThemeId }) => {
 
 export const TangledAvatarFrame = ({ className = "" }: { className?: string }) => (
   <svg viewBox="-20 -20 140 140" fill="none" className={className} overflow="visible">
-    <defs>
-      <linearGradient id="hairGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-        <stop offset="0%" stopColor="#eab308" />
-        <stop offset="100%" stopColor="#b45309" />
-      </linearGradient>
-      <linearGradient id="frameGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-        <stop offset="0%" stopColor="#fde047" />
-        <stop offset="100%" stopColor="#d97706" />
-      </linearGradient>
-    </defs>
-    
-    {/* Left Hair Drop */}
-    <path d="M 8 45 C -15 70 -15 110 5 125 L 25 125 C 10 100 15 70 30 55 Z" fill="url(#hairGradient)" />
-    {/* Right Hair Drop */}
-    <path d="M 92 45 C 115 70 115 110 95 125 L 75 125 C 90 100 85 70 70 55 Z" fill="url(#hairGradient)" />
-    
-    {/* Main Frame Circle */}
-    <circle cx="50" cy="50" r="48" stroke="#78350f" strokeWidth="6" />
-    <circle cx="50" cy="50" r="48" stroke="url(#frameGradient)" strokeWidth="4" />
-    
     {/* Flower Cluster Top Left */}
     <g transform="translate(10, -5)">
       {/* 5 purple circles overlapping exactly as in reference */}
