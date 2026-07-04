@@ -3636,6 +3636,7 @@ export default function Messages() {
               recordingStream={streamRef.current}
               recordingPreviewUrl={recordingPreviewUrl}
               disabled={!online || blocked || editingMessage !== null}
+              isTangled={isTangledTheme(appThemeId)}
             />
           )}
           <BubbleColorSelector

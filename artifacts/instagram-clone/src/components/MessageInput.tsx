@@ -49,6 +49,7 @@ interface MessageInputProps {
   recordingPreviewUrl?: string | null;
   disabled: boolean;
   replyPreview?: React.ReactNode;
+  isTangled?: boolean;
 }
 
 type OpenPicker = "emoji" | "sticker" | "greeting" | "stickerz" | "schedule" | null;
@@ -307,6 +308,7 @@ export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputPro
   disabled,
   replyPreview,
   draftKey,
+  isTangled,
 }, ref) {
   const [input, setInput] = useState(() => {
     if (draftKey) {
@@ -819,18 +821,42 @@ export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputPro
         </motion.div>
       )}
 
-      <div className={`message-input-pill flex items-center gap-[8px] sm:gap-[10px] bg-[#1a1a1a] rounded-[40px] py-[7px] sm:py-[9px] pr-[8px] sm:pr-[14px] pl-[5px] sm:pl-[9px] mx-[4px] md:mx-auto md:w-full md:max-w-[800px] ${scheduledTime ? 'rounded-tl-none rounded-tr-none border border-primary/30 border-t-0' : ''}`}>
+      <div className={`message-input-pill flex items-center gap-[8px] sm:gap-[10px] py-[7px] sm:py-[9px] pr-[8px] sm:pr-[14px] pl-[5px] sm:pl-[9px] mx-[4px] md:mx-auto md:w-full md:max-w-[800px] ${
+        isTangled 
+          ? 'bg-[#1f2227] rounded-[40px] border-2 border-[#fcd34d]' 
+          : 'bg-[#1a1a1a] rounded-[40px]'
+      } ${scheduledTime ? 'rounded-tl-none rounded-tr-none border-t-0 border-primary/30' : ''}`}>
         {/* eslint-disable-next-line */}
-        <button
-          type="button"
-          onClick={onOpenCamera}
-          className="camera-btn w-[38px] h-[38px] sm:w-[44px] sm:h-[44px] rounded-full active:scale-95 flex shrink-0 items-center justify-center text-white border-none transition-all hover:brightness-90"
-          style={{ backgroundColor: theme.bubbleColor }}
-          disabled={disabled}
-          aria-label="Take photo with camera"
-        >
-          <Camera className="w-[20px] h-[20px] sm:w-[22px] sm:h-[22px]" strokeWidth={1.8} />
-        </button>
+        {isTangled ? (
+          <button
+            type="button"
+            onClick={onOpenCamera}
+            className="w-[38px] h-[38px] sm:w-[44px] sm:h-[44px] rounded-full overflow-hidden shrink-0 active:scale-95 transition-all border-2 border-[#fcd34d] flex items-center justify-center bg-[#fde68a]"
+            disabled={disabled}
+            aria-label="Take photo with camera"
+          >
+            <img 
+              src="/themes/maximus.png" 
+              alt="Camera" 
+              className="w-full h-full object-cover" 
+              onError={(e) => { 
+                e.currentTarget.style.display = 'none'; 
+                e.currentTarget.parentElement!.innerHTML = '<span style="font-size: 24px">🐴</span>'; 
+              }} 
+            />
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={onOpenCamera}
+            className="camera-btn w-[38px] h-[38px] sm:w-[44px] sm:h-[44px] rounded-full active:scale-95 flex shrink-0 items-center justify-center text-white border-none transition-all hover:brightness-90"
+            style={{ backgroundColor: theme.bubbleColor }}
+            disabled={disabled}
+            aria-label="Take photo with camera"
+          >
+            <Camera className="w-[20px] h-[20px] sm:w-[22px] sm:h-[22px]" strokeWidth={1.8} />
+          </button>
+        )}
 
         {textInput}
 
@@ -840,46 +866,101 @@ export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputPro
           </div>
         ) : (
           <div className="flex items-center gap-0 sm:gap-[2px] shrink-0">
-            <button
-              type="button"
-              onClick={onStartRecording}
-              className={`w-[34px] h-[34px] sm:w-[38px] sm:h-[38px] flex items-center justify-center rounded-full hover:bg-white/10 active:scale-95 transition-all text-[#ccc] border-none bg-transparent ${disabled ? iconBtnDisabled : ""}`}
-              disabled={disabled}
-              aria-label="Start voice recording"
-            >
-              <Mic className="w-[22px] h-[22px] sm:w-[24px] sm:h-[24px]" strokeWidth={1.8} />
-            </button>
-            <button
-              type="button"
-              onClick={handleImageClick}
-              className={`w-[34px] h-[34px] sm:w-[38px] sm:h-[38px] flex items-center justify-center rounded-full hover:bg-white/10 active:scale-95 transition-all text-[#ccc] border-none bg-transparent ${disabled ? iconBtnDisabled : ""}`}
-              disabled={disabled}
-              aria-label="Attach image or video"
-            >
-              <ImageIcon className="w-[22px] h-[22px] sm:w-[24px] sm:h-[24px]" strokeWidth={1.8} />
-            </button>
-            <button
-              type="button"
-              onClick={toggleStickerPicker}
-              className={`w-[34px] h-[34px] sm:w-[38px] sm:h-[38px] flex items-center justify-center rounded-full hover:bg-white/10 active:scale-95 transition-all text-[#ccc] border-none bg-transparent ${disabled ? iconBtnDisabled : ""}`}
-              disabled={disabled}
-              aria-label="Stickers and GIFs"
-            >
-              <Sticker className="w-[22px] h-[22px] sm:w-[24px] sm:h-[24px]" strokeWidth={1.8} />
-            </button>
-            
-            <div className="relative shrink-0 flex items-center justify-center">
-              <button
-                type="button"
-                onClick={() => setShowAttachmentMenu((s) => !s)}
-                className={`w-[34px] h-[34px] sm:w-[38px] sm:h-[38px] flex items-center justify-center rounded-full hover:bg-white/10 active:scale-95 transition-all text-[#ccc] border-none bg-transparent ${disabled ? iconBtnDisabled : ""}`}
-                disabled={disabled}
-                aria-label="More attachment options"
-              >
-                <PlusCircle className={`w-[22px] h-[22px] sm:w-[24px] sm:h-[24px] transition-transform duration-[0.3s] ease-[cubic-bezier(0.34,1.56,0.64,1)] ${showAttachmentMenu ? "rotate-45" : ""}`} strokeWidth={1.8} />
-              </button>
-              {attachmentMenu}
-            </div>
+            {isTangled ? (
+              <>
+                <button
+                  type="button"
+                  onClick={onStartRecording}
+                  className={`w-[34px] h-[34px] sm:w-[38px] sm:h-[38px] flex items-center justify-center rounded-full hover:bg-white/10 active:scale-95 transition-all text-[#fcd34d] border-none bg-transparent ${disabled ? iconBtnDisabled : ""}`}
+                  disabled={disabled}
+                  aria-label="Start voice recording"
+                >
+                  <img 
+                    src="/themes/frying_pan.png" 
+                    alt="Mic" 
+                    className="w-[26px] h-[26px] object-contain drop-shadow-md" 
+                    onError={(e) => { 
+                      e.currentTarget.style.display = 'none'; 
+                      e.currentTarget.parentElement!.innerHTML = '<span style="font-size: 20px">🍳</span>'; 
+                    }} 
+                  />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleImageClick}
+                  className={`w-[34px] h-[34px] sm:w-[38px] sm:h-[38px] flex items-center justify-center rounded-full hover:bg-white/10 active:scale-95 transition-all text-[#fcd34d] border-none bg-transparent ${disabled ? iconBtnDisabled : ""}`}
+                  disabled={disabled}
+                  aria-label="Attach image or video"
+                >
+                  <ImageIcon className="w-[22px] h-[22px] sm:w-[24px] sm:h-[24px]" strokeWidth={1.8} />
+                </button>
+                <button
+                  type="button"
+                  onClick={toggleStickerPicker}
+                  className={`w-[34px] h-[34px] sm:w-[38px] sm:h-[38px] flex items-center justify-center rounded-full hover:bg-white/10 active:scale-95 transition-all text-[#fcd34d] border-none bg-transparent ${disabled ? iconBtnDisabled : ""}`}
+                  disabled={disabled}
+                  aria-label="Stickers and GIFs"
+                >
+                  <Smile className="w-[22px] h-[22px] sm:w-[24px] sm:h-[24px]" strokeWidth={1.8} />
+                </button>
+                
+                <div className="relative shrink-0 flex items-center justify-center">
+                  <button
+                    type="button"
+                    onClick={() => setShowAttachmentMenu((s) => !s)}
+                    className={`w-[34px] h-[34px] sm:w-[38px] sm:h-[38px] flex items-center justify-center rounded-full hover:bg-white/10 active:scale-95 transition-all text-[#fcd34d] border-none bg-transparent ${disabled ? iconBtnDisabled : ""}`}
+                    disabled={disabled}
+                    aria-label="More attachment options"
+                  >
+                    <PlusCircle className={`w-[22px] h-[22px] sm:w-[24px] sm:h-[24px] transition-transform duration-[0.3s] ease-[cubic-bezier(0.34,1.56,0.64,1)] ${showAttachmentMenu ? "rotate-45" : ""}`} strokeWidth={1.8} />
+                  </button>
+                  {attachmentMenu}
+                </div>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={onStartRecording}
+                  className={`w-[34px] h-[34px] sm:w-[38px] sm:h-[38px] flex items-center justify-center rounded-full hover:bg-white/10 active:scale-95 transition-all text-[#ccc] border-none bg-transparent ${disabled ? iconBtnDisabled : ""}`}
+                  disabled={disabled}
+                  aria-label="Start voice recording"
+                >
+                  <Mic className="w-[22px] h-[22px] sm:w-[24px] sm:h-[24px]" strokeWidth={1.8} />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleImageClick}
+                  className={`w-[34px] h-[34px] sm:w-[38px] sm:h-[38px] flex items-center justify-center rounded-full hover:bg-white/10 active:scale-95 transition-all text-[#ccc] border-none bg-transparent ${disabled ? iconBtnDisabled : ""}`}
+                  disabled={disabled}
+                  aria-label="Attach image or video"
+                >
+                  <ImageIcon className="w-[22px] h-[22px] sm:w-[24px] sm:h-[24px]" strokeWidth={1.8} />
+                </button>
+                <button
+                  type="button"
+                  onClick={toggleStickerPicker}
+                  className={`w-[34px] h-[34px] sm:w-[38px] sm:h-[38px] flex items-center justify-center rounded-full hover:bg-white/10 active:scale-95 transition-all text-[#ccc] border-none bg-transparent ${disabled ? iconBtnDisabled : ""}`}
+                  disabled={disabled}
+                  aria-label="Stickers and GIFs"
+                >
+                  <Sticker className="w-[22px] h-[22px] sm:w-[24px] sm:h-[24px]" strokeWidth={1.8} />
+                </button>
+                
+                <div className="relative shrink-0 flex items-center justify-center">
+                  <button
+                    type="button"
+                    onClick={() => setShowAttachmentMenu((s) => !s)}
+                    className={`w-[34px] h-[34px] sm:w-[38px] sm:h-[38px] flex items-center justify-center rounded-full hover:bg-white/10 active:scale-95 transition-all text-[#ccc] border-none bg-transparent ${disabled ? iconBtnDisabled : ""}`}
+                    disabled={disabled}
+                    aria-label="More attachment options"
+                  >
+                    <PlusCircle className={`w-[22px] h-[22px] sm:w-[24px] sm:h-[24px] transition-transform duration-[0.3s] ease-[cubic-bezier(0.34,1.56,0.64,1)] ${showAttachmentMenu ? "rotate-45" : ""}`} strokeWidth={1.8} />
+                  </button>
+                  {attachmentMenu}
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>
