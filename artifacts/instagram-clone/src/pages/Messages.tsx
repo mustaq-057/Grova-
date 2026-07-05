@@ -303,6 +303,8 @@ export default function Messages() {
   const userIdRef = useRef<string | undefined>(undefined);
   const prependScrollHeightRef = useRef<number | null>(null);
   const isPrependingRef = useRef(false);
+  /** True once the user has paginated back and loaded older messages — prevents polls from dropping them */
+  const hasLoadedHistoryRef = useRef(false);
   const unsentIdsRef = useRef<Set<string>>(new Set());
   const recentTailIdsRef = useRef<Set<string>>(new Set());
   const scrollAnchorSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -326,6 +328,9 @@ export default function Messages() {
     stickToBottomRef.current = true;
     isNearBottomRef.current = true;
     setIsNearBottom(true);
+    // When returning to the bottom, old history is no longer visible.
+    // Reset the flag so background polls operate normally until the user paginates up again.
+    hasLoadedHistoryRef.current = false;
     scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
   }, []);
 
@@ -661,6 +666,8 @@ export default function Messages() {
           prependScrollHeightRef.current = null;
           return prev;
         }
+        // Mark that we have history loaded — polls must not drop these messages
+        hasLoadedHistoryRef.current = true;
         return [...unique, ...prev];
       });
       // Use the server's hasMore field; if it returned a full page, there may be more
@@ -754,6 +761,9 @@ export default function Messages() {
       }).catch(() => { });
     };
 
+    // Reset history-load flag on each mount so polls don't carry stale state
+    hasLoadedHistoryRef.current = false;
+
     void hydrateQuickReactions();
     const cached = messages.length === 0 ? readChatCache(user.id) : messages;
     const tailIds = (cached ?? []).slice(-12).map((m) => m.id);
@@ -815,6 +825,31 @@ export default function Messages() {
         const fresh = await normalizeMessages(raw);
         if (!mounted) return;
         setMessages((prev) => {
+          // If user has loaded history (paginated older messages), use a safe merge
+          // that only adds/updates messages without dropping old ones from the top.
+          if (hasLoadedHistoryRef.current) {
+            const freshIds = new Set(fresh.map((m) => m.id));
+            // Apply updates/deletes from fresh to existing messages, then append truly new ones
+            const updated = prev.map((m) => {
+              if (!freshIds.has(m.id)) return m;
+              const fromServer = fresh.find((f) => f.id === m.id)!;
+              // Always honour server-side deletes
+              if (fromServer.deleted) return { ...m, ...fromServer, deleted: true, text: undefined, imageUrl: undefined, imageData: undefined, audioData: undefined, gifUrl: undefined, fileData: undefined };
+              return { ...m, ...fromServer, text: fromServer.text ?? m.text, imageUrl: fromServer.imageUrl || m.imageUrl, imageData: fromServer.imageData || m.imageData };
+            });
+            const existingIds = new Set(prev.map((m) => m.id));
+            const brandNew = fresh.filter((m) => !existingIds.has(m.id));
+            const next = brandNew.length > 0 ? [...updated, ...brandNew].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()) : updated;
+            const sig = messagesListSignature(next);
+            if (sig === messagesListSignature(prev)) {
+              scrollPreserveRef.current = null;
+              return prev;
+            }
+            messagesSigRef.current = sig;
+            // Cache only the latest 80 (tail) — old history is re-loaded on scroll
+            if (user?.id) writeChatCache(user.id, filterMessagesForCache(user.id, next));
+            return next;
+          }
           const merged = reconcilePendingOptimistics(prev, fresh, pendingOutgoingRef.current);
           const guarded = enforceUnsentMessages(merged, unsentIdsRef.current);
           const keepIds = new Set(
@@ -831,7 +866,13 @@ export default function Messages() {
           if (user?.id) writeChatCache(user.id, filterMessagesForCache(user.id, next));
           return next;
         });
-        setHasMore(fresh.length > 0 && (data.pagination?.hasMore ?? false));
+        // Only update hasMore from polls when user hasn't loaded history.
+        // Polls fetch the latest page, so their hasMore only reflects whether there
+        // are more messages BEFORE the latest 80 — not whether the user's older
+        // paginated messages can continue to be loaded.
+        if (!hasLoadedHistoryRef.current) {
+          setHasMore(fresh.length > 0 && (data.pagination?.hasMore ?? false));
+        }
       }).catch(() => {
         scrollPreserveRef.current = null;
       });
