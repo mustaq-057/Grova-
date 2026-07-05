@@ -799,7 +799,12 @@ export default function Messages() {
     } else if (!restoreAnchor && isNearBottomRef.current) {
       stickToBottomRef.current = true;
     }
-    loadMessages();
+    // Automatically restore any previously cleared chat history when opening the chat
+    restoreChatForUser(user.id)
+      .catch(console.error)
+      .finally(() => {
+        loadMessages();
+      });
 
     const pollSyncMessages = () => {
       if (!mounted) return;
