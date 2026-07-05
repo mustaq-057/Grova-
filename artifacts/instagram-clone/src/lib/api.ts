@@ -534,6 +534,12 @@ export const api = {
       body: JSON.stringify({}),
     }),
 
+  /** Restore all previously hidden/cleared messages for this user. */
+  restoreChat: (userId: string) =>
+    apiFetch<{ success: boolean }>(`/hidden-messages/${userId}/restore`, {
+      method: "DELETE",
+    }),
+
   sendCallSignal: (data: {
     type: "offer" | "answer" | "ice" | "end" | "reject";
     senderId: string;

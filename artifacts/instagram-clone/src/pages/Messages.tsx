@@ -55,6 +55,7 @@ import {
   hydrateHiddenMessages,
   getChatClearedAt,
   clearChatForUser,
+  restoreChatForUser,
   applyHiddenMessageId,
   getHiddenMessageIds,
   removeHiddenMessageId,
@@ -181,6 +182,8 @@ export default function Messages() {
   );
   const [showInfo, setShowInfo] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
+  const [restoring, setRestoring] = useState(false);
   const [blocked, setBlocked] = useState(() => isChatBlocked());
   const [recording, setRecording] = useState(false);
   const [recordingPaused, setRecordingPaused] = useState(false);
@@ -3091,6 +3094,24 @@ export default function Messages() {
     }
   }, [user, loadMessages]);
 
+  const handleRestoreChat = useCallback(async () => {
+    if (!user) return;
+    setShowRestoreConfirm(false);
+    setRestoring(true);
+    try {
+      await restoreChatForUser(user.id);
+      setHiddenTick((t) => t + 1);
+      // Force a fresh reload to pull in all historical messages
+      messagesSigRef.current = "0";
+      await loadMessages();
+    } catch (err) {
+      console.error("Failed to restore chat:", err);
+      window.alert("Could not restore messages from the server. Try again.");
+    } finally {
+      setRestoring(false);
+    }
+  }, [user, loadMessages]);
+
   const toggleLike = useCallback(async (id: string) => {
     try { await api.likeMessage(id); } catch { /**/ }
   }, []);
@@ -3752,15 +3773,39 @@ export default function Messages() {
               <p className="text-sm text-muted-foreground text-center mb-5">
                 Messages disappear on your account only. {pName} will still see the full chat.
               </p>
-              <div className="flex gap-2">
+              <div className="flex gap-2 mb-2">
                 <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 py-2.5 bg-secondary rounded-xl text-sm font-semibold" data-testid="button-cancel-delete">Cancel</button>
                 <button onClick={handleDeleteChat} className="flex-1 py-2.5 bg-destructive text-white rounded-xl text-sm font-semibold" data-testid="button-confirm-delete">Delete</button>
               </div>
+              <button
+                onClick={() => { setShowDeleteConfirm(false); setShowRestoreConfirm(true); }}
+                className="w-full py-2.5 bg-primary/10 text-primary rounded-xl text-sm font-semibold hover:bg-primary/20 transition-colors"
+                data-testid="button-restore-chat"
+              >
+                ✨ Restore Previously Deleted Messages
+              </button>
             </div>
           </div>
         )}
 
-
+        {/* ── Restore messages confirm ── */}
+        {showRestoreConfirm && (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-6">
+            <div className="bg-card border border-border rounded-2xl p-6 w-full max-w-xs">
+              <div className="text-3xl text-center mb-3">✨</div>
+              <h3 className="font-bold text-center mb-1">Restore Deleted Messages?</h3>
+              <p className="text-sm text-muted-foreground text-center mb-5">
+                This will make all messages you previously hid or cleared visible again on your account.
+              </p>
+              <div className="flex gap-2">
+                <button onClick={() => setShowRestoreConfirm(false)} className="flex-1 py-2.5 bg-secondary rounded-xl text-sm font-semibold">Cancel</button>
+                <button onClick={handleRestoreChat} disabled={restoring} className="flex-1 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-semibold disabled:opacity-60">
+                  {restoring ? "Restoring…" : "Restore"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {mediaViewer && (
           <MediaViewerOverlay

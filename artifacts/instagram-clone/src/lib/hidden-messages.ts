@@ -101,6 +101,17 @@ export async function clearChatForUser(userId: string): Promise<string> {
   return optimisticClearedAt;
 }
 
+/** Restore all hidden/cleared messages for a user — clears local state and calls server. */
+export async function restoreChatForUser(userId: string): Promise<void> {
+  // Optimistically clear local state immediately so UI refreshes
+  clearedAtByUser.set(userId, null);
+  persistClearedAt(userId, null);
+  hiddenByUser.set(userId, new Set());
+  persistHiddenIds(userId, new Set());
+  // Sync to server
+  await api.restoreChat(userId);
+}
+
 export async function hideMessageForUser(userId: string, messageId: string): Promise<void> {
   const set = ensureHiddenSet(userId);
   set.add(messageId);
