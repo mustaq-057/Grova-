@@ -163,6 +163,63 @@ export const TangledDecor = ({ className = "" }: { className?: string }) => (
   </svg>
 );
 
+// Islamic: Elegant glowing crescent moons, stars, and lantern silhouettes
+export const IslamicDecor = ({ className = "" }: { className?: string }) => (
+  <svg viewBox="0 0 200 200" fill="none" className={className}>
+    <defs>
+      <radialGradient id="islamicGlow" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stopColor="#fef3c7" stopOpacity="0.9" />
+        <stop offset="50%" stopColor="#fde047" stopOpacity="0.6" />
+        <stop offset="100%" stopColor="#fbbf24" stopOpacity="0" />
+      </radialGradient>
+      <radialGradient id="lanternGlow" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stopColor="#fde68a" stopOpacity="0.8" />
+        <stop offset="100%" stopColor="#d97706" stopOpacity="0" />
+      </radialGradient>
+    </defs>
+    
+    {/* Large Crescent Moon */}
+    <path d="M140,40 A50,50 0 1,0 160,120 A40,40 0 1,1 140,40 Z" fill="#fbbf24" opacity="0.85" />
+    <circle cx="130" cy="80" r="60" fill="url(#islamicGlow)" opacity="0.5" pointerEvents="none" />
+    
+    {/* Star 1 */}
+    <g transform="translate(145, 65) scale(0.6)">
+      <path d="M0,-15 L4,-4 L15,-4 L6,3 L9,14 L0,7 L-9,14 L-6,3 L-15,-4 L-4,-4 Z" fill="#fef3c7" opacity="0.9" />
+    </g>
+    
+    {/* Star 2 */}
+    <g transform="translate(170, 45) scale(0.4)">
+      <path d="M0,-15 L4,-4 L15,-4 L6,3 L9,14 L0,7 L-9,14 L-6,3 L-15,-4 L-4,-4 Z" fill="#fcd34d" opacity="0.8" />
+    </g>
+
+    {/* Hanging Lantern */}
+    <g transform="translate(50, 0)">
+      {/* Chain */}
+      <line x1="0" y1="0" x2="0" y2="40" stroke="#fcd34d" strokeWidth="1.5" opacity="0.6" strokeDasharray="4 2" />
+      {/* Lantern Top */}
+      <path d="M-10,40 L10,40 L5,50 L-5,50 Z" fill="#d97706" opacity="0.9" />
+      <polygon points="0,35 -3,40 3,40" fill="#fbbf24" opacity="0.9" />
+      {/* Lantern Body */}
+      <path d="M-8,50 L8,50 L12,70 L-12,70 Z" fill="#fcd34d" opacity="0.2" stroke="#fbbf24" strokeWidth="1.5" />
+      {/* Lantern Bottom */}
+      <path d="M-12,70 L12,70 L8,75 L-8,75 Z" fill="#d97706" opacity="0.9" />
+      {/* Lantern Light Glow */}
+      <circle cx="0" cy="60" r="15" fill="url(#lanternGlow)" />
+      {/* Inner Candle Flame */}
+      <path d="M0,58 Q3,62 0,65 Q-3,62 0,58 Z" fill="#fef3c7" opacity="0.9" />
+    </g>
+    
+    {/* Geometric accent line */}
+    <path d="M10,180 L30,160 L50,180 L70,160 L90,180" stroke="#d97706" strokeWidth="1.5" fill="none" opacity="0.4" />
+    <path d="M10,170 L30,150 L50,170 L70,150 L90,170" stroke="#fbbf24" strokeWidth="1" fill="none" opacity="0.3" />
+    
+    {/* Small dots */}
+    <circle cx="20" cy="120" r="1.5" fill="#fde047" opacity="0.8" />
+    <circle cx="80" cy="110" r="2" fill="#fcd34d" opacity="0.7" />
+    <circle cx="100" cy="40" r="1" fill="#fef3c7" opacity="0.9" />
+  </svg>
+);
+
 export const ThemeCornerDecor = memo(({ theme }: { theme: AppThemeId }) => {
   if (theme === "floura") return (
     <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
@@ -194,6 +251,16 @@ export const ThemeCornerDecor = memo(({ theme }: { theme: AppThemeId }) => {
       </div>
     </div>
   );
+  if (theme === "islamic") return (
+    <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
+      <div className="absolute top-[-10px] left-[-10px] w-48 h-48 opacity-45 pointer-events-none -rotate-12">
+        <IslamicDecor className="w-full h-full drop-shadow-lg" />
+      </div>
+      <div className="absolute top-[-20px] right-[-20px] w-56 h-56 opacity-40 pointer-events-none rotate-12 transform scale-x-[-1]">
+        <IslamicDecor className="w-full h-full drop-shadow-xl" />
+      </div>
+    </div>
+  );
   
   return null;
 });
@@ -202,7 +269,8 @@ export const ThemeShortcutDecor = memo(({ theme }: { theme: AppThemeId }) => {
   if (theme === "floura") return <div className="absolute -top-4 -right-4 w-20 h-20 opacity-25 pointer-events-none text-pink-400 rotate-12"><FlouraDecor className="w-full h-full" /></div>;
   if (theme === "mint") return <div className="absolute -top-4 -right-4 w-20 h-20 opacity-25 pointer-events-none text-emerald-400 -rotate-12"><MintDecor className="w-full h-full" /></div>;
   if (theme === "sara-lavender") return <div className="absolute -top-4 -right-4 w-16 h-16 opacity-25 pointer-events-none text-purple-400 rotate-45"><SaraDecor className="w-full h-full" /></div>;
-    if (theme === "tangled") return <div className="absolute -top-3 -right-3 w-20 h-20 opacity-35 pointer-events-none"><TangledDecor className="w-full h-full" /></div>;
+  if (theme === "tangled") return <div className="absolute -top-3 -right-3 w-20 h-20 opacity-35 pointer-events-none"><TangledDecor className="w-full h-full" /></div>;
+  if (theme === "islamic") return <div className="absolute -top-4 -right-4 w-20 h-20 opacity-40 pointer-events-none transform scale-x-[-1]"><IslamicDecor className="w-full h-full" /></div>;
   return null;
 });
 

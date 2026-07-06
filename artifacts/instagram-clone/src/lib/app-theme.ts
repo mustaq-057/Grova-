@@ -11,7 +11,8 @@ export type AppThemeId =
   | "mint"
   | "library"
   | "autumn-amber"
-  | "petrichor";
+  | "petrichor"
+  | "islamic";
 
 const PREMIUM_ANIMATED_THEMES: AppThemeId[] = ["moonlight-saga"];
 
@@ -33,6 +34,7 @@ const THEME_BACKGROUNDS: Partial<Record<AppThemeId, string>> = {
   "library": "/themes/library-bg.png",
   "autumn-amber": "/themes/autumn-amber-bg.png",
   "petrichor": "/themes/petrichor-bg.png",
+  "islamic": "/themes/islamic-bg.png",
 };
 
 export const APP_THEME_CHANGED = "grova-app-theme-changed";
@@ -45,6 +47,28 @@ export const APP_THEMES: {
   dark: Record<string, string>;
   light: Record<string, string>;
 }[] = [
+    {
+      id: "islamic",
+      name: "Islamic",
+      description: "Serene night sky and glowing crescent 🌙",
+      swatch: "bg-gradient-to-br from-[#064e3b] via-[#134e4a] to-[#d97706]",
+      dark: {
+        "--app-background": "160 80% 6%", // Very deep emerald/teal
+        "--app-foreground": "160 20% 95%", // Soft green-white
+        "--app-primary": "42 90% 55%", // Radiant gold
+        "--app-card": "160 70% 9%", // Slightly lighter deep teal
+        "--app-secondary": "160 50% 14%",
+        "--app-border": "160 40% 20%",
+      },
+      light: {
+        "--app-background": "160 40% 96%", // Very soft mint/teal white
+        "--app-foreground": "160 60% 10%", // Deep teal text
+        "--app-primary": "160 70% 30%", // Emerald green for light primary
+        "--app-card": "0 0% 100%",
+        "--app-secondary": "160 30% 90%",
+        "--app-border": "160 25% 85%",
+      },
+    },
     {
       id: "tangled",
       name: "Tangled",
@@ -303,6 +327,10 @@ export function isTangledTheme(themeId?: AppThemeId): boolean {
   return (themeId ?? getStoredAppTheme()) === "tangled";
 }
 
+export function isIslamicTheme(themeId?: AppThemeId): boolean {
+  return (themeId ?? getStoredAppTheme()) === "islamic";
+}
+
 export function getThemeBackgroundUrl(themeId?: AppThemeId): string | null {
   const id = themeId ?? getStoredAppTheme();
   return THEME_BACKGROUNDS[id] ?? null;
@@ -322,6 +350,7 @@ export function getThemeBackgroundOpacity(themeId?: AppThemeId): number {
   if (id === "autumn-amber") return 1.0;
   if (id === "petrichor") return 1.0;
   if (id === "tangled") return 1.0;
+  if (id === "islamic") return 1.0;
   return 0.28;
 }
 
@@ -369,6 +398,13 @@ export function getPhotoScrimGradient(themeId: AppThemeId, dark: boolean): strin
       ? "linear-gradient(180deg, rgba(10,28,18,0.15) 0%, rgba(8,22,14,0.45) 100%)"
       : "linear-gradient(180deg, rgba(240,245,235,0.15) 0%, rgba(230,240,225,0.4) 100%)";
   }
+
+  if (themeId === "islamic") {
+    return dark
+      ? "linear-gradient(180deg, rgba(5,20,15,0.4) 0%, rgba(2,10,8,0.85) 100%)"
+      : "linear-gradient(180deg, rgba(240,250,245,0.5) 0%, rgba(225,240,235,0.8) 100%)";
+  }
+
 
   return dark
     ? "linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.88) 100%)"
