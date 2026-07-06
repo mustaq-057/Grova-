@@ -223,17 +223,49 @@ export const TangledAvatarFrame = ({ className = "" }: { className?: string }) =
     <circle cx="50" cy="50" r="48" stroke="#78350f" strokeWidth="6" />
     <circle cx="50" cy="50" r="48" stroke="url(#frameGradient)" strokeWidth="4" />
     
-    {/* Flower Cluster Top Left */}
-    <g transform="translate(10, -5)">
-      {/* 5 purple circles overlapping exactly as in reference */}
-      <circle cx="15" cy="15" r="9" fill="#9333ea" />
-      <circle cx="5" cy="25" r="7" fill="#a855f7" />
-      <circle cx="12" cy="32" r="6" fill="#c084fc" />
-      <circle cx="28" cy="22" r="6" fill="#c084fc" />
-      <circle cx="2" cy="15" r="5" fill="#c084fc" />
-      {/* Inner dots */}
-      <circle cx="15" cy="15" r="3" fill="#d8b4fe" />
-      <circle cx="5" cy="25" r="2.5" fill="#e9d5ff" />
+    {/* Single Real Purple Flower Top Left */}
+    <g transform="translate(4, -8)">
+      <defs>
+        <clipPath id="singleFlowerClip">
+          {/* 5 petals around center to create a realistic single flower silhouette */}
+          <circle cx="15" cy="8" r="8" />
+          <circle cx="23" cy="14" r="8" />
+          <circle cx="20" cy="24" r="8" />
+          <circle cx="10" cy="24" r="8" />
+          <circle cx="7" cy="14" r="8" />
+          <circle cx="15" cy="16" r="6" />
+        </clipPath>
+        <filter id="flowerShadow" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="2" stdDeviation="2" floodOpacity="0.4" />
+        </filter>
+      </defs>
+      
+      {/* Shadow layer (since drop-shadow on clipped image can be tricky, we apply it to a duplicate shape) */}
+      <g filter="url(#flowerShadow)">
+        <circle cx="15" cy="8" r="8" fill="#000" />
+        <circle cx="23" cy="14" r="8" fill="#000" />
+        <circle cx="20" cy="24" r="8" fill="#000" />
+        <circle cx="10" cy="24" r="8" fill="#000" />
+        <circle cx="7" cy="14" r="8" fill="#000" />
+        <circle cx="15" cy="16" r="6" fill="#000" />
+      </g>
+      
+      {/* The actual photo */}
+      <image 
+        href="/themes/purple_flower.jpg" 
+        x="0" 
+        y="0" 
+        width="32" 
+        height="32" 
+        clipPath="url(#singleFlowerClip)" 
+        preserveAspectRatio="xMidYMid slice" 
+      />
+      
+      {/* Optional organic lighting overlay to enhance realism */}
+      <circle cx="15" cy="15" r="14" fill="url(#frameGradient)" opacity="0.15" clipPath="url(#singleFlowerClip)" pointerEvents="none" />
+      {/* Small golden center stigma */}
+      <circle cx="15" cy="16" r="2.5" fill="#fde047" opacity="0.9" />
+      <circle cx="15" cy="16" r="1" fill="#d97706" />
     </g>
   </svg>
 );
