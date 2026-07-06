@@ -1352,6 +1352,27 @@ export default function Messages() {
       void api.getMessages().then(async (data) => {
         const fresh = await normalizeMessages(data.messages ?? []);
         setMessages((prev) => {
+          if (hasLoadedHistoryRef.current) {
+            const freshIds = new Set(fresh.map((m) => m.id));
+            const updated = prev.map((m) => {
+              if (!freshIds.has(m.id)) return m;
+              const fromServer = fresh.find((f) => f.id === m.id)!;
+              if (fromServer.deleted) return { ...m, ...fromServer, deleted: true, text: undefined, imageUrl: undefined, imageData: undefined, audioData: undefined, gifUrl: undefined, fileData: undefined };
+              return { ...m, ...fromServer, text: fromServer.text ?? m.text, imageUrl: fromServer.imageUrl || m.imageUrl, imageData: fromServer.imageData || m.imageData };
+            });
+            const existingIds = new Set(prev.map((m) => m.id));
+            const brandNew = fresh.filter((m) => !existingIds.has(m.id));
+            const next = brandNew.length > 0 ? [...updated, ...brandNew].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()) : updated;
+            const sig = messagesListSignature(next);
+            if (sig === messagesListSignature(prev)) {
+              scrollPreserveRef.current = null;
+              return prev;
+            }
+            messagesSigRef.current = sig;
+            if (user?.id) writeChatCache(user.id, filterMessagesForCache(user.id, next));
+            return next;
+          }
+
           const merged = reconcilePendingOptimistics(prev, fresh, pendingOutgoingRef.current);
           const guarded = enforceUnsentMessages(merged, unsentIdsRef.current);
           const keepIds = new Set(
