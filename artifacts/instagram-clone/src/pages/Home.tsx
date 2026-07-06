@@ -255,16 +255,14 @@ export default memo(function Home() {
                   onClick={() => setShowMyOptions(true)}
                 >
                 {isTangled ? (
-                  <div className="tangled-avatar-wrap">
-                    <div className="tangled-avatar-stage">
-                      <AvatarImage
-                        src={user?.avatar}
-                        userId={user?.id ?? "me"}
-                        alt=""
-                        className="tangled-avatar-photo tangled-avatar-photo--self"
-                      />
-                      <div className="tangled-avatar-frame tangled-avatar-frame--self" aria-hidden />
-                    </div>
+                  <div className="relative">
+                    <AvatarImage
+                      src={user?.avatar}
+                      userId={user?.id ?? "me"}
+                      alt=""
+                      className="w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover shadow-[0_0_20px_rgba(251,191,36,0.3)] bg-background"
+                    />
+                    <TangledAvatarFrame className="absolute -top-[20%] -left-[20%] w-[140%] h-[140%] pointer-events-none drop-shadow-md z-10" />
                   </div>
                 ) : (
                   <AvatarImage
@@ -331,16 +329,14 @@ export default memo(function Home() {
                   disabled={partnerStories.length === 0 && !partnerNote}
                 >
                 {isTangled ? (
-                  <div className="tangled-avatar-wrap">
-                    <div className="tangled-avatar-stage">
-                      <AvatarImage
-                        src={partner.avatar}
-                        userId={partner.id}
-                        alt=""
-                        className="tangled-avatar-photo tangled-avatar-photo--partner"
-                      />
-                      <div className="tangled-avatar-frame tangled-avatar-frame--partner" aria-hidden />
-                    </div>
+                  <div className="relative">
+                    <AvatarImage
+                      src={partner.avatar}
+                      userId={partner.id}
+                      alt=""
+                      className="w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover shadow-[0_0_20px_rgba(251,191,36,0.3)] bg-background"
+                    />
+                    <TangledAvatarFrame className="absolute -top-[20%] -left-[20%] w-[140%] h-[140%] pointer-events-none drop-shadow-md z-10" />
                   </div>
                 ) : (
                   <AvatarImage
