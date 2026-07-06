@@ -423,10 +423,12 @@ export default memo(function Home() {
                   <Icon className={`w-5 h-5 text-primary ${appTheme === 'library' ? 'library-shortcut-icon' : ''} ${isTangled ? '!text-amber-300 drop-shadow-sm' : ''}`} aria-hidden="true" />
                 </div>
                 
-                <div className={isTangled ? "mt-auto relative z-10" : ""}>
-                  <p className={`font-semibold text-sm ${appTheme === 'library' ? 'library-shortcut-title' : ''} ${isTangled ? '!text-white font-serif text-lg drop-shadow-md' : ''}`}>{s.label}</p>
-                  <p className={`text-xs text-muted-foreground mt-0.5 ${appTheme === 'library' ? 'library-shortcut-desc' : ''} ${isTangled ? '!text-white/80 drop-shadow-md' : ''}`}>{s.desc}</p>
-                </div>
+                {!isTangled && (
+                  <div className="mt-auto relative z-10">
+                    <p className={`font-semibold text-sm ${appTheme === 'library' ? 'library-shortcut-title' : ''}`}>{s.label}</p>
+                    <p className={`text-xs text-muted-foreground mt-0.5 ${appTheme === 'library' ? 'library-shortcut-desc' : ''}`}>{s.desc}</p>
+                  </div>
+                )}
                 
                 {isAutumnAmber && (
                   <div className="absolute -top-4 -right-4 w-20 h-20 opacity-30 pointer-events-none rotate-12">
