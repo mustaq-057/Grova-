@@ -615,7 +615,7 @@ export const MessageItem = memo(function MessageItem({
       initial={animateEntrance ? { opacity: 0, scale: 0.95, y: 15 } : false}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       transition={animateEntrance ? { type: "spring", stiffness: 400, damping: 28 } : { duration: 0 }}
-      className={`group flex items-end gap-2 mb-1 min-w-0 max-w-full ${isMe ? "flex-row-reverse" : "flex-row"}`}
+      className={`group flex items-end gap-2 mb-1 min-w-0 max-w-full relative ${isMe ? "flex-row-reverse" : "flex-row"}`}
       data-testid={`message-${msg.id}`}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -767,6 +767,11 @@ export const MessageItem = memo(function MessageItem({
             {seenLabel}
           </p>
         )}
+      </div>
+
+      {/* Swipe-to-reveal timestamp */}
+      <div className="absolute top-1/2 -translate-y-1/2 -right-[65px] w-[55px] text-[10px] text-muted-foreground flex justify-center items-center pointer-events-none opacity-80 whitespace-nowrap">
+        {new Date(msg.timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
       </div>
     </motion.div>
   );
