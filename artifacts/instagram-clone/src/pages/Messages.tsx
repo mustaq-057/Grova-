@@ -3376,7 +3376,7 @@ export default function Messages() {
 
         <div className="chat-panel-top shrink-0 z-20 flex flex-col relative">
           {/* ── Header ── */}
-          <div className="chat-panel-header flex items-center gap-2 sm:gap-2 px-2 sm:px-3 py-2 sm:py-1.5 border-b shrink-0 text-foreground">
+          <div className="chat-panel-header flex items-center gap-2 sm:gap-2 px-2 sm:px-3 pt-[calc(0.5rem+env(safe-area-inset-top))] pb-2 sm:pb-1.5 border-b shrink-0 text-foreground">
             <div className="relative shrink-0">
               <AvatarImage src={pAvatar} userId={partnerId} alt={pName} className="w-10 h-10 sm:w-9 sm:h-9 rounded-full object-cover ring-2 ring-primary/20" />
               {presence.online && (

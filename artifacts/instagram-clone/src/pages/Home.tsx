@@ -214,7 +214,7 @@ export default memo(function Home() {
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
-        className="sticky top-0 z-10 px-4 py-3 flex items-center justify-between"
+        className="sticky top-0 z-10 px-4 pt-[calc(0.75rem+env(safe-area-inset-top))] pb-3 flex items-center justify-between"
         style={{
           background: 'hsl(var(--background) / 0.95)',
           backdropFilter: 'blur(20px) saturate(1.5)',
