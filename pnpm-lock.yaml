@@ -213,6 +213,9 @@ importers:
       '@capacitor-community/keep-awake':
         specifier: ^8.0.1
         version: 8.0.1(@capacitor/core@8.4.1)
+      '@capacitor-community/media':
+        specifier: ^9.1.0
+        version: 9.1.0(@capacitor/core@8.4.1)
       '@capacitor/android':
         specifier: ^8.4.1
         version: 8.4.1(@capacitor/core@8.4.1)
@@ -890,6 +893,11 @@ packages:
 
   '@capacitor-community/keep-awake@8.0.1':
     resolution: {integrity: sha512-wTI5A6FWl5gWoMduzJ5euuJ1P73SO+rea0jV6vNdmz5TLbwIDhufelFe/GowNvU9gog6kDYbFhJ2pOp9ua1f3w==}
+    peerDependencies:
+      '@capacitor/core': '>=8.0.0'
+
+  '@capacitor-community/media@9.1.0':
+    resolution: {integrity: sha512-HTd+n2pPBE7otRqYzr09sOrAb59t/bVzCME19dVixKmDP09rxB+Mt6aj0c5AhMoKS8Jw4712r5tk+gifHTlW/Q==}
     peerDependencies:
       '@capacitor/core': '>=8.0.0'
 
@@ -6062,6 +6070,10 @@ snapshots:
       '@babel/helper-validator-identifier': 7.29.7
 
   '@capacitor-community/keep-awake@8.0.1(@capacitor/core@8.4.1)':
+    dependencies:
+      '@capacitor/core': 8.4.1
+
+  '@capacitor-community/media@9.1.0(@capacitor/core@8.4.1)':
     dependencies:
       '@capacitor/core': 8.4.1
 

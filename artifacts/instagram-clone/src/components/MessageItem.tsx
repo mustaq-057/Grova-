@@ -374,7 +374,8 @@ export const MessageItem = memo(function MessageItem({
                   e.stopPropagation();
                   try {
                     const downloadUrl = resolveMediaDownloadUrl(msg.imageUrl || msg.imageData || imageDisplaySrc, "image");
-                    const res = await fetch(downloadUrl);
+                    const res = await fetch(downloadUrl, { credentials: "include" });
+                    if (!res.ok) throw new Error("Failed to fetch image: " + res.statusText);
                     const blob = await res.blob();
                     await downloadFileNative(blob, `grova-${msg.type}-${Date.now()}.jpg`);
                   } catch (err) {

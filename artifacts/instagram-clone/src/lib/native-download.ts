@@ -1,6 +1,7 @@
 import { Capacitor } from "@capacitor/core";
 import { Filesystem, Directory } from "@capacitor/filesystem";
 import { Share } from "@capacitor/share";
+import { Media } from "@capacitor-community/media";
 import { toast } from "sonner";
 
 /**
@@ -33,14 +34,22 @@ export async function downloadFileNative(blob: Blob, filename: string): Promise<
       directory: Directory.Cache,
     });
 
-    // Use native share dialog so the user can "Save to Gallery", "Save to Files", etc.
-    // This perfectly bypasses Android 13+ strict MediaStore permission nightmares
-    // by delegating the save intent to the OS share sheet.
-    await Share.share({
-      title: filename,
-      url: writeResult.uri,
-      dialogTitle: "Save or Share File",
-    });
+    const isImage = filename.toLowerCase().endsWith(".jpg") || 
+                    filename.toLowerCase().endsWith(".jpeg") || 
+                    filename.toLowerCase().endsWith(".png");
+
+    if (isImage) {
+      // Save directly to the device gallery using the media plugin
+      await Media.savePhoto({ path: writeResult.uri });
+      toast.success("Saved to gallery!");
+    } else {
+      // For non-images (or if we prefer), fallback to the native share sheet
+      await Share.share({
+        title: filename,
+        url: writeResult.uri,
+        dialogTitle: "Save or Share File",
+      });
+    }
     
   } catch (error) {
     console.error("Native download failed:", error);

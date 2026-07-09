@@ -1,7 +1,7 @@
 /** Home country timezones for this couple (Morocco + India). */
 export const USER_TIMEZONES: Record<string, string> = {
-  me: "Africa/Casablanca",
-  wife: "Asia/Kolkata",
+  me: "Asia/Kolkata",
+  wife: "Africa/Casablanca",
 };
 
 export function getUserTimeZone(userId: string | undefined): string {
