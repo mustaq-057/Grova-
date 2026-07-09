@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   appName: 'Aesthetic-Clone',
   webDir: 'dist',
   server: {
-    url: 'https://grovaapp.vercel.app',
+    url: 'https://grova-proxy.mehaboobmustaq0.workers.dev',
     cleartext: false
   }
 };
