@@ -2232,13 +2232,13 @@ export default function Messages() {
       return;
     }
     const now = Date.now();
-    if (now - lastTypingPingRef.current > 400) {
+    if (now - lastTypingPingRef.current > 4000) {
       lastTypingPingRef.current = now;
       void api.sendTyping(user.id, partnerId, true);
     }
     typingTimeoutRef.current = setTimeout(() => {
       void api.sendTyping(user.id, partnerId, false);
-    }, 1500);
+    }, 5000);
   }, [user, partnerId]);
 
   const sendGreeting = useCallback((g: GreetingTemplate) => {

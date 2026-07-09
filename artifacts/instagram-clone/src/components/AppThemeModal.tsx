@@ -1,6 +1,6 @@
-import { memo, useRef } from "react";
+import { memo, useRef, useEffect } from "react";
 import { X, ChevronUp, ChevronDown } from "lucide-react";
-import { APP_THEMES, applyAppTheme, type AppThemeId } from "@/lib/app-theme";
+import { APP_THEMES, applyAppTheme, getThemeBackgroundUrl, type AppThemeId } from "@/lib/app-theme";
 
 type Props = {
   show: boolean;
@@ -11,6 +11,19 @@ type Props = {
 
 export const AppThemeModal = memo(function AppThemeModal({ show, onClose, current, onSelect }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Preload background images to instantly apply themes without lag
+  useEffect(() => {
+    if (show) {
+      APP_THEMES.forEach((t) => {
+        const url = getThemeBackgroundUrl(t.id);
+        if (url) {
+          const img = new Image();
+          img.src = url;
+        }
+      });
+    }
+  }, [show]);
 
   if (!show) return null;
 
