@@ -6,6 +6,7 @@ import { isChatBlocked } from "./client-memory";
 import { readSessionSnapshot } from "./profile-cache";
 import { callStartedText, callEndedText, missedCallText, canceledCallText, declinedCallText } from "./call-chat-log";
 import { openLiveChannel, type LiveChannel } from "./sse-client";
+import { KeepAwake } from "@capacitor-community/keep-awake";
 
 export type CallType = "audio" | "video";
 
@@ -263,6 +264,14 @@ export function CallProvider({ children }: { children: ReactNode }) {
       if (channel?.mode === "sse") channel.eventSource.close();
     };
   }, [user, handleCallSignal]);
+
+  useEffect(() => {
+    if (callState || incomingCall) {
+      KeepAwake.keepAwake().catch(() => {});
+    } else {
+      KeepAwake.allowSleep().catch(() => {});
+    }
+  }, [callState, incomingCall]);
 
   return (
     <CallContext.Provider value={{
