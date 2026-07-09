@@ -214,14 +214,48 @@ export default memo(function Home() {
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
-        className="sticky top-0 z-10 bg-background/95 backdrop-blur px-4 py-3 flex items-center justify-between border-b border-border/50"
+        className="sticky top-0 z-10 px-4 py-3 flex items-center justify-between"
+        style={{
+          background: 'hsl(var(--background) / 0.95)',
+          backdropFilter: 'blur(20px) saturate(1.5)',
+          WebkitBackdropFilter: 'blur(20px) saturate(1.5)',
+          borderBottom: '1px solid hsl(var(--border) / 0.4)',
+          boxShadow: '0 1px 12px -2px hsl(var(--primary) / 0.08)',
+        }}
       >
-        <span className={`font-serif italic text-xl font-bold text-primary ${appTheme === 'library' ? 'library-home-title' : ''}`} aria-label="Grova app logo">Grova</span>
-        {isEncryptionReady() && (
-          <span className="flex items-center gap-1 text-[10px] text-green-500 bg-green-500/10 px-2 py-1 rounded-full border border-green-500/20" role="status" aria-label="End-to-end encryption active">
-            <Shield className="w-3 h-3" aria-hidden="true" /> Encrypted
+        <div className="flex items-center gap-2">
+          <span 
+            className={`font-serif italic text-[22px] font-bold tracking-tight ${
+              appTheme === 'library' ? 'library-home-title' : 'text-primary'
+            }`} 
+            aria-label="Grova app logo"
+            style={{ letterSpacing: '-0.02em' }}
+          >
+            Grova
           </span>
-        )}
+          {isTangled && (
+            <span className="text-xs font-medium text-amber-400/80 bg-amber-400/10 px-2 py-0.5 rounded-full border border-amber-400/20">
+              ✨ Tangled
+            </span>
+          )}
+          {isAutumnAmber && (
+            <span className="text-xs font-medium text-orange-400/80 bg-orange-400/10 px-2 py-0.5 rounded-full border border-orange-400/20">
+              🍂 Autumn
+            </span>
+          )}
+          {isPetrichor && (
+            <span className="text-xs font-medium text-slate-400/80 bg-slate-400/10 px-2 py-0.5 rounded-full border border-slate-400/20">
+              🌧️ Petrichor
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {isEncryptionReady() && (
+            <span className="flex items-center gap-1 text-[10px] text-green-500 bg-green-500/10 px-2 py-1 rounded-full border border-green-500/20" role="status" aria-label="End-to-end encryption active">
+              <Shield className="w-3 h-3" aria-hidden="true" /> E2E
+            </span>
+          )}
+        </div>
       </motion.div>
 
 

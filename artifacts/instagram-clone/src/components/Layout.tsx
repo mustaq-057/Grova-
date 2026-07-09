@@ -239,9 +239,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </main>
       ) : (
         <main
-          className={`flex-1 overflow-hidden relative z-10 ${showThemeBg ? "bg-background/88 backdrop-blur-sm" : ""}`}
+          className={`flex-1 overflow-x-hidden relative z-10 ${showThemeBg ? "bg-background/88 backdrop-blur-sm" : ""}`}
         >
-          <div ref={mainScrollRef} className="h-full overflow-y-auto pb-20 sm:pb-16 md:pb-0 scrollbar-thin scrollbar-thumb-primary/40 scrollbar-track-transparent">
+          <div ref={mainScrollRef} className="h-full overflow-y-auto overflow-x-hidden pb-20 sm:pb-16 md:pb-0 scrollbar-thin scrollbar-thumb-primary/40 scrollbar-track-transparent">
             {children}
           </div>
         </main>
@@ -250,7 +250,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
       {/* Mobile Bottom Bar - Responsive with Menu Toggle */}
       {!isLibrary && !libraryMode && (
         <nav
-          className={`md:hidden fixed bottom-0 left-0 right-0 h-16 sm:h-14 app-chrome border-t border-border/50 flex items-center justify-around px-1 z-50 safe-area-bottom ${showThemeBg ? "bg-background/95 backdrop-blur-lg" : "bg-background/95 backdrop-blur-md"}`}
+          className={`md:hidden fixed bottom-0 left-0 right-0 app-chrome border-t border-border/50 flex items-center justify-around px-1 z-50 ${showThemeBg ? "bg-background/95 backdrop-blur-lg" : "bg-background/95 backdrop-blur-md"}`}
+          style={{ height: 'calc(4rem + env(safe-area-inset-bottom, 0px))', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
         >
         {navItems.filter((i) => !["Dua", "Memories", "Calendar", "Library", "Tasks", "Milestones", "Secret Notes"].includes(i.label)).map((item) => {
           const Icon = item.icon;

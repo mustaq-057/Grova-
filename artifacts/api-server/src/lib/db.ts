@@ -684,9 +684,24 @@ export async function initDb() {
         id TEXT PRIMARY KEY,
         content TEXT NOT NULL,
         author TEXT NOT NULL,
-        timestamp TEXT NOT NULL
+        timestamp TEXT NOT NULL,
+        title TEXT,
+        color TEXT,
+        icon TEXT
       )
     `);
+
+    for (const sql of [
+      "ALTER TABLE secret_notes ADD COLUMN IF NOT EXISTS title TEXT",
+      "ALTER TABLE secret_notes ADD COLUMN IF NOT EXISTS color TEXT",
+      "ALTER TABLE secret_notes ADD COLUMN IF NOT EXISTS icon TEXT"
+    ]) {
+      try {
+        await db.execute(sql);
+      } catch {
+        /* column may exist */
+      }
+    }
 
     await db.execute(`
       CREATE TABLE IF NOT EXISTS scheduled_messages (

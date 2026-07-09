@@ -744,7 +744,7 @@ export default function EReader() {
                 }).catch(() => {});
               }}
               onLoadError={(err) => setLoadError(err?.message || "Failed to parse PDF")}
-              className="flex flex-col items-center py-6 gap-6"
+              className="flex flex-col items-center py-6 px-4 gap-6"
               loading={
                 <div className="flex flex-col items-center justify-center flex-1 text-white/50 h-full w-full py-20 gap-4">
                   <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
@@ -754,7 +754,7 @@ export default function EReader() {
             >
               {totalPages > 0 && Array.from({ length: totalPages }, (_, i) => {
                 const pageNum = i + 1;
-                const pageWidth = Math.min(window.innerWidth - 32, 800);
+                const pageWidth = Math.min(window.innerWidth - 48, 800);
                 const placeholderH = Math.round(pageWidth * 1.414) + 24;
                 const inWindow = pageNum >= pdfWindow.start && pageNum <= pdfWindow.end;
                 if (!inWindow) {

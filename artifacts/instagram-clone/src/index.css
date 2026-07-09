@@ -250,6 +250,11 @@
   }
 }
 
+/* Safe area utility — used by the fixed mobile bottom nav */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
 /* Instagram-style story ring — only when .has-story */
 .story-ring {
   padding: 2px;
@@ -286,8 +291,9 @@
 
 .chat-panel-top {
   grid-row: 1;
-  background: hsl(var(--background) / 0.85);
-  backdrop-filter: blur(8px);
+  background: hsl(var(--background) / 0.92);
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
 }
 
 .chat-panel-messages {
@@ -313,7 +319,8 @@
 /* Keep composer above the fixed mobile bottom nav (Layout z-50 bar) */
 @media (max-width: 767px) {
   .chat-panel-bottom {
-    padding-bottom: 4rem;
+    /* h-16 nav = 64px = 4rem, plus safe area */
+    padding-bottom: calc(4rem + env(safe-area-inset-bottom, 0px));
   }
 }
 

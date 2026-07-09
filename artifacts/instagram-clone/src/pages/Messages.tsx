@@ -3376,68 +3376,60 @@ export default function Messages() {
 
         <div className="chat-panel-top shrink-0 z-20 flex flex-col relative">
           {/* ── Header ── */}
-          <div className="chat-panel-header flex items-center gap-1.5 sm:gap-2 px-1.5 sm:px-3 py-1 sm:py-1.5 border-b shrink-0 text-foreground">
+          <div className="chat-panel-header flex items-center gap-2 sm:gap-2 px-2 sm:px-3 py-2 sm:py-1.5 border-b shrink-0 text-foreground">
             <div className="relative shrink-0">
-              <AvatarImage src={pAvatar} userId={partnerId} alt={pName} className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover" />
+              <AvatarImage src={pAvatar} userId={partnerId} alt={pName} className="w-10 h-10 sm:w-9 sm:h-9 rounded-full object-cover ring-2 ring-primary/20" />
               {presence.online && (
-                <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-background" />
+                <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-background shadow-sm" />
               )}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-semibold text-sm" data-testid="chat-partner-name">{pName}</p>
-              <p className={`text-xs flex items-center ${presence.online ? "text-green-400" : "text-muted-foreground"}`}>
+              <p className="font-semibold text-[15px] sm:text-sm leading-tight" data-testid="chat-partner-name">{pName}</p>
+              <p className={`text-[11px] sm:text-xs flex items-center gap-1 leading-tight mt-0.5 ${presence.online ? "text-green-400" : "text-muted-foreground"}`}>
+                {presence.online && <span className="w-1.5 h-1.5 bg-green-400 rounded-full inline-block" />}
                 {presence.label}
               </p>
             </div>
             <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
               {isEncryptionReady() && (
                 <span className="hidden sm:flex items-center gap-1 text-[10px] text-green-400 bg-green-500/10 px-2 py-0.5 rounded-full border border-green-500/20 mr-1">
-                  <Shield className="w-3 h-3" /> Encrypted
+                  <Shield className="w-3 h-3" /> E2E
                 </span>
               )}
-              <div className="hidden sm:flex items-center gap-1 px-2 py-1 rounded-full bg-secondary/60">
-                {online ? (
-                  <Wifi className="w-3 h-3 text-green-400" />
-                ) : (
-                  <WifiOff className="w-3 h-3 text-destructive" />
-                )}
-                <span className="text-xs text-muted-foreground">{presence.label}</span>
-              </div>
-
 
               {appThemeId !== "mint" && (
                 <button
                   onClick={() => setShowBubbleColors(true)}
-                  className="p-1.5 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 active:scale-95 text-muted-foreground hover:text-foreground hover:bg-secondary"
+                  className="p-2 sm:p-1.5 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 active:scale-95 text-muted-foreground hover:text-foreground hover:bg-secondary"
                   aria-label="Chat Colors"
                   title="Chat Colors"
                 >
-                  <Palette className="w-4 h-4" strokeWidth={1.5} />
+                  <Palette className="w-[18px] h-[18px] sm:w-4 sm:h-4" strokeWidth={1.5} />
                 </button>
               )}
               <button
                 onClick={() => startCall("audio")}
-                className="hidden sm:inline-flex p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 active:scale-95"
+                className="p-2 sm:p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 active:scale-95"
                 data-testid="button-voice-call"
                 aria-label="Start audio call"
               >
-                <Phone className="w-4 h-4" strokeWidth={1.5} />
+                <Phone className="w-[18px] h-[18px] sm:w-4 sm:h-4" strokeWidth={1.5} />
               </button>
               <button
                 onClick={() => startCall("video")}
-                className="hidden sm:inline-flex p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 active:scale-95"
+                className="p-2 sm:p-1.5 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 active:scale-95"
                 data-testid="button-video-call"
                 aria-label="Start video call"
               >
-                <Video className="w-4 h-4" strokeWidth={1.5} />
+                <Video className="w-[18px] h-[18px] sm:w-4 sm:h-4" strokeWidth={1.5} />
               </button>
               <button
                 onClick={() => { setShowInfo(s => !s); }}
-                className={`p-1.5 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 active:scale-95 ${showInfo ? "text-primary" : "text-muted-foreground hover:text-foreground hover:bg-secondary"}`}
+                className={`p-2 sm:p-1.5 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-primary/50 active:scale-95 ${showInfo ? "text-primary" : "text-muted-foreground hover:text-foreground hover:bg-secondary"}`}
                 data-testid="button-info"
                 aria-label="Show chat info"
               >
-                <Info className="w-4 h-4" strokeWidth={1.5} />
+                <Info className="w-[18px] h-[18px] sm:w-4 sm:h-4" strokeWidth={1.5} />
               </button>
             </div>
           </div>
