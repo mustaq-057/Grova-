@@ -57,9 +57,15 @@ export async function downloadFileNative(blob: Blob, filename: string): Promise<
           }
         }
 
+        // Determine correct mime type
+        let mimeType = "image/jpeg";
+        if (filename.toLowerCase().endsWith(".png")) mimeType = "image/png";
+        else if (filename.toLowerCase().endsWith(".gif")) mimeType = "image/gif";
+        else if (filename.toLowerCase().endsWith(".webp")) mimeType = "image/webp";
+
         // Save directly to the device gallery using the media plugin by passing base64 directly
         await Media.savePhoto({ 
-          path: `data:image/jpeg;base64,${base64Data}`,
+          path: `data:${mimeType};base64,${base64Data}`,
           ...(albumId ? { albumIdentifier: albumId } : {})
         });
         toast.success("Saved to gallery!");

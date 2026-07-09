@@ -574,10 +574,11 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
                             videoRef.current = node;
                             if (node && streamRef.current && node.srcObject !== streamRef.current) {
                               node.srcObject = streamRef.current;
+                              node.play().catch(() => {});
                             }
                           }
                         }}
-                        autoPlay playsInline muted
+                        autoPlay playsInline muted controls={false} disablePictureInPicture disableRemotePlayback
                         className="w-full h-full object-cover"
                         style={{ 
                           filter: liveFilter,
@@ -603,11 +604,12 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
                       videoRef.current = node;
                       if (node && streamRef.current && node.srcObject !== streamRef.current) {
                         node.srcObject = streamRef.current;
+                        node.play().catch(() => {});
                       }
                     }
                   }
                 }}
-                autoPlay playsInline muted
+                autoPlay playsInline muted controls={false} disablePictureInPicture disableRemotePlayback
                 className="hidden"
               />
             </div>
@@ -630,9 +632,10 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
                   videoRef.current = node;
                   if (node && streamRef.current && node.srcObject !== streamRef.current) {
                     node.srcObject = streamRef.current;
+                    node.play().catch(() => {});
                   }
                 }}
-                autoPlay playsInline muted
+                autoPlay playsInline muted controls={false} disablePictureInPicture disableRemotePlayback
                 className={`absolute inset-0 w-full h-full object-cover origin-center ${facingMode === "user" ? "scale-x-[-1]" : ""}`}
                 style={{
                   transform: `scale(${zoom}) ${facingMode === "user" ? "scaleX(-1)" : ""}`,
