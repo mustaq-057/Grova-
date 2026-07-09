@@ -39,9 +39,39 @@ export async function downloadFileNative(blob: Blob, filename: string): Promise<
                     filename.toLowerCase().endsWith(".png");
 
     if (isImage) {
-      // Save directly to the device gallery using the media plugin
-      await Media.savePhoto({ path: writeResult.uri });
-      toast.success("Saved to gallery!");
+      try {
+        let albumId: string | undefined;
+        if (Capacitor.getPlatform() === 'android') {
+          try {
+            const albumsResponse = await Media.getAlbums();
+            // Try to find a standard album, or create one for our app
+            let targetAlbum = albumsResponse.albums.find(a => a.name === 'Pictures' || a.name === 'Grovaa');
+            if (!targetAlbum) {
+              await Media.createAlbum({ name: 'Grovaa' });
+              const newAlbums = await Media.getAlbums();
+              targetAlbum = newAlbums.albums.find(a => a.name === 'Grovaa');
+            }
+            if (targetAlbum) albumId = targetAlbum.identifier;
+          } catch (albumErr) {
+            console.warn("Could not fetch albums", albumErr);
+          }
+        }
+
+        // Save directly to the device gallery using the media plugin by passing base64 directly
+        await Media.savePhoto({ 
+          path: `data:image/jpeg;base64,${base64Data}`,
+          ...(albumId ? { albumIdentifier: albumId } : {})
+        });
+        toast.success("Saved to gallery!");
+      } catch (mediaErr) {
+        console.error("Media save error, falling back to Share:", mediaErr);
+        // Fallback to the native share sheet if the gallery API fails
+        await Share.share({
+          title: filename,
+          url: writeResult.uri,
+          dialogTitle: "Save Image",
+        });
+      }
     } else {
       // For non-images (or if we prefer), fallback to the native share sheet
       await Share.share({
