@@ -120,26 +120,20 @@ export default memo(function Login() {
       setPassword("");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "";
-      if (msg.includes("Attempts remaining: 1")) {
-        setError("Invalid email or password. One attempt left.");
+      if (msg.toLowerCase().includes("invalid email or password")) {
+        setError("Incorrect email or password. Please try again.");
+      } else if (msg.includes("Attempts remaining: 1")) {
+        setError("Incorrect password. One attempt left before lockout.");
       } else if (msg.toLowerCase().includes("too many") || msg.includes("429")) {
         setError("Too many wrong attempts. Login blocked for 30 minutes. Try again later.");
-      } else if (serverOnline && /\(HTTP |request failed|not found/i.test(msg)) {
-        setError(
-          msg.includes("Not allowed by CORS")
-            ? "CORS blocked login. Add your site URL to ALLOWED_ORIGINS in Vercel (no trailing slash), then redeploy."
-            : `Login API error: ${msg}. Health check passed — check Vercel → Logs for the /api function.`,
-        );
-      } else if (/connection lost|request failed|not found|failed to fetch|cannot reach/i.test(msg)) {
-        setError(
-          "Cannot reach the login API. Open /api/healthz in your browser — if it shows an error, fix DATABASE_URL and ENCRYPTION_* on Vercel (Cloudinary is only for photo/PDF uploads). Then redeploy.",
-        );
-      } else if (msg.toLowerCase().includes("invalid email or password")) {
-        setError("Invalid email or password. Check PRIMARY_AUTH_EMAILS matches your email exactly on Vercel.");
       } else if (msg.toLowerCase().includes("database unavailable")) {
-        setError("Database is not connected. Set DATABASE_URL (Neon) in Vercel env vars and redeploy.");
+        setError("Database is not connected. Please try again later.");
+      } else if (msg.includes("Not allowed by CORS")) {
+        setError("CORS blocked login. Add your site URL to ALLOWED_ORIGINS in Vercel (no trailing slash), then redeploy.");
+      } else if (/connection lost|failed to fetch|cannot reach/i.test(msg)) {
+        setError("Cannot reach the server. Check your internet connection and try again.");
       } else {
-        setError(msg || "Login failed. Check Vercel env vars (PRIMARY_AUTH_*) and redeploy.");
+        setError("Login failed. Please check your email and password.");
       }
     } finally {
       setLoading(false);
