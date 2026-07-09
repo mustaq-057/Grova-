@@ -493,6 +493,14 @@ export async function initDb() {
     `);
 
     await db.execute(`
+      CREATE TABLE IF NOT EXISTS fcm_tokens (
+        user_id TEXT PRIMARY KEY,
+        token TEXT NOT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await db.execute(`
       CREATE TABLE IF NOT EXISTS public_keys (
         user_id TEXT PRIMARY KEY,
         public_key TEXT NOT NULL,

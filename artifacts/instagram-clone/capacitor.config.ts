@@ -7,7 +7,12 @@ const config: CapacitorConfig = {
   server: {
     url: 'https://grova-proxy.mehaboobmustaq0.workers.dev',
     cleartext: false
-  }
+  },
+  plugins: {
+    PushNotifications: {
+      presentationOptions: ["badge", "sound", "alert"],
+    },
+  },
 };
 
 export default config;

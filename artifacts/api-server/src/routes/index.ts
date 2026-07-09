@@ -33,6 +33,7 @@ import doodleRouter from "./doodle";
 import storiesRouter from "./stories";
 import avatarNotesRouter from "./avatar-notes";
 import aiRouter from "./ai";
+import pushRouter from "./push";
 
 const router: IRouter = Router();
 
@@ -75,5 +76,6 @@ router.use("/doodle", doodleRouter);
 router.use(storiesRouter);
 router.use(avatarNotesRouter);
 router.use(aiRouter);
+router.use(pushRouter);
 
 export default router;

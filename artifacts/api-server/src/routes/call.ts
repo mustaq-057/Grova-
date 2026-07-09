@@ -6,6 +6,8 @@ import { rateLimiters } from "../lib/security";
 import { getWebRTCConfiguration } from "../lib/webrtc";
 import { AuthenticatedRequest } from "../types";
 import webpush from "web-push";
+import { sendPushNotification } from "../lib/fcm";
+import { profileDisplayName } from "../lib/activity-feed";
 
 // Configure web-push if keys are present
 if (process.env.VITE_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
@@ -112,6 +114,20 @@ router.post("/call/notify", rateLimiters.messages, authenticate, (req, res) => {
     "INSERT INTO call_signals (receiver_id, event, data, created_at, expires_at) VALUES ($1, $2, $3, $4, $5)",
     [partnerId, event, JSON.stringify(payload), Date.now(), expiresAt]
   ).catch(err => console.error("Failed to save call notification:", err));
+
+  // Send FCM Push for incoming call
+  profileDisplayName(from).then(fromName => {
+    db.query("SELECT token FROM fcm_tokens WHERE user_id = ?", [partnerId]).then(tokenResult => {
+      if (tokenResult.rows.length > 0) {
+        const token = tokenResult.rows[0].token as string;
+        sendPushNotification(token, "Incoming Call", `${fromName} is calling you via ${callType}...`, {
+          type: "call",
+          callType: callType,
+          senderId: from,
+        });
+      }
+    });
+  }).catch(err => console.error("Failed to fetch FCM token for call:", err));
 
   res.json({ ok: true });
 });

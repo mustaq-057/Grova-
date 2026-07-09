@@ -12,6 +12,7 @@ import Login from "@/pages/Login";
 import Home from "@/pages/Home";
 import { toast } from "sonner";
 import { useEffect, useRef, type ReactNode } from "react";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 import Messages from "@/pages/Messages";
 import Create from "@/pages/Create";
 import Profile from "@/pages/Profile";
@@ -52,6 +53,9 @@ function AuthLoading() {
 function ProtectedRouter() {
   const { user, authReady, lockProfileSession } = useAuth();
   const lastActivityRef = useRef(Date.now());
+  
+  // Register for push notifications if on Android/iOS
+  usePushNotifications();
 
   useEffect(() => {
     if (!user) return;

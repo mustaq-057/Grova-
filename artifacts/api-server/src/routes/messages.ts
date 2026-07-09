@@ -11,6 +11,7 @@ import { validators, validateBody } from "../lib/validation";
 import { getChatClearedAtForUser } from "../lib/chat-clear";
 import { uploadMedia } from "../lib/storage";
 import { extForContentType } from "../lib/file-mime";
+import { sendPushNotification } from "../lib/fcm";
 
 async function autoUploadBase64Field(dataUrl: string | undefined): Promise<string | undefined> {
   if (!dataUrl || !dataUrl.startsWith("data:")) return dataUrl;
@@ -524,6 +525,34 @@ router.post("/messages", authenticate, validateBody({
     if (companionSticker === "🤲") {
       await postCoupleActivity("dua", senderId!, fromName, "shared a dua with you 🤲", "/dua").catch(() => {});
     }
+
+    // Send FCM Push Notification
+    try {
+      const tokenResult = await db.query(
+        "SELECT token FROM fcm_tokens WHERE user_id = ?",
+        [partnerId]
+      );
+      if (tokenResult.rows.length > 0) {
+        const token = tokenResult.rows[0].token as string;
+        let pushBody = "New message";
+        if (type === "text") pushBody = text || "Text message";
+        else if (type === "image") pushBody = "🖼️ Sent an image";
+        else if (type === "video") pushBody = "🎥 Sent a video";
+        else if (type === "audio") pushBody = "🎤 Sent a voice message";
+        else if (type === "location") pushBody = "📍 Shared a location";
+        else if (type === "file") pushBody = "📄 Sent a file";
+        else if (type === "heart") pushBody = "❤️ Sent a heart";
+
+        await sendPushNotification(token, fromName, pushBody, {
+          type: "message",
+          messageId: id,
+          senderId: senderId!,
+        });
+      }
+    } catch (pushErr) {
+      console.error("Failed to send push notification:", pushErr);
+    }
+
     // Chat media (photos, GIFs, doodles, etc.) only bump the chat badge — not the bell feed.
 
     res.json(msg);

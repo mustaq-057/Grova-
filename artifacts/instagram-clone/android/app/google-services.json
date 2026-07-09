@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "298292277750",
+    "project_id": "grovaa-67987",
+    "storage_bucket": "grovaa-67987.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:298292277750:android:acd3e519b9da573aba57d7",
+        "android_client_info": {
+          "package_name": "com.aesthetic.clone"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCYrbymMJgmPdMZsHM9kPN7oizt6_JK3uw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

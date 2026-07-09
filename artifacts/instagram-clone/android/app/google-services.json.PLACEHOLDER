@@ -1,0 +1,10 @@
+{
+  "NOTE": "PLEASE REPLACE THIS FILE WITH YOUR REAL google-services.json FROM FIREBASE",
+  "INSTRUCTIONS": [
+    "1. Go to console.firebase.google.com",
+    "2. Create a project and add an Android app",
+    "3. Set the package name to match your capacitor.config.ts (e.g. com.grova.app)",
+    "4. Download the google-services.json file",
+    "5. Place it here and rename it exactly to: google-services.json"
+  ]
+}
