@@ -3,6 +3,7 @@ import { Download, X, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { tryRefreshSession } from "@/lib/api";
 import { resolveMediaDownloadUrl } from "@/lib/media-url";
+import { downloadFileNative } from "@/lib/native-download";
 
 type MediaItem = {
   url: string;
@@ -70,17 +71,10 @@ export function MediaViewerOverlay({
       return currentItem.kind === "video" ? "mp4" : "jpg";
     };
 
-    const saveBlob = (blob: Blob) => {
+    const saveBlob = async (blob: Blob) => {
       const ext = extFromBlob(blob);
       const fileName = `${fileBase}.${ext}`;
-      const objectUrl = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = objectUrl;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(objectUrl);
+      await downloadFileNative(blob, fileName);
       toast.success("Downloaded");
     };
 
@@ -111,19 +105,14 @@ export function MediaViewerOverlay({
 
     try {
       const blob = await fetchBlob();
-      // REMOVED navigator.share logic to force direct download
-      saveBlob(blob);
+      await saveBlob(blob);
     } catch {
       try {
         const downloadUrl = resolveMediaDownloadUrl(currentItem.url, currentItem.kind);
-        const a = document.createElement("a");
-        a.href = downloadUrl;
-        a.download = fileBase;
-        a.target = "_blank";
-        a.rel = "noopener noreferrer";
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
+        const res = await fetch(downloadUrl);
+        const blob = await res.blob();
+        const ext = extFromBlob(blob);
+        await downloadFileNative(blob, `${fileBase}.${ext}`);
       } catch {
         toast.error("Download failed");
       }

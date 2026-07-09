@@ -1,5 +1,6 @@
 import type { ApiMessage } from "./api";
 import { messagePreview, scrubUndecryptedServerText } from "./message-utils";
+import { downloadFileNative } from "./native-download";
 
 const W = 480;
 const PAD = 20;
@@ -66,14 +67,7 @@ export function downloadChatAsText(
   ];
 
   const blob = new Blob([lines.join("\n")], { type: "text/plain;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `grova-chat-${new Date().toISOString().slice(0, 10)}.txt`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
+  void downloadFileNative(blob, `grova-chat-${new Date().toISOString().slice(0, 10)}.txt`);
 }
 
 function formatMsgTime(iso: string): string {
@@ -305,18 +299,11 @@ export async function downloadChatAsImage(
     const blob = await new Promise<Blob>((resolve, reject) => {
       canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Failed to export"))), "image/png");
     });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
     const suffix =
       pages.length > 1
         ? `-part-${String(pageNum + 1).padStart(2, "0")}-of-${pages.length}`
         : "";
-    a.download = `grova-chat-${new Date().toISOString().slice(0, 10)}${suffix}.png`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    void downloadFileNative(blob, `grova-chat-${new Date().toISOString().slice(0, 10)}${suffix}.png`);
 
     if (pageNum < pages.length - 1) {
       await new Promise((resolve) => setTimeout(resolve, 400));

@@ -2,6 +2,7 @@ import { memo } from "react";
 import { Download, ExternalLink, Share2, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { browserViewUrl, inlineMediaDownloadUrl } from "@/lib/file-view";
+import { downloadFileNative } from "@/lib/native-download";
 
 type Props = {
   open: boolean;
@@ -21,15 +22,22 @@ export const MobileFileOpenSheet = memo(function MobileFileOpenSheet({
   const viewUrl = browserViewUrl(fileUrl, fileName, mimeType);
   const downloadUrl = inlineMediaDownloadUrl(fileUrl, fileName, mimeType);
 
-  const saveToDevice = () => {
-    const a = document.createElement("a");
-    a.href = downloadUrl;
-    a.download = fileName;
-    a.rel = "noopener noreferrer";
-    a.target = "_blank";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+  const saveToDevice = async () => {
+    try {
+      const res = await fetch(downloadUrl, { credentials: "omit" });
+      const blob = await res.blob();
+      await downloadFileNative(blob, fileName);
+    } catch (e) {
+      console.error("Native download failed:", e);
+      const a = document.createElement("a");
+      a.href = downloadUrl;
+      a.download = fileName;
+      a.rel = "noopener noreferrer";
+      a.target = "_blank";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    }
     onClose();
   };
 
@@ -82,7 +90,7 @@ export const MobileFileOpenSheet = memo(function MobileFileOpenSheet({
             <div className="grid gap-2">
               <button
                 type="button"
-                onClick={saveToDevice}
+                onClick={() => void saveToDevice()}
                 className="flex items-center gap-3 w-full px-4 py-3 rounded-xl bg-secondary hover:bg-secondary/80 text-sm font-medium"
               >
                 <Download className="w-5 h-5 text-primary" />

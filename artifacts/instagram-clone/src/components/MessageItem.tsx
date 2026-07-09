@@ -24,6 +24,7 @@ import { resolveChatImageUrl, resolveChatVideoUrl, resolveChatAudioUrl, resolveM
 import { useEffect } from "react";
 import { useChatTheme } from "@/hooks/useChatTheme";
 import { useCall } from "@/lib/call-context";
+import { downloadFileNative } from "@/lib/native-download";
 import { Phone, PhoneOff, PhoneForwarded, PhoneMissed, Video, Lock, Clock, Palette } from "lucide-react";
 
 function isEmojiOnlyText(text?: string): boolean {
@@ -369,16 +370,16 @@ export const MessageItem = memo(function MessageItem({
             {!isEphemeralMedia(msg) && (
               <button
                 type="button"
-                onClick={(e) => {
+                onClick={async (e) => {
                   e.stopPropagation();
-                  const a = document.createElement("a");
-                  a.href = resolveMediaDownloadUrl(msg.imageUrl || msg.imageData || imageDisplaySrc, "image");
-                  a.download = `grova-${msg.type}-${Date.now()}.jpg`;
-                  a.target = "_blank";
-                  a.rel = "noopener noreferrer";
-                  document.body.appendChild(a);
-                  a.click();
-                  a.remove();
+                  try {
+                    const downloadUrl = resolveMediaDownloadUrl(msg.imageUrl || msg.imageData || imageDisplaySrc, "image");
+                    const res = await fetch(downloadUrl);
+                    const blob = await res.blob();
+                    await downloadFileNative(blob, `grova-${msg.type}-${Date.now()}.jpg`);
+                  } catch (err) {
+                    console.error("Download failed", err);
+                  }
                 }}
                 className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/40 text-white flex items-center justify-center transition-opacity z-10 hover:bg-black/70 shadow-sm"
                 aria-label="Download image"
