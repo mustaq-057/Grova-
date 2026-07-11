@@ -3706,7 +3706,7 @@ export default function Messages() {
               value={editText}
               onChange={(val) => {
                 setEditText(val);
-                handleInputActivity();
+                handleInputActivity(val);
               }}
               onSave={handleSaveEdit}
               onCancel={handleCancelEdit}
