@@ -492,6 +492,13 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
 
   return ReactDOM.createPortal(
     <AnimatePresence>
+      <style>{`
+        .camera-feed-video::-webkit-media-controls,
+        .camera-feed-video::-webkit-media-controls-enclosure,
+        .camera-feed-video::-webkit-media-controls-panel {
+          display: none !important;
+        }
+      `}</style>
       <motion.div
         initial={{ opacity: 0, y: 50 }}
         animate={{ opacity: 1, y: 0 }}
@@ -579,7 +586,7 @@ export function CameraOverlay({ onClose, onCapture, mode = "chat" }: CameraOverl
                           }
                         }}
                         autoPlay playsInline muted controls={false} disablePictureInPicture disableRemotePlayback
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover camera-feed-video"
                         style={{ 
                           filter: liveFilter,
                           transform: `scale(${zoom}) ${facingMode === "user" ? "scaleX(-1)" : ""}`

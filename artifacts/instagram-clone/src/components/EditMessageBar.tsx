@@ -1,5 +1,5 @@
-import { memo } from "react";
-import { Pencil, X } from "lucide-react";
+import { memo, useRef, useEffect } from "react";
+import { X, Check } from "lucide-react";
 
 type Props = {
   value: string;
@@ -7,6 +7,7 @@ type Props = {
   onSave: () => void;
   onCancel: () => void;
   saving?: boolean;
+  isTangled?: boolean;
 };
 
 export const EditMessageBar = memo(function EditMessageBar({
@@ -15,47 +16,83 @@ export const EditMessageBar = memo(function EditMessageBar({
   onSave,
   onCancel,
   saving = false,
+  isTangled,
 }: Props) {
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.style.height = "auto";
+      inputRef.current.style.height = `${Math.min(inputRef.current.scrollHeight, 120)}px`;
+    }
+  }, [value]);
+
   return (
-    <div className="mx-3 mb-2 rounded-2xl bg-[#262626] border border-white/10 overflow-hidden">
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-white/10">
-        <Pencil className="w-4 h-4 text-primary shrink-0" aria-hidden />
-        <p className="text-xs font-semibold text-primary">Edit message</p>
+    <div className="chat-panel-input relative w-full z-20 shrink-0 px-0 pt-1.5 pb-1">
+      {/* Edit indicator preview above input */}
+      <div className="absolute -top-[30px] left-[5%] w-[90%] bg-primary/20 backdrop-blur-md border border-primary/30 text-white text-[13px] px-4 py-1.5 rounded-t-2xl flex items-center justify-between z-10 font-medium">
+        <div className="flex items-center gap-2">
+          <span className="text-[14px]">✏️</span>
+          Editing message
+        </div>
+        <button onClick={onCancel} className="text-white/50 hover:text-white p-1">
+          <X className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      <div className={`message-input-pill flex items-center gap-[8px] sm:gap-[10px] py-[7px] sm:py-[9px] pr-[8px] sm:pr-[14px] pl-[5px] sm:pl-[9px] mx-[4px] md:mx-auto md:w-full md:max-w-[800px] ${
+        isTangled 
+          ? 'bg-[#1f2227] rounded-[40px] border-2 border-[#fcd34d] shadow-[0_0_30px_#fcd34d]' 
+          : 'bg-[#1a1a1a] rounded-[40px]'
+      } rounded-tl-none rounded-tr-none border-t-0 border-primary/30`}>
+        
+        {/* Cancel button matching the camera button slot */}
         <button
           type="button"
           onClick={onCancel}
-          className="ml-auto shrink-0 p-1 text-white/60 hover:text-white"
-          aria-label="Cancel edit"
+          className="w-[38px] h-[38px] sm:w-[44px] sm:h-[44px] rounded-full active:scale-95 flex shrink-0 items-center justify-center text-white/50 hover:text-white transition-all bg-white/5 hover:bg-white/10 border-none"
+          aria-label="Cancel editing"
         >
-          <X className="w-5 h-5" />
+          <X className="w-[20px] h-[20px]" strokeWidth={1.8} />
         </button>
-      </div>
-      <div className="flex items-end gap-2 p-2">
+
         <textarea
+          ref={inputRef}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              onSave();
+              const isMobile = window.matchMedia("(max-width: 767px)").matches;
+              if (!isMobile) {
+                e.preventDefault();
+                if (value.trim()) onSave();
+              }
             } else if (e.key === "Escape") {
               onCancel();
             }
           }}
           placeholder="Edit message..."
-          rows={Math.min(Math.max(value.split("\n").length, 1), 6)}
-          className="flex-1 min-w-0 px-4 py-2.5 bg-background/80 border border-white/10 rounded-2xl text-[15px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none leading-relaxed"
+          rows={1}
+          className="flex-1 w-0 min-w-0 bg-transparent text-[17px] placeholder-[#888] text-white focus:outline-none border-none resize-none m-0 p-0 block overflow-y-auto"
+          style={{ minHeight: '24px', maxHeight: '120px', lineHeight: '24px' }}
           autoFocus
           disabled={saving}
         />
-        <button
-          type="button"
-          onClick={onSave}
-          disabled={saving || !value.trim()}
-          className="shrink-0 px-4 py-2.5 bg-primary text-primary-foreground rounded-full text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50"
-        >
-          {saving ? "Saving…" : "Save"}
-        </button>
+
+        <div className="pr-1">
+          <button
+            type="button"
+            onClick={onSave}
+            disabled={saving || !value.trim()}
+            className={`send-btn p-2.5 rounded-full transition-all shrink-0 ${
+              saving || !value.trim() ? "opacity-50 cursor-not-allowed bg-primary/60" : "bg-primary text-primary-foreground hover:bg-primary/90"
+            }`}
+            aria-label="Save message"
+          >
+            <Check className="w-5 h-5" />
+          </button>
+        </div>
+
       </div>
     </div>
   );

@@ -2844,6 +2844,16 @@ export default function Messages() {
     };
   }, [mediaViewer?.timed, mediaViewer?.messageId]);
 
+  useEffect(() => {
+    if (replyTo) {
+      setTimeout(() => {
+        if (isNearBottomRef.current) {
+          scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
+        }
+      }, 50);
+    }
+  }, [replyTo]);
+
 
   // Voice recording
   const startRecording = useCallback(async () => {
@@ -3652,16 +3662,7 @@ export default function Messages() {
               </div>
             </div>
           )}
-          {/* ── Edit Message Bar ── */}
-          {editingMessage && (
-            <EditMessageBar
-              value={editText}
-              onChange={setEditText}
-              onSave={handleSaveEdit}
-              onCancel={handleCancelEdit}
-              saving={editSaving}
-            />
-          )}
+
 
           {doodleOpen && (
             <DoodleCanvas
@@ -3688,7 +3689,16 @@ export default function Messages() {
           )}
 
           {/* ── Input Bar or Media Preview ── */}
-          {pendingMediaPreview ? (
+          {editingMessage ? (
+            <EditMessageBar
+              value={editText}
+              onChange={setEditText}
+              onSave={handleSaveEdit}
+              onCancel={handleCancelEdit}
+              saving={editSaving}
+              isTangled={isTangledTheme(appThemeId)}
+            />
+          ) : pendingMediaPreview ? (
             <PendingMediaPreview
               file={pendingMediaPreview.normalized}
               onCancel={() => setPendingMediaPreview(null)}
@@ -3735,7 +3745,7 @@ export default function Messages() {
               recordingTime={recordingTime}
               recordingStream={streamRef.current}
               recordingPreviewUrl={recordingPreviewUrl}
-              disabled={!online || blocked || editingMessage !== null}
+              disabled={!online || blocked}
               isTangled={isTangledTheme(appThemeId)}
             />
           )}
