@@ -437,6 +437,19 @@ export default function Messages() {
     setDoodleLiveMode(false);
   }, []);
 
+  const consumeReplyMeta = useCallback(() => {
+    if (!replyTo) return {};
+    const meta = {
+      replyToId: replyTo.id,
+      replyToText: replyPreviewLabel(replyTo).slice(0, 200),
+      replyToSenderId: replyTo.senderId,
+      replyToFontStyle: replyTo.fontStyle,
+      replyToImageUrl: replyTo.type === "image" || replyTo.type === "doodle" ? (replyTo.imageUrl || replyTo.imageData) : undefined,
+    };
+    setReplyTo(null);
+    return meta;
+  }, [replyTo]);
+
   const handleDoodleSend = useCallback((data: DoodleData) => {
     if (!user) {
       toast.error("You must be signed in to send a doodle.", { duration: 4000 });
@@ -449,12 +462,13 @@ export default function Messages() {
     closeDoodlePanel();
     const tempId = crypto.randomUUID();
     const posText = JSON.stringify({ width: data.width, height: data.height });
+    const replyMeta = consumeReplyMeta();
 
     pendingOutgoingRef.current.add(tempId);
     setMessages((prev) => [
       ...prev,
       buildOptimisticMessage(
-        { senderId: user.id, type: "doodle", imageData: data.imageData, text: posText },
+        { senderId: user.id, type: "doodle", imageData: data.imageData, text: posText, ...replyMeta },
         tempId,
       ),
     ]);
@@ -471,6 +485,7 @@ export default function Messages() {
           type: "doodle",
           imageUrl: url,
           text: posText,
+          ...replyMeta,
         });
         const saved = await api.sendMessage(outgoing);
         const [display] = await normalizeMessages([saved]);
@@ -491,7 +506,7 @@ export default function Messages() {
         toast.error(`Failed to send doodle: ${errorMsg}`, { duration: 5000 });
       }
     })();
-  }, [closeDoodlePanel, user, online, requestStickToBottom, partner, partnerName, partnerId]);
+  }, [closeDoodlePanel, user, online, requestStickToBottom, partner, partnerName, partnerId, consumeReplyMeta]);
 
   // Define partner info early to avoid hoisting issues
   const pAvatar = partner?.avatar || partnerAvatar || defaultAvatar(partnerId);
@@ -1898,12 +1913,14 @@ export default function Messages() {
     }
 
     stopTyping();
+    const replyMeta = consumeReplyMeta();
+    const fullMsg = { ...partial, ...replyMeta };
 
     let tempId: string | null = null;
     try {
       tempId = crypto.randomUUID();
       pendingOutgoingRef.current.add(tempId);
-      const optimistic = buildOptimisticMessage({ senderId: user.id, ...partial }, tempId);
+      const optimistic = buildOptimisticMessage({ senderId: user.id, ...fullMsg }, tempId);
 
       setMessages((prev) => {
         const next = [...prev, optimistic];
@@ -1912,7 +1929,7 @@ export default function Messages() {
       });
       requestStickToBottom();
 
-      const outgoing = await prepareOutgoingMessage({ senderId: user.id, ...partial });
+      const outgoing = await prepareOutgoingMessage({ senderId: user.id, ...fullMsg });
       const saved = await api.sendMessage(outgoing);
       const [display] = await normalizeMessages([saved]);
       setMessages((prev) => {
@@ -1932,7 +1949,7 @@ export default function Messages() {
       setError("Message did not send. Check your connection and try again.");
       throw err;
     }
-  }, [user, online, requestStickToBottom, stopTyping]);
+  }, [user, online, requestStickToBottom, stopTyping, consumeReplyMeta]);
 
   sendMsgRef.current = sendMsg;
   userIdRef.current = user?.id;
@@ -1944,10 +1961,11 @@ export default function Messages() {
       const mime = file.type || "image/jpeg";
       const localPreview = URL.createObjectURL(file);
       pendingOutgoingRef.current.add(tempId);
+      const replyMeta = consumeReplyMeta();
       setMessages((prev) => [
         ...prev,
         buildOptimisticMessage(
-          { senderId: user.id, type: "image", imageUrl: localPreview },
+          { senderId: user.id, type: "image", imageUrl: localPreview, ...replyMeta },
           tempId,
         ),
       ]);
@@ -1962,6 +1980,7 @@ export default function Messages() {
           type: "image",
           imageUrl: url,
           ...(sticker ? { companionSticker: sticker } : {}),
+          ...replyMeta,
         });
         const saved = await api.sendMessage(outgoing);
         const [display] = await normalizeMessages([saved]);
@@ -1980,7 +1999,7 @@ export default function Messages() {
         throw err;
       }
     },
-    [user, mediaViewMode, pName],
+    [user, mediaViewMode, pName, consumeReplyMeta],
   );
 
   const uploadAndSendEphemeralMedia = useCallback(
@@ -1999,6 +2018,7 @@ export default function Messages() {
       const tempId = crypto.randomUUID();
       const mime = kind === "video" ? guessVideoMime(file) : file.type || "image/jpeg";
       const localPreview = URL.createObjectURL(file);
+      const replyMeta = consumeReplyMeta();
       pendingOutgoingRef.current.add(tempId);
       const optimistic = buildOptimisticMessage(
         {
@@ -2012,6 +2032,7 @@ export default function Messages() {
             : localPreview
               ? { imageUrl: localPreview }
               : {}),
+          ...replyMeta,
         },
         tempId,
       );
@@ -2191,23 +2212,13 @@ export default function Messages() {
     const text = rawText.trim();
     if (!text) return;
     stopTyping();
-    const replyMeta = replyTo
-      ? {
-        replyToId: replyTo.id,
-        replyToText: replyPreviewLabel(replyTo).slice(0, 200),
-        replyToSenderId: replyTo.senderId,
-        replyToFontStyle: replyTo.fontStyle,
-        replyToImageUrl: replyTo.type === "image" || replyTo.type === "doodle" ? (replyTo.imageUrl || replyTo.imageData) : undefined,
-      }
-      : {};
-    setReplyTo(null);
+    // replyMeta is handled by sendMsg now!
     sendMsg({
       text,
       type: "text",
       fontStyle: fontStyle === "default" ? undefined : fontStyle,
-      ...replyMeta,
     });
-  }, [sendMsg, replyTo, stopTyping]);
+  }, [sendMsg, stopTyping]);
 
   // Debounced search handler
   const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -2958,10 +2969,11 @@ export default function Messages() {
 
         voiceSendInFlightRef.current = true;
         const tempId = crypto.randomUUID();
+        const replyMeta = consumeReplyMeta();
         pendingOutgoingRef.current.add(tempId);
         setMessages((prev) => [
           ...prev,
-          buildOptimisticMessage({ senderId, type: "audio" }, tempId),
+          buildOptimisticMessage({ senderId, type: "audio", ...replyMeta }, tempId),
         ]);
         scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
         void (async () => {
@@ -2975,6 +2987,7 @@ export default function Messages() {
                 senderId,
                 type: "audio",
                 audioData: "",
+                ...replyMeta,
               }),
             ]);
             outgoing.audioData = url;
