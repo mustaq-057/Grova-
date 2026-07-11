@@ -196,46 +196,6 @@ export default function Messages() {
   const messagesStartRef = useRef<HTMLDivElement>(null);
   const [showCamera, setShowCamera] = useState(false);
 
-  // ── Android hardware back button: close any open overlay ───────────────────
-  useEffect(() => {
-    const handlePopState = () => {
-      // Dismiss overlays in priority order (topmost first)
-      if (showCamera)          { setShowCamera(false);           return; }
-      if (mediaViewer)         { setMediaViewer(null);           return; }
-      if (contextMenu)         { setContextMenu(null);           return; }
-      if (pendingMediaPreview) { setPendingMediaPreview(null);   return; }
-      if (doodleOpen)          { setDoodleOpen(false);           return; }
-      if (showAppThemes)       { setShowAppThemes(false);        return; }
-      if (showBubbleColors)    { setShowBubbleColors(false);     return; }
-      if (showThreadPanel)     { setShowThreadPanel(false); setActiveThread(null); return; }
-      if (showSearch)          { setShowSearch(false);           return; }
-      if (showInfo)            { setShowInfo(false);             return; }
-      if (editingMessage)      { setEditingMessage(null); setEditText(""); return; }
-      if (replyTo)             { setReplyTo(null);               return; }
-    };
-    window.addEventListener("popstate", handlePopState);
-    return () => window.removeEventListener("popstate", handlePopState);
-  }, [
-    showCamera, mediaViewer, contextMenu, pendingMediaPreview, doodleOpen,
-    showAppThemes, showBubbleColors, showThreadPanel, showSearch, showInfo,
-    editingMessage, replyTo,
-  ]);
-
-  // Push a history sentinel whenever any overlay becomes open, so the back
-  // button has a state to consume instead of navigating away.
-  const anyOverlayOpen =
-    showCamera || !!mediaViewer || !!contextMenu || !!pendingMediaPreview ||
-    doodleOpen || showAppThemes || showBubbleColors || showThreadPanel ||
-    showSearch || showInfo || !!editingMessage || !!replyTo;
-
-  const prevOverlayOpenRef = useRef(false);
-  useEffect(() => {
-    if (anyOverlayOpen && !prevOverlayOpenRef.current) {
-      window.history.pushState({ overlayOpen: true }, "");
-    }
-    prevOverlayOpenRef.current = anyOverlayOpen;
-  }, [anyOverlayOpen]);
-
   const openCamera = () => setShowCamera(true);
   const closeCamera = () => setShowCamera(false);
   const [pendingMediaPreview, setPendingMediaPreview] = useState<{
@@ -362,6 +322,49 @@ export default function Messages() {
   /** Tracks whether we already scrolled to the first unread message on initial load */
   const initialUnreadHandledRef = useRef(false);
   const firstPaintScrollDoneRef = useRef(false);
+
+  // ── Android hardware back button: close any open overlay ───────────────────
+  // NOTE: This block must stay AFTER all state declarations so every variable
+  // referenced inside handlePopState is already defined.
+  const prevOverlayOpenRef = useRef(false);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      // Dismiss overlays in priority order (topmost first)
+      if (showCamera)          { setShowCamera(false);           return; }
+      if (mediaViewer)         { setMediaViewer(null);           return; }
+      if (contextMenu)         { setContextMenu(null);           return; }
+      if (pendingMediaPreview) { setPendingMediaPreview(null);   return; }
+      if (doodleOpen)          { setDoodleOpen(false);           return; }
+      if (showAppThemes)       { setShowAppThemes(false);        return; }
+      if (showBubbleColors)    { setShowBubbleColors(false);     return; }
+      if (showThreadPanel)     { setShowThreadPanel(false); setActiveThread(null); return; }
+      if (showSearch)          { setShowSearch(false);           return; }
+      if (showInfo)            { setShowInfo(false);             return; }
+      if (editingMessage)      { setEditingMessage(null); setEditText(""); return; }
+      if (replyTo)             { setReplyTo(null);               return; }
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [
+    showCamera, mediaViewer, contextMenu, pendingMediaPreview, doodleOpen,
+    showAppThemes, showBubbleColors, showThreadPanel, showSearch, showInfo,
+    editingMessage, replyTo,
+  ]);
+
+  // Push a history sentinel whenever any overlay becomes open.
+  const anyOverlayOpen =
+    showCamera || !!mediaViewer || !!contextMenu || !!pendingMediaPreview ||
+    doodleOpen || showAppThemes || showBubbleColors || showThreadPanel ||
+    showSearch || showInfo || !!editingMessage || !!replyTo;
+
+  useEffect(() => {
+    if (anyOverlayOpen && !prevOverlayOpenRef.current) {
+      window.history.pushState({ overlayOpen: true }, "");
+    }
+    prevOverlayOpenRef.current = anyOverlayOpen;
+  }, [anyOverlayOpen]);
+  // ───────────────────────────────────────────────────────────────────────────
 
   const partnerId = useMemo(() => user?.id === "me" ? "wife" : "me", [user?.id]);
 
