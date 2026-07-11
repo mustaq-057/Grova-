@@ -49,22 +49,22 @@ export async function downloadFileNative(blob: Blob, filename: string): Promise<
 
     if (isImage) {
       // ── Save image straight to gallery — NO share dialog ────────────
+      // NOTE: Do NOT call Media.checkPermissions() first!
+      // On Android 13+ it checks WRITE_EXTERNAL_STORAGE (capped at API 32),
+      // which always returns 'denied' even when READ_MEDIA_IMAGES is granted.
+      // Just call savePhoto() directly — the OS enforces permissions itself.
       try {
-        if (Capacitor.getPlatform() === "android") {
-          const check = await Media.checkPermissions();
-          if (check.publicStorage !== "granted") {
-            const req = await Media.requestPermissions();
-            if (req.publicStorage !== "granted") {
-              toast.error("Gallery permission denied. Please allow in Settings → Apps → Grovaa → Permissions.");
-              return;
-            }
-          }
-        }
         await Media.savePhoto({ path: writeResult.uri });
         toast.success("Saved to gallery! ✓");
-      } catch (mediaErr) {
+      } catch (mediaErr: any) {
         console.error("Media.savePhoto failed:", mediaErr);
-        toast.error("Could not save to gallery. Please check app permissions.");
+        // Only show a permissions message if it's actually a permission error
+        const errMsg = (mediaErr?.message ?? "").toLowerCase();
+        if (errMsg.includes("permission") || errMsg.includes("denied") || errMsg.includes("access")) {
+          toast.error("Gallery access denied. Go to Settings → Apps → Grovaa → Permissions → Photos and allow.");
+        } else {
+          toast.error("Could not save to gallery. Please try again.");
+        }
       }
     } else {
       // Non-image files: share sheet is the correct Android UX here
