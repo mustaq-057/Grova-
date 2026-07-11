@@ -40,10 +40,7 @@ export function usePushNotifications() {
           }
         }
 
-        // Register with Apple / Google to receive push via APNS/FCM
-        await PushNotifications.register();
-
-        // Listeners for push notification events
+        // Listeners for push notification events must be added BEFORE register()
         PushNotifications.addListener('registration', async (token: Token) => {
           console.log('[Push] Registration token: ', token.value);
           // Send token to our API server
@@ -83,6 +80,9 @@ export function usePushNotifications() {
             }
           }
         );
+
+        // Register with Apple / Google to receive push via APNS/FCM
+        await PushNotifications.register();
 
       } catch (err) {
         console.error('[Push] Failed to register push notifications', err);
