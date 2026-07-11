@@ -23,6 +23,23 @@ export function usePushNotifications() {
           return;
         }
 
+        // Create notification channel for Android 8+
+        if (Capacitor.getPlatform() === 'android') {
+          try {
+            await PushNotifications.createChannel({
+              id: 'grova_messages',
+              name: 'Grovaa Messages',
+              description: 'Notifications for new messages and calls',
+              importance: 5, // High importance (heads-up notification)
+              visibility: 1, // Public
+              vibration: true,
+            });
+            console.log('[Push] Notification channel created successfully');
+          } catch (e) {
+            console.error('[Push] Failed to create notification channel:', e);
+          }
+        }
+
         // Register with Apple / Google to receive push via APNS/FCM
         await PushNotifications.register();
 
