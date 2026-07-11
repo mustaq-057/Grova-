@@ -196,28 +196,48 @@ export default function Messages() {
   const messagesStartRef = useRef<HTMLDivElement>(null);
   const [showCamera, setShowCamera] = useState(false);
 
+  // ── Android hardware back button: close any open overlay ───────────────────
   useEffect(() => {
-    const handlePopState = (e: PopStateEvent) => {
-      if (showCamera) {
-        setShowCamera(false);
-      }
+    const handlePopState = () => {
+      // Dismiss overlays in priority order (topmost first)
+      if (showCamera)          { setShowCamera(false);           return; }
+      if (mediaViewer)         { setMediaViewer(null);           return; }
+      if (contextMenu)         { setContextMenu(null);           return; }
+      if (pendingMediaPreview) { setPendingMediaPreview(null);   return; }
+      if (doodleOpen)          { setDoodleOpen(false);           return; }
+      if (showAppThemes)       { setShowAppThemes(false);        return; }
+      if (showBubbleColors)    { setShowBubbleColors(false);     return; }
+      if (showThreadPanel)     { setShowThreadPanel(false); setActiveThread(null); return; }
+      if (showSearch)          { setShowSearch(false);           return; }
+      if (showInfo)            { setShowInfo(false);             return; }
+      if (editingMessage)      { setEditingMessage(null); setEditText(""); return; }
+      if (replyTo)             { setReplyTo(null);               return; }
     };
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
-  }, [showCamera]);
+  }, [
+    showCamera, mediaViewer, contextMenu, pendingMediaPreview, doodleOpen,
+    showAppThemes, showBubbleColors, showThreadPanel, showSearch, showInfo,
+    editingMessage, replyTo,
+  ]);
 
-  const openCamera = () => {
-    window.history.pushState({ cameraOpen: true }, "");
-    setShowCamera(true);
-  };
+  // Push a history sentinel whenever any overlay becomes open, so the back
+  // button has a state to consume instead of navigating away.
+  const anyOverlayOpen =
+    showCamera || !!mediaViewer || !!contextMenu || !!pendingMediaPreview ||
+    doodleOpen || showAppThemes || showBubbleColors || showThreadPanel ||
+    showSearch || showInfo || !!editingMessage || !!replyTo;
 
-  const closeCamera = () => {
-    if (window.history.state?.cameraOpen) {
-      window.history.back();
-    } else {
-      setShowCamera(false);
+  const prevOverlayOpenRef = useRef(false);
+  useEffect(() => {
+    if (anyOverlayOpen && !prevOverlayOpenRef.current) {
+      window.history.pushState({ overlayOpen: true }, "");
     }
-  };
+    prevOverlayOpenRef.current = anyOverlayOpen;
+  }, [anyOverlayOpen]);
+
+  const openCamera = () => setShowCamera(true);
+  const closeCamera = () => setShowCamera(false);
   const [pendingMediaPreview, setPendingMediaPreview] = useState<{
     file: File;
     clipboardItemType?: string;
