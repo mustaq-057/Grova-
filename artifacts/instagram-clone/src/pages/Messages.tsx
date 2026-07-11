@@ -2845,15 +2845,14 @@ export default function Messages() {
   }, [mediaViewer?.timed, mediaViewer?.messageId]);
 
   useEffect(() => {
-    if (replyTo) {
+    if (replyTo || editingMessage) {
       setTimeout(() => {
         if (isNearBottomRef.current) {
           scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
         }
       }, 50);
     }
-  }, [replyTo]);
-
+  }, [replyTo, editingMessage]);
 
   // Voice recording
   const startRecording = useCallback(async () => {
@@ -3692,7 +3691,10 @@ export default function Messages() {
           {editingMessage ? (
             <EditMessageBar
               value={editText}
-              onChange={setEditText}
+              onChange={(val) => {
+                setEditText(val);
+                handleInputActivity();
+              }}
               onSave={handleSaveEdit}
               onCancel={handleCancelEdit}
               saving={editSaving}
