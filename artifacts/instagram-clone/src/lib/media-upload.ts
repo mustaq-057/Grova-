@@ -284,11 +284,92 @@ export async function uploadMediaFile(file: File | Blob, contentType?: string): 
 /** @deprecated Use uploadMedia — kept for older imports */
 export const uploadMediaToB2 = uploadMedia;
 
+/** Convert a Uint8Array to a base64 string without stack overflow for large buffers. */
+function uint8ArrayToBase64(bytes: Uint8Array): string {
+  const CHUNK = 8192;
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(binary);
+}
+
+/**
+ * Read a Blob/File as a data URL.
+ *
+ * Strategy (most-to-least reliable on Android WebViews):
+ * 1. FileReader.readAsDataURL  — works on most devices
+ * 2. fetch(objectURL) → arrayBuffer → manual base64  — fallback for Android
+ *    WebViews where FileReader fails silently on content:// gallery URIs
+ *    (common on Samsung One UI / MIUI / Android 13+ without READ_MEDIA_*)
+ */
 export function readFileAsDataUrl(file: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
+  return new Promise<string>((resolve, reject) => {
+    // ── Primary path: FileReader ─────────────────────────────────────────
     const reader = new FileReader();
-    reader.onloadend = () => resolve(reader.result as string);
-    reader.onerror = () => reject(new Error("Failed to read file"));
+    let settled = false;
+
+    const done = (result: string) => {
+      if (settled) return;
+      settled = true;
+      resolve(result);
+    };
+
+    const fail = (errMsg: string) => {
+      if (settled) return;
+      settled = true;
+      // ── Fallback path: fetch objectURL → arrayBuffer → base64 ───────
+      let objectUrl: string | null = null;
+      try {
+        objectUrl = URL.createObjectURL(file);
+      } catch {
+        reject(new Error(errMsg));
+        return;
+      }
+      fetch(objectUrl)
+        .then((r) => {
+          if (!r.ok) throw new Error(`fetch blob failed: ${r.status}`);
+          return r.arrayBuffer();
+        })
+        .then((buf) => {
+          const bytes = new Uint8Array(buf);
+          const mime =
+            (file instanceof File ? file.type : "") ||
+            "application/octet-stream";
+          const b64 = uint8ArrayToBase64(bytes);
+          resolve(`data:${mime};base64,${b64}`);
+        })
+        .catch(() => reject(new Error(errMsg)))
+        .finally(() => {
+          if (objectUrl) URL.revokeObjectURL(objectUrl);
+        });
+    };
+
+    reader.onloadend = () => {
+      if (reader.result) {
+        done(reader.result as string);
+      } else {
+        fail("Failed to read file");
+      }
+    };
+    reader.onerror = () => fail("Failed to read file");
+
+    // Safety net: some Android WebViews never fire onloadend/onerror for
+    // content:// URIs — trigger fallback after 8 s.
+    const timeout = window.setTimeout(() => fail("Failed to read file"), 8000);
+    reader.onloadend = () => {
+      window.clearTimeout(timeout);
+      if (reader.result) {
+        done(reader.result as string);
+      } else {
+        fail("Failed to read file");
+      }
+    };
+    reader.onerror = () => {
+      window.clearTimeout(timeout);
+      fail("Failed to read file");
+    };
+
     reader.readAsDataURL(file);
   });
 }

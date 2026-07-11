@@ -1,7 +1,7 @@
 import { useState, memo, useCallback, useMemo, useRef, useLayoutEffect } from "react";
 import { useLocation } from "wouter";
 import { createPortal } from "react-dom";
-import { Smile, MoreHorizontal, Trash2, Download, Pin } from "lucide-react";
+import { Smile, MoreHorizontal, Trash2, Download, Pin, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { AudioMessage } from "@/components/AudioMessage";
 import { cn } from "@/lib/utils";
@@ -105,6 +105,7 @@ export const MessageItem = memo(function MessageItem({
   const [imageLoadFailed, setImageLoadFailed] = useState(false);
   const [imageRetry, setImageRetry] = useState(0);
   const [doodleExpired, setDoodleExpired] = useState(false);
+  const [imageDownloading, setImageDownloading] = useState(false);
 
   useEffect(() => {
     if ((msg.variant as string) === "doodle_invite") {
@@ -370,22 +371,30 @@ export const MessageItem = memo(function MessageItem({
             {!isEphemeralMedia(msg) && (
               <button
                 type="button"
+                disabled={imageDownloading}
                 onClick={async (e) => {
                   e.stopPropagation();
+                  if (imageDownloading) return;
+                  setImageDownloading(true);
                   try {
-                    const downloadUrl = resolveMediaDownloadUrl(msg.imageUrl || msg.imageData || imageDisplaySrc, "image");
+                    const rawUrl = msg.imageUrl || msg.imageData || imageDisplaySrc || "";
+                    const downloadUrl = resolveMediaDownloadUrl(rawUrl, "image");
                     const res = await fetch(downloadUrl, { credentials: "include" });
-                    if (!res.ok) throw new Error("Failed to fetch image: " + res.statusText);
+                    if (!res.ok) throw new Error("Fetch failed: " + res.statusText);
                     const blob = await res.blob();
-                    await downloadFileNative(blob, `grova-${msg.type}-${Date.now()}.jpg`);
+                    await downloadFileNative(blob, `grova-image-${Date.now()}.jpg`);
                   } catch (err) {
                     console.error("Download failed", err);
+                  } finally {
+                    setImageDownloading(false);
                   }
                 }}
-                className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/40 text-white flex items-center justify-center transition-opacity z-10 hover:bg-black/70 shadow-sm"
+                className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/40 text-white flex items-center justify-center transition-opacity z-10 hover:bg-black/70 shadow-sm disabled:opacity-50"
                 aria-label="Download image"
               >
-                <Download className="w-4 h-4" />
+                {imageDownloading
+                  ? <Loader2 className="w-4 h-4 animate-spin" />
+                  : <Download className="w-4 h-4" />}
               </button>
             )}
           </div>

@@ -1,97 +1,124 @@
 import { Capacitor } from "@capacitor/core";
 import { Filesystem, Directory } from "@capacitor/filesystem";
-import { Share } from "@capacitor/share";
 import { Media } from "@capacitor-community/media";
+import { Share } from "@capacitor/share";
 import { toast } from "sonner";
 
+/** In-flight guard — prevents double-tap from triggering two concurrent downloads. */
+let _downloadInProgress = false;
+
 /**
- * Safely downloads a file. 
- * On Web: uses the standard <a download> trick.
- * On Native (Android/iOS): uses @capacitor/filesystem to save and @capacitor/share to share/save to gallery.
+ * Save a file to the device.
+ * - Images → saved DIRECTLY to the photo gallery (no share sheet, no dialog).
+ * - Other files → use native share sheet (only option without a Files app API).
+ * - Web → standard <a download> trick.
  */
 export async function downloadFileNative(blob: Blob, filename: string): Promise<void> {
-  if (!Capacitor.isNativePlatform()) {
-    // Web implementation
-    const objectUrl = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = objectUrl;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(objectUrl), 100);
-    return;
-  }
+  if (_downloadInProgress) return;
+  _downloadInProgress = true;
 
-  // Native Android/iOS implementation
   try {
+    if (!Capacitor.isNativePlatform()) {
+      // Web: standard anchor download
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = objectUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 100);
+      return;
+    }
+
+    // ── Native Android/iOS ────────────────────────────────────────────
     const base64Data = await blobToBase64(blob);
-    
-    // Write to Cache directory first
+
+    // Write the file to the Cache directory first
     const writeResult = await Filesystem.writeFile({
       path: filename,
       data: base64Data,
       directory: Directory.Cache,
     });
 
-    const isImage = filename.toLowerCase().endsWith(".jpg") || 
-                    filename.toLowerCase().endsWith(".jpeg") || 
-                    filename.toLowerCase().endsWith(".png");
+    const lc = filename.toLowerCase();
+    const isImage =
+      lc.endsWith(".jpg") || lc.endsWith(".jpeg") ||
+      lc.endsWith(".png") || lc.endsWith(".webp") ||
+      lc.endsWith(".gif") || lc.endsWith(".heic");
 
     if (isImage) {
+      // ── Save image straight to gallery — NO share dialog ────────────
       try {
-        if (Capacitor.getPlatform() === 'android') {
+        if (Capacitor.getPlatform() === "android") {
           const check = await Media.checkPermissions();
-          if (check.publicStorage !== 'granted') {
-             const req = await Media.requestPermissions();
-             if (req.publicStorage !== 'granted') {
-                throw new Error("Gallery permission denied");
-             }
+          if (check.publicStorage !== "granted") {
+            const req = await Media.requestPermissions();
+            if (req.publicStorage !== "granted") {
+              toast.error("Gallery permission denied. Please allow in Settings → Apps → Grovaa → Permissions.");
+              return;
+            }
           }
         }
-        
-        // Save directly to the device gallery using the media plugin
-        await Media.savePhoto({ 
-          path: writeResult.uri
-        });
-        toast.success("Saved to gallery!");
+        await Media.savePhoto({ path: writeResult.uri });
+        toast.success("Saved to gallery! ✓");
       } catch (mediaErr) {
-        console.error("Media save error, falling back to Share:", mediaErr);
-        // Fallback to the native share sheet if the gallery API fails
+        console.error("Media.savePhoto failed:", mediaErr);
+        toast.error("Could not save to gallery. Please check app permissions.");
+      }
+    } else {
+      // Non-image files: share sheet is the correct Android UX here
+      try {
         await Share.share({
           title: filename,
           url: writeResult.uri,
-          dialogTitle: "Save Image",
+          dialogTitle: "Save or Share File",
         });
+      } catch {
+        toast.error("Could not share file.");
       }
-    } else {
-      // For non-images (or if we prefer), fallback to the native share sheet
-      await Share.share({
-        title: filename,
-        url: writeResult.uri,
-        dialogTitle: "Save or Share File",
-      });
     }
-    
   } catch (error) {
-    console.error("Native download failed:", error);
-    toast.error("Failed to save file. Check permissions.");
+    console.error("downloadFileNative failed:", error);
+    toast.error("Download failed. Check permissions and try again.");
+  } finally {
+    _downloadInProgress = false;
   }
 }
 
-function blobToBase64(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = reject;
-    reader.onload = () => {
-      if (typeof reader.result === "string") {
-        // Remove the data URI prefix (e.g., "data:image/jpeg;base64,")
-        const b64 = reader.result.split(",")[1];
-        resolve(b64);
-      } else {
-        reject(new Error("Failed to convert blob to base64"));
-      }
-    };
-    reader.readAsDataURL(blob);
-  });
+/**
+ * Convert a Blob to a base64 string (without the data: prefix).
+ * Uses arrayBuffer path on Android WebViews where FileReader can fail silently.
+ */
+async function blobToBase64(blob: Blob): Promise<string> {
+  // Primary: FileReader (fast, works everywhere except some Samsung WebViews)
+  try {
+    const result = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      const timeout = window.setTimeout(() => reject(new Error("timeout")), 6000);
+      reader.onloadend = () => {
+        window.clearTimeout(timeout);
+        const r = reader.result;
+        if (typeof r === "string" && r.includes(",")) {
+          resolve(r.split(",")[1]!);
+        } else {
+          reject(new Error("bad result"));
+        }
+      };
+      reader.onerror = () => { window.clearTimeout(timeout); reject(reader.error); };
+      reader.readAsDataURL(blob);
+    });
+    return result;
+  } catch {
+    // Fallback: arrayBuffer → manual base64 (always works in WebViews)
+    const buf = await blob.arrayBuffer();
+    const bytes = new Uint8Array(buf);
+    const CHUNK = 8192;
+    let binary = "";
+    for (let i = 0; i < bytes.length; i += CHUNK) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+    }
+    return btoa(binary);
+  }
 }
+

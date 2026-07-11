@@ -434,19 +434,9 @@ export default function Messages() {
 
       if (!el) return false;
 
-      const container = messagesContainerRef.current;
-      el.scrollIntoView({ behavior: "auto", block: "center" });
+      // Smooth scroll natively, no rAF loop (which causes jumpiness)
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
       flash(el);
-      
-      // Ensure it stays centered after any immediate layout shifts (images loading)
-      let frames = 0;
-      const keepCentered = () => {
-        if (!el || !messagesContainerRef.current) return;
-        el.scrollIntoView({ behavior: "auto", block: "center" });
-        frames++;
-        if (frames < 30) requestAnimationFrame(keepCentered); // Half a second of adjustment
-      };
-      requestAnimationFrame(keepCentered);
       
       return true;
     };
