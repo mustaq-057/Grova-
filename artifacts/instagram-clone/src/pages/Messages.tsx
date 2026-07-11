@@ -195,6 +195,29 @@ export default function Messages() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesStartRef = useRef<HTMLDivElement>(null);
   const [showCamera, setShowCamera] = useState(false);
+
+  useEffect(() => {
+    const handlePopState = (e: PopStateEvent) => {
+      if (showCamera) {
+        setShowCamera(false);
+      }
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [showCamera]);
+
+  const openCamera = () => {
+    window.history.pushState({ cameraOpen: true }, "");
+    setShowCamera(true);
+  };
+
+  const closeCamera = () => {
+    if (window.history.state?.cameraOpen) {
+      window.history.back();
+    } else {
+      setShowCamera(false);
+    }
+  };
   const [pendingMediaPreview, setPendingMediaPreview] = useState<{
     file: File;
     clipboardItemType?: string;
@@ -3745,7 +3768,7 @@ export default function Messages() {
               onImageSelect={(file, itemType) => {
                 void handlePickedFile(file, itemType);
               }}
-              onOpenCamera={() => setShowCamera(true)}
+              onOpenCamera={openCamera}
               mediaViewMode={mediaViewMode}
               onMediaViewModeChange={setMediaViewMode}
               onDoodleOpen={openDoodlePanel}
@@ -3786,9 +3809,9 @@ export default function Messages() {
 
         {showCamera && (
           <CameraOverlay
-            onClose={() => setShowCamera(false)}
+            onClose={closeCamera}
             onCapture={(file) => {
-              setShowCamera(false);
+              closeCamera();
               void handlePickedFile(file);
             }}
           />

@@ -40,6 +40,16 @@ export async function downloadFileNative(blob: Blob, filename: string): Promise<
 
     if (isImage) {
       try {
+        if (Capacitor.getPlatform() === 'android') {
+          const check = await Media.checkPermissions();
+          if (check.publicStorage !== 'granted') {
+             const req = await Media.requestPermissions();
+             if (req.publicStorage !== 'granted') {
+                throw new Error("Gallery permission denied");
+             }
+          }
+        }
+        
         // Save directly to the device gallery using the media plugin
         await Media.savePhoto({ 
           path: writeResult.uri
