@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import useEmblaCarousel from "embla-carousel-react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { resolvePostMediaUrl } from "@/lib/media-url";
+import { ZoomableImage } from "./ZoomableImage";
 
 type Props = {
   urls: string[];
@@ -14,6 +15,7 @@ export function PostCarousel({ urls, alt, ratioClass }: Props) {
   const [selected, setSelected] = useState(0);
   const [canPrev, setCanPrev] = useState(false);
   const [canNext, setCanNext] = useState(false);
+  const [isZooming, setIsZooming] = useState(false);
 
   const onSelect = useCallback(() => {
     if (!emblaApi) return;
@@ -36,29 +38,31 @@ export function PostCarousel({ urls, alt, ratioClass }: Props) {
   if (urls.length <= 1) {
     const url = urls[0] ?? "";
     return (
-      <div className={`${ratioClass} bg-secondary/30 overflow-hidden`}>
-        <img
+      <div className={`${ratioClass} bg-secondary/30 ${isZooming ? 'overflow-visible z-50 relative' : 'overflow-hidden'}`}>
+        <ZoomableImage
           src={resolvePostMediaUrl(url) ?? url}
           alt={alt}
           className={ratioClass === "aspect-auto" ? "w-full h-auto object-contain" : "w-full h-full object-cover"}
           loading="lazy"
+          onZoomChange={setIsZooming}
         />
       </div>
     );
   }
 
   return (
-    <div className={`relative ${ratioClass} bg-secondary/30 overflow-hidden group`}>
-      <div ref={emblaRef} className="overflow-hidden h-full touch-pan-y">
+    <div className={`relative ${ratioClass} bg-secondary/30 ${isZooming ? 'overflow-visible z-50' : 'overflow-hidden'} group`}>
+      <div ref={emblaRef} className={`${isZooming ? 'overflow-visible' : 'overflow-hidden'} h-full touch-pan-y`}>
         <div className="flex h-full">
           {urls.map((url, i) => (
-            <div key={`${url}-${i}`} className="min-w-0 shrink-0 grow-0 basis-full h-full">
-              <img
+            <div key={`${url}-${i}`} className={`min-w-0 shrink-0 grow-0 basis-full h-full ${isZooming && i === selected ? 'z-50 overflow-visible' : ''}`}>
+              <ZoomableImage
                 src={resolvePostMediaUrl(url) ?? url}
                 alt={`${alt} ${i + 1}`}
                 className={ratioClass === "aspect-auto" ? "w-full h-auto object-contain select-none" : "w-full h-full object-cover select-none"}
                 loading={i === 0 ? "lazy" : "eager"}
                 draggable={false}
+                onZoomChange={(zoom) => i === selected && setIsZooming(zoom)}
               />
             </div>
           ))}
