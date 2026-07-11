@@ -43,6 +43,7 @@ export function MediaViewerOverlay({
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [internalReady, setInternalReady] = useState(mediaReady);
+  const [isDownloading, setIsDownloading] = useState(false);
   
   const pinchRef = useRef<{ dist: number; scale: number } | null>(null);
   const panRef = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
@@ -103,6 +104,8 @@ export function MediaViewerOverlay({
       return res.blob();
     };
 
+    if (isDownloading) return;
+    setIsDownloading(true);
     try {
       const blob = await fetchBlob();
       await saveBlob(blob);
@@ -113,11 +116,14 @@ export function MediaViewerOverlay({
         const blob = await res.blob();
         const ext = extFromBlob(blob);
         await downloadFileNative(blob, `${fileBase}.${ext}`);
+        toast.success("Downloaded");
       } catch {
         toast.error("Download failed");
       }
+    } finally {
+      setIsDownloading(false);
     }
-  }, [currentItem]);
+  }, [currentItem, isDownloading]);
 
   const onTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length === 2) {
@@ -192,11 +198,16 @@ export function MediaViewerOverlay({
         {allowDownload && internalReady && (
           <button
             type="button"
+            disabled={isDownloading}
             onClick={() => void handleDownload()}
-            className="w-10 h-10 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80 transition-colors"
+            className="w-10 h-10 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80 transition-colors disabled:opacity-50"
             aria-label="Download"
           >
-            <Download className="w-5 h-5" />
+            {isDownloading ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <Download className="w-5 h-5" />
+            )}
           </button>
         )}
         <button

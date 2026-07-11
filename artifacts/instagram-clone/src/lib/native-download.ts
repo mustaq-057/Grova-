@@ -40,33 +40,9 @@ export async function downloadFileNative(blob: Blob, filename: string): Promise<
 
     if (isImage) {
       try {
-        let albumId: string | undefined;
-        if (Capacitor.getPlatform() === 'android') {
-          try {
-            const albumsResponse = await Media.getAlbums();
-            // Try to find a standard album, or create one for our app
-            let targetAlbum = albumsResponse.albums.find(a => a.name === 'Pictures' || a.name === 'Grovaa');
-            if (!targetAlbum) {
-              await Media.createAlbum({ name: 'Grovaa' });
-              const newAlbums = await Media.getAlbums();
-              targetAlbum = newAlbums.albums.find(a => a.name === 'Grovaa');
-            }
-            if (targetAlbum) albumId = targetAlbum.identifier;
-          } catch (albumErr) {
-            console.warn("Could not fetch albums", albumErr);
-          }
-        }
-
-        // Determine correct mime type
-        let mimeType = "image/jpeg";
-        if (filename.toLowerCase().endsWith(".png")) mimeType = "image/png";
-        else if (filename.toLowerCase().endsWith(".gif")) mimeType = "image/gif";
-        else if (filename.toLowerCase().endsWith(".webp")) mimeType = "image/webp";
-
-        // Save directly to the device gallery using the media plugin by passing base64 directly
+        // Save directly to the device gallery using the media plugin
         await Media.savePhoto({ 
-          path: `data:${mimeType};base64,${base64Data}`,
-          ...(albumId ? { albumIdentifier: albumId } : {})
+          path: writeResult.uri
         });
         toast.success("Saved to gallery!");
       } catch (mediaErr) {
