@@ -1,6 +1,6 @@
 import { memo, useRef, useState, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
 import { createPortal } from "react-dom";
-import { Smile, Mic, Send, Sticker, Paperclip, X, MessageCircle, MapPin, PenTool, Zap, Plus, Image as ImageIcon, PlusCircle, Sparkles, FileText, Palette, File as FileIcon, AlertCircle, Camera, MessageSquarePlus, Type, Clock, Pause, Play } from "lucide-react";
+import { Smile, Mic, Send, Sticker, Paperclip, X, MessageCircle, MapPin, PenTool, Zap, Plus, Image as ImageIcon, PlusCircle, Sparkles, FileText, Palette, File as FileIcon, AlertCircle, Camera, MessageSquarePlus, Type, Clock, Pause, Play, Instagram } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import EmojiPicker from "@/components/EmojiPicker";
 import StickerPicker from "@/components/StickerPicker";
@@ -19,6 +19,7 @@ const CustomDoodleIcon = () => <PenTool className="w-[26px] h-[26px] text-white"
 const CustomPaletteIcon = () => <Palette className="w-[26px] h-[26px] text-white" strokeWidth={1.6} />;
 const CustomFileIcon = () => <FileIcon className="w-[26px] h-[26px] text-white" strokeWidth={1.6} />;
 const CustomClockIcon = () => <Clock className="w-[26px] h-[26px] text-white" strokeWidth={1.6} />;
+const CustomGrovagramIcon = () => <Instagram className="w-[26px] h-[26px] text-white" strokeWidth={1.6} />;
 
 interface MessageInputProps {
   draftKey?: string;
@@ -664,6 +665,23 @@ export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputPro
             className="fixed z-[201] right-3 sm:right-4 bottom-[calc(8rem+env(safe-area-inset-bottom,0px))] md:bottom-[5.5rem] bg-[#1c1c1c] rounded-[22px] py-[10px] shadow-[0_8px_40px_rgba(0,0,0,0.7)] flex flex-col min-w-[210px] sm:min-w-[230px]"
             role="menu"
           >
+            <button
+              type="button"
+              onClick={() => {
+                setShowAttachmentMenu(false);
+                toast("Grovagram is coming soon! 🚀", { style: { background: "#1c1c1c", color: "#fff", border: "1px solid #333" } });
+              }}
+              className="flex items-center gap-[20px] px-[24px] py-[12px] text-[17px] font-normal hover:bg-white/5 transition-colors w-full text-left text-white"
+            >
+              <div className="w-[28px] h-[28px] flex items-center justify-center shrink-0 text-pink-500">
+                <CustomGrovagramIcon />
+              </div>
+              <div className="flex flex-col">
+                <span className="leading-tight">Grovagram</span>
+                <span className="text-[11px] text-pink-400 font-medium tracking-wide uppercase mt-0.5">Coming Soon</span>
+              </div>
+            </button>
+
             {onShareLocation && (
               <button
                 type="button"
