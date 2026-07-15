@@ -36,6 +36,40 @@ async function refreshSessionIfUnauthorized(status: number, attempt: number): Pr
 function isPdfMime(mime: string): boolean {
   return mime === "application/pdf" || mime.startsWith("application/pdf;");
 }
+/**
+ * Safely copies a Blob/File into memory for Android WebViews. 
+ * Prevents strict Android 13+ WebView errors where streaming a raw 
+ * content:// URI directly to a network POST request fails.
+ */
+async function ensureReadableBlob(file: Blob | File): Promise<Blob | File> {
+  // Skip for non-Android or very large files (>40MB) to prevent OOM
+  if (!navigator.userAgent.toLowerCase().includes("android") || file.size > 40 * 1024 * 1024) {
+    return file;
+  }
+  let objectUrl: string | null = null;
+  try {
+    objectUrl = URL.createObjectURL(file);
+    const res = await fetch(objectUrl);
+    if (!res.ok) throw new Error("fetch failed");
+    const buf = await res.arrayBuffer();
+    if (file instanceof File) {
+      return new File([buf], file.name, { type: file.type, lastModified: file.lastModified });
+    }
+    return new Blob([buf], { type: file.type });
+  } catch (err) {
+    try {
+      const buf = await file.arrayBuffer();
+      if (file instanceof File) {
+        return new File([buf], file.name, { type: file.type, lastModified: file.lastModified });
+      }
+      return new Blob([buf], { type: file.type });
+    } catch {
+      return file; // Fallback to raw file if everything fails
+    }
+  } finally {
+    if (objectUrl) URL.revokeObjectURL(objectUrl);
+  }
+}
 
 /** Upload PDF directly to Backblaze B2 via presigned URL — bypasses Vercel body limits. */
 async function uploadPdfToB2(
@@ -116,11 +150,12 @@ async function uploadViaBackendBinary(
 }
 
 export async function uploadMediaBinary(
-  file: File | Blob,
+  rawFile: File | Blob,
   contentType: string,
   attempt = 0,
   fileName?: string,
 ): Promise<string> {
+  const file = attempt === 0 ? await ensureReadableBlob(rawFile) : rawFile;
   const mime = normalizeUploadMime(contentType);
   const controller = new AbortController();
   const timeoutMs = isPdfMime(mime)
