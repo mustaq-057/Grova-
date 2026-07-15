@@ -731,24 +731,6 @@ export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputPro
 
             <button
               type="button"
-              onClick={() => {
-                setShowAttachmentMenu(false);
-                toast("Grovagram is coming soon! 🚀", { style: { background: "#1c1c1c", color: "#fff", border: "1px solid #333" } });
-              }}
-              className="flex items-center gap-[20px] px-[24px] py-[15px] text-[17px] font-normal hover:bg-white/5 transition-colors w-full text-left text-white"
-              disabled={disabled}
-            >
-              <div className="w-[28px] h-[28px] flex items-center justify-center shrink-0 text-pink-500">
-                <CustomGrovagramIcon />
-              </div>
-              <span className="flex items-center gap-2">
-                Grovagram
-                <span className="text-[10px] bg-pink-500/10 text-pink-400 px-1.5 py-0.5 rounded uppercase font-bold tracking-wider leading-none">Coming Soon</span>
-              </span>
-            </button>
-
-            <button
-              type="button"
               onClick={toggleSchedulePicker}
               className="flex items-center gap-[20px] px-[24px] py-[15px] text-[17px] font-normal hover:bg-white/5 transition-colors w-full text-left text-white"
               disabled={disabled}
@@ -774,6 +756,23 @@ export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputPro
               </span>
             </button>
 
+            <button
+              type="button"
+              onClick={() => {
+                setShowAttachmentMenu(false);
+                toast("Grovagram is coming soon! 🚀", { style: { background: "#1c1c1c", color: "#fff", border: "1px solid #333" } });
+              }}
+              className="flex items-center gap-[20px] px-[24px] py-[15px] text-[17px] font-normal hover:bg-white/5 transition-colors w-full text-left text-white"
+              disabled={disabled}
+            >
+              <div className="w-[28px] h-[28px] flex items-center justify-center shrink-0 text-pink-500">
+                <CustomGrovagramIcon />
+              </div>
+              <span className="flex items-center gap-2">
+                Grovagram
+                <span className="text-[10px] bg-pink-500/10 text-pink-400 px-1.5 py-0.5 rounded uppercase font-bold tracking-wider leading-none">Coming Soon</span>
+              </span>
+            </button>
 
           </motion.div>
         </>,
