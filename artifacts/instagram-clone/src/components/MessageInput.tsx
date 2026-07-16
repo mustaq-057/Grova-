@@ -323,6 +323,7 @@ export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputPro
   const [fontStyle, setFontStyle] = useState<"default" | "edo" | "italian" | "allura">("default");
   const [openPicker, setOpenPicker] = useState<OpenPicker>(null);
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
+  const [showAiMention, setShowAiMention] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const genericFileInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -357,6 +358,7 @@ export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputPro
     lastSentTimeRef.current = now;
 
     setInput("");
+    setShowAiMention(false);
     if (draftKey) {
       try { sessionStorage.removeItem(draftKey); } catch {}
     }
@@ -434,6 +436,13 @@ export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputPro
     const value = e.target.value;
     setInput(value);
     onInputActivity?.(value);
+    
+    const words = value.split(/\s+/);
+    if (words.some(w => w.startsWith("@") || w === "@")) {
+      setShowAiMention(true);
+    } else {
+      setShowAiMention(false);
+    }
     
     e.target.style.height = 'auto';
     e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
@@ -848,6 +857,18 @@ export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputPro
             <div className="w-2.5 h-2.5 bg-destructive rounded-full animate-pulse" />
           )}
           <span className="tabular-nums min-w-[36px] text-center font-bold tracking-wide">{formatTime(recordingTime)}</span>
+        </motion.div>
+      )}
+
+      {showAiMention && !recording && (
+        <motion.div
+          initial={{ opacity: 0, y: 10, scale: 0.9 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 10, scale: 0.9 }}
+          className="absolute -top-[52px] left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-1.5 bg-gradient-to-r from-blue-600/90 to-purple-600/90 backdrop-blur-xl text-white text-sm font-bold rounded-[20px] z-10 border border-white/20 shadow-lg whitespace-nowrap pointer-events-none"
+        >
+          <Sparkles className="w-4 h-4 text-yellow-300" />
+          Grova AI coming soon! ✨
         </motion.div>
       )}
 
