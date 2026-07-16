@@ -3976,7 +3976,7 @@ export default function Messages() {
                 scrollChatToBottom(messagesContainerRef.current, bottomRef.current);
                 setHasNewMessages(false);
               }}
-              className="absolute right-4 bottom-[calc(env(safe-area-inset-bottom,0px)+6.5rem)] z-40 p-2.5 bg-primary/90 hover:bg-primary text-primary-foreground backdrop-blur-md rounded-full shadow-lg border border-white/10"
+              className="fixed right-4 bottom-[calc(env(safe-area-inset-bottom,0px)+6.5rem)] z-[9990] p-2.5 bg-primary/90 hover:bg-primary text-primary-foreground backdrop-blur-md rounded-full shadow-lg border border-white/10"
             >
               <ChevronDown className="w-5 h-5" />
             </motion.button>
