@@ -1,12 +1,13 @@
-import { Router } from "express";
+import { Router, Response } from "express";
 import { z } from "zod";
 import db from "../lib/db";
 import { authenticate } from "../lib/auth-middleware";
 import { logger } from "../lib/logger";
+import type { AuthenticatedRequest } from "../types";
 
 const router = Router();
 
-router.post("/push/fcm-token", authenticate, async (req, res) => {
+router.post("/push/fcm-token", authenticate, async (req: AuthenticatedRequest, res: Response) => {
   const schema = z.object({
     token: z.string().min(1),
   });

@@ -36,10 +36,32 @@ async function refreshSessionIfUnauthorized(status: number, attempt: number): Pr
 function isPdfMime(mime: string): boolean {
   return mime === "application/pdf" || mime.startsWith("application/pdf;");
 }
+/** Sniff MIME type from the first bytes of a buffer (magic bytes). */
+function sniffMimeFromBytes(buf: ArrayBuffer): string {
+  const bytes = new Uint8Array(buf, 0, Math.min(12, buf.byteLength));
+  // JPEG: FF D8 FF
+  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "image/jpeg";
+  // PNG: 89 50 4E 47
+  if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) return "image/png";
+  // GIF: 47 49 46
+  if (bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46) return "image/gif";
+  // WEBP: RIFF????WEBP
+  if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 &&
+      bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50) return "image/webp";
+  // HEIC/HEIF: ftyp box
+  if (bytes[4] === 0x66 && bytes[5] === 0x74 && bytes[6] === 0x79 && bytes[7] === 0x70) return "image/heic";
+  // MP4: ftyp
+  if (bytes[4] === 0x66 && bytes[5] === 0x74 && bytes[6] === 0x79 && bytes[7] === 0x70) return "video/mp4";
+  // WebM: 1A 45 DF A3
+  if (bytes[0] === 0x1a && bytes[1] === 0x45 && bytes[2] === 0xdf && bytes[3] === 0xa3) return "video/webm";
+  return "image/jpeg"; // Safe default for gallery picks
+}
+
 /**
  * Safely copies a Blob/File into memory for Android WebViews. 
  * Prevents strict Android 13+ WebView errors where streaming a raw 
  * content:// URI directly to a network POST request fails.
+ * Also sniffs MIME type from magic bytes when file.type is empty (Android 15).
  */
 async function ensureReadableBlob(file: Blob | File): Promise<Blob | File> {
   // Skip for non-Android or very large files (>40MB) to prevent OOM
@@ -52,17 +74,24 @@ async function ensureReadableBlob(file: Blob | File): Promise<Blob | File> {
     const res = await fetch(objectUrl);
     if (!res.ok) throw new Error("fetch failed");
     const buf = await res.arrayBuffer();
+    // Resolve MIME — sniff from magic bytes if type is empty (Android 15 content:// URIs)
+    const resolvedType = (file.type && file.type !== "application/octet-stream")
+      ? file.type
+      : sniffMimeFromBytes(buf);
     if (file instanceof File) {
-      return new File([buf], file.name, { type: file.type, lastModified: file.lastModified });
+      return new File([buf], file.name || `media.${resolvedType.split("/")[1] ?? "jpg"}`, { type: resolvedType, lastModified: file.lastModified });
     }
-    return new Blob([buf], { type: file.type });
+    return new Blob([buf], { type: resolvedType });
   } catch (err) {
     try {
       const buf = await file.arrayBuffer();
+      const resolvedType = (file.type && file.type !== "application/octet-stream")
+        ? file.type
+        : sniffMimeFromBytes(buf);
       if (file instanceof File) {
-        return new File([buf], file.name, { type: file.type, lastModified: file.lastModified });
+        return new File([buf], file.name || `media.${resolvedType.split("/")[1] ?? "jpg"}`, { type: resolvedType, lastModified: file.lastModified });
       }
-      return new Blob([buf], { type: file.type });
+      return new Blob([buf], { type: resolvedType });
     } catch {
       return file; // Fallback to raw file if everything fails
     }
