@@ -50,23 +50,23 @@ export const APP_THEMES: {
     {
       id: "islamic",
       name: "Islamic",
-      description: "Serene night sky and glowing crescent 🌙",
-      swatch: "bg-gradient-to-br from-[#064e3b] via-[#134e4a] to-[#d97706]",
+      description: "Lanterns & starlit geometry بسم الله 🌙",
+      swatch: "bg-gradient-to-br from-[#0a1628] via-[#0d3d2f] to-[#c9a227]",
       dark: {
-        "--app-background": "160 80% 6%", // Very deep emerald/teal
-        "--app-foreground": "160 20% 95%", // Soft green-white
-        "--app-primary": "42 90% 55%", // Radiant gold
-        "--app-card": "160 70% 9%", // Slightly lighter deep teal
-        "--app-secondary": "160 50% 14%",
-        "--app-border": "160 40% 20%",
+        "--app-background": "210 60% 5%",   // Deep midnight navy (starry mosque night)
+        "--app-foreground": "48 40% 92%",   // Warm parchment ivory
+        "--app-primary": "43 88% 58%",      // Brilliant Islamic gold
+        "--app-card": "200 50% 8%",         // Deep teal-navy card
+        "--app-secondary": "195 45% 12%",   // Slightly lighter teal-navy
+        "--app-border": "170 35% 22%",      // Soft emerald border
       },
       light: {
-        "--app-background": "160 40% 96%", // Very soft mint/teal white
-        "--app-foreground": "160 60% 10%", // Deep teal text
-        "--app-primary": "160 70% 30%", // Emerald green for light primary
-        "--app-card": "0 0% 100%",
-        "--app-secondary": "160 30% 90%",
-        "--app-border": "160 25% 85%",
+        "--app-background": "40 35% 97%",   // Warm parchment cream
+        "--app-foreground": "195 60% 12%",  // Deep teal-navy text
+        "--app-primary": "170 60% 25%",     // Rich emerald for light primary
+        "--app-card": "45 30% 99%",         // Near-white parchment
+        "--app-secondary": "40 20% 92%",    // Soft sand secondary
+        "--app-border": "160 20% 82%",      // Delicate teal border
       },
     },
     {
@@ -401,8 +401,8 @@ export function getPhotoScrimGradient(themeId: AppThemeId, dark: boolean): strin
 
   if (themeId === "islamic") {
     return dark
-      ? "linear-gradient(180deg, rgba(5,20,15,0.4) 0%, rgba(2,10,8,0.85) 100%)"
-      : "linear-gradient(180deg, rgba(240,250,245,0.5) 0%, rgba(225,240,235,0.8) 100%)";
+      ? "linear-gradient(180deg, rgba(4,12,24,0.35) 0%, rgba(2,8,18,0.80) 100%)"
+      : "linear-gradient(180deg, rgba(248,244,232,0.4) 0%, rgba(238,232,215,0.75) 100%)";
   }
 
 
