@@ -549,8 +549,13 @@ router.post("/messages", authenticate, validateBody({
           senderId: senderId!,
         });
       }
-    } catch (pushErr) {
-      console.error("Failed to send push notification:", pushErr);
+    } catch (pushErr: any) {
+      if (pushErr?.code === 'FCM_STALE_TOKEN') {
+        // Auto-remove invalid token so it doesn't block future messages
+        await db.execute("DELETE FROM fcm_tokens WHERE user_id = ?", [partnerId]).catch(() => {});
+      } else {
+        console.error("Failed to send push notification:", pushErr);
+      }
     }
 
     // Chat media (photos, GIFs, doodles, etc.) only bump the chat badge — not the bell feed.

@@ -95,7 +95,7 @@ export function usePushNotifications() {
                   body,
                   channelId: 'grova_messages',
                   sound: undefined, // uses channel default
-                  smallIcon: 'ic_stat_icon_config_sample',
+                  smallIcon: 'ic_launcher',
                   iconColor: '#e91e8c',
                   extra: notification.data ?? {},
                 }],
@@ -131,8 +131,8 @@ export function usePushNotifications() {
     // Clean up all listeners on unmount
     return () => {
       if (Capacitor.isNativePlatform()) {
+        // Do NOT reset registeredRef — prevents re-registration loops on Android back-nav
         PushNotifications.removeAllListeners().catch(() => {});
-        registeredRef.current = false;
       }
     };
   }, []);

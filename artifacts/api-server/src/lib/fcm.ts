@@ -15,7 +15,9 @@ function initFirebase(): boolean {
       return false;
     }
 
-    const serviceAccount = JSON.parse(serviceAccountJson);
+    // Strip surrounding single-quotes that some .env parsers leave in place
+    const cleaned = serviceAccountJson.trim().replace(/^'([\s\S]*)'$/, '$1');
+    const serviceAccount = JSON.parse(cleaned);
 
     // Avoid re-initializing if already done (Vercel warm functions)
     if (admin.apps.length > 0) {
@@ -42,6 +44,9 @@ function initFirebase(): boolean {
  * and the `data` block (so the app can route it when tapped/foregrounded).
  * By explicitly setting the `channelId` to 'grova_messages' (which has HIGH importance),
  * we bypass the silent-drop issues on Samsung/Vivo.
+ *
+ * Throws an error with code 'FCM_STALE_TOKEN' when the token is unregistered,
+ * so callers can remove it from the database.
  */
 export async function sendPushNotification(
   token: string,
@@ -53,11 +58,14 @@ export async function sendPushNotification(
 
   try {
     const message: admin.messaging.Message = {
+      // ⚠️  REQUIRED — the FCM registration token of the target device
+      token,
       notification: {
         title,
         body,
       },
       data: {
+        // Mirror title/body into data so Capacitor foreground handler can read them
         title,
         body,
         channelId: 'grova_messages',
@@ -66,36 +74,39 @@ export async function sendPushNotification(
       },
       android: {
         priority: 'high',
+        // ttl in milliseconds for the Admin SDK (4 hours)
         ttl: 4 * 60 * 60 * 1000,
         collapseKey: 'grova_message',
-        directBootOk: true,
         notification: {
           channelId: 'grova_messages',
           sound: 'default',
           clickAction: 'FCM_PLUGIN_ACTIVITY',
-        }
+          // ic_launcher is guaranteed to exist in every APK build
+          icon: 'ic_launcher',
+          color: '#e91e8c',
+        },
       },
-      // FCM options for delivery analytics
       fcmOptions: {
         analyticsLabel: 'grova_message',
       },
     };
 
     const response = await admin.messaging(fcmApp).send(message);
-    console.log(`[FCM] Sent data message to ${token.substring(0, 8)}...: ${response}`);
+    console.log(`[FCM] ✅ Sent to ${token.substring(0, 8)}...: ${response}`);
     return true;
   } catch (error: any) {
-    // If the token is invalid/unregistered, log clearly so it can be cleaned up
     const errCode: string = error?.errorInfo?.code ?? error?.code ?? '';
     if (
       errCode.includes('registration-token-not-registered') ||
       errCode.includes('invalid-registration-token')
     ) {
-      console.warn(`[FCM] Stale token for ${token.substring(0, 8)}... — should be removed from DB`);
-    } else {
-      console.error('[FCM] Error sending push notification:', error);
+      console.warn(`[FCM] ⚠️  Stale token ${token.substring(0, 8)}... — will be removed from DB`);
+      // Signal stale token to caller so it can clean up the DB row
+      const e = new Error('FCM_STALE_TOKEN');
+      (e as any).code = 'FCM_STALE_TOKEN';
+      throw e;
     }
+    console.error('[FCM] Error sending push notification:', error);
     return false;
   }
 }
-

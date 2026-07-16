@@ -463,6 +463,9 @@ export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputPro
       files = files.slice(0, 10);
     }
     
+    // Detect if this came from the image/video picker (vs. the generic file picker)
+    const isMediaPicker = e.target.accept?.includes("image/*");
+
     // Validate all files before processing
     const unsupportedFiles: string[] = [];
     const oversizedFiles: string[] = [];
@@ -474,6 +477,15 @@ export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputPro
       
       if (fileSizeMB > maxMB) {
         oversizedFiles.push(`${file.name} (${fileSizeMB.toFixed(1)}MB)`);
+        continue;
+      }
+
+      // Android 15 / Samsung One UI: content:// URIs often arrive with file.type === ""
+      // The OS already filtered by the input's `accept` attribute, so trust it.
+      const mimeIsEmpty = !file.type || file.type === "application/octet-stream";
+      if (mimeIsEmpty && isMediaPicker) {
+        // Accept silently — classifyMediaFile will sniff the real type via magic bytes
+        validFiles.push(file);
         continue;
       }
 
