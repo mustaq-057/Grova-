@@ -3051,7 +3051,29 @@ export default function Messages() {
       setRecordingPaused(false);
       setRecordingTime(0);
       timerRef.current = setInterval(() => {
-        setRecordingTime((t) => t + 1);
+        setRecordingTime((t) => {
+          if (t >= 599) {
+            const recorder = mediaRecorderRef.current;
+            if (recorder && recorder.state !== "inactive") {
+              shouldSendVoiceRef.current = true;
+              if (recorder.state === "recording") recorder.requestData();
+              recorder.stop();
+            }
+            if (timerRef.current) clearInterval(timerRef.current);
+            setTimeout(() => {
+              setRecording(false);
+              setRecordingPaused(false);
+              setRecordingTime(0);
+              setRecordingPreviewUrl((prev) => {
+                if (prev) URL.revokeObjectURL(prev);
+                return null;
+              });
+              toast.success("10-minute limit reached. Sending voice note.", { duration: 4000 });
+            }, 0);
+            return 600;
+          }
+          return t + 1;
+        });
       }, 1000);
     } catch (err) {
       console.error("Microphone error:", err);
@@ -3092,7 +3114,31 @@ export default function Messages() {
         if (prev) URL.revokeObjectURL(prev);
         return null;
       });
-      timerRef.current = setInterval(() => setRecordingTime((t) => t + 1), 1000);
+      timerRef.current = setInterval(() => {
+        setRecordingTime((t) => {
+          if (t >= 599) {
+            const recorder = mediaRecorderRef.current;
+            if (recorder && recorder.state !== "inactive") {
+              shouldSendVoiceRef.current = true;
+              if (recorder.state === "recording") recorder.requestData();
+              recorder.stop();
+            }
+            if (timerRef.current) clearInterval(timerRef.current);
+            setTimeout(() => {
+              setRecording(false);
+              setRecordingPaused(false);
+              setRecordingTime(0);
+              setRecordingPreviewUrl((prev) => {
+                if (prev) URL.revokeObjectURL(prev);
+                return null;
+              });
+              toast.success("10-minute limit reached. Sending voice note.", { duration: 4000 });
+            }, 0);
+            return 600;
+          }
+          return t + 1;
+        });
+      }, 1000);
     } catch {
       /* ignore */
     }
