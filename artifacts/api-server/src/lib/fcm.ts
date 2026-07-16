@@ -38,14 +38,10 @@ function initFirebase(): boolean {
 /**
  * Send a push notification to a specific device token.
  *
- * We intentionally use a DATA-ONLY FCM message (no top-level `notification` block).
- *
- * Why: Samsung One UI and Vivo FuntouchOS intercept "notification" payloads and
- * hand them directly to the OS tray when the app is killed — they never wake the
- * FirebaseMessagingService. The result is either a silent drop or a severely delayed
- * notification. A data-only message bypasses this: FCM delivers it at HIGH priority,
- * the FirebaseMessagingService is woken up, and the Capacitor plugin shows the local
- * notification with full heads-up behaviour.
+ * We include BOTH the `notification` block (so Android OS shows it when app is killed)
+ * and the `data` block (so the app can route it when tapped/foregrounded).
+ * By explicitly setting the `channelId` to 'grova_messages' (which has HIGH importance),
+ * we bypass the silent-drop issues on Samsung/Vivo.
  */
 export async function sendPushNotification(
   token: string,
@@ -57,10 +53,10 @@ export async function sendPushNotification(
 
   try {
     const message: admin.messaging.Message = {
-      token,
-      // ── DATA-ONLY: no top-level `notification` object ─────────────────
-      // The Capacitor PushNotifications plugin reads these data fields and
-      // displays a heads-up notification locally via the Android channel.
+      notification: {
+        title,
+        body,
+      },
       data: {
         title,
         body,
@@ -69,17 +65,15 @@ export async function sendPushNotification(
         ...(data ?? {}),
       },
       android: {
-        // HIGH priority wakes the device even in Doze mode
         priority: 'high',
-        // 4-hour TTL — if the device is offline longer the message is dropped
-        // rather than flooding the user with stale notifications
         ttl: 4 * 60 * 60 * 1000,
-        // collapse_key so rapid-fire messages don't pile up
         collapseKey: 'grova_message',
-        // directBootOk lets the service run on a locked (direct boot) device
         directBootOk: true,
-        // Do NOT set android.notification here — that would reintroduce the
-        // OS-tray interception we're explicitly trying to avoid.
+        notification: {
+          channelId: 'grova_messages',
+          sound: 'default',
+          clickAction: 'FCM_PLUGIN_ACTIVITY',
+        }
       },
       // FCM options for delivery analytics
       fcmOptions: {

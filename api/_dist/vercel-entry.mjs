@@ -13363,10 +13363,10 @@ async function sendPushNotification(token, title, body, data) {
   if (!initFirebase() || !fcmApp) return false;
   try {
     const message = {
-      token,
-      // ── DATA-ONLY: no top-level `notification` object ─────────────────
-      // The Capacitor PushNotifications plugin reads these data fields and
-      // displays a heads-up notification locally via the Android channel.
+      notification: {
+        title,
+        body
+      },
       data: {
         title,
         body,
@@ -13375,17 +13375,15 @@ async function sendPushNotification(token, title, body, data) {
         ...data ?? {}
       },
       android: {
-        // HIGH priority wakes the device even in Doze mode
         priority: "high",
-        // 4-hour TTL — if the device is offline longer the message is dropped
-        // rather than flooding the user with stale notifications
         ttl: 4 * 60 * 60 * 1e3,
-        // collapse_key so rapid-fire messages don't pile up
         collapseKey: "grova_message",
-        // directBootOk lets the service run on a locked (direct boot) device
-        directBootOk: true
-        // Do NOT set android.notification here — that would reintroduce the
-        // OS-tray interception we're explicitly trying to avoid.
+        directBootOk: true,
+        notification: {
+          channelId: "grova_messages",
+          sound: "default",
+          clickAction: "FCM_PLUGIN_ACTIVITY"
+        }
       },
       // FCM options for delivery analytics
       fcmOptions: {
