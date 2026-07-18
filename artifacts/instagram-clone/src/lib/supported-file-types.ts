@@ -166,24 +166,34 @@ export const DOCUMENTS_ONLY_ACCEPT = SUPPORTED_MIME_TYPES.filter(
     !mime.startsWith("video/"),
 ).join(",");
 
+const CAMERA_PHOTO_NAME =
+  /^(IMG_|DSC_|PXL_|MVIMG_|photo_|image_|Screenshot|\d{8}_\d{6})/i;
+
 // Helper function to check if a file is supported
 export function isSupportedFileType(mimeType?: string, filename?: string): boolean {
   if (!mimeType && !filename) return false;
 
+  const mime = mimeType?.split(";")[0]?.trim().toLowerCase() || "";
+
   // Check by MIME type first
-  if (mimeType && SUPPORTED_MIME_TYPES.includes(mimeType)) {
+  if (mime && mime !== "application/octet-stream" && SUPPORTED_MIME_TYPES.includes(mime)) {
     return true;
   }
 
   // Check by extension
   if (filename) {
-    const ext = filename.substring(filename.lastIndexOf(".")).toLowerCase();
-    const supportedExts = Object.values(SUPPORTED_FILE_TYPES)
-      .flatMap((category) => Object.values(category))
-      .map((ext) => ext.toLowerCase());
+    if (CAMERA_PHOTO_NAME.test(filename)) return true;
 
-    if (supportedExts.includes(ext)) {
-      return true;
+    const dot = filename.lastIndexOf(".");
+    if (dot >= 0) {
+      const ext = filename.substring(dot).toLowerCase();
+      const supportedExts = Object.values(SUPPORTED_FILE_TYPES)
+        .flatMap((category) => Object.values(category))
+        .map((e) => e.toLowerCase());
+
+      if (supportedExts.includes(ext)) {
+        return true;
+      }
     }
   }
 

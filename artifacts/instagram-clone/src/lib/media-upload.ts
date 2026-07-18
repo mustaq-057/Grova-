@@ -63,6 +63,11 @@ function sniffMimeFromBytes(buf: ArrayBuffer): string {
  * content:// URI directly to a network POST request fails.
  * Also sniffs MIME type from magic bytes when file.type is empty (Android 15).
  */
+/** Copy content:// gallery picks into memory — required on Android 13–15 WebViews (Samsung One UI). */
+export async function materializeGalleryFile(file: Blob | File): Promise<Blob | File> {
+  return ensureReadableBlob(file);
+}
+
 async function ensureReadableBlob(file: Blob | File): Promise<Blob | File> {
   // Skip for non-Android or very large files (>40MB) to prevent OOM
   if (!navigator.userAgent.toLowerCase().includes("android") || file.size > 40 * 1024 * 1024) {
@@ -332,16 +337,20 @@ export async function uploadMedia(dataUrl: string, contentType?: string, attempt
 
 /** Upload a File/Blob — PDFs go to Cloudinary raw; other media uses auto/binary paths. */
 export async function uploadMediaFile(file: File | Blob, contentType?: string): Promise<string> {
-  const mime =
-    normalizeUploadMime(contentType || (file instanceof File ? file.type : "") || "application/octet-stream");
+  const materialized = await materializeGalleryFile(file);
+  const mime = normalizeUploadMime(
+    contentType ||
+      (materialized instanceof File ? materialized.type : "") ||
+      "application/octet-stream",
+  );
 
-  const fileName = file instanceof File ? file.name : undefined;
-  const useBinary = isPdfMime(mime) || file.size >= BINARY_UPLOAD_MIN_BYTES;
+  const fileName = materialized instanceof File ? materialized.name : undefined;
+  const useBinary = isPdfMime(mime) || materialized.size >= BINARY_UPLOAD_MIN_BYTES;
 
   if (useBinary) {
-    return uploadMediaBinary(file, mime, 0, fileName);
+    return uploadMediaBinary(materialized, mime, 0, fileName);
   }
-  const dataUrl = await readFileAsDataUrl(file);
+  const dataUrl = await readFileAsDataUrl(materialized);
   return uploadMedia(dataUrl, mime || guessContentType(dataUrl), 0, fileName);
 }
 
@@ -397,9 +406,11 @@ export function readFileAsDataUrl(file: Blob): Promise<string> {
         })
         .then((buf) => {
           const bytes = new Uint8Array(buf);
-          const mime =
-            (file instanceof File ? file.type : "") ||
-            "application/octet-stream";
+          const declared =
+            file instanceof File && file.type && file.type !== "application/octet-stream"
+              ? file.type
+              : "";
+          const mime = declared || sniffMimeFromBytes(buf);
           const b64 = uint8ArrayToBase64(bytes);
           resolve(`data:${mime};base64,${b64}`);
         })

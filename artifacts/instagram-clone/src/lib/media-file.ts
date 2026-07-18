@@ -1,3 +1,5 @@
+import { materializeGalleryFile } from "./media-upload";
+
 const VIDEO_EXT = /\.(mp4|webm|mov|avi|mkv|m4v|3gp|mpeg|mpg)$/i;
 const IMAGE_EXT = /\.(jpe?g|png|gif|webp|bmp|heic|heif|avif)$/i;
 const HEIC_IMAGE_BRANDS = new Set([
@@ -42,6 +44,8 @@ function classifyIsoFtypBrand(brand: string): "image" | "video" {
 const DOCUMENT_EXT =
   /\.(pdf|docx?|xlsx?|pptx?|txt|csv|rtf|odt|ods|odp|pages|numbers|key)$/i;
 const GENERIC_CLIPBOARD_NAME = /^(?:image\.png|blob|file)$/i;
+const CAMERA_PHOTO_NAME =
+  /^(IMG_|DSC_|DCIM|PXL_|MVIMG_|photo_|image_|Screenshot|\d{8}_\d{6})/i;
 
 function isDocumentMime(type: string): boolean {
   if (!type) return false;
@@ -212,9 +216,21 @@ export function isImageFile(file: File, hintType?: string): boolean {
   return IMAGE_EXT.test(file.name);
 }
 
+/** Gallery/camera picks with empty MIME — common on Samsung Android 15. */
+export function isLikelyGalleryMediaPick(file: File, hintType?: string): boolean {
+  const mime = (file.type || hintType || "").split(";")[0]?.trim().toLowerCase() || "";
+  if (mime.startsWith("image/") || mime.startsWith("video/")) return true;
+  if (mime && mime !== "application/octet-stream") return false;
+  if (/\.(jpe?g|png|gif|webp|heic|heif|bmp|avif|mp4|webm|mov|m4v|3gp)$/i.test(file.name)) return true;
+  if (CAMERA_PHOTO_NAME.test(file.name)) return true;
+  if (/^\d{8}_\d{6}/.test(file.name)) return true;
+  return !hintType && file.size > 0;
+}
+
 export async function detectMediaByMagicBytes(file: File): Promise<"image" | "video" | null> {
   try {
-    const bytes = new Uint8Array(await file.slice(0, 16).arrayBuffer());
+    const readable = (await materializeGalleryFile(file)) as File;
+    const bytes = new Uint8Array(await readable.slice(0, 16).arrayBuffer());
     if (bytes.length < 4) return null;
 
     if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "image";
@@ -276,8 +292,6 @@ export async function sniffVideoFile(file: File): Promise<boolean> {
   });
 }
 
-const CAMERA_PHOTO_NAME = /^(IMG_|DSC_|DCIM|PXL_|MVIMG_|photo_|image_|Screenshot)/i;
-
 export async function classifyMediaFile(file: File, hintType?: string): Promise<"image" | "video" | "other"> {
   const normalized = normalizeGalleryFile(file, hintType);
   const type = mimeType(normalized, hintType);
@@ -309,7 +323,8 @@ export async function classifyMediaFile(file: File, hintType?: string): Promise<
 
 /** Infer MIME/extension for camera/gallery picks that arrive as octet-stream with no name. */
 export async function resolveGalleryPick(file: File, hintType?: string): Promise<File> {
-  let normalized = normalizeGalleryFile(file, hintType);
+  const materialized = (await materializeGalleryFile(file)) as File;
+  let normalized = normalizeGalleryFile(materialized, hintType);
   const baseType = normalized.type?.split(";")[0]?.trim().toLowerCase() || "";
   if (baseType && baseType !== "application/octet-stream") return normalized;
 

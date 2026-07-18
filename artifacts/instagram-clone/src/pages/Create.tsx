@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { useAuth } from "@/lib/auth";
 import { useLocation } from "wouter";
 import { savePost, getPosts, clearLegacyLocalMedia } from "@/lib/local-posts";
-import { uploadMedia } from "@/lib/media-upload";
+import { readFileAsDataUrl, uploadMedia } from "@/lib/media-upload";
 import { isAcceptedGalleryImage, prepareImageForUpload, resolveGalleryPick } from "@/lib/media-file";
 import { ImageCropModal } from "@/components/ImageCropModal";
 import { countPostImages } from "@/lib/post-media";
@@ -75,18 +75,18 @@ export default memo(function Create() {
       return;
     }
     const toAdd = list.slice(0, Math.min(roomInGrid, roomInPost));
-    let added = 0;
-    toAdd.forEach((file) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const dataUrl = reader.result as string;
-        if (!dataUrl) return;
-        setQueue((prev) => [...prev, { id: crypto.randomUUID(), dataUrl, originalDataUrl: dataUrl }]);
-        added += 1;
-        if (added === 1) setStep("review");
-      };
-      reader.readAsDataURL(file);
-    });
+    try {
+      const previews = await Promise.all(
+        toAdd.map(async (file) => {
+          const dataUrl = await readFileAsDataUrl(file);
+          return { id: crypto.randomUUID(), dataUrl, originalDataUrl: dataUrl };
+        }),
+      );
+      setQueue((prev) => [...prev, ...previews]);
+      if (previews.length > 0) setStep("review");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Could not read photo.");
+    }
   };
 
   const handleDrop = (e: React.DragEvent) => {

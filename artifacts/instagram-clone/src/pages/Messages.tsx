@@ -85,6 +85,7 @@ import {
   getVideoDurationSafe,
   guessVideoMime,
   isDocumentFile,
+  isLikelyGalleryMediaPick,
   isVideoFile,
   normalizeGalleryFile,
   normalizePastedFile,
@@ -2623,8 +2624,11 @@ export default function Messages() {
             oversizedFiles.push(`${file.name} (${videoSizeMB.toFixed(1)}MB - max 10MB for videos)`);
             continue;
           }
-        } else if (!isSupportedFileType(file.type, file.name)) {
-          unsupportedFiles.push(file.name);
+        } else if (
+          !isLikelyGalleryMediaPick(file, clipboardItemType) &&
+          !isSupportedFileType(file.type, file.name)
+        ) {
+          unsupportedFiles.push(file.name || "unknown file");
         }
       }
       
