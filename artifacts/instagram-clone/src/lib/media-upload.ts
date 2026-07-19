@@ -63,9 +63,22 @@ function sniffMimeFromBytes(buf: ArrayBuffer): string {
  * content:// URI directly to a network POST request fails.
  * Also sniffs MIME type from magic bytes when file.type is empty (Android 15).
  */
+/**
+ * Cache of already-materialized blobs — prevents re-reading the same file
+ * multiple times through the pipeline (resolveGalleryPick → readFileAsDataUrl).
+ * WeakMap so entries are GC'd automatically when the blob is no longer referenced.
+ */
+const materializedCache = new WeakMap<Blob, Blob | File>();
+
 /** Copy content:// gallery picks into memory — required on Android 13–15 WebViews (Samsung One UI). */
 export async function materializeGalleryFile(file: Blob | File): Promise<Blob | File> {
-  return ensureReadableBlob(file);
+  // Return the cached copy if we already read this blob into memory.
+  const cached = materializedCache.get(file);
+  if (cached) return cached;
+  const result = await ensureReadableBlob(file);
+  // Cache it — but only if we got a different object back (i.e. it was actually re-read).
+  if (result !== file) materializedCache.set(file, result);
+  return result;
 }
 
 function isAndroid(): boolean {
@@ -460,6 +473,7 @@ function readDataUrlViaFileReader(file: Blob): Promise<string> {
  * content:// gallery URIs, especially when multiple files are selected).
  */
 export async function readFileAsDataUrl(file: Blob): Promise<string> {
+  // materializeGalleryFile is cached via WeakMap — no re-read if already done.
   const ready = await materializeGalleryFile(file);
   if (isAndroid()) {
     try {
