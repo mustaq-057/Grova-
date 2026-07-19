@@ -295,27 +295,35 @@ export async function uploadMediaBinary(
       const combinedError = errors.join(" | ");
       throw new Error(`PDF upload failed. Details: ${combinedError || "Check Cloudinary settings on Vercel"}`);
     } else {
-      const signRes = await fetch("/api/media/sign", {
-        headers: getAuthHeaders(),
-        credentials: "include",
-        signal: controller.signal,
-      });
-
-      if (signRes.ok) {
-        const { signature, timestamp, apiKey, cloudName } = await signRes.json();
-        const formData = new FormData();
-        formData.append("file", file);
-        formData.append("api_key", apiKey);
-        formData.append("timestamp", String(timestamp));
-        formData.append("signature", signature);
-
-        const resourceType = (mime.startsWith("video/") || mime.startsWith("audio/")) ? "video" : "image";
-        res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`, {
-          method: "POST",
-          body: formData,
+      // On Android WebViews, skip direct Cloudinary upload — FormData with blob
+      // data is unreliable and causes HTTP 400 for photos 3+ (bytes get corrupted).
+      // Always route through the backend binary endpoint on Android.
+      if (!isAndroid()) {
+        const signRes = await fetch("/api/media/sign", {
+          headers: getAuthHeaders(),
+          credentials: "include",
           signal: controller.signal,
         });
+
+        if (signRes.ok) {
+          const { signature, timestamp, apiKey, cloudName } = await signRes.json();
+          const formData = new FormData();
+          formData.append("file", file);
+          formData.append("api_key", apiKey);
+          formData.append("timestamp", String(timestamp));
+          formData.append("signature", signature);
+
+          const resourceType = (mime.startsWith("video/") || mime.startsWith("audio/")) ? "video" : "image";
+          res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`, {
+            method: "POST",
+            body: formData,
+            signal: controller.signal,
+          });
+        } else {
+          res = await uploadViaBackendBinary(file, mime, fileName, controller, attempt);
+        }
       } else {
+        // Android: always use backend to avoid WebView FormData blob corruption
         res = await uploadViaBackendBinary(file, mime, fileName, controller, attempt);
       }
     }

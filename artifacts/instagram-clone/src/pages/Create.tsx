@@ -148,11 +148,12 @@ export default memo(function Create() {
     try {
       clearLegacyLocalMedia(myId);
       const uploadedUrls: string[] = [];
+      const failedIndexes: number[] = [];
       let calculatedRatio = "auto";
 
       for (let i = 0; i < queue.length; i++) {
-        const photo = queue[i];
-        
+        const photo = queue[i]!;
+
         if (i === 0) {
           const img = new Image();
           await new Promise<void>((resolve) => {
@@ -169,10 +170,20 @@ export default memo(function Create() {
           });
         }
 
-        const mime = photo.dataUrl.match(/^data:([^;]+);/)?.[1] ?? "image/jpeg";
-        const mediaUrl = await uploadMedia(photo.dataUrl, mime);
-        uploadedUrls.push(mediaUrl);
+        try {
+          const mime = photo.dataUrl.match(/^data:([^;]+);/)?.[1] ?? "image/jpeg";
+          const mediaUrl = await uploadMedia(photo.dataUrl, mime);
+          uploadedUrls.push(mediaUrl);
+        } catch (err) {
+          console.error(`[shareAll] photo ${i + 1} upload failed:`, err);
+          failedIndexes.push(i + 1);
+        }
       }
+
+      if (uploadedUrls.length === 0) {
+        throw new Error("All photos failed to upload. Check your connection and try again.");
+      }
+
       await savePost(myId, {
         image: uploadedUrls[0]!,
         images: uploadedUrls.length > 1 ? uploadedUrls : undefined,
@@ -181,10 +192,16 @@ export default memo(function Create() {
         ratio: calculatedRatio,
         at: new Date().toISOString(),
       });
+
       setQueue([]);
       setCaption("");
       setLocationLabel("");
       setStep("pick");
+
+      if (failedIndexes.length > 0) {
+        alert(`Posted ${uploadedUrls.length} of ${queue.length} photos. ${failedIndexes.length} could not be uploaded — try re-selecting them.`);
+      }
+
       setLocation("/");
     } catch (err) {
       console.error("Share failed:", err);
@@ -197,6 +214,7 @@ export default memo(function Create() {
       setSharing(false);
     }
   };
+
 
   const cropTarget = queue.find((p) => p.id === cropId);
 
