@@ -323,7 +323,8 @@ export async function classifyMediaFile(file: File, hintType?: string): Promise<
 
 /** Infer MIME/extension for camera/gallery picks that arrive as octet-stream with no name. */
 export async function resolveGalleryPick(file: File, hintType?: string): Promise<File> {
-  const materialized = (await materializeGalleryFile(file)) as File;
+  // Skip re-reading if already materialized (e.g. came from materializeGalleryFiles)
+  const materialized = ((file as any).__materialized ? file : await materializeGalleryFile(file)) as File;
   let normalized = normalizeGalleryFile(materialized, hintType);
   const baseType = normalized.type?.split(";")[0]?.trim().toLowerCase() || "";
   if (baseType && baseType !== "application/octet-stream") return normalized;

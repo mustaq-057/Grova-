@@ -65,6 +65,8 @@ function sniffMimeFromBytes(buf: ArrayBuffer): string {
  */
 /** Copy content:// gallery picks into memory — required on Android 13–15 WebViews (Samsung One UI). */
 export async function materializeGalleryFile(file: Blob | File): Promise<Blob | File> {
+  // Already materialized — skip the expensive re-read.
+  if ((file as any).__materialized) return file;
   return ensureReadableBlob(file);
 }
 
@@ -115,9 +117,13 @@ async function ensureReadableBlob(file: Blob | File, attempt = 0): Promise<Blob 
       ? file.type
       : sniffMimeFromBytes(buf);
     if (file instanceof File) {
-      return new File([buf], file.name || `media.${resolvedType.split("/")[1] ?? "jpg"}`, { type: resolvedType, lastModified: file.lastModified });
+      const f = new File([buf], file.name || `media.${resolvedType.split("/")[1] ?? "jpg"}`, { type: resolvedType, lastModified: file.lastModified });
+      (f as any).__materialized = true;
+      return f;
     }
-    return new Blob([buf], { type: resolvedType });
+    const b = new Blob([buf], { type: resolvedType });
+    (b as any).__materialized = true;
+    return b;
   } catch (err) {
     try {
       const buf = await file.arrayBuffer();
@@ -126,9 +132,13 @@ async function ensureReadableBlob(file: Blob | File, attempt = 0): Promise<Blob 
         ? file.type
         : sniffMimeFromBytes(buf);
       if (file instanceof File) {
-        return new File([buf], file.name || `media.${resolvedType.split("/")[1] ?? "jpg"}`, { type: resolvedType, lastModified: file.lastModified });
+        const f = new File([buf], file.name || `media.${resolvedType.split("/")[1] ?? "jpg"}`, { type: resolvedType, lastModified: file.lastModified });
+        (f as any).__materialized = true;
+        return f;
       }
-      return new Blob([buf], { type: resolvedType });
+      const b2 = new Blob([buf], { type: resolvedType });
+      (b2 as any).__materialized = true;
+      return b2;
     } catch {
       if (attempt < 2) {
         await new Promise((r) => setTimeout(r, 250 * (attempt + 1)));
@@ -460,7 +470,8 @@ function readDataUrlViaFileReader(file: Blob): Promise<string> {
  * content:// gallery URIs, especially when multiple files are selected).
  */
 export async function readFileAsDataUrl(file: Blob): Promise<string> {
-  const ready = await materializeGalleryFile(file);
+  // If already materialized, skip the costly re-materialize step.
+  const ready = (file as any).__materialized ? file : await materializeGalleryFile(file);
   if (isAndroid()) {
     try {
       return await readDataUrlViaArrayBuffer(ready);
