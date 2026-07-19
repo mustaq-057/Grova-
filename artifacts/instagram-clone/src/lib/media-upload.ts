@@ -68,9 +68,39 @@ export async function materializeGalleryFile(file: Blob | File): Promise<Blob | 
   return ensureReadableBlob(file);
 }
 
-async function ensureReadableBlob(file: Blob | File): Promise<Blob | File> {
+function isAndroid(): boolean {
+  return navigator.userAgent.toLowerCase().includes("android");
+}
+
+/** Materialize multiple gallery picks sequentially — parallel reads break on Vivo/Samsung WebViews. */
+export async function materializeGalleryFiles(files: File[]): Promise<File[]> {
+  const out: File[] = [];
+  for (let i = 0; i < files.length; i++) {
+    const raw = files[i]!;
+    if (!raw || raw.size <= 0) continue;
+    try {
+      const materialized = (await materializeGalleryFile(raw)) as File;
+      const ext = materialized.type?.split("/")[1] || "jpg";
+      const stem =
+        materialized.name && !/^blob|^image\.|^file$/i.test(materialized.name)
+          ? materialized.name.replace(/\.[^.]+$/, "")
+          : `photo-${Date.now()}-${i}`;
+      const name = /\.[a-z0-9]+$/i.test(materialized.name) ? materialized.name : `${stem}.${ext}`;
+      out.push(
+        name === materialized.name
+          ? materialized
+          : new File([materialized], name, { type: materialized.type, lastModified: materialized.lastModified }),
+      );
+    } catch (err) {
+      console.warn("[gallery] failed to read file", i, err);
+    }
+  }
+  return out;
+}
+
+async function ensureReadableBlob(file: Blob | File, attempt = 0): Promise<Blob | File> {
   // Skip for non-Android or very large files (>40MB) to prevent OOM
-  if (!navigator.userAgent.toLowerCase().includes("android") || file.size > 40 * 1024 * 1024) {
+  if (!isAndroid() || file.size > 40 * 1024 * 1024) {
     return file;
   }
   let objectUrl: string | null = null;
@@ -79,6 +109,7 @@ async function ensureReadableBlob(file: Blob | File): Promise<Blob | File> {
     const res = await fetch(objectUrl);
     if (!res.ok) throw new Error("fetch failed");
     const buf = await res.arrayBuffer();
+    if (!buf.byteLength) throw new Error("empty file");
     // Resolve MIME — sniff from magic bytes if type is empty (Android 15 content:// URIs)
     const resolvedType = (file.type && file.type !== "application/octet-stream")
       ? file.type
@@ -90,6 +121,7 @@ async function ensureReadableBlob(file: Blob | File): Promise<Blob | File> {
   } catch (err) {
     try {
       const buf = await file.arrayBuffer();
+      if (!buf.byteLength) throw new Error("empty file");
       const resolvedType = (file.type && file.type !== "application/octet-stream")
         ? file.type
         : sniffMimeFromBytes(buf);
@@ -98,7 +130,11 @@ async function ensureReadableBlob(file: Blob | File): Promise<Blob | File> {
       }
       return new Blob([buf], { type: resolvedType });
     } catch {
-      return file; // Fallback to raw file if everything fails
+      if (attempt < 2) {
+        await new Promise((r) => setTimeout(r, 250 * (attempt + 1)));
+        return ensureReadableBlob(file, attempt + 1);
+      }
+      throw new Error("Failed to read file");
     }
   } finally {
     if (objectUrl) URL.revokeObjectURL(objectUrl);
@@ -367,78 +403,46 @@ function uint8ArrayToBase64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
-/**
- * Read a Blob/File as a data URL.
- *
- * Strategy (most-to-least reliable on Android WebViews):
- * 1. FileReader.readAsDataURL  — works on most devices
- * 2. fetch(objectURL) → arrayBuffer → manual base64  — fallback for Android
- *    WebViews where FileReader fails silently on content:// gallery URIs
- *    (common on Samsung One UI / MIUI / Android 13+ without READ_MEDIA_*)
- */
-export function readFileAsDataUrl(file: Blob): Promise<string> {
+function blobToDataUrl(file: Blob, buf: ArrayBuffer): string {
+  const bytes = new Uint8Array(buf);
+  const declared =
+    file instanceof File && file.type && file.type !== "application/octet-stream" ? file.type : "";
+  const mime = declared || sniffMimeFromBytes(buf);
+  return `data:${mime};base64,${uint8ArrayToBase64(bytes)}`;
+}
+
+async function readDataUrlViaArrayBuffer(file: Blob): Promise<string> {
+  const buf = await file.arrayBuffer();
+  if (!buf.byteLength) throw new Error("Failed to read file");
+  return blobToDataUrl(file, buf);
+}
+
+function readDataUrlViaFileReader(file: Blob): Promise<string> {
   return new Promise<string>((resolve, reject) => {
-    // ── Primary path: FileReader ─────────────────────────────────────────
     const reader = new FileReader();
     let settled = false;
 
     const done = (result: string) => {
       if (settled) return;
       settled = true;
+      if (!result || result.length < 32) {
+        reject(new Error("Failed to read file"));
+        return;
+      }
       resolve(result);
     };
 
     const fail = (errMsg: string) => {
       if (settled) return;
       settled = true;
-      // ── Fallback path: fetch objectURL → arrayBuffer → base64 ───────
-      let objectUrl: string | null = null;
-      try {
-        objectUrl = URL.createObjectURL(file);
-      } catch {
-        reject(new Error(errMsg));
-        return;
-      }
-      fetch(objectUrl)
-        .then((r) => {
-          if (!r.ok) throw new Error(`fetch blob failed: ${r.status}`);
-          return r.arrayBuffer();
-        })
-        .then((buf) => {
-          const bytes = new Uint8Array(buf);
-          const declared =
-            file instanceof File && file.type && file.type !== "application/octet-stream"
-              ? file.type
-              : "";
-          const mime = declared || sniffMimeFromBytes(buf);
-          const b64 = uint8ArrayToBase64(bytes);
-          resolve(`data:${mime};base64,${b64}`);
-        })
-        .catch(() => reject(new Error(errMsg)))
-        .finally(() => {
-          if (objectUrl) URL.revokeObjectURL(objectUrl);
-        });
+      readDataUrlViaArrayBuffer(file).then(done).catch(() => reject(new Error(errMsg)));
     };
 
-    reader.onloadend = () => {
-      if (reader.result) {
-        done(reader.result as string);
-      } else {
-        fail("Failed to read file");
-      }
-    };
-    reader.onerror = () => fail("Failed to read file");
-
-    // Safety net: some Android WebViews never fire onloadend/onerror for
-    // content:// URIs — trigger fallback after 8 s.
     const timeout = window.setTimeout(() => fail("Failed to read file"), 8000);
     reader.onloadend = () => {
       window.clearTimeout(timeout);
-      if (reader.result) {
-        done(reader.result as string);
-      } else {
-        fail("Failed to read file");
-      }
+      if (reader.result) done(reader.result as string);
+      else fail("Failed to read file");
     };
     reader.onerror = () => {
       window.clearTimeout(timeout);
@@ -447,4 +451,22 @@ export function readFileAsDataUrl(file: Blob): Promise<string> {
 
     reader.readAsDataURL(file);
   });
+}
+
+/**
+ * Read a Blob/File as a data URL.
+ *
+ * On Android WebViews, reads via arrayBuffer first (FileReader often fails on
+ * content:// gallery URIs, especially when multiple files are selected).
+ */
+export async function readFileAsDataUrl(file: Blob): Promise<string> {
+  const ready = await materializeGalleryFile(file);
+  if (isAndroid()) {
+    try {
+      return await readDataUrlViaArrayBuffer(ready);
+    } catch {
+      return readDataUrlViaFileReader(ready);
+    }
+  }
+  return readDataUrlViaFileReader(ready);
 }

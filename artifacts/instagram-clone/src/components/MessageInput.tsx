@@ -9,6 +9,7 @@ import { StickerzPicker } from "@/components/StickerzPicker";
 import type { CustomSticker } from "@/lib/stickerz";
 import { extractClipboardFiles, readClipboardFilesAsync } from "@/lib/media-file";
 import { useChatTheme } from "@/hooks/useChatTheme";
+import { materializeGalleryFiles } from "@/lib/media-upload";
 import { isSupportedFileType, MAX_FILE_SIZE_MB, DOCUMENTS_ONLY_ACCEPT } from "@/lib/supported-file-types";
 import { toast } from "sonner";
 import { getFontStyleStyles } from "@/lib/message-utils";
@@ -463,8 +464,9 @@ export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputPro
     genericFileInputRef.current?.click();
   }, []);
 
-  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    let files = Array.from(e.target.files || []);
+  const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target;
+    let files = Array.from(input.files || []);
     if (files.length === 0) return;
     
     if (files.length > 10) {
@@ -473,7 +475,7 @@ export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputPro
     }
     
     // Detect if this came from the image/video picker (vs. the generic file picker)
-    const isMediaPicker = e.target.accept?.includes("image/*");
+    const isMediaPicker = input.accept?.includes("image/*");
 
     // Validate all files before processing
     const unsupportedFiles: string[] = [];
@@ -515,12 +517,20 @@ export const MessageInput = memo(forwardRef<HTMLTextAreaElement, MessageInputPro
       alert(`⚠️ Files too large (max ${MAX_FILE_SIZE_MB}MB):\n${oversizedFiles.join("\n")}`);
     }
 
-    // Send valid files if any
+    // Send valid files if any — materialize gallery picks before clearing the input
     if (validFiles.length > 0) {
-      onImageSelect(validFiles.length === 1 ? validFiles[0] : validFiles, validFiles.length === 1 ? validFiles[0].type || undefined : undefined);
+      const ready = isMediaPicker ? await materializeGalleryFiles(validFiles) : validFiles;
+      if (ready.length === 0) {
+        toast.error("Failed to read selected files. Try selecting again.");
+      } else {
+        onImageSelect(
+          ready.length === 1 ? ready[0]! : ready,
+          ready.length === 1 ? ready[0]!.type || undefined : undefined,
+        );
+      }
     }
 
-    e.target.value = "";
+    input.value = "";
   }, [onImageSelect]);
 
   const openDoodle = useCallback(() => {

@@ -76,7 +76,7 @@ import {
 import { mergeMessagesIfChanged, messagesListSignature } from "@/lib/message-list-perf";
 import { downloadChatAsImage, downloadChatAsText } from "@/lib/chat-download";
 import { openLiveChannel } from "@/lib/sse-client";
-import { uploadMediaToB2, uploadMediaFile } from "@/lib/media-upload";
+import { uploadMediaToB2, uploadMediaFile, materializeGalleryFiles } from "@/lib/media-upload";
 import {
   classifyMediaFile,
   detectMediaByMagicBytes,
@@ -2608,8 +2608,16 @@ export default function Messages() {
 
   const handlePickedFile = useCallback(
     async (fileInput: File | File[], clipboardItemType?: string) => {
-      const files = Array.isArray(fileInput) ? fileInput : [fileInput];
+      let files = Array.isArray(fileInput) ? fileInput : [fileInput];
       if (!user || filePickInFlightRef.current || files.length === 0) return;
+
+      if (!clipboardItemType) {
+        files = await materializeGalleryFiles(files);
+        if (files.length === 0) {
+          toast.error("Failed to read selected files. Try selecting again.", { duration: 4000 });
+          return;
+        }
+      }
       
       // Validate file types upfront
       const unsupportedFiles: string[] = [];
@@ -2696,7 +2704,7 @@ export default function Messages() {
         }
 
         if (files.length === 1 && (kind === "image" || kind === "video")) {
-          setPendingMediaPreview({ file, clipboardItemType, kind, normalized });
+          setPendingMediaPreview({ file: normalized, clipboardItemType, kind, normalized });
           return;
         }
 
@@ -2718,7 +2726,9 @@ export default function Messages() {
       };
 
       try {
-        await Promise.all(files.map((f) => processSingleFile(f)));
+        for (const f of files) {
+          await processSingleFile(f);
+        }
       } finally {
         filePickInFlightRef.current = false;
         clearTimeout(unlockTimer);

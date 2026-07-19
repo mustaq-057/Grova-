@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { useAuth } from "@/lib/auth";
 import { useLocation } from "wouter";
 import { savePost, getPosts, clearLegacyLocalMedia } from "@/lib/local-posts";
-import { readFileAsDataUrl, uploadMedia } from "@/lib/media-upload";
+import { readFileAsDataUrl, uploadMedia, materializeGalleryFiles } from "@/lib/media-upload";
 import { isAcceptedGalleryImage, prepareImageForUpload, resolveGalleryPick } from "@/lib/media-file";
 import { ImageCropModal } from "@/components/ImageCropModal";
 import { countPostImages } from "@/lib/post-media";
@@ -29,6 +29,7 @@ export default memo(function Create() {
   const [location, setLocationLabel] = useState("");
   const [step, setStep] = useState<"pick" | "review">("pick");
   const [sharing, setSharing] = useState(false);
+  const [loadingPhotos, setLoadingPhotos] = useState(false);
   const [savedPhotoCount, setSavedPhotoCount] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -46,46 +47,73 @@ export default memo(function Create() {
   }, [user]);
 
   const addFiles = async (files: FileList | File[]) => {
-    const list: File[] = [];
-    let lastError: string | null = null;
-    for (const raw of Array.from(files)) {
-      try {
-        const resolved = await resolveGalleryPick(raw);
-        if (!isAcceptedGalleryImage(resolved)) {
-          lastError = "Only photos are supported.";
-          continue;
-        }
-        list.push(await prepareImageForUpload(resolved));
-      } catch (err) {
-        lastError = err instanceof Error ? err.message : "Could not read photo.";
-      }
-    }
-    if (list.length === 0) {
-      alert(lastError ?? "Only photos are supported.");
-      return;
-    }
-    const roomInGrid = MAX_PHOTOS - savedPhotoCount - queue.length;
-    if (roomInGrid <= 0) {
-      alert(`You already have ${MAX_PHOTOS} photos. Delete some from your grid to add more.`);
-      return;
-    }
-    const roomInPost = MAX_PHOTOS_PER_POST - queue.length;
-    if (roomInPost <= 0) {
-      alert(`Up to ${MAX_PHOTOS_PER_POST} photos per post.`);
-      return;
-    }
-    const toAdd = list.slice(0, Math.min(roomInGrid, roomInPost));
+    setLoadingPhotos(true);
     try {
-      const previews = await Promise.all(
-        toAdd.map(async (file) => {
+      const snapshot = Array.from(files);
+      const materialized = await materializeGalleryFiles(snapshot);
+      if (materialized.length === 0) {
+        alert("Could not read selected photos. Try selecting again.");
+        return;
+      }
+
+      const list: File[] = [];
+      let lastError: string | null = null;
+      let skipped = 0;
+      for (const raw of materialized) {
+        try {
+          const resolved = await resolveGalleryPick(raw);
+          if (!isAcceptedGalleryImage(resolved)) {
+            lastError = "Only photos are supported.";
+            skipped += 1;
+            continue;
+          }
+          list.push(await prepareImageForUpload(resolved));
+        } catch (err) {
+          skipped += 1;
+          lastError = err instanceof Error ? err.message : "Could not read photo.";
+        }
+      }
+      if (list.length === 0) {
+        alert(lastError ?? "Only photos are supported.");
+        return;
+      }
+      const roomInGrid = MAX_PHOTOS - savedPhotoCount - queue.length;
+      if (roomInGrid <= 0) {
+        alert(`You already have ${MAX_PHOTOS} photos. Delete some from your grid to add more.`);
+        return;
+      }
+      const roomInPost = MAX_PHOTOS_PER_POST - queue.length;
+      if (roomInPost <= 0) {
+        alert(`Up to ${MAX_PHOTOS_PER_POST} photos per post.`);
+        return;
+      }
+      const toAdd = list.slice(0, Math.min(roomInGrid, roomInPost));
+      const previews: QueuedPhoto[] = [];
+      let readFailed = 0;
+      for (const file of toAdd) {
+        try {
           const dataUrl = await readFileAsDataUrl(file);
-          return { id: crypto.randomUUID(), dataUrl, originalDataUrl: dataUrl };
-        }),
-      );
+          previews.push({ id: crypto.randomUUID(), dataUrl, originalDataUrl: dataUrl });
+        } catch (err) {
+          readFailed += 1;
+          lastError = err instanceof Error ? err.message : "Could not read photo.";
+        }
+      }
+      if (previews.length === 0) {
+        alert(lastError ?? "Could not read photo.");
+        return;
+      }
       setQueue((prev) => [...prev, ...previews]);
-      if (previews.length > 0) setStep("review");
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Could not read photo.");
+      setStep("review");
+      const dropped = snapshot.length - previews.length;
+      if (dropped > 0 || skipped > 0 || readFailed > 0) {
+        alert(
+          `Added ${previews.length} of ${snapshot.length} photo(s).` +
+            (dropped + skipped + readFailed > 0 ? " Some files could not be read — try selecting fewer at once." : ""),
+        );
+      }
+    } finally {
+      setLoadingPhotos(false);
     }
   };
 
@@ -213,7 +241,7 @@ export default memo(function Create() {
           }}
           onDragLeave={() => setDragging(false)}
           onDrop={canAddMore ? handleDrop : undefined}
-          onClick={() => canAddMore && fileInputRef.current?.click()}
+          onClick={() => !loadingPhotos && canAddMore && fileInputRef.current?.click()}
           data-testid="upload-dropzone"
         >
           <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/20 to-pink-500/20 flex items-center justify-center">
@@ -221,7 +249,7 @@ export default memo(function Create() {
           </div>
           <div className="text-center">
             <p className="font-semibold text-base">
-              {!canAddMore ? "Photo limit reached" : "Add photos to your feed"}
+              {!canAddMore ? "Photo limit reached" : loadingPhotos ? "Reading photos…" : "Add photos to your feed"}
             </p>
             <p className="text-sm text-muted-foreground mt-1">Select one or many · crop each one</p>
           </div>
@@ -241,8 +269,12 @@ export default memo(function Create() {
             className="hidden"
             onClick={(e) => e.stopPropagation()}
             onChange={(e) => {
-              if (e.target.files?.length) addFiles(e.target.files);
-              e.target.value = "";
+              const input = e.target;
+              const picked = input.files ? Array.from(input.files) : [];
+              if (picked.length === 0) return;
+              void addFiles(picked).finally(() => {
+                input.value = "";
+              });
             }}
           />
         </motion.div>
@@ -284,8 +316,12 @@ export default memo(function Create() {
             className="hidden"
             onClick={(e) => e.stopPropagation()}
             onChange={(e) => {
-              if (e.target.files?.length) addFiles(e.target.files);
-              e.target.value = "";
+              const input = e.target;
+              const picked = input.files ? Array.from(input.files) : [];
+              if (picked.length === 0) return;
+              void addFiles(picked).finally(() => {
+                input.value = "";
+              });
             }}
           />
 
