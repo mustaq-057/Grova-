@@ -9,7 +9,7 @@ import { isAcceptedGalleryImage, prepareImageForUpload, resolveGalleryPick } fro
 import { ImageCropModal } from "@/components/ImageCropModal";
 import { countPostImages } from "@/lib/post-media";
 
-const MAX_PHOTOS = 20;
+const MAX_PHOTOS = 100;
 const MAX_PHOTOS_PER_POST = 10;
 
 type QueuedPhoto = {
@@ -37,7 +37,8 @@ export default memo(function Create() {
   const photosUsed = savedPhotoCount + queue.length;
   const slotsLeft = Math.max(0, MAX_PHOTOS - savedPhotoCount);
   const canAddMore = photosUsed < MAX_PHOTOS;
-  const canAddMoreToQueue = canAddMore && queue.length < MAX_PHOTOS_PER_POST;
+  // + button only checks current post queue — not your lifetime total
+  const canAddMoreToQueue = queue.length < MAX_PHOTOS_PER_POST;
 
   useEffect(() => {
     if (!user) return;
