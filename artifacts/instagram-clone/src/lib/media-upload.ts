@@ -76,8 +76,14 @@ export async function materializeGalleryFile(file: Blob | File): Promise<Blob | 
   const cached = materializedCache.get(file);
   if (cached) return cached;
   const result = await ensureReadableBlob(file);
-  // Cache it — but only if we got a different object back (i.e. it was actually re-read).
-  if (result !== file) materializedCache.set(file, result);
+  if (result !== file) {
+    // Cache original → result (so calling with original file again is fast)
+    materializedCache.set(file, result);
+    // Cache result → result (so downstream stages that receive the materialized
+    // file also skip re-reading — they get a different object reference than
+    // the original content:// File, so without this they'd miss the cache)
+    materializedCache.set(result as Blob, result);
+  }
   return result;
 }
 
