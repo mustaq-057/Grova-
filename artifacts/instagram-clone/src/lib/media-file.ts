@@ -418,7 +418,12 @@ async function fileToJpegBlob(file: File, maxDim = 4096, quality = 0.88): Promis
 
   return new Promise((resolve, reject) => {
     canvas.toBlob(
-      (blob) => (blob ? resolve(blob) : reject(new Error("Could not prepare photo."))),
+      (blob) => {
+        canvas.width = 1;
+        canvas.height = 1;
+        if (blob) resolve(blob);
+        else reject(new Error("Could not prepare photo."));
+      },
       "image/jpeg",
       quality,
     );

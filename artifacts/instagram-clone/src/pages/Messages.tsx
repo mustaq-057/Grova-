@@ -2697,9 +2697,20 @@ export default function Messages() {
           return;
         }
 
+        let finalFile = normalized;
+        if (kind === "image") {
+          try {
+            finalFile = await prepareImageForUpload(normalized, clipboardItemType);
+          } catch (error) {
+            console.error("Failed to prepare image:", error);
+            finishToast(toastId, { type: "error", message: "Could not process image." });
+            return;
+          }
+        }
+
         const MAX_FILE_SIZE =
-          kind === "video" ? 10 * 1024 * 1024 : kind === "image" ? 25 * 1024 * 1024 : 25 * 1024 * 1024;
-        if (normalized.size > MAX_FILE_SIZE) {
+          kind === "video" ? 10 * 1024 * 1024 : 25 * 1024 * 1024;
+        if (finalFile.size > MAX_FILE_SIZE) {
           finishToast(toastId, {
             type: "error",
             message: kind === "video" ? "Video too large (max 10MB)." : "File too large (max 25MB).",
@@ -2708,17 +2719,17 @@ export default function Messages() {
         }
 
         if (files.length === 1 && (kind === "image" || kind === "video")) {
-          setPendingMediaPreview({ file: normalized, clipboardItemType, kind, normalized });
+          setPendingMediaPreview({ file: finalFile, clipboardItemType, kind, normalized: finalFile });
           return;
         }
 
         try {
           if (kind === "image") {
-            await uploadAndSendGalleryImage(normalized, batchId);
+            await uploadAndSendGalleryImage(finalFile, batchId);
           } else if (kind === "video") {
-            await uploadAndSendFile(normalized);
+            await uploadAndSendFile(finalFile);
           } else {
-            await uploadAndSendFile(normalized);
+            await uploadAndSendFile(finalFile);
           }
         } catch (error) {
           console.error("Failed to process file:", error);
