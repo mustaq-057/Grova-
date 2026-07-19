@@ -2757,7 +2757,7 @@ export default function Messages() {
           if (isEphemeral) {
             await uploadAndSendEphemeralMedia(prepared, "image", viewMode);
           } else {
-            await uploadAndSendGalleryImage(prepared);
+            await uploadAndSendGalleryImage(prepared, crypto.randomUUID());
           }
         } else if (kind === "video") {
           const mime = guessVideoMime(normalized, clipboardItemType);
