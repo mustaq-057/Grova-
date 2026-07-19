@@ -9,7 +9,6 @@ import { isAcceptedGalleryImage, prepareImageForUpload, resolveGalleryPick } fro
 import { ImageCropModal } from "@/components/ImageCropModal";
 import { countPostImages } from "@/lib/post-media";
 
-const MAX_PHOTOS = 100;
 const MAX_PHOTOS_PER_POST = 10;
 
 type QueuedPhoto = {
@@ -34,13 +33,11 @@ export default memo(function Create() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const myId = user?.id ?? "me";
-  const photosUsed = savedPhotoCount + queue.length;
-  const slotsLeft = Math.max(0, MAX_PHOTOS - savedPhotoCount);
-  const canAddMore = photosUsed < MAX_PHOTOS;
-  // + button only checks current post queue — not your lifetime total
+  const canAddMore = true; // no global cap — only per-post limit applies
   const canAddMoreToQueue = queue.length < MAX_PHOTOS_PER_POST;
 
   useEffect(() => {
+    // savedPhotoCount kept for display only — not used to block uploads
     if (!user) return;
     getPosts(user.id)
       .then((posts) => setSavedPhotoCount(countPostImages(posts)))
@@ -78,11 +75,7 @@ export default memo(function Create() {
         alert(lastError ?? "Only photos are supported.");
         return;
       }
-      const roomInGrid = MAX_PHOTOS - savedPhotoCount - queue.length;
-      if (roomInGrid <= 0) {
-        alert(`You already have ${MAX_PHOTOS} photos. Delete some from your grid to add more.`);
-        return;
-      }
+      const roomInGrid = MAX_PHOTOS_PER_POST - queue.length;
       const roomInPost = MAX_PHOTOS_PER_POST - queue.length;
       if (roomInPost <= 0) {
         alert(`Up to ${MAX_PHOTOS_PER_POST} photos per post.`);
@@ -140,10 +133,6 @@ export default memo(function Create() {
 
   const shareAll = async () => {
     if (!user || queue.length === 0) return;
-    if (savedPhotoCount + queue.length > MAX_PHOTOS) {
-      alert(`You can only add ${slotsLeft} more photo(s).`);
-      return;
-    }
     setSharing(true);
     try {
       clearLegacyLocalMedia(myId);
