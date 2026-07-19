@@ -47,7 +47,7 @@ function sniffMimeFromBytes(buf: ArrayBuffer): string {
   if (bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46) return "image/gif";
   // WEBP: RIFF????WEBP
   if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 &&
-      bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50) return "image/webp";
+    bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50) return "image/webp";
   // HEIC/HEIF: ftyp box
   if (bytes[4] === 0x66 && bytes[5] === 0x74 && bytes[6] === 0x79 && bytes[7] === 0x70) return "image/heic";
   // MP4: ftyp
@@ -65,8 +65,6 @@ function sniffMimeFromBytes(buf: ArrayBuffer): string {
  */
 /** Copy content:// gallery picks into memory — required on Android 13–15 WebViews (Samsung One UI). */
 export async function materializeGalleryFile(file: Blob | File): Promise<Blob | File> {
-  // Already materialized — skip the expensive re-read.
-  if ((file as any).__materialized) return file;
   return ensureReadableBlob(file);
 }
 
@@ -117,13 +115,9 @@ async function ensureReadableBlob(file: Blob | File, attempt = 0): Promise<Blob 
       ? file.type
       : sniffMimeFromBytes(buf);
     if (file instanceof File) {
-      const f = new File([buf], file.name || `media.${resolvedType.split("/")[1] ?? "jpg"}`, { type: resolvedType, lastModified: file.lastModified });
-      (f as any).__materialized = true;
-      return f;
+      return new File([buf], file.name || `media.${resolvedType.split("/")[1] ?? "jpg"}`, { type: resolvedType, lastModified: file.lastModified });
     }
-    const b = new Blob([buf], { type: resolvedType });
-    (b as any).__materialized = true;
-    return b;
+    return new Blob([buf], { type: resolvedType });
   } catch (err) {
     try {
       const buf = await file.arrayBuffer();
@@ -132,13 +126,9 @@ async function ensureReadableBlob(file: Blob | File, attempt = 0): Promise<Blob 
         ? file.type
         : sniffMimeFromBytes(buf);
       if (file instanceof File) {
-        const f = new File([buf], file.name || `media.${resolvedType.split("/")[1] ?? "jpg"}`, { type: resolvedType, lastModified: file.lastModified });
-        (f as any).__materialized = true;
-        return f;
+        return new File([buf], file.name || `media.${resolvedType.split("/")[1] ?? "jpg"}`, { type: resolvedType, lastModified: file.lastModified });
       }
-      const b2 = new Blob([buf], { type: resolvedType });
-      (b2 as any).__materialized = true;
-      return b2;
+      return new Blob([buf], { type: resolvedType });
     } catch {
       if (attempt < 2) {
         await new Promise((r) => setTimeout(r, 250 * (attempt + 1)));
@@ -241,8 +231,8 @@ export async function uploadMediaBinary(
   const timeoutMs = isPdfMime(mime)
     ? 3600_000 // 1 hour
     : mime.startsWith("video/") || mime.startsWith("audio/")
-    ? 3600_000 // 1 hour
-    : 300_000; // 5 minutes
+      ? 3600_000 // 1 hour
+      : 300_000; // 5 minutes
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
   let res: Response;
@@ -386,8 +376,8 @@ export async function uploadMediaFile(file: File | Blob, contentType?: string): 
   const materialized = await materializeGalleryFile(file);
   const mime = normalizeUploadMime(
     contentType ||
-      (materialized instanceof File ? materialized.type : "") ||
-      "application/octet-stream",
+    (materialized instanceof File ? materialized.type : "") ||
+    "application/octet-stream",
   );
 
   const fileName = materialized instanceof File ? materialized.name : undefined;
@@ -470,8 +460,7 @@ function readDataUrlViaFileReader(file: Blob): Promise<string> {
  * content:// gallery URIs, especially when multiple files are selected).
  */
 export async function readFileAsDataUrl(file: Blob): Promise<string> {
-  // If already materialized, skip the costly re-materialize step.
-  const ready = (file as any).__materialized ? file : await materializeGalleryFile(file);
+  const ready = await materializeGalleryFile(file);
   if (isAndroid()) {
     try {
       return await readDataUrlViaArrayBuffer(ready);
