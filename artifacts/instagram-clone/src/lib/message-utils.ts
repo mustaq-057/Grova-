@@ -157,8 +157,21 @@ export function collectImageStack(
     if (m.senderId !== first.senderId || m.type !== "image") break;
     if (isEphemeralMedia(m)) break;
     const prev = stack[stack.length - 1]!;
-    const gap = new Date(m.timestamp).getTime() - new Date(prev.timestamp).getTime();
-    if (gap > 60_000) break;
+    
+    // Check batch ID logic
+    const mBatchMatch = m.companionSticker?.match(/__batch:([a-zA-Z0-9-]+)/);
+    const prevBatchMatch = prev.companionSticker?.match(/__batch:([a-zA-Z0-9-]+)/);
+    const mBatch = mBatchMatch ? mBatchMatch[1] : null;
+    const prevBatch = prevBatchMatch ? prevBatchMatch[1] : null;
+
+    if (mBatch && prevBatch) {
+      if (mBatch !== prevBatch) break; // Different batches
+    } else {
+      // Legacy gap logic for backward compatibility (20 seconds max gap)
+      const gap = new Date(m.timestamp).getTime() - new Date(prev.timestamp).getTime();
+      if (gap > 20_000) break;
+    }
+
     stack.push(m);
     i++;
     if (stack.length >= 10) break;

@@ -1992,7 +1992,7 @@ export default function Messages() {
   userIdRef.current = user?.id;
 
   const uploadAndSendGalleryImage = useCallback(
-    async (file: File) => {
+    async (file: File, batchId?: string) => {
       if (!user) return;
       const tempId = crypto.randomUUID();
       const mime = file.type || "image/jpeg";
@@ -2010,8 +2010,11 @@ export default function Messages() {
       try {
         const url = await uploadMediaFile(file, mime);
         registerLocalBlobUrl(url, localPreview);
-        const sticker =
+        let sticker =
           mediaViewMode === "once" ? "__vm:once" : mediaViewMode === "twice" ? "__vm:twice" : undefined;
+        if (!sticker && batchId) {
+          sticker = `__batch:${batchId}`;
+        }
         const outgoing = await prepareOutgoingMessage({
           senderId: user.id,
           type: "image",
@@ -2660,6 +2663,7 @@ export default function Messages() {
       const unlockTimer = window.setTimeout(() => {
         filePickInFlightRef.current = false;
       }, 90_000);
+      const batchId = crypto.randomUUID();
 
       const processSingleFile = async (file: File) => {
         const normalized = clipboardItemType
@@ -2710,7 +2714,7 @@ export default function Messages() {
 
         try {
           if (kind === "image") {
-            await uploadAndSendGalleryImage(normalized);
+            await uploadAndSendGalleryImage(normalized, batchId);
           } else if (kind === "video") {
             await uploadAndSendFile(normalized);
           } else {

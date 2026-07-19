@@ -113,7 +113,7 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction):
   const token = (req.headers.authorization?.startsWith("Bearer ")
     ? req.headers.authorization.slice(7)
     : (req as unknown as { cookies?: Record<string, string> }).cookies?.grova_token) || "";
-  const csrfToken = String(req.headers["x-csrf-token"] || "");
+  const csrfToken = String(req.headers["x-csrf-token"] || req.query.csrf_token || "");
   if (!token) {
     next();
     return;

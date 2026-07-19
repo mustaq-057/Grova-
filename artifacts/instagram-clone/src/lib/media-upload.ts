@@ -219,18 +219,24 @@ async function uploadViaBackendBinary(
   controller: AbortController,
   attempt: number,
 ): Promise<Response> {
-  let res = await fetch("/api/media/upload-binary", {
+  const authHeaders = binaryUploadHeaders(mime, fileName);
+  const csrfToken = authHeaders["X-CSRF-Token"] || "";
+  const uploadUrl = `/api/media/upload-binary?csrf_token=${encodeURIComponent(csrfToken)}`;
+
+  let res = await fetch(uploadUrl, {
     method: "POST",
     credentials: "include",
-    headers: binaryUploadHeaders(mime, fileName),
+    headers: authHeaders,
     body: file,
     signal: controller.signal,
   });
   if (await refreshSessionIfUnauthorized(res.status, attempt)) {
-    res = await fetch("/api/media/upload-binary", {
+    const newHeaders = binaryUploadHeaders(mime, fileName);
+    const newCsrf = newHeaders["X-CSRF-Token"] || "";
+    res = await fetch(`/api/media/upload-binary?csrf_token=${encodeURIComponent(newCsrf)}`, {
       method: "POST",
       credentials: "include",
-      headers: binaryUploadHeaders(mime, fileName),
+      headers: newHeaders,
       body: file,
       signal: controller.signal,
     });
@@ -293,7 +299,7 @@ export async function uploadMediaBinary(
       }
 
       const combinedError = errors.join(" | ");
-      throw new Error(`PDF upload failed. Details: ${combinedError || "Check Cloudinary settings on Vercel"}`);
+      throw new Error(`Media upload failed. Details: ${combinedError || "Check Cloudinary settings on Vercel"}`);
     } else {
       // On Android WebViews, skip direct Cloudinary upload — FormData with blob
       // data is unreliable and causes HTTP 400 for photos 3+ (bytes get corrupted).
