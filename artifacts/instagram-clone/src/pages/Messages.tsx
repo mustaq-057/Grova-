@@ -3396,7 +3396,7 @@ export default function Messages() {
   }, [messages, user, hiddenTick]);
 
   const filteredMessages = useMemo(() => {
-    let filtered = visibleMessages;
+    let filtered = visibleMessages.filter((msg) => !msg.deleted);
 
     // Apply search query
     if (searchQuery) {

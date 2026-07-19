@@ -6,7 +6,6 @@ import { motion } from "framer-motion";
 import { AudioMessage } from "@/components/AudioMessage";
 import { cn } from "@/lib/utils";
 import { ChatFileBubble } from "@/components/ChatFileBubble";
-import { DeletedMessageNotice } from "@/components/DeletedMessageNotice";
 import { DuaMessage } from "@/components/DuaMessage";
 import { EphemeralMediaBubble, ViewOnceIcon } from "@/components/EphemeralMediaBubble";
 import { ImageStackBubble } from "@/components/ImageStackBubble";
@@ -295,8 +294,7 @@ export const MessageItem = memo(function MessageItem({
   }, [onOpenMenu, msg]);
 
   if (msg.deleted) {
-    if (msg.companionSticker?.includes("__vanish__")) return null;
-    return <DeletedMessageNotice isMe={isMe} partnerName={partnerName} />;
+    return null;
   }
 
   const viewMode = msg.mediaViewMode ?? parseMediaViewMode(msg.companionSticker);
