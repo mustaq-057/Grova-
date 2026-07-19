@@ -7,7 +7,7 @@ import { rateLimiters } from "../lib/security";
 import { postCoupleActivity, profileDisplayName } from "../lib/activity-feed";
 
 const STORY_TTL_MS = 24 * 60 * 60 * 1000;
-const MAX_POSTS_PER_USER = 20;
+const MAX_POSTS_PER_USER = 10_000; // no practical limit
 
 const router = Router();
 
